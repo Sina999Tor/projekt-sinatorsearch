@@ -9997,20 +9997,22 @@ function parseXmltvEpg(xml) {
     for(const chan in buckets) buckets[chan].sort((a,b) => a.start - b.start);
     
     // Cross-index: for each playlist channel, find matching EPG bucket
-    // EPG channel IDs may differ from tvg-id in playlist (diacritics, case)
-    const normalize = s => s.toLowerCase().replace(/[čc]/g,'c').replace(/[šs]/g,'s').replace(/[žz]/g,'z')
-        .replace(/[áa]/g,'a').replace(/[éíě]/g,'e').replace(/\.cz$/,'').replace(/[^a-z0-9]/g,'');
-    
+    const normalize = s => s.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/\.cz$|\.sk$/g, '')
+        .replace(/[^a-z0-9]/g, '');
+
     const normalizedBuckets = {};
     for(const [chan, progs] of Object.entries(buckets)) {
-        normalizedBuckets[normalize(chan)] = progs;
+        const key = normalize(chan);
+        if(!normalizedBuckets[key]) normalizedBuckets[key] = progs;
     }
-    
+
     // Build final epgData indexed by channel tvg-id AND name
     const epgData = { ...buckets };
     for(const ch of tvState.channels) {
-        if(epgData[ch.id]) continue; // already matched
-        const normId = normalize(ch.id || '');
+        if(epgData[ch.id]) continue;
+        const normId   = normalize(ch.id   || '');
         const normName = normalize(ch.name || '');
         const match = normalizedBuckets[normId] || normalizedBuckets[normName];
         if(match) { epgData[ch.id] = match; epgData[ch.name] = match; }
@@ -10018,24 +10020,21 @@ function parseXmltvEpg(xml) {
     tvState.epgData = epgData;
 }
 // -----------------------------------------------------------------------------
-// Načtení EPG XML souborů přes Netlify Function (obchází CORS open-epg.com)
+// Načtení lokálních EPG XML souborů (czech3.xml + slovakia1.xml)
 async function loadLocalXmlEpg() {
-    const sources = [
-        '/.netlify/functions/epg?file=czech',
-        '/.netlify/functions/epg?file=slovakia'
-    ];
+    const files = ['czech3.xml', 'slovakia1.xml'];
     let combinedXml = '';
-    for(const url of sources) {
+    for(const file of files) {
         try {
-            const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
-            if(!res.ok) { console.warn('EPG function error:', url, res.status); continue; }
+            const res = await fetch(file, { signal: AbortSignal.timeout(20000) });
+            if(!res.ok) continue;
             const text = await res.text();
             combinedXml += text + '\n';
         } catch(e) {
-            console.warn('EPG load failed:', url, e);
+            console.warn('EPG XML load failed:', file, e);
         }
     }
-    tvState.xmlEpgLoaded = true;
+    tvState.xmlEpgLoaded = true;  // nastav AŽ po načtení
     if(combinedXml.length > 100) {
         parseXmltvEpg(combinedXml);
     }
