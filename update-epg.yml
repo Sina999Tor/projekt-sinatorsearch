@@ -1,0 +1,61 @@
+name: Update EPG data
+
+on:
+  schedule:
+    - cron: '0 4 */3 * *'   # každé 3 dny ve 4:00 UTC
+  workflow_dispatch:
+
+jobs:
+  update-epg:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Download czech3.xml
+        run: |
+          curl -fsSL \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+            -H "Accept: application/xml,text/xml,*/*" \
+            -H "Referer: https://www.open-epg.com/" \
+            "https://www.open-epg.com/files/czech3.xml" \
+            -o czech3.xml 2>/dev/null || true
+
+          if [ ! -s czech3.xml ] || [ $(wc -c < czech3.xml) -lt 10000 ]; then
+            echo "open-epg.com selhal, zkouším zálohu..."
+            curl -fsSL \
+              "https://raw.githubusercontent.com/globetvapp/epg/main/Czech/czech3.xml" \
+              -o czech3.xml 2>/dev/null || true
+          fi
+
+          echo "czech3.xml: $(wc -c < czech3.xml) bytes"
+
+      - name: Download slovakia1.xml
+        run: |
+          curl -fsSL \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+            -H "Accept: application/xml,text/xml,*/*" \
+            -H "Referer: https://www.open-epg.com/" \
+            "https://www.open-epg.com/app/download.php?file=slovakia1.xml" \
+            -o slovakia1.xml 2>/dev/null || true
+
+          if [ ! -s slovakia1.xml ] || [ $(wc -c < slovakia1.xml) -lt 10000 ]; then
+            echo "open-epg.com selhal, zkouším zálohu..."
+            curl -fsSL \
+              "https://raw.githubusercontent.com/globetvapp/epg/main/Slovakia/slovakia1.xml" \
+              -o slovakia1.xml 2>/dev/null || true
+          fi
+
+          echo "slovakia1.xml: $(wc -c < slovakia1.xml) bytes"
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add czech3.xml slovakia1.xml
+          if git diff --staged --quiet; then
+            echo "Zadna zmena."
+          else
+            git commit -m "chore: update EPG data [skip ci]"
+            git push
+          fi
