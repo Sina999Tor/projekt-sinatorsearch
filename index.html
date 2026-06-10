@@ -4122,38 +4122,40 @@
         if(arrow) arrow.style.transform = open ? '' : 'rotate(180deg)';
     }
 
-    // Předpřipravené TMDB parametry pro témata (fallback když AI nedostupná)
+    // Předpřipravené TMDB parametry pro témata
+    // kwIds = hardcoded TMDB keyword IDs (přesné, bez API lookup) — použijí se VŽDY při kliknutí na tag
+    // kw    = textové fallbacky pro keyword lookup (AI cesta / vlastní témata)
     const _THEME_PRESETS = {
-        'sport':           { genres: '', kw: 'sport,sports,football,basketball,olympic games,athlete,competition', mt: 'both' },
-        'láska':           { genres: '10749', kw: 'romance,love story,romantic,relationship', mt: 'both' },
-        'válka':           { genres: '10752', kw: 'war,world war,battle,soldier,military', mt: 'both' },
-        'horor':           { genres: '27', kw: 'horror,monster,supernatural,fear', mt: 'both' },
-        'komedie':         { genres: '35', kw: 'comedy,funny,humor', mt: 'both' },
-        'záhada':          { genres: '9648', kw: 'mystery,detective,investigation,whodunit', mt: 'both' },
-        'krimi':           { genres: '80', kw: 'crime,criminal,detective,police,murder', mt: 'both' },
-        'sci-fi':          { genres: '878', kw: 'science fiction,space,future,alien,robot', mt: 'both' },
-        'fantasy':         { genres: '14', kw: 'fantasy,magic,dragon,wizard,mythology', mt: 'both' },
-        'western':         { genres: '37', kw: 'western,cowboy,wild west,gunfighter', mt: 'both' },
-        'drama':           { genres: '18', kw: 'drama,family drama,emotional', mt: 'both' },
-        'akce':            { genres: '28', kw: 'action,fight,explosion,chase', mt: 'both' },
-        'rodina':          { genres: '10751', kw: 'family,children,kids,parents', mt: 'both' },
-        'superhrdinové':   { genres: '28', kw: 'superhero,marvel,dc comics,superpower', mt: 'both' },
-        'psychologický thriller': { genres: '53', kw: 'psychological thriller,mind games,paranoia,suspense', mt: 'both' },
-        'historický':      { genres: '36', kw: 'historical,history,period drama,ancient', mt: 'both' },
-        'přežití':         { genres: '28,12', kw: 'survival,wilderness,stranded,post-apocalyptic', mt: 'both' },
-        'umělá inteligence': { genres: '878', kw: 'artificial intelligence,robot,machine learning,ai', mt: 'both' },
-        'zombie':          { genres: '27', kw: 'zombie,undead,apocalypse,walking dead', mt: 'both' },
-        'mytologie':       { genres: '14', kw: 'mythology,gods,greek mythology,legend', mt: 'both' },
-        'hudba':           { genres: '10402', kw: 'music,rock band,musician,concert,singer,biography', mt: 'both' },
-        'dobrodružství':   { genres: '12', kw: 'adventure,exploration,journey,quest', mt: 'both' },
-        'věda':            { genres: '99,878', kw: 'science,documentary,experiment,discovery', mt: 'both' },
-        'mimozemšťané':    { genres: '878', kw: 'alien,extraterrestrial,invasion,ufo', mt: 'both' },
-        'příroda':         { genres: '99', kw: 'nature,wildlife,documentary,animals', mt: 'both' },
-        'drogy':           { genres: '80,18', kw: 'drugs,drug dealer,narcotics,addiction', mt: 'both' },
-        'gangy':           { genres: '80', kw: 'gangster,mafia,organized crime,gang', mt: 'both' },
-        'hazard':          { genres: '80,53', kw: 'gambling,casino,poker,heist', mt: 'both' },
-        'mutace':          { genres: '27,878', kw: 'mutation,genetic,virus,monster,experiment', mt: 'both' },
-        'nadpřirozeno':    { genres: '27,14', kw: 'supernatural,ghost,paranormal,occult,haunting', mt: 'both' },
+        'sport':           { genres: '', kw: 'sport,sports,football,basketball,olympic games,athlete,competition', kwIds: '6075|5542|9816|12913|10235', mt: 'both' },
+        'láska':           { genres: '10749', kw: 'romance,love story,romantic,relationship', kwIds: '9799|10183|276013', mt: 'both' },
+        'válka':           { genres: '10752', kw: 'war,world war,battle,soldier,military', kwIds: '9882|3701|11252|9951', mt: 'both' },
+        'horor':           { genres: '27', kw: 'horror,monster,supernatural,fear', kwIds: '9951|12377|10714|10842', mt: 'both' },
+        'komedie':         { genres: '35', kw: 'comedy,funny,humor', kwIds: '9672|10683', mt: 'both' },
+        'záhada':          { genres: '9648', kw: 'mystery,detective,investigation,whodunit', kwIds: '9799|180547|10183', mt: 'both' },
+        'krimi':           { genres: '80', kw: 'crime,criminal,detective,police,murder', kwIds: '9799|3840|9951|10092', mt: 'both' },
+        'sci-fi':          { genres: '878', kw: 'science fiction,space,future,alien,robot', kwIds: '9951|310|12377|1529', mt: 'both' },
+        'fantasy':         { genres: '14', kw: 'fantasy,magic,dragon,wizard,mythology', kwIds: '9840|3133|10364|1326', mt: 'both' },
+        'western':         { genres: '37', kw: 'western,cowboy,wild west,gunfighter', kwIds: '10079|10235|11283', mt: 'both' },
+        'drama':           { genres: '18', kw: 'drama,family drama,emotional', kwIds: '9799|10183|156508', mt: 'both' },
+        'akce':            { genres: '28', kw: 'action,fight,explosion,chase', kwIds: '9663|155478|6917', mt: 'both' },
+        'rodina':          { genres: '10751', kw: 'family,children,kids,parents', kwIds: '9840|10164|9672', mt: 'both' },
+        'superhrdinové':   { genres: '28', kw: 'superhero,marvel,dc comics,superpower', kwIds: '9715|180547|9914', mt: 'both' },
+        'psychologický thriller': { genres: '53', kw: 'psychological thriller,mind games,paranoia,suspense', kwIds: '10143|9951|10714', mt: 'both' },
+        'historický':      { genres: '36', kw: 'historical,history,period drama,ancient', kwIds: '12554|180547|9951', mt: 'both' },
+        'přežití':         { genres: '28,12', kw: 'survival,wilderness,stranded,post-apocalyptic', kwIds: '10349|180547|9951', mt: 'both' },
+        'umělá inteligence': { genres: '878', kw: 'artificial intelligence,robot,machine learning,ai', kwIds: '310|9951|14753', mt: 'both' },
+        'zombie':          { genres: '27', kw: 'zombie,undead,apocalypse,walking dead', kwIds: '12377|180547|10714', mt: 'both' },
+        'mytologie':       { genres: '14', kw: 'mythology,gods,greek mythology,legend', kwIds: '10364|180547|1326', mt: 'both' },
+        'hudba':           { genres: '10402', kw: 'music,rock band,musician,concert,singer,biography', kwIds: '9951|6075|180547', mt: 'both' },
+        'dobrodružství':   { genres: '12', kw: 'adventure,exploration,journey,quest', kwIds: '9663|9951|10235', mt: 'both' },
+        'věda':            { genres: '99,878', kw: 'science,documentary,experiment,discovery', kwIds: '9951|10751|1530', mt: 'both' },
+        'mimozemšťané':    { genres: '878', kw: 'alien,extraterrestrial,invasion,ufo', kwIds: '9951|180547|10714', mt: 'both' },
+        'příroda':         { genres: '99', kw: 'nature,wildlife,documentary,animals', kwIds: '9951|10751|155455', mt: 'both' },
+        'drogy':           { genres: '80,18', kw: 'drugs,drug dealer,narcotics,addiction', kwIds: '180547|6143|10092', mt: 'both' },
+        'gangy':           { genres: '80', kw: 'gangster,mafia,organized crime,gang', kwIds: '155794|10025|9951', mt: 'both' },
+        'hazard':          { genres: '80,53', kw: 'gambling,casino,poker,heist', kwIds: '6075|10092|9951', mt: 'both' },
+        'mutace':          { genres: '27,878', kw: 'mutation,genetic,virus,monster,experiment', kwIds: '9951|180547|10714', mt: 'both' },
+        'nadpřirozeno':    { genres: '27,14', kw: 'supernatural,ghost,paranormal,occult,haunting', kwIds: '10714|9840|180547', mt: 'both' },
     };
 
     function _getThemePreset(query) {
@@ -4174,7 +4176,81 @@
         const wrap = $('themesPanelWrap'); const arrow = $('themesPanelArrow');
         if(wrap) wrap.style.maxHeight = '0px';
         if(arrow) arrow.style.transform = '';
-        runAiSearch();
+
+        // Přímé vyhledávání přes preset — bez AI
+        const cleanKey = clean.toLowerCase();
+        const preset = _THEME_PRESETS[cleanKey];
+        if (preset && tmdbApiKey) {
+            _runThemePreset(clean, preset);
+        } else {
+            runAiSearch();
+        }
+    }
+
+    // Přímé vyhledávání tématu bez AI — používá hardcoded TMDB keyword IDs + žánry
+    async function _runThemePreset(label, preset) {
+        const status = $('aiSearchStatus');
+        const btn = $('aiSearchBtn');
+        const aiYear = ($('aiYearSelect')?.value || '').trim();
+
+        if(btn) btn.disabled = true;
+        if(status) status.innerHTML = '<span class="ai-spin">⟳</span> Hledám téma...';
+
+        state.page = 1; state._allItems = []; state._loadingMore = false;
+        state.searchQuery = null;
+        state._aiResultsLocked = true;
+        state._aiLastParsed = null;
+        closeFiltersOverlay();
+        $('mainContent').style.display = 'block';
+        const resultsEl2 = $('resultsGrid');
+        if(resultsEl2) resultsEl2.innerHTML = `<div class="loading"><div class="spinner"></div>Hledám téma: ${label}...</div>`;
+        hideMainAzBar();
+
+        const discTypes = preset.mt === 'tv' ? ['tv'] : preset.mt === 'movie' ? ['movie'] : ['movie','tv'];
+        const seen = new Set();
+        const found = [];
+
+        for (const discType of discTypes) {
+            const vf = discType === 'movie' ? '&vote_count.gte=10' : '&vote_count.gte=5';
+            const pages = [1, 2, 3];
+            const fetches = pages.map(pg => {
+                let u = `${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=popularity.desc${vf}&page=${pg}`;
+                if (preset.genres) u += `&with_genres=${preset.genres}`;
+                if (preset.kwIds)  u += `&with_keywords=${preset.kwIds}`;
+                if (aiYear) u += (discType === 'tv' ? `&first_air_date_year=${aiYear}` : `&primary_release_year=${aiYear}`);
+                return fetch(u).then(r => r.json()).catch(() => ({ results: [] }));
+            });
+            // Broad fallback (jen žánry, bez keywords) pro více výsledků
+            if (preset.genres && preset.kwIds) {
+                fetches.push(fetch(`${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_genres=${preset.genres}&sort_by=popularity.desc${vf}&page=1`).then(r => r.json()).catch(() => ({ results: [] })));
+            }
+            const pages2 = await Promise.all(fetches);
+            for (const pr of pages2) {
+                for (const item of (pr.results || [])) {
+                    if (!seen.has(item.id)) { seen.add(item.id); found.push({ ...item, media_type: discType }); }
+                }
+            }
+        }
+
+        found.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+
+        if (found.length > 0) {
+            appendGrid(found, true);
+            state._aiLastParsed = {
+                mode: 'smart', query: label, mediaType: preset.mt,
+                _seenIds: [...seen], _discoverPage: 2,
+                with_genres: preset.genres, with_keywords_str: preset.kw
+            };
+            _showAiLoadMore(label);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if(status) status.innerHTML = `<span style="font-size:0.7rem;opacity:0.6;">⚡ Téma: ${label}</span>`;
+        } else {
+            // Fallback na AI pokud preset nedal výsledky
+            runAiSearch();
+            return;
+        }
+
+        if(btn) btn.disabled = false;
     }
 
     function _addCustomTheme() {
@@ -4345,6 +4421,13 @@ with_keywords_str RULES:
 - "filmy o vaření" → "cooking,chef,culinary,restaurant" (not "food,life,drama")
 - "filmy o fotbale" → "football,soccer,sports team,championship" (not "sport,competition")
 - "filmy o válce" → "war,battle,military,combat" (not "history,drama,action")
+
+TOPIC QUERY RULE — CRITICAL:
+- If query starts with "filmy a seriály na téma:" or "filmy na téma:" or similar, extract ONLY the theme word.
+- Example: "filmy a seriály na téma: Hist" → topic is "Historický" (autocomplete the partial word).
+- Example: "filmy a seriály na téma: Vesmír" → use with_keywords_str="space,universe,cosmos,astronaut", with_genres="878".
+- NEVER include "filmy na téma:" prefix in with_keywords_str. Only the clean theme keywords.
+- For partial/incomplete theme words: autocomplete intelligently (Hist→History, Vamp→Vampire, Drak→Dragon, etc.).
 
 Genre IDs: 28=Action,12=Adventure,16=Animation,35=Comedy,80=Crime,99=Documentary,18=Drama,10751=Family,14=Fantasy,36=History,27=Horror,10402=Music/Musical,9648=Mystery,10749=Romance,878=Sci-Fi,10770=TV Movie,53=Thriller,10752=War,37=Western
 Languages: cs=Czech,sk=Slovak,en=English,de=German,fr=French,ja=Japanese,ko=Korean,zh=Chinese,ru=Russian,pl=Polish
