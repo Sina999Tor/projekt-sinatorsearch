@@ -2700,7 +2700,7 @@
                     <button class="action-btn-modal csfd" onclick="openCsfd('${safeT}',${year||0})">🎬 ČSFD</button>
                     <button class="action-btn-modal kinobox" onclick="openKinobox('${safeT}',${year||0})">🎫 Kinobox</button>
                     <button class="action-btn-modal" style="background:rgba(249,168,37,0.15);border-color:#f9a825;color:#f9a825;" onclick="openSlozkyPicker({id:'${imdbId}',type:'${type}',title:'${safeT}',year:${year||0},poster:'${poster}',rating:parseFloat('${rating}')||0})">📁 Složky</button>
-                    <button class="action-btn-modal" style="background:rgba(255,215,0,0.15);border-color:var(--gold);color:var(--gold);grid-column:1/-1" onclick="window._prefillAndOpenAdd&&window._prefillAndOpenAdd(window._omdbTmdbId||0,'${type}')">⭐ Doporučit</button>
+                    <button class="action-btn-modal" style="background:rgba(255,215,0,0.15);border-color:var(--gold);color:var(--gold);grid-column:1/-1" onclick="window._dPrefill={tmdbId:window._omdbTmdbId||0,type:'${type}',title:'${safeT}',year:${year||0},poster:'${poster}'};openAddDoporuceni()">⭐ Doporučit</button>
                 </div>
 
                 <!-- Režie -->
@@ -6960,7 +6960,7 @@ ${collectionBtn}
 <button class="action-btn-modal" onclick="openTraktListPicker(${id},'${type}')" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">📋 Do seznamu</button>
 </div>
 <button class="action-btn-modal" style="background:rgba(100,160,255,0.15);border-color:#5b9bd5;color:#7db8f7;grid-column:1/-1" onclick="showSimilarInModal(${id},'${type}',this)">🎯 Podobné tituly</button>
-<button class="action-btn-modal" style="background:rgba(255,215,0,0.15);border-color:var(--gold);color:var(--gold);grid-column:1/-1" onclick="window._prefillAndOpenAdd&&window._prefillAndOpenAdd(${id},'${type}')">⭐ Doporučit</button>
+<button class="action-btn-modal" style="background:rgba(255,215,0,0.15);border-color:var(--gold);color:var(--gold);grid-column:1/-1" onclick="window._dPrefill={tmdbId:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}'};openAddDoporuceni()">⭐ Doporučit</button>
 ${cast ? `<button class="action-btn-modal" style="grid-column:1/-1" onclick="showCastModal(${id},'${type}')">👥 Herci</button>` : ''}
 ${directors.length ? `<button class="action-btn-modal" style="background:rgba(138,43,226,0.15);border-color:#8a2be2;color:#c084fc;grid-column:1/-1" onclick="showDirectorsModal(${id},'${type}')">🎥 Režie</button>` : ''}
 </div>`;
