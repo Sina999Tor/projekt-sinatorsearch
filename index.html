@@ -17808,7 +17808,7 @@ window.searchForDoporuceni = async function() {
   const wrap = document.getElementById('dSearchResults');
   wrap.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px 0;">Hledám…</div>';
   try {
-    const tmdbKey = localStorage.getItem('sinator_tmdb_key') || '';
+    const tmdbKey = localStorage.getItem('sinator_tmdb_api_key') || '';
     const r = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${encodeURIComponent(q)}&language=cs-CZ`);
     const data = await r.json();
     const results = (data.results||[]).filter(x => x.media_type === 'movie' || x.media_type === 'tv').slice(0, 6);
@@ -17906,7 +17906,7 @@ function injectDoporucitBtn(id, type) {
 async function prefillAndOpenAdd(id, type) {
   // Získáme info z TMDB
   try {
-    const tmdbKey = localStorage.getItem('sinator_tmdb_key') || '';
+    const tmdbKey = localStorage.getItem('sinator_tmdb_api_key') || '';
     const d = await (await fetch(`https://api.themoviedb.org/3/${type}/${id}?api_key=${tmdbKey}&language=cs-CZ`)).json();
     window._dPrefill = {
       tmdbId: id,
