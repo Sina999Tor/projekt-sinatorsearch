@@ -3415,11 +3415,23 @@
         c.innerHTML = `<div style="margin-bottom:12px;"><button class="modal-back-btn" onclick="loadMdblistLists('trakt')">← Zpět na seznamy</button></div><div class="loading"><div class="spinner"></div>Načítám seznam...</div>`;
         await ensureTraktToken();
         try {
-            const res = await fetch(`${TRAKT_BASE}/users/${state.trakt.username||'me'}/lists/${listObj.id}/items?extended=full`, { headers: getTraktHeaders() });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const items = await res.json();
-            if (!items.length) { c.innerHTML = `<div style="margin-bottom:12px;"><button class="modal-back-btn" onclick="loadMdblistLists('trakt')">← Zpět</button></div><div class="empty">Seznam je prázdný.</div>`; return; }
-            const mapped = items.map(it => { const m = it.movie || it.show; if (!m || !m.ids?.tmdb) return null; return { id: m.ids.tmdb, type: it.type === 'movie' ? 'movie' : 'tv', title: m.title||'?', year: m.year||'', poster_path: null, vote_average: 0 }; }).filter(Boolean);
+            const username = state.trakt.username || 'me';
+            const headers = getTraktHeaders();
+            let allItems = [];
+            let page = 1;
+            const limit = 500;
+            while (true) {
+                const res = await fetch(`${TRAKT_BASE}/users/${username}/lists/${listObj.id}/items?extended=full&limit=${limit}&page=${page}`, { headers });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const items = await res.json();
+                if (!Array.isArray(items) || !items.length) break;
+                allItems = allItems.concat(items);
+                const pageCount = parseInt(res.headers.get('X-Pagination-Page-Count') || '1', 10);
+                if (page >= pageCount) break;
+                page++;
+            }
+            if (!allItems.length) { c.innerHTML = `<div style="margin-bottom:12px;"><button class="modal-back-btn" onclick="loadMdblistLists('trakt')">← Zpět</button></div><div class="empty">Seznam je prázdný.</div>`; return; }
+            const mapped = allItems.map(it => { const m = it.movie || it.show; if (!m || !m.ids?.tmdb) return null; return { id: m.ids.tmdb, type: it.type === 'movie' ? 'movie' : 'tv', title: m.title||'?', year: m.year||'', poster_path: null, vote_average: 0 }; }).filter(Boolean);
             if (!mapped.length) { c.innerHTML = `<div style="margin-bottom:12px;"><button class="modal-back-btn" onclick="loadMdblistLists('trakt')">← Zpět</button></div><div class="empty">Prázdný seznam nebo bez TMDB ID.</div>`; return; }
             c.innerHTML = `<div style="margin-bottom:12px;"><button class="modal-back-btn" onclick="loadMdblistLists('trakt')">← Zpět na seznamy</button></div><div style="font-size:1rem;font-weight:700;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);">${listObj.name}</div><div id="mdbListGrid" class="results" style="grid-template-columns:repeat(2,1fr);gap:6px;"></div>`;
             _renderMdbGrid('mdbListGrid', mapped, listObj.name);
@@ -6362,11 +6374,23 @@ EXAMPLES:
         $('traktResultsContainer').innerHTML = `<div class="loading"><div class="spinner"></div>Načítám...</div>`;
         await ensureTraktToken();
         try {
-            const res = await fetch(`${TRAKT_BASE}/users/${state.trakt.username||'me'}/lists/${listObj.id}/items?extended=full`, { headers: getTraktHeaders() });
-            if (!res.ok) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba API: HTTP ${res.status}</div>`; return; }
-            const items = await res.json();
-            if(!items.length) { $('traktResultsContainer').innerHTML = `<div class="empty">Seznam je prázdný.</div>`; return; }
-            await renderTraktItems(items, listObj.name);
+            const username = state.trakt.username || 'me';
+            const headers = getTraktHeaders();
+            let allItems = [];
+            let page = 1;
+            const limit = 500;
+            while (true) {
+                const res = await fetch(`${TRAKT_BASE}/users/${username}/lists/${listObj.id}/items?extended=full&limit=${limit}&page=${page}`, { headers });
+                if (!res.ok) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba API: HTTP ${res.status}</div>`; return; }
+                const items = await res.json();
+                if (!Array.isArray(items) || !items.length) break;
+                allItems = allItems.concat(items);
+                const pageCount = parseInt(res.headers.get('X-Pagination-Page-Count') || '1', 10);
+                if (page >= pageCount) break;
+                page++;
+            }
+            if (!allItems.length) { $('traktResultsContainer').innerHTML = `<div class="empty">Seznam je prázdný.</div>`; return; }
+            await renderTraktItems(allItems, listObj.name);
         } catch(e) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba: ${e.message}</div>`; }
     }
 
