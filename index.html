@@ -4238,6 +4238,62 @@
         if(btn) btn.disabled = true;
         if(status) status.innerHTML = '<span class="ai-spin">⟳</span> AI analyzuje dotaz...';
 
+        // ── PRE-AI DETEKCE: jednoduché discover dotazy bez AI ──────────────
+        // Zachytí: "nejlepší komedie 2026", "top horrory 2025", "nejnovější akční filmy"
+        (function() {
+            const q = queryWithYear.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+            // Žánrová mapa CZ/SK → TMDB ID
+            const genreMap = {
+                'komedie':35,'komedii':35,'komedi':35,
+                'horor':27,'horory':27,'hororu':27,
+                'akcni':28,'akce':28,'akcnich':28,'akčni':28,
+                'thriller':53,'thrillery':53,
+                'drama':18,'dramata':18,
+                'romanticky':10749,'romance':10749,'romanticke':10749,
+                'dokument':99,'dokumenty':99,'dokumentarni':99,
+                'animovany':16,'animace':16,'animovane':16,
+                'fantasy':14,'sci-fi':878,'scifi':878,
+                'krimi':80,'kriminalka':80,'kriminalni':80,
+                'rodinny':10751,'rodinne':10751,
+                'musical':10402,'muzikaly':10402,'hudebni':10402,
+                'western':37,'historicky':36,'valecny':10752
+            };
+            // Rok v dotazu
+            const yearMatch = q.match(/(19[5-9]\d|20[0-3]\d)/);
+            const yr = yearMatch ? parseInt(yearMatch[1]) : (aiYear ? parseInt(aiYear) : null);
+            // Hledáme žánr
+            let foundGenre = null;
+            for (const [kw, id] of Object.entries(genreMap)) {
+                if (q.includes(kw)) { foundGenre = id; break; }
+            }
+            // Mediální typ
+            const isTv = /serial|serie|seri[aá]l|show|epizod/.test(q);
+            const mt = isTv ? 'tv' : 'movie';
+            // Řazení
+            const isTop = /nejlepsi|nejl[eé]p|top |best|nejkvali/.test(q);
+            const isNew = /nejnovej|nejnov[eě]|nov[eě] |latest|recent|letosni|letošni/.test(q);
+            const sortBy = isTop ? 'vote_average.desc' : isNew ? 'release_date.desc' : 'popularity.desc';
+            const minVotes = isTop ? 30 : 5;
+
+            // Pokud máme aspoň žánr nebo rok → přeskočit AI, použít discover přímo
+            if (foundGenre || yr) {
+                const params = { sort_by: sortBy, 'vote_count.gte': minVotes };
+                if (foundGenre) params.with_genres = String(foundGenre);
+                if (yr) params[mt === 'tv' ? 'first_air_date_year' : 'primary_release_year'] = yr;
+                // Naplnit parsed objekt jako by to vrátila AI
+                window._preAiParsed = {
+                    mode: 'smart', query: queryWithYear, mediaType: mt,
+                    titles: [], tvTitles: [], animatedTitles: [], persons: [],
+                    keywords: [], with_genres: foundGenre ? String(foundGenre) : '',
+                    with_keywords_str: '',
+                    discoverParams: { mediaType: mt, params }
+                };
+                if(status) status.innerHTML = '<span style="font-size:0.7rem;opacity:0.6;">⚡ Rychlé vyhledávání (bez AI)</span>';
+            } else {
+                window._preAiParsed = null;
+            }
+        })();
+
         const systemPrompt = `You are a STRICT and PRECISE movie and TV search assistant. Analyze the query and return ONLY highly relevant results. Reply ONLY with valid JSON, no markdown, no explanation. NEVER refuse — all film topics are valid.
 
 ALWAYS return this exact format (empty arrays [] for fields with no data):
@@ -4292,6 +4348,9 @@ EXAMPLES:
 "Arnold Schwarzenegger" -> {"mode":"smart","query":"Arnold Schwarzenegger","mediaType":"both","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[{"name":"Arnold Schwarzenegger","role":"actor"}],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":null}
 "film kde hrdina cestuje casem" -> {"mode":"smart","query":"film kde hrdina cestuje casem","mediaType":"movie","titles":["Back to the Future","Back to the Future Part II","Looper","Primer","Edge of Tomorrow","About Time","12 Monkeys","Predestination","Palm Springs","Tenet"],"tvTitles":["Dark","Quantum Leap","Travelers"],"animatedTitles":[],"persons":[],"keywords":["time-travel","time-loop","parallel-universe"],"with_genres":"878","with_keywords_str":"time travel,time machine,alternate timeline","discoverParams":null}
 "nejlepsi komedie 2025" -> {"mode":"smart","query":"nejlepsi komedie 2025","mediaType":"movie","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":{"mediaType":"movie","params":{"sort_by":"vote_average.desc","with_genres":"35","primary_release_year":2025,"vote_count.gte":30}}}
+"nejlepší komedie roku 2026" -> {"mode":"smart","query":"nejlepší komedie roku 2026","mediaType":"movie","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":{"mediaType":"movie","params":{"sort_by":"vote_average.desc","with_genres":"35","primary_release_year":2026,"vote_count.gte":10}}}
+"top horrory 2024" -> {"mode":"smart","query":"top horrory 2024","mediaType":"movie","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":{"mediaType":"movie","params":{"sort_by":"vote_average.desc","with_genres":"27","primary_release_year":2024,"vote_count.gte":20}}}
+"nejnovejsi akcni filmy" -> {"mode":"smart","query":"nejnovejsi akcni filmy","mediaType":"movie","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":{"mediaType":"movie","params":{"sort_by":"release_date.desc","with_genres":"28","vote_count.gte":5}}}
 "ceske filmy" -> {"mode":"smart","query":"ceske filmy","mediaType":"movie","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":{"mediaType":"movie","params":{"sort_by":"popularity.desc","with_original_language":"cs","with_origin_country":"CZ","vote_count.gte":5}}}
 "ceske komedie 2020" -> {"mode":"smart","query":"ceske komedie 2020","mediaType":"movie","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":{"mediaType":"movie","params":{"sort_by":"popularity.desc","with_genres":"35","with_origin_country":"CZ","primary_release_year":2020,"vote_count.gte":3}}}
 "filmy o dinosaurech" -> {"mode":"smart","query":"filmy o dinosaurech","mediaType":"movie","titles":["Jurassic Park","The Lost World: Jurassic Park","Jurassic World","Jurassic World: Fallen Kingdom","Jurassic World Dominion"],"tvTitles":["Prehistoric Planet"],"animatedTitles":[],"persons":[],"keywords":["dinosaur","prehistoric","paleontology"],"with_genres":"","with_keywords_str":"dinosaur,prehistoric animal,paleontology","discoverParams":null}
@@ -4326,6 +4385,14 @@ EXAMPLES:
 
             let data = null;
             let usedProvider = '';
+
+            // Pokud pre-AI detekce již našla výsledek → přeskočit AI volání
+            if (window._preAiParsed) {
+                const _p = window._preAiParsed;
+                window._preAiParsed = null;
+                data = { choices:[{message:{content: JSON.stringify(_p)}}] };
+                usedProvider = 'preAI';
+            }
 
             // 1) Gemini (pokud má klíč)
             if (!data && geminiApiKey) {
@@ -4372,9 +4439,9 @@ EXAMPLES:
             if (!data) {
                 if(status) status.innerHTML = '<span class="ai-spin">⟳</span> Free AI analyzuje…';
                 const freeModels = [
-                    'meta-llama/llama-3.3-8b-instruct:free',
-                    'mistralai/mistral-7b-instruct:free',
-                    'google/gemma-3-4b-it:free'
+                    'meta-llama/llama-3.3-70b-instruct:free',
+                    'meta-llama/llama-3.1-8b-instruct:free',
+                    'mistralai/mistral-7b-instruct:free'
                 ];
                 for (const model of freeModels) {
                     data = await _callOpenAICompat(
