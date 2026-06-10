@@ -4259,9 +4259,16 @@
                 'western':37,'historicky':36,'valecny':10752
             };
             // Rok v dotazu
-            const yearMatch = q.match(/(19[5-9]\d|20[0-3]\d)/);
+            const yearMatch = q.match(/\b(19[5-9]\d|20[0-3]\d)\b/);
             const yr = yearMatch ? parseInt(yearMatch[1]) : (aiYear ? parseInt(aiYear) : null);
-            // Hledáme žánr
+            // Dekáda: "filmy z 90. let", "osmdesatych" atd.
+            let decadeGte = null, decadeLte = null;
+            const _decNum = q.match(/(?:z |v )?(\d0)[. -]*let/);
+            const _decWordMap = {devadesatych:90,devadesatek:90,osmdesatych:80,osmdesatek:80,sedmdesatych:70,sedmdesatek:70,sedesatych:60,padesatych:50};
+            const _decKey = Object.keys(_decWordMap).find(k=>q.includes(k));
+            const _dec = _decNum ? parseInt(_decNum[1]) : (_decKey ? _decWordMap[_decKey] : null);
+            if (_dec && !yr) { const _cent = _dec < 30 ? 2000 : 1900; decadeGte = `${_cent+_dec}-01-01`; decadeLte = `${_cent+_dec+9}-12-31`; }
+            // Hledáme žánr// Hledáme žánr
             let foundGenre = null;
             for (const [kw, id] of Object.entries(genreMap)) {
                 if (q.includes(kw)) { foundGenre = id; break; }
@@ -4273,13 +4280,14 @@
             const isTop = /nejlepsi|nejl[eé]p|top |best|nejkvali/.test(q);
             const isNew = /nejnovej|nejnov[eě]|nov[eě] |latest|recent|letosni|letošni/.test(q);
             const sortBy = isTop ? 'vote_average.desc' : isNew ? 'release_date.desc' : 'popularity.desc';
-            const minVotes = isTop ? 30 : 5;
+            const minVotes = isTop ? 150 : 5;
 
-            // Pokud máme aspoň žánr nebo rok → přeskočit AI, použít discover přímo
-            if (foundGenre || yr) {
+            // Pokud máme aspoň žánr nebo rok nebo dekádu → přeskočit AI, použít discover přímo
+            if (foundGenre || yr || decadeGte) {
                 const params = { sort_by: sortBy, 'vote_count.gte': minVotes };
                 if (foundGenre) params.with_genres = String(foundGenre);
                 if (yr) params[mt === 'tv' ? 'first_air_date_year' : 'primary_release_year'] = yr;
+                if (decadeGte) { params['release_date.gte'] = decadeGte; params['release_date.lte'] = decadeLte; }
                 // Naplnit parsed objekt jako by to vrátila AI
                 window._preAiParsed = {
                     mode: 'smart', query: queryWithYear, mediaType: mt,
@@ -4369,18 +4377,93 @@ EXAMPLES:
 
 
         try {
-            // ── HELPER: volej OpenAI-compatible endpoint ───────────────────────
-            async function _callOpenAICompat(url, apiKey, model, messages, hdrs) {
+            // ══ FUNCTION CALLING TOOLS definice ═══════════════════════════════
+            const aiTools = [
+              { type:'function', function:{
+                name:'discover_movies',
+                description:'Filtrování filmů/seriálů podle žánru, roku, dekády nebo řazení. Použij pro: "nejlepší komedie 2026", "akční filmy z 90. let", "nejnovější thrillery".',
+                parameters:{ type:'object', properties:{
+                  primary_release_year:{ type:'number', description:'Konkrétní rok vydání (např. 2026). Použij jen pro konkrétní rok.' },
+                  release_date_gte:{ type:'string', description:'Začátek rozsahu dat pro dekády. Formát YYYY-MM-DD. Např. pro 90. léta: "1990-01-01".' },
+                  release_date_lte:{ type:'string', description:'Konec rozsahu dat pro dekády. Formát YYYY-MM-DD. Např. pro 90. léta: "1999-12-31".' },
+                  with_genres:{ type:'number', description:'TMDB ID žánru. PŘESNÉ PŘIŘAZENÍ: Akční=28, Dobrodružný=12, Animovaný=16, Komedie=35, Krimi=80, Dokument=99, Drama=18, Rodinný=10751, Fantasy=14, Historický=36, Horor=27, Hudební=10402, Mysteriózní=9648, Romantický=10749, Sci-Fi=878, Thriller=53, Válečný=10752, Western=37. PRAVIDLO: použij POUZE jeden žánr který uživatel EXPLICITNĚ zmínil.' },
+                  with_genres2:{ type:'number', description:'Druhý žánr TMDB ID — pouze pokud uživatel zmínil DVĚ žánrová slova (např. "akční komedie"). Použij stejný klíč jako with_genres.' },
+                  sort_by:{ type:'string', enum:['popularity.desc','vote_average.desc','release_date.desc'], description:'Řazení. "nejlepší"/"top"/"best" → vote_average.desc. "nejnovější"/"nové"/"letošní" → release_date.desc. Jinak → popularity.desc.' },
+                  media_type:{ type:'string', enum:['movie','tv'], description:'Typ média. "seriál"/"série"/"show" → tv. Jinak → movie.' }
+                }, required:[] }
+              }},
+              { type:'function', function:{
+                name:'search_titles',
+                description:'Hledání podle konkrétních názvů filmů/seriálů, franšízy, nebo klíčového slova tématu. Použij pro: "Terminator filmy", "Marvel", "filmy o vaření", "Harry Potter", "filmy s Bradem Pittem".',
+                parameters:{ type:'object', properties:{
+                  query:{ type:'string', description:'Anglické klíčové slovo nebo název franšízy/tématu (např. "Terminator", "cooking", "Brad Pitt").' },
+                  titles:{ type:'array', items:{type:'string'}, description:'Konkrétní anglické názvy filmů/seriálů pokud jsou známé (např. ["The Terminator","Terminator 2"]).' },
+                  persons:{ type:'array', items:{ type:'object', properties:{ name:{type:'string'}, role:{type:'string',enum:['actor','director']} }, required:['name','role'] }, description:'Herci nebo režiséři pokud jsou v dotazu zmíněni jménem.' },
+                  keywords:{ type:'array', items:{type:'string'}, description:'2-4 přesná anglická TMDB klíčová slova popisující téma (např. ["cooking","chef","culinary"]).' },
+                  media_type:{ type:'string', enum:['movie','tv','both'], description:'Typ média. "seriál" → tv, "film" → movie, obojí nebo nejasné → both.' }
+                }, required:[] }
+              }}
+            ];
+
+            // ── HELPER: Function Calling pro OpenAI-compatible endpointy ──────
+            async function _callWithTools(url, apiKey, model, messages, hdrs) {
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, ...(hdrs||{}) },
-                    body: JSON.stringify({ model, messages, max_tokens: 1500, temperature: 0.1 }),
+                    body: JSON.stringify({ model, messages, tools: aiTools, tool_choice: 'auto', max_tokens: 800, temperature: 0.1 }),
                     signal
-                }).catch(e => null);
+                }).catch(() => null);
                 if (!res || !res.ok) return null;
                 const j = await res.json().catch(() => null);
-                const t = j?.choices?.[0]?.message?.content;
-                return t ? { choices: [{ message: { content: t } }] } : null;
+                if (!j) return null;
+                const msg = j?.choices?.[0]?.message;
+                if (!msg) return null;
+                // Vrátit tool_call nebo text content
+                if (msg.tool_calls?.length) return { tool_calls: msg.tool_calls };
+                if (msg.content) return { content: msg.content };
+                return null;
+            }
+
+            // ── KONVERZE tool_call → parsed formát ────────────────────────────
+            function _toolCallToParsed(toolCall, query) {
+                const fn = toolCall.function.name;
+                let args;
+                try { args = JSON.parse(toolCall.function.arguments); } catch(e) { return null; }
+
+                if (fn === 'discover_movies') {
+                    const mt = args.media_type || 'movie';
+                    const isTop = args.sort_by === 'vote_average.desc';
+                    const params = {
+                        sort_by: args.sort_by || 'popularity.desc',
+                        'vote_count.gte': isTop ? 150 : 5
+                    };
+                    const genres = [args.with_genres, args.with_genres2].filter(Boolean).join(',');
+                    if (genres) params.with_genres = genres;
+                    if (args.primary_release_year) params[mt==='tv'?'first_air_date_year':'primary_release_year'] = args.primary_release_year;
+                    if (args.release_date_gte) params['release_date.gte'] = args.release_date_gte;
+                    if (args.release_date_lte) params['release_date.lte'] = args.release_date_lte;
+                    return {
+                        mode:'smart', query, mediaType: mt,
+                        titles:[], tvTitles:[], animatedTitles:[], persons:[],
+                        keywords:[], with_genres: genres, with_keywords_str:'',
+                        discoverParams:{ mediaType: mt, params }
+                    };
+                }
+                if (fn === 'search_titles') {
+                    const mt = args.media_type || 'both';
+                    return {
+                        mode:'smart', query, mediaType: mt,
+                        titles: mt!=='tv' ? (args.titles||[]) : [],
+                        tvTitles: mt!=='movie' ? (args.titles||[]) : [],
+                        animatedTitles:[],
+                        persons: args.persons||[],
+                        keywords: args.keywords||[],
+                        with_genres:'',
+                        with_keywords_str: args.query || '',
+                        discoverParams: null
+                    };
+                }
+                return null;
             }
 
             let data = null;
@@ -4394,48 +4477,86 @@ EXAMPLES:
                 usedProvider = 'preAI';
             }
 
-            // 1) Gemini (pokud má klíč)
+            // ── HELPER: normalizace odpovědi na jednotný formát ───────────────
+            // Konvertuje tool_call odpověď na { choices:[{message:{content:JSON}}] }
+            function _normalizeAiResponse(raw, query) {
+                if (!raw) return null;
+                if (raw.choices) return raw; // Už je ve starém formátu (preAI)
+                if (raw.tool_calls?.length) {
+                    const parsed = _toolCallToParsed(raw.tool_calls[0], query);
+                    if (!parsed) return null;
+                    return { choices:[{message:{content: JSON.stringify(parsed)}}] };
+                }
+                if (raw.content) {
+                    // Textová odpověď (fallback bez tool_calls)
+                    return { choices:[{message:{content: raw.content}}] };
+                }
+                return null;
+            }
+
+            // 1) Gemini (pokud má klíč) — Gemini má vlastní tools format
             if (!data && geminiApiKey) {
                 if(status) status.innerHTML = '<span class="ai-spin">⟳</span> Gemini analyzuje…';
+                // Gemini: posílá tools jako functionDeclarations
+                const geminiFunctions = aiTools.map(t => ({
+                    name: t.function.name,
+                    description: t.function.description,
+                    parameters: t.function.parameters
+                }));
                 const geminiRes = await fetch(
                     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
                     { method:'POST', headers:{'Content-Type':'application/json'},
-                      body: JSON.stringify({ system_instruction:{parts:[{text:systemPrompt}]}, contents:[{role:'user',parts:[{text:queryWithYear}]}], generationConfig:{maxOutputTokens:1500,temperature:0.1} }),
+                      body: JSON.stringify({
+                          system_instruction:{parts:[{text:'Jsi filmový vyhledávač. Na základě dotazu uživatele zavolej správnou funkci s přesnými parametry. Vždy zavolej jednu z funkcí — nikdy neodpovídej textem.'}]},
+                          contents:[{role:'user',parts:[{text:queryWithYear}]}],
+                          tools:[{functionDeclarations: geminiFunctions}],
+                          generationConfig:{temperature:0.1}
+                      }),
                       signal }
                 ).catch(() => null);
                 if (geminiRes && geminiRes.ok) {
                     const gb = await geminiRes.json().catch(()=>({}));
-                    const gt = gb?.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (gt) { data = { choices:[{message:{content:gt}}] }; usedProvider='Gemini'; }
+                    // Zkus tool call (functionCall)
+                    const part = gb?.candidates?.[0]?.content?.parts?.[0];
+                    if (part?.functionCall) {
+                        const syntheticTool = { function:{ name: part.functionCall.name, arguments: JSON.stringify(part.functionCall.args||{}) } };
+                        const parsed = _toolCallToParsed(syntheticTool, queryWithYear);
+                        if (parsed) { data = { choices:[{message:{content: JSON.stringify(parsed)}}] }; usedProvider='Gemini'; }
+                    } else if (part?.text) {
+                        // Fallback: text response
+                        data = { choices:[{message:{content: part.text}}] }; usedProvider='Gemini';
+                    }
                 }
             }
 
-            // 2) Groq (pokud má klíč)
+            // 2) Groq s Function Calling (pokud má klíč)
             if (!data && groqApiKey) {
                 if(status) status.innerHTML = '<span class="ai-spin">⟳</span> Groq analyzuje…';
-                data = await _callOpenAICompat(
+                const raw = await _callWithTools(
                     'https://api.groq.com/openai/v1/chat/completions',
                     groqApiKey,
                     'llama-3.3-70b-versatile',
-                    [{role:'system',content:systemPrompt},{role:'user',content:queryWithYear}]
+                    [{role:'system',content:'Jsi filmový vyhledávač. Na základě dotazu zavolej správnou funkci. Vždy zavolej jednu z dostupných funkcí.'},{role:'user',content:queryWithYear}]
                 );
+                data = _normalizeAiResponse(raw, queryWithYear);
                 if (data) usedProvider = 'Groq';
             }
 
-            // 3) OpenRouter s vlastním klíčem
+            // 3) OpenRouter s vlastním klíčem + Function Calling
             if (!data && openRouterKey) {
                 if(status) status.innerHTML = '<span class="ai-spin">⟳</span> OpenRouter analyzuje…';
-                data = await _callOpenAICompat(
+                const raw = await _callWithTools(
                     'https://openrouter.ai/api/v1/chat/completions',
                     openRouterKey,
                     'meta-llama/llama-3.3-70b-instruct:free',
-                    [{role:'system',content:systemPrompt},{role:'user',content:queryWithYear}],
+                    [{role:'system',content:'Jsi filmový vyhledávač. Na základě dotazu zavolej správnou funkci. Vždy zavolej jednu z dostupných funkcí.'},{role:'user',content:queryWithYear}],
                     {'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}
                 );
+                data = _normalizeAiResponse(raw, queryWithYear);
                 if (data) usedProvider = 'OpenRouter';
             }
 
-            // 4) OpenRouter free (bez klíče)
+            // 4) OpenRouter free — Function Calling (spolehlivější modely)
             if (!data) {
                 if(status) status.innerHTML = '<span class="ai-spin">⟳</span> Free AI analyzuje…';
                 const freeModels = [
@@ -4444,13 +4565,14 @@ EXAMPLES:
                     'mistralai/mistral-7b-instruct:free'
                 ];
                 for (const model of freeModels) {
-                    data = await _callOpenAICompat(
+                    const raw = await _callWithTools(
                         'https://openrouter.ai/api/v1/chat/completions',
                         'sk-or-free',
                         model,
-                        [{role:'system',content:systemPrompt},{role:'user',content:queryWithYear}],
+                        [{role:'system',content:'Jsi filmový vyhledávač. Na základě dotazu zavolej správnou funkci. Vždy zavolej jednu z dostupných funkcí.'},{role:'user',content:queryWithYear}],
                         {'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}
                     );
+                    data = _normalizeAiResponse(raw, queryWithYear);
                     if (data) { usedProvider = 'Free AI'; break; }
                 }
             }
