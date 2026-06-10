@@ -3004,7 +3004,7 @@
     function goHome() {
         navigationStack.length = 0;
         state.view = 'movies'; state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false; state._aiResultsLocked = false;
-        state.searchQuery = null; state._aiLastParsed = null; state._aiCurrentYear = null;
+        state.searchQuery = null; state._aiLastParsed = null;
         if (window._aiScrollObserver) { window._aiScrollObserver.disconnect(); window._aiScrollObserver = null; }
         document.getElementById('aiLoadMoreBtn')?.remove();
         const searchInput = $('searchInput');
@@ -4227,7 +4227,6 @@
         // Rok z AI year selectu
         const aiYear = ($('aiYearSelect')?.value || '').trim();
         // Uložit aktuální rok pro Load More (dekrementování)
-        state._aiCurrentYear = aiYear ? parseInt(aiYear) : null;
         // Přidáme rok do dotazu pro AI (pokud není v textu)
         const queryWithYear = (aiYear && !query.includes(aiYear)) ? `${query} ${aiYear}` : query;
 
@@ -12942,7 +12941,7 @@ function _showAiLoadMore(label) {
         box-shadow:0 4px 20px rgba(99,102,241,0.35);
         transition:opacity 0.2s;
         " onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-        <span style="font-size:1rem;">⬇️</span> Načíst další výsledky${state._aiCurrentYear ? ' <span style="opacity:0.7;font-size:0.8em;">(' + (state._aiCurrentYear - 1) + ')</span>' : ''}
+        <span style="font-size:1rem;">⬇️</span> Načíst další výsledky
     </button>`;
     const resultsEl = document.getElementById('results');
     if (resultsEl) resultsEl.appendChild(btn);
@@ -12962,15 +12961,6 @@ async function aiLoadMore() {
     const tmdbApiKey = window._store?.getItem('sinator_tmdb_api_key') || window._tmdbKey || '';
     const BASE = 'https://api.themoviedb.org/3';
 
-    // === ROK: dekrementuj o 1 při každém "Načíst další" ===
-    if (state._aiCurrentYear) { state._aiCurrentYear -= 1; }
-    const lmYear = state._aiCurrentYear || null;
-    function _addYearParam(url, mediaType) {
-        if (!lmYear) return url;
-        const param = (mediaType === 'tv') ? 'first_air_date_year=' + lmYear : 'primary_release_year=' + lmYear;
-        return url + '&' + param;
-    }
-
     const btn = document.getElementById('aiLoadMoreBtn');
     if (btn) btn.innerHTML = '<div style="padding:12px;color:#a78bfa;font-size:0.8rem;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;animation:spin 0.8s linear infinite">⟳</span> Načítám…</div>';
 
@@ -12984,8 +12974,8 @@ async function aiLoadMore() {
         const page = (p._searchPage || 2);
         try {
             const [movieRes, tvRes, personRes] = await Promise.all([
-                fetch(_addYearParam(`${BASE}/search/movie?api_key=${tmdbApiKey}&language=cs-CZ&query=${encodeURIComponent(p.query)}&page=${page}`, 'movie')),
-                fetch(_addYearParam(`${BASE}/search/tv?api_key=${tmdbApiKey}&language=cs-CZ&query=${encodeURIComponent(p.query)}&page=${page}`, 'tv')),
+                fetch(`${BASE}/search/movie?api_key=${tmdbApiKey}&language=cs-CZ&query=${encodeURIComponent(p.query)}&page=${page}`),
+                fetch(`${BASE}/search/tv?api_key=${tmdbApiKey}&language=cs-CZ&query=${encodeURIComponent(p.query)}&page=${page}`),
                 fetch(`${BASE}/search/person?api_key=${tmdbApiKey}&language=cs-CZ&query=${encodeURIComponent(p.query)}&page=${page}`)
             ]);
             const movies = ((await movieRes.json()).results || []).map(m => ({...m, media_type: 'movie'}));
@@ -13073,7 +13063,7 @@ No explanation, no markdown.`;
         if (!kwIds.length) { btn?.remove(); return; }
         try {
             const voteFilter = kwType === 'movie' ? '&vote_count.gte=50' : '&vote_count.gte=20';
-            const url = _addYearParam(`${BASE}/discover/${kwType}?api_key=${tmdbApiKey}&language=cs-CZ&with_keywords=${kwIds.join('|')}&sort_by=${kwSort}${voteFilter}&page=${kwPage}`, kwType);
+            const url = `${BASE}/discover/${kwType}?api_key=${tmdbApiKey}&language=cs-CZ&with_keywords=${kwIds.join('|')}&sort_by=${kwSort}${voteFilter}&page=${kwPage}`;
             const r = await fetch(url);
             const d = await r.json();
             const newItems = (d.results || [])
@@ -13120,7 +13110,6 @@ No explanation, no markdown.`;
                     let u = `${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ&sort_by=popularity.desc${vf}&page=${smartPage}`;
                     if (aiGenres) u += `&with_genres=${aiGenres}`;
                     if (kwIds_lm.length) u += `&with_keywords=${kwIds_lm.slice(0,3).join('|')}`;
-                    u = _addYearParam(u, discType);
                     try {
                         const d = await fetch(u).then(r=>r.json()).catch(()=>({results:[]}));
                         const batch = (d.results||[]).filter(x=>!seenIds.has(x.id)).map(x=>({...x,media_type:discType}));
@@ -13145,9 +13134,7 @@ No explanation, no markdown.`;
             try {
                 const dp = p.discoverParams;
                 const dmt = dp.mediaType || (mt === 'tv' ? 'tv' : 'movie');
-                const yearKey = dmt === 'tv' ? 'first_air_date_year' : 'primary_release_year';
-                const yearOverride = lmYear ? { [yearKey]: lmYear } : {};
-                const params = Object.assign({}, dp.params, yearOverride, { api_key: tmdbApiKey, language: 'cs-CZ', page: smartPage });
+                const params = Object.assign({}, dp.params, { api_key: tmdbApiKey, language: 'cs-CZ', page: smartPage });
                 const qs = Object.entries(params).map(([k,v]) => k+'='+encodeURIComponent(v)).join('&');
                 const r = await fetch(`${BASE}/discover/${dmt}?${qs}`);
                 const d = await r.json();
