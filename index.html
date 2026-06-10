@@ -859,6 +859,7 @@
         <button class="action-btn icon" id="btnFavToggle" onclick="openFavsModal()" title="Oblíbené">❤️<span class="badge fav" id="favBadge" style="display:none">0</span></button>
         <button class="action-btn icon" onclick="openSlozkyModal()" title="Moje složky" style="font-size:1.2rem;font-weight:700;color:#f9a825;">📁</button>
         <button class="action-btn icon" id="btnListsToggle" onclick="openListsModal()" title="Seznamy — Trakt, Simkl, Shlédnuté…">📋<span class="badge trakt" id="listsBadge" style="display:none">!</span></button>
+        <button class="action-btn icon" id="btnDoporucujiToggle" onclick="openDoporucujiModal()" title="Doporučuji — sdílená doporučení">⭐</button>
         <button class="action-btn icon" id="btnZabavaToggle" onclick="openZabavaModal()" title="Zábava — Weby, AI…">🎲</button>
         <button class="action-btn icon" onclick="openSettingsModal()" title="Nastavení">🔧</button>
         <button class="action-btn icon" id="btnToggleToolbar" onclick="toggleToolbar()" title="Schovat/zobrazit tlačítka" style="font-size:0.7rem;opacity:0.6;">▲</button>
@@ -2699,6 +2700,7 @@
                     <button class="action-btn-modal csfd" onclick="openCsfd('${safeT}',${year||0})">🎬 ČSFD</button>
                     <button class="action-btn-modal kinobox" onclick="openKinobox('${safeT}',${year||0})">🎫 Kinobox</button>
                     <button class="action-btn-modal" style="background:rgba(249,168,37,0.15);border-color:#f9a825;color:#f9a825;" onclick="openSlozkyPicker({id:'${imdbId}',type:'${type}',title:'${safeT}',year:${year||0},poster:'${poster}',rating:parseFloat('${rating}')||0})">📁 Složky</button>
+                    <button class="action-btn-modal" style="background:rgba(255,215,0,0.15);border-color:var(--gold);color:var(--gold);grid-column:1/-1" onclick="window._prefillAndOpenAdd&&window._prefillAndOpenAdd(window._omdbTmdbId||0,'${type}')">⭐ Doporučit</button>
                 </div>
 
                 <!-- Režie -->
@@ -6958,6 +6960,7 @@ ${collectionBtn}
 <button class="action-btn-modal" onclick="openTraktListPicker(${id},'${type}')" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">📋 Do seznamu</button>
 </div>
 <button class="action-btn-modal" style="background:rgba(100,160,255,0.15);border-color:#5b9bd5;color:#7db8f7;grid-column:1/-1" onclick="showSimilarInModal(${id},'${type}',this)">🎯 Podobné tituly</button>
+<button class="action-btn-modal" style="background:rgba(255,215,0,0.15);border-color:var(--gold);color:var(--gold);grid-column:1/-1" onclick="window._prefillAndOpenAdd&&window._prefillAndOpenAdd(${id},'${type}')">⭐ Doporučit</button>
 ${cast ? `<button class="action-btn-modal" style="grid-column:1/-1" onclick="showCastModal(${id},'${type}')">👥 Herci</button>` : ''}
 ${directors.length ? `<button class="action-btn-modal" style="background:rgba(138,43,226,0.15);border-color:#8a2be2;color:#c084fc;grid-column:1/-1" onclick="showDirectorsModal(${id},'${type}')">🎥 Režie</button>` : ''}
 </div>`;
@@ -17596,4 +17599,325 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- ════════════════════════════════════════════════════════════════════ -->
 
 </body>
-</html>
+</html><!-- ════════ DOPORUČUJI MODAL ════════ -->
+<div id="doporucujiOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;overflow-y:auto;" onclick="if(event.target===this)closeDoporucujiModal()">
+  <div style="background:var(--bg-card);border-radius:20px 20px 0 0;max-width:600px;margin:60px auto 0;min-height:calc(100vh - 60px);border:1px solid var(--border);border-bottom:none;">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-card);border-radius:20px 20px 0 0;z-index:2;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:1.5rem;">⭐</span>
+        <span style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:700;background:linear-gradient(135deg,#fff,var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Doporučuji</span>
+      </div>
+      <button onclick="closeDoporucujiModal()" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;padding:4px 8px;">✕</button>
+    </div>
+    <!-- Tabs filmy/seriály -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);">
+      <button id="dTab-movie" onclick="switchDTab('movie')" style="flex:1;padding:12px;border:none;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;font-size:0.9rem;">🎬 Filmy</button>
+      <button id="dTab-tv" onclick="switchDTab('tv')" style="flex:1;padding:12px;border:none;background:var(--bg-elevated);color:var(--text-muted);font-weight:500;cursor:pointer;font-size:0.9rem;">📺 Seriály</button>
+    </div>
+    <!-- Štítky filter -->
+    <div id="dTagsFilter" style="padding:10px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);min-height:46px;align-items:center;">
+      <span style="color:var(--text-muted);font-size:0.8rem;">Načítám štítky…</span>
+    </div>
+    <!-- Seznam doporučení -->
+    <div id="dList" style="padding:12px 16px;min-height:200px;">
+      <div class="loading"><div class="spinner"></div>Načítám…</div>
+    </div>
+    <!-- Přidat tlačítko -->
+    <div style="padding:16px;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--bg-card);">
+      <button onclick="openAddDoporuceni()" style="width:100%;padding:13px;background:linear-gradient(135deg,var(--gold),#ffaa00);color:#000;border:none;border-radius:10px;font-weight:700;font-size:0.95rem;cursor:pointer;">➕ Přidat doporučení</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD DOPORUCENI MODAL -->
+<div id="addDoporuceniOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:10001;overflow-y:auto;" onclick="if(event.target===this)closeAddDoporuceni()">
+  <div style="background:var(--bg-card);border-radius:20px;max-width:520px;margin:40px auto;border:1px solid var(--border);overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);">
+      <span style="font-weight:700;font-size:1rem;">➕ Přidat doporučení</span>
+      <button onclick="closeAddDoporuceni()" style="background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+      <!-- Vyhledávání -->
+      <div>
+        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:6px;">Vyhledat film / seriál</label>
+        <div style="display:flex;gap:8px;">
+          <input id="dSearchInput" type="text" placeholder="Název…" style="flex:1;padding:10px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.9rem;" onkeydown="if(event.key==='Enter')searchForDoporuceni()">
+          <button onclick="searchForDoporuceni()" style="padding:10px 14px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer;">🔍</button>
+        </div>
+        <div id="dSearchResults" style="margin-top:8px;max-height:200px;overflow-y:auto;"></div>
+      </div>
+      <!-- Vybraný titul -->
+      <div id="dSelectedTitle" style="display:none;background:var(--bg-elevated);border-radius:10px;padding:10px;display:none;align-items:center;gap:10px;">
+        <img id="dSelectedPoster" src="" style="width:40px;height:60px;object-fit:cover;border-radius:6px;">
+        <div>
+          <div id="dSelectedName" style="font-weight:700;font-size:0.95rem;"></div>
+          <div id="dSelectedYear" style="font-size:0.8rem;color:var(--text-muted);"></div>
+        </div>
+      </div>
+      <!-- Komentář -->
+      <div>
+        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:6px;">Komentář (proč doporučuješ?)</label>
+        <textarea id="dComment" rows="3" placeholder="Např. Skvělý thriller, nečekaný konec…" style="width:100%;padding:10px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.9rem;resize:none;"></textarea>
+      </div>
+      <!-- Štítky -->
+      <div>
+        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:6px;">Štítky (odděl čárkou, např. thriller, na víkend)</label>
+        <input id="dTags" type="text" placeholder="thriller, akce, pro děti…" style="width:100%;padding:10px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.9rem;">
+      </div>
+      <!-- Přezdívka -->
+      <div>
+        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:6px;">Tvoje přezdívka</label>
+        <input id="dNickname" type="text" placeholder="Např. Petr, FilmFan…" style="width:100%;padding:10px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.9rem;" maxlength="30">
+      </div>
+      <button onclick="submitDoporuceni()" style="padding:13px;background:linear-gradient(135deg,var(--gold),#ffaa00);color:#000;border:none;border-radius:10px;font-weight:700;font-size:0.95rem;cursor:pointer;">✅ Odeslat doporučení</button>
+      <div id="dSubmitMsg" style="text-align:center;font-size:0.85rem;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK + Doporučuji logika -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCGnf9SlyOW2M5jXU2qOVUJ2sVMedTIBxo",
+  authDomain: "sinator-search-app.firebaseapp.com",
+  projectId: "sinator-search-app",
+  storageBucket: "sinator-search-app.firebasestorage.app",
+  messagingSenderId: "913116949090",
+  appId: "1:913116949090:web:229284a08906acfd0fff3b"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
+// ---- STATE ----
+let _dTab = 'movie';
+let _dActiveTag = null;
+let _dSelected = null; // { tmdbId, type, title, year, poster }
+let _dAllItems = [];
+
+// ---- OPEN/CLOSE ----
+window.openDoporucujiModal = function() {
+  document.getElementById('doporucujiOverlay').style.display = 'block';
+  document.getElementById('btnDoporucujiToggle')?.classList.add('active');
+  loadDoporuceni();
+};
+window.closeDoporucujiModal = function() {
+  document.getElementById('doporucujiOverlay').style.display = 'none';
+  document.getElementById('btnDoporucujiToggle')?.classList.remove('active');
+};
+window.openAddDoporuceni = function() {
+  document.getElementById('addDoporuceniOverlay').style.display = 'block';
+  // prefill přezdívka z localStorage
+  const nick = localStorage.getItem('sinator_d_nick') || '';
+  document.getElementById('dNickname').value = nick;
+  // prefill pokud přichází z detailu
+  if (window._dPrefill) {
+    _dSelected = window._dPrefill;
+    showSelectedTitle(_dSelected);
+    window._dPrefill = null;
+  }
+};
+window.closeAddDoporuceni = function() {
+  document.getElementById('addDoporuceniOverlay').style.display = 'none';
+  document.getElementById('dSearchResults').innerHTML = '';
+  document.getElementById('dSearchInput').value = '';
+  document.getElementById('dComment').value = '';
+  document.getElementById('dTags').value = '';
+  document.getElementById('dSubmitMsg').innerHTML = '';
+  document.getElementById('dSelectedTitle').style.display = 'none';
+  _dSelected = null;
+};
+
+// ---- TABS ----
+window.switchDTab = function(tab) {
+  _dTab = tab;
+  _dActiveTag = null;
+  document.getElementById('dTab-movie').style.background = tab === 'movie' ? 'var(--accent)' : 'var(--bg-elevated)';
+  document.getElementById('dTab-movie').style.color = tab === 'movie' ? '#fff' : 'var(--text-muted)';
+  document.getElementById('dTab-tv').style.background = tab === 'tv' ? 'var(--accent)' : 'var(--bg-elevated)';
+  document.getElementById('dTab-tv').style.color = tab === 'tv' ? '#fff' : 'var(--text-muted)';
+  renderDList();
+  renderDTags();
+};
+
+// ---- LOAD DATA ----
+async function loadDoporuceni() {
+  document.getElementById('dList').innerHTML = '<div class="loading"><div class="spinner"></div>Načítám…</div>';
+  try {
+    const q = query(collection(db, 'doporuceni'), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    _dAllItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderDTags();
+    renderDList();
+  } catch(e) {
+    document.getElementById('dList').innerHTML = `<div class="empty">Chyba načtení: ${e.message}</div>`;
+  }
+}
+
+function renderDTags() {
+  const items = _dAllItems.filter(i => i.type === _dTab);
+  const tagSet = new Set();
+  items.forEach(i => (i.tags||[]).forEach(t => tagSet.add(t)));
+  const tags = [...tagSet].sort();
+  const wrap = document.getElementById('dTagsFilter');
+  if (!tags.length) { wrap.innerHTML = '<span style="color:var(--text-muted);font-size:0.8rem;">Žádné štítky</span>'; return; }
+  wrap.innerHTML = `<button onclick="filterDTag(null)" style="padding:5px 12px;border-radius:20px;border:1px solid ${_dActiveTag===null?'var(--gold)':'var(--border)'};background:${_dActiveTag===null?'rgba(255,215,0,0.15)':'var(--bg-elevated)'};color:${_dActiveTag===null?'var(--gold)':'var(--text-muted)'};cursor:pointer;font-size:0.8rem;white-space:nowrap;">Vše</button>`
+    + tags.map(t => `<button onclick="filterDTag('${t.replace(/'/g,"\\'")}\')" style="padding:5px 12px;border-radius:20px;border:1px solid ${_dActiveTag===t?'var(--gold)':'var(--border)'};background:${_dActiveTag===t?'rgba(255,215,0,0.15)':'var(--bg-elevated)'};color:${_dActiveTag===t?'var(--gold)':'var(--text-muted)'};cursor:pointer;font-size:0.8rem;white-space:nowrap;">${t}</button>`).join('');
+}
+
+window.filterDTag = function(tag) {
+  _dActiveTag = tag;
+  renderDTags();
+  renderDList();
+};
+
+function renderDList() {
+  const wrap = document.getElementById('dList');
+  let items = _dAllItems.filter(i => i.type === _dTab);
+  if (_dActiveTag) items = items.filter(i => (i.tags||[]).includes(_dActiveTag));
+  if (!items.length) { wrap.innerHTML = '<div class="empty" style="padding:30px;text-align:center;">Žádná doporučení zatím.<br><span style="font-size:0.85rem;color:var(--text-muted);">Buď první! ⭐</span></div>'; return; }
+  wrap.innerHTML = items.map(item => {
+    const poster = item.poster ? `<img src="https://image.tmdb.org/t/p/w185${item.poster}" style="width:52px;height:78px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : `<div style="width:52px;height:78px;background:var(--bg-elevated);border-radius:8px;display:grid;place-items:center;font-size:1.4rem;flex-shrink:0;">${item.type==='tv'?'📺':'🎬'}</div>`;
+    const tags = (item.tags||[]).map(t=>`<span style="background:rgba(255,215,0,0.12);color:var(--gold);border-radius:12px;padding:2px 8px;font-size:0.72rem;">${t}</span>`).join('');
+    const date = item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString('cs-CZ') : '';
+    return `<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="window._openDetailFromD(${item.tmdbId},'${item.type}')">
+      ${poster}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:0.95rem;margin-bottom:2px;">${item.title} <span style="color:var(--text-muted);font-weight:400;font-size:0.85rem;">(${item.year||''})</span></div>
+        ${item.comment ? `<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:6px;line-height:1.4;">"${item.comment}"</div>` : ''}
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">${tags}</div>
+        <div style="font-size:0.75rem;color:#666;">👤 ${item.nickname||'Anonym'} · ${date}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window._openDetailFromD = function(id, type) {
+  closeDoporucujiModal();
+  if (window.openDetail) openDetail(id, type);
+};
+
+// ---- SEARCH PRO PŘIDÁNÍ ----
+window.searchForDoporuceni = async function() {
+  const q = document.getElementById('dSearchInput').value.trim();
+  if (!q) return;
+  const wrap = document.getElementById('dSearchResults');
+  wrap.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px 0;">Hledám…</div>';
+  try {
+    const tmdbKey = localStorage.getItem('sinator_tmdb_key') || '';
+    const r = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${encodeURIComponent(q)}&language=cs-CZ`);
+    const data = await r.json();
+    const results = (data.results||[]).filter(x => x.media_type === 'movie' || x.media_type === 'tv').slice(0, 6);
+    if (!results.length) { wrap.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px 0;">Nic nenalezeno.</div>'; return; }
+    wrap.innerHTML = results.map(x => {
+      const title = x.title || x.name || '?';
+      const year = (x.release_date||x.first_air_date||'').slice(0,4);
+      const poster = x.poster_path ? `<img src="https://image.tmdb.org/t/p/w92${x.poster_path}" style="width:32px;height:48px;object-fit:cover;border-radius:4px;">` : `<div style="width:32px;height:48px;background:var(--bg-card);border-radius:4px;display:grid;place-items:center;">${x.media_type==='tv'?'📺':'🎬'}</div>`;
+      return `<div onclick="selectDTitle(${x.id},'${x.media_type==='tv'?'tv':'movie'}','${title.replace(/'/g,"\\'")}','${year}','${x.poster_path||''}')" style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;cursor:pointer;border:1px solid var(--border);margin-bottom:6px;background:var(--bg-elevated);">
+        ${poster}
+        <div><div style="font-weight:600;font-size:0.9rem;">${title}</div><div style="font-size:0.78rem;color:var(--text-muted);">${year} · ${x.media_type==='tv'?'Seriál':'Film'}</div></div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    wrap.innerHTML = `<div style="color:var(--accent);font-size:0.85rem;">Chyba: ${e.message}</div>`;
+  }
+};
+
+window.selectDTitle = function(id, type, title, year, poster) {
+  _dSelected = { tmdbId: id, type, title, year, poster };
+  showSelectedTitle(_dSelected);
+  document.getElementById('dSearchResults').innerHTML = '';
+  document.getElementById('dSearchInput').value = '';
+};
+
+function showSelectedTitle(sel) {
+  const el = document.getElementById('dSelectedTitle');
+  el.style.display = 'flex';
+  document.getElementById('dSelectedPoster').src = sel.poster ? `https://image.tmdb.org/t/p/w92${sel.poster}` : '';
+  document.getElementById('dSelectedName').textContent = sel.title;
+  document.getElementById('dSelectedYear').textContent = sel.year + (sel.type === 'tv' ? ' · Seriál' : ' · Film');
+}
+
+// ---- SUBMIT ----
+window.submitDoporuceni = async function() {
+  const msg = document.getElementById('dSubmitMsg');
+  if (!_dSelected) { msg.innerHTML = '<span style="color:var(--accent);">⚠️ Nejprve vyber film nebo seriál.</span>'; return; }
+  const comment = document.getElementById('dComment').value.trim();
+  const tagsRaw = document.getElementById('dTags').value.trim();
+  const nickname = document.getElementById('dNickname').value.trim() || 'Anonym';
+  const tags = tagsRaw ? tagsRaw.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean) : [];
+  msg.innerHTML = '<span style="color:var(--text-muted);">Odesílám…</span>';
+  try {
+    await addDoc(collection(db, 'doporuceni'), {
+      tmdbId: _dSelected.tmdbId,
+      type: _dSelected.type,
+      title: _dSelected.title,
+      year: _dSelected.year,
+      poster: _dSelected.poster,
+      comment,
+      tags,
+      nickname,
+      createdAt: serverTimestamp()
+    });
+    localStorage.setItem('sinator_d_nick', nickname);
+    msg.innerHTML = '<span style="color:var(--trakt);">✅ Doporučení přidáno!</span>';
+    setTimeout(() => {
+      closeAddDoporuceni();
+      loadDoporuceni();
+    }, 1200);
+  } catch(e) {
+    msg.innerHTML = `<span style="color:var(--accent);">Chyba: ${e.message}</span>`;
+  }
+};
+
+// ---- TLAČÍTKO V DETAILU FILMU/SERIÁLU ----
+// Přidá tlačítko "⭐ Doporučit" do detailu
+const _origOpenDetail = window.openDetail;
+if (_origOpenDetail) {
+  window.openDetail = async function(id, type, ...rest) {
+    await _origOpenDetail(id, type, ...rest);
+    // Počkáme na render detailu a přidáme tlačítko
+    setTimeout(() => injectDoporucitBtn(id, type), 600);
+  };
+}
+
+function injectDoporucitBtn(id, type) {
+  if (document.getElementById('btnDoporucitDetail')) return;
+  // Najdeme tlačítkový řádek v detailu
+  const btns = document.querySelector('.detail-actions, #detailActions, .detail-buttons');
+  if (!btns) {
+    // fallback — hledáme Stremio nebo podobné tlačítko
+    const stremio = document.querySelector('[onclick*="stremio"], [onclick*="Stremio"]');
+    const parent = stremio?.parentElement;
+    if (!parent) return;
+    const btn = document.createElement('button');
+    btn.id = 'btnDoporucitDetail';
+    btn.innerHTML = '⭐ Doporučit';
+    btn.style.cssText = 'padding:10px 16px;background:rgba(255,215,0,0.15);border:1px solid var(--gold);border-radius:8px;color:var(--gold);font-weight:700;cursor:pointer;font-size:0.85rem;';
+    btn.onclick = () => prefillAndOpenAdd(id, type);
+    parent.appendChild(btn);
+  }
+}
+
+async function prefillAndOpenAdd(id, type) {
+  // Získáme info z TMDB
+  try {
+    const tmdbKey = localStorage.getItem('sinator_tmdb_key') || '';
+    const d = await (await fetch(`https://api.themoviedb.org/3/${type}/${id}?api_key=${tmdbKey}&language=cs-CZ`)).json();
+    window._dPrefill = {
+      tmdbId: id,
+      type,
+      title: d.title || d.name || '',
+      year: (d.release_date || d.first_air_date || '').slice(0,4),
+      poster: d.poster_path || ''
+    };
+  } catch { window._dPrefill = { tmdbId: id, type, title: '', year: '', poster: '' }; }
+  openAddDoporuceni();
+}
+
+window._prefillAndOpenAdd = prefillAndOpenAdd;
+</script>
