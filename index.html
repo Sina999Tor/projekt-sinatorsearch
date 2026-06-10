@@ -3946,7 +3946,7 @@
                 return;
             }
             if (window._simklGen !== gen) return;
-            renderSimklGrid(mapped, list.name);
+            renderSimklGrid(mapped, list.name, true);
             const batchSize = 10;
             for (let i = 0; i < mapped.length; i += batchSize) {
                 if (window._simklGen !== gen) return;
@@ -3963,7 +3963,7 @@
                     } catch {}
                 }));
                 if (window._simklGen !== gen) return;
-                renderSimklGrid(mapped, list.name);
+                renderSimklGrid(mapped, list.name, false);
             }
         } catch(e) {
             if (window._simklGen !== gen) return;
@@ -3971,7 +3971,7 @@
         }
     }
 
-    function renderSimklGrid(items, listName) {
+    function renderSimklGrid(items, listName, doScroll) {
         // Highlight active tab
         const lists = window._simklListsCache || [];
         lists.forEach((l,i) => {
@@ -3982,7 +3982,7 @@
             btn.style.borderColor = active ? '#1cb99a' : 'var(--border)';
             btn.style.color = active ? '#000' : 'var(--text-muted)';
             btn.style.fontWeight = active ? '700' : '500';
-            if (active) btn.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+            if (active && doScroll) btn.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
         });
         const count = `<div style="padding:14px 0 6px;font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;background:linear-gradient(135deg,#fff,var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">${items.length} položek</div>`;
         const grid = `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;">${items.map(it => {
@@ -6403,17 +6403,17 @@ EXAMPLES:
         }).filter(Boolean);
         if(!mapped.length) { $('traktResultsContainer').innerHTML=`<div class="empty">Prázdný seznam nebo bez TMDB ID.</div>`; return; }
         if(window._traktGen !== gen) return;
-        renderTraktGrid(mapped, listName);
+        renderTraktGrid(mapped, listName, true);
         const batchSize = 10;
         for(let i=0; i<mapped.length; i+=batchSize) {
             if(window._traktGen !== gen) return;
             await Promise.all(mapped.slice(i, i+batchSize).map(async item => { try { const ctrl=new AbortController(); const tmr=setTimeout(()=>ctrl.abort(),8000); const d = await (await fetch(`${BASE}/${item.type}/${item.id}?api_key=${tmdbApiKey}&language=cs-CZ`,{signal:ctrl.signal})).json(); clearTimeout(tmr); item.poster_path = d.poster_path||null; item.vote_average = d.vote_average||0; const csT=d.title||d.name||''; if(csT)item.title=csT; } catch {} }));
             if(window._traktGen !== gen) return;
-            renderTraktGrid(mapped, listName);
+            renderTraktGrid(mapped, listName, false);
         }
     }
 
-    function renderTraktGrid(items, listName) {
+    function renderTraktGrid(items, listName, doScroll) {
         // Highlight active tab
         const lists = window._traktListsCache || [];
         lists.forEach((l,i) => {
@@ -6424,7 +6424,7 @@ EXAMPLES:
             btn.style.borderColor = active ? 'var(--trakt)' : 'var(--border)';
             btn.style.color = active ? '#fff' : 'var(--text-muted)';
             btn.style.fontWeight = active ? '700' : '500';
-            if (active) btn.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+            if (active && doScroll) btn.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
         });
         const count = `<div style="padding:14px 0 6px;font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;background:linear-gradient(135deg,#fff,var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">${items.length} položek</div>`;
         const grid = `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;">${items.map(it=>{
