@@ -1598,6 +1598,19 @@
                 </div>
             </div>
             <div class="settings-divider"></div>
+            <div class="settings-section" style="background:rgba(255,165,0,0.07);border:1px solid rgba(255,165,0,0.25);border-radius:12px;padding:14px 16px;">
+                <span class="settings-label" style="color:#ffaa00;">🛡️ Admin přístup (Doporučuji)</span>
+                <input type="password" class="settings-input" id="adminPwdInput" placeholder="Admin heslo…" autocomplete="off">
+                <div class="settings-actions">
+                    <button class="settings-btn-small" onclick="toggleAdminPwdVisibility()">👁️ Zobrazit</button>
+                    <button class="settings-btn-small" onclick="activateAdminMode()" style="background:rgba(255,165,0,0.3);">🛡️ Aktivovat</button>
+                    <button class="settings-btn-small settings-btn-remove" onclick="deactivateAdminMode()">🔓 Odhlásit</button>
+                </div>
+                <div style="font-size:0.75rem;margin-top:6px;" id="adminModeStatus">
+                    <span style="color:#888;">Admin: <span id="adminModeLabel">Neaktivní</span></span>
+                </div>
+            </div>
+            <div class="settings-divider"></div>
             <button class="settings-full-btn" onclick="toggleFullscreen()" id="settingsFullscreenBtn">🔒 Fullscreen (zapnuto)</button>
             <button class="settings-full-btn" id="pwaInstallBtn" onclick="installPWA()" style="display:none;">📲 Instalovat aplikaci</button>
             <div id="pwaInstallInfo" style="font-size:0.7rem; color:var(--text-muted); text-align:center; margin-top:4px; display:none;">Dostupné v Chrome/Edge na Androidu přes HTTPS</div>
@@ -17679,7 +17692,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- Firebase SDK + Doporučuji logika -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCGnf9SlyOW2M5jXU2qOVUJ2sVMedTIBxo",
@@ -17784,17 +17797,33 @@ function renderDList() {
     const poster = item.poster ? `<img src="https://image.tmdb.org/t/p/w185${item.poster}" style="width:52px;height:78px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : `<div style="width:52px;height:78px;background:var(--bg-elevated);border-radius:8px;display:grid;place-items:center;font-size:1.4rem;flex-shrink:0;">${item.type==='tv'?'📺':'🎬'}</div>`;
     const tags = (item.tags||[]).map(t=>`<span style="background:rgba(255,215,0,0.12);color:var(--gold);border-radius:12px;padding:2px 8px;font-size:0.72rem;">${t}</span>`).join('');
     const date = item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString('cs-CZ') : '';
-    return `<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="window._openDetailFromD(${item.tmdbId},'${item.type}')">
-      ${poster}
-      <div style="flex:1;min-width:0;">
-        <div style="font-weight:700;font-size:0.95rem;margin-bottom:2px;">${item.title} <span style="color:var(--text-muted);font-weight:400;font-size:0.85rem;">(${item.year||''})</span></div>
-        ${item.comment ? `<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:6px;line-height:1.4;">"${item.comment}"</div>` : ''}
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">${tags}</div>
-        <div style="font-size:0.75rem;color:#666;">👤 ${item.nickname||'Anonym'} · ${date}</div>
+    const myNick = (localStorage.getItem('sinator_d_nick')||'').toLowerCase();
+    const isAdmin = localStorage.getItem('sinator_admin_mode') === '1';
+    const isOwner = isAdmin || (myNick && myNick === (item.nickname||'').toLowerCase());
+    return `<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <div style="cursor:pointer;display:flex;gap:12px;flex:1;min-width:0;" onclick="window._openDetailFromD(${item.tmdbId},'${item.type}')">
+        ${poster}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:0.95rem;margin-bottom:2px;">${item.title} <span style="color:var(--text-muted);font-weight:400;font-size:0.85rem;">(${item.year||''})</span></div>
+          ${item.comment ? `<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:6px;line-height:1.4;">"${item.comment}"</div>` : ''}
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">${tags}</div>
+          <div style="font-size:0.75rem;color:#666;">👤 ${item.nickname||'Anonym'} · ${date}</div>
+        </div>
       </div>
+      ${isOwner ? `<button onclick="window._deleteDoporuceni('${item.id}')" style="background:none;border:none;color:#666;font-size:1.1rem;cursor:pointer;padding:4px 8px;align-self:flex-start;flex-shrink:0;" title="Smazat">🗑️</button>` : ''}
     </div>`;
   }).join('');
 }
+
+window._deleteDoporuceni = async function(docId) {
+  if (!confirm('Smazat toto doporučení?')) return;
+  try {
+    await deleteDoc(doc(db, 'doporuceni', docId));
+    _dAllItems = _dAllItems.filter(i => i.id !== docId);
+    renderDTags();
+    renderDList();
+  } catch(e) { alert('Chyba: ' + e.message); }
+};
 
 window._openDetailFromD = function(id, type) {
   closeDoporucujiModal();
@@ -17920,4 +17949,50 @@ async function prefillAndOpenAdd(id, type) {
 }
 
 window._prefillAndOpenAdd = prefillAndOpenAdd;
+
+// ---- ADMIN MODE ----
+const _ADMIN_HASH = '781813bb37eab22353b8a69c29a5cac43df0e1efb8b3a112d2528a3c3b59f4d2';
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+window.activateAdminMode = async function() {
+  const pwd = document.getElementById('adminPwdInput')?.value || '';
+  if (!pwd) return;
+  const hash = await sha256(pwd);
+  if (hash === _ADMIN_HASH) {
+    localStorage.setItem('sinator_admin_mode', '1');
+    document.getElementById('adminPwdInput').value = '';
+    updateAdminStatus();
+    alert('✅ Admin režim aktivován.');
+  } else {
+    alert('❌ Nesprávné heslo.');
+  }
+};
+
+window.deactivateAdminMode = function() {
+  localStorage.removeItem('sinator_admin_mode');
+  updateAdminStatus();
+};
+
+window.toggleAdminPwdVisibility = function() {
+  const el = document.getElementById('adminPwdInput');
+  if (el) el.type = el.type === 'password' ? 'text' : 'password';
+};
+
+function updateAdminStatus() {
+  const lbl = document.getElementById('adminModeLabel');
+  if (!lbl) return;
+  const active = localStorage.getItem('sinator_admin_mode') === '1';
+  lbl.textContent = active ? '✅ Aktivní' : 'Neaktivní';
+  lbl.style.color = active ? '#1db954' : '#888';
+}
+
+// Init admin status on settings open
+const _origOpenSettings = window.openSettingsModal;
+if (_origOpenSettings) {
+  window.openSettingsModal = function(...a) { _origOpenSettings(...a); setTimeout(updateAdminStatus, 100); };
+}
 </script>
