@@ -5593,8 +5593,10 @@ EXAMPLES:
             return;
         }
 
+        if (!url) { setInfiniteLoading(false); state._loadingMore = false; return; }
         try {
             const res = await fetch(url);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             const results = data.results || [];
             state.totalPages = Math.min(data.total_pages || 1, 500);
@@ -5605,8 +5607,8 @@ EXAMPLES:
                 appendGrid(typedResults, isFirstPage);
             }
         } catch (e) {
-            console.error(e);
-            if (isFirstPage) resultsEl.innerHTML = '<div class="empty">⚠️ Chyba načítání</div>';
+            console.error('loadPopularContent error:', e);
+            if (isFirstPage) resultsEl.innerHTML = `<div class="empty" style="text-align:center;">⚠️ Chyba načítání<br><small style="color:#888;font-size:0.75rem;">${e.message}</small><br><br><button onclick="loadPopularContent()" style="margin-top:8px;padding:8px 18px;background:var(--accent);border:none;border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
         } finally {
             setInfiniteLoading(false);
             state._loadingMore = false;
@@ -5840,11 +5842,21 @@ EXAMPLES:
     function startSearch() {
         const q = $('searchInput')?.value.trim();
         if(!q) return;
+        mainSearchLiveHide();
+        // Zavřít overlay
+        state.searchOpen = false;
+        const overlay = $('searchOverlay');
+        if (overlay) overlay.classList.remove('show');
+        const btn = $('btnSearchToggle');
+        if (btn) btn.classList.remove('active');
+        // Resetovat na movies view
+        state.view = 'movies';
+        document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'movies'));
         state.page = 1;
         state._allItems = [];
         state._loadingMore = false;
+        state._aiResultsLocked = false;
         state.searchQuery = q;
-        toggleSearchOverlay();
         resultsEl.innerHTML = '<div class="loading"><div class="spinner"></div>Hledám...</div>';
         searchMedia(q);
     }
