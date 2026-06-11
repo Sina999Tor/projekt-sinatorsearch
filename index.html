@@ -5869,7 +5869,7 @@ EXAMPLES:
         if (!tmdbApiKey) { resultsEl.innerHTML = '<div class="empty">⚠️ Nejprve zadejte TMDB API klíč v nastavení!</div>'; return; }
         setInfiniteLoading(true);
         
-        const { mediaType, genreId, year, sortBy } = state.filters;
+        const { mediaType, genreId, year, sortBy, country } = state.filters;
         try {
             let results = [];
             if(query) {
