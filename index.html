@@ -5585,7 +5585,7 @@ EXAMPLES:
                 const persons = (await Promise.all(fetches)).filter(Boolean);
                 appendActorGrid(persons, isFirstPage);
             } catch(e) {
-                if (isFirstPage) resultsEl.innerHTML = '<div class="empty">⚠️ Chyba načítání</div>';
+                if (isFirstPage) resultsEl.innerHTML = `<div class="empty">⚠️ Chyba D: ${e.message}</div>`;
             } finally {
                 setInfiniteLoading(false);
                 state._loadingMore = false;
@@ -6012,7 +6012,7 @@ EXAMPLES:
             }
         } catch (e) { 
             console.error(e); 
-            if (isFirstPage) resultsEl.innerHTML='<div class="empty">⚠️ Chyba načítání</div>';
+            if (isFirstPage) resultsEl.innerHTML=`<div class="empty">⚠️ Chyba F: ${e.message}</div>`;
         } finally {
             setInfiniteLoading(false);
             state._loadingMore = false;
