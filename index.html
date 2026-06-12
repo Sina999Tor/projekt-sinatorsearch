@@ -275,9 +275,11 @@
         .gallery-item:hover img { transform: scale(1.05); }
         .gallery-item .placeholder { width: 100%; height: 100%; display: grid; place-items: center; font-size: 1.8rem; color: var(--text-muted); }
         
-        .trakt-modal-overlay, .favs-modal-overlay, .settings-modal-overlay, .sources-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); backdrop-filter: blur(10px); z-index: 10500; justify-content: center; align-items: flex-start; padding: 60px 20px 20px; overflow-y: auto; }
+        .trakt-modal-overlay, .favs-modal-overlay, .sources-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); backdrop-filter: blur(10px); z-index: 10500; justify-content: center; align-items: flex-start; padding: 60px 20px 20px; overflow-y: auto; }
         .trakt-modal-overlay.open, .favs-modal-overlay.open, .settings-modal-overlay.open, .sources-modal-overlay.open { display: flex; }
-        .trakt-modal, .favs-modal, .settings-modal, .sources-modal { background: var(--bg-card); border-radius: 16px; max-width: 700px; width: 100%; max-height: 92vh; overflow-y: auto; position: relative; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.8); overscroll-behavior: contain; }
+        .settings-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.97); backdrop-filter: blur(16px); z-index: 10500; flex-direction: column; overflow: hidden; }
+        .trakt-modal, .favs-modal, .sources-modal { background: var(--bg-card); border-radius: 16px; max-width: 700px; width: 100%; max-height: 92vh; overflow-y: auto; position: relative; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.8); overscroll-behavior: contain; }
+        .settings-modal { background: #141414; width: 100%; height: 100%; display: flex; flex-direction: column; border-radius: 0; border: none; overflow: hidden; }
         .sources-modal { max-width: 600px; }
         /* ── iVysílání modal ── */
         .ivysilani-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.94); backdrop-filter: blur(12px); z-index: 10500; justify-content: center; align-items: flex-start; padding: 20px 12px 20px; overflow-y: auto; }
@@ -401,9 +403,11 @@
         .modal-header-row { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); z-index: 10; }
         .modal-header-row h2 { font-family: 'Playfair Display', serif; font-size: 1.4rem; background: linear-gradient(135deg, #fff, var(--trakt)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .favs-modal-header h2, .settings-modal-header h2, .sources-modal-header h2 { background: linear-gradient(135deg, #fff, var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .settings-modal .modal-header-row { position: static; background: #141414; flex-shrink: 0; padding: 14px 16px; }
+        .settings-modal .settings-modal-body { flex: 1; overflow-y: auto; min-height: 0; padding: 16px; }
         .close-modal-btn, .close-settings, .close-sources { background: var(--bg-elevated); border: 1px solid var(--border); color: #fff; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: grid; place-items: center; transition: 0.2s; }
         .close-modal-btn:hover, .close-settings:hover, .close-sources:hover { background: var(--accent); border-color: var(--accent); transform: rotate(90deg); }
-        .trakt-modal-body, .favs-modal-body, .settings-modal-body, .sources-modal-body { padding: 20px 24px; display: block; min-height: 200px; }
+        .trakt-modal-body, .favs-modal-body, .sources-modal-body { padding: 20px 24px; display: block; min-height: 200px; }
         #traktResultsContainer, #simklResultsContainer { padding: 0 !important; }
         .favs-subtabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
         .favs-subtab { padding: 6px 14px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; transition: 0.2s; }
@@ -2325,10 +2329,12 @@
         if($('omdbApiKeyInput')) $('omdbApiKeyInput').value = omdbApiKey;
         updateGeminiStatus(); updateGroqStatus(); updateOpenRouterStatus(); updateOmdbStatus();
         $('settingsModal')?.classList.add('open');
+        if(window.updatePwaBtn) updatePwaBtn();
     }
     
     function closeSettingsModal() {
         $('settingsModal')?.classList.remove('open');
+        if(window.updatePwaBtn) updatePwaBtn();
     }
 
     // ─── OMDb API ──────────────────────────────────────────────────────────────
@@ -17487,7 +17493,8 @@ document.addEventListener('DOMContentLoaded', function() {
             'nahodnyTipModal','kvizModal','zebrickyModal','upcomingModal',
             'porovnaniModal','moodModal','myStatsModal',
             'tvRadioModal','zabavaModal','listsModal','musicModal',
-            'slozkyModal','slozkyPickerModal','doporucujiOverlay','addDoporuceniOverlay'
+            'slozkyModal','slozkyPickerModal','doporucujiOverlay','addDoporuceniOverlay',
+            'settingsModal'
         ];
         var anyModalOpen = fullscreenModalIds.some(function(id) {
             var el = document.getElementById(id);
