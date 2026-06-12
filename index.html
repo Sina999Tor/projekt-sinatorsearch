@@ -2312,6 +2312,9 @@
         $('modalContent')?.classList.remove('watched-full');
     }
 
+    window._openFavsModal = () => openFavsModal();
+    window._openWatchedModal = () => openWatchedModal();
+
     function openSettingsModal() {
         closeHelperModals();
         if($('geminiApiKeyInput')) $('geminiApiKeyInput').value = geminiApiKey;
@@ -17477,7 +17480,18 @@ document.addEventListener('DOMContentLoaded', function() {
         // In slozky folder detail: show btn (it will go back, not close)
         var slozkyModal = document.getElementById('slozkyModal');
         var inFolder = slozkyModal && slozkyModal.classList.contains('open') && slozkyModal.dataset.inFolder === '1';
-        if (closer || inFolder) {
+        // Hide when any fullscreen modal with its own close button is visible
+        var fullscreenModalIds = [
+            'nahodnyTipModal','kvizModal','zebrickyModal','upcomingModal',
+            'porovnaniModal','moodModal','myStatsModal',
+            'tvRadioModal','zabavaModal','listsModal','musicModal',
+            'slozkyModal','slozkyPickerModal','doporucujiModal','addDoporuceniModal'
+        ];
+        var anyModalOpen = fullscreenModalIds.some(function(id) {
+            var el = document.getElementById(id);
+            return el && (el.style.display === 'flex' || el.style.display === 'block' || el.classList.contains('open'));
+        });
+        if (closer || inFolder || anyModalOpen) {
             btn.style.display = 'none';
         } else {
             btn.style.display = 'flex';
@@ -18197,10 +18211,12 @@ let _ntFilter = 'movie';
 function openNahodnyTipModal() {
   const m = document.getElementById('nahodnyTipModal');
   if (m) { m.style.display = 'flex'; }
+  if(window.updatePwaBtn) updatePwaBtn();
 }
 function closeNahodnyTipModal() {
   const m = document.getElementById('nahodnyTipModal');
   if (m) m.style.display = 'none';
+  if(window.updatePwaBtn) updatePwaBtn();
 }
 function ntSetFilter(f) {
   _ntFilter = f;
@@ -18256,8 +18272,8 @@ async function loadNahodnyTip() {
 // 🧠 FILMOVÝ KVÍZ
 // =====================================================
 let _kvizDiff = 'easy', _kvizQuestions = [], _kvizCurrent = 0, _kvizScore = 0, _kvizAnswered = false;
-function openKvizModal() { const m=document.getElementById('kvizModal'); if(m){m.style.display='flex';} resetKvizUI(); }
-function closeKvizModal() { const m=document.getElementById('kvizModal'); if(m)m.style.display='none'; }
+function openKvizModal() { const m=document.getElementById('kvizModal'); if(m){m.style.display='flex';} resetKvizUI(); if(window.updatePwaBtn)updatePwaBtn(); }
+function closeKvizModal() { const m=document.getElementById('kvizModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
 function resetKvizUI() {
   _kvizQuestions=[]; _kvizCurrent=0; _kvizScore=0; _kvizAnswered=false;
   const b=document.getElementById('kvizBody');
@@ -18366,8 +18382,8 @@ function renderKvizResult() {
 // 🏆 FILMOVÉ ŽEBŘÍČKY
 // =====================================================
 let _zebrickyTab = 'top_all', _zebrickyCache = {};
-function openZebricky() { const m=document.getElementById('zebrickyModal'); if(m){m.style.display='flex';} zebrickySetTab('top_all'); }
-function closeZebrickyModal() { const m=document.getElementById('zebrickyModal'); if(m)m.style.display='none'; }
+function openZebricky() { const m=document.getElementById('zebrickyModal'); if(m){m.style.display='flex';} zebrickySetTab('top_all'); if(window.updatePwaBtn)updatePwaBtn(); }
+function closeZebrickyModal() { const m=document.getElementById('zebrickyModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
 function zebrickySetTab(tab) {
   _zebrickyTab = tab;
   document.querySelectorAll('.zeb-tab').forEach(b => {
@@ -18420,8 +18436,8 @@ async function loadZebricky(tab) {
 // 📅 CO SE CHYSTÁ
 // =====================================================
 let _upcomingTab = 'movies', _upcomingCache = {};
-function openUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m){m.style.display='flex';} upcomingSetTab('movies'); }
-function closeUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m)m.style.display='none'; }
+function openUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m){m.style.display='flex';} upcomingSetTab('movies'); if(window.updatePwaBtn)updatePwaBtn(); }
+function closeUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
 function upcomingSetTab(tab) {
   _upcomingTab = tab;
   const tabs = {movies:'upTabMovies',tv:'upTabTv'};
@@ -18472,8 +18488,8 @@ async function loadUpcoming(tab) {
 // =====================================================
 // 🎭 POROVNÁNÍ FILMŮ
 // =====================================================
-function openPorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m){m.style.display='flex';resetPorovnani();} }
-function closePorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m)m.style.display='none'; }
+function openPorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m){m.style.display='flex';resetPorovnani();} if(window.updatePwaBtn)updatePwaBtn(); }
+function closePorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
 function resetPorovnani() {
   const inp=document.getElementById('porovnaniInput'); const res=document.getElementById('porovnaniResult');
   if(inp){inp.style.display='block';} if(res){res.style.display='none';res.innerHTML='';}
@@ -18527,8 +18543,8 @@ Vrať POUZE validní JSON (žádný markdown):
 // =====================================================
 // 🎬 FILMOVÁ NÁLADA
 // =====================================================
-function openMoodModal() { const m=document.getElementById('moodModal'); if(m){m.style.display='flex';resetMood();} }
-function closeMoodModal() { const m=document.getElementById('moodModal'); if(m)m.style.display='none'; }
+function openMoodModal() { const m=document.getElementById('moodModal'); if(m){m.style.display='flex';resetMood();} if(window.updatePwaBtn)updatePwaBtn(); }
+function closeMoodModal() { const m=document.getElementById('moodModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
 function resetMood() {
   const pick=document.getElementById('moodPicker'); const res=document.getElementById('moodResult');
   if(pick)pick.style.display='grid'; if(res){res.style.display='none';res.innerHTML='';}
@@ -18601,8 +18617,8 @@ async function loadMoodTips(mood) {
 // =====================================================
 // 📊 MOJE STATISTIKY
 // =====================================================
-function openMyStatsModal() { const m=document.getElementById('myStatsModal'); if(m){m.style.display='flex';renderMyStats();} }
-function closeMyStatsModal() { const m=document.getElementById('myStatsModal'); if(m)m.style.display='none'; }
+function openMyStatsModal() { const m=document.getElementById('myStatsModal'); if(m){m.style.display='flex';renderMyStats();} if(window.updatePwaBtn)updatePwaBtn(); }
+function closeMyStatsModal() { const m=document.getElementById('myStatsModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
 function renderMyStats() {
   const body = document.getElementById('myStatsBody');
   if (!body) return;
@@ -18622,19 +18638,30 @@ function renderMyStats() {
   // Avg rating
   const ratings = favs.filter(f=>f.rating>0).map(f=>f.rating);
   const avgRating = ratings.length ? (ratings.reduce((a,b)=>a+b,0)/ratings.length).toFixed(1) : '—';
-  const statCard = (emoji,label,value,color='#fff') =>
-    `<div style="background:#1a1a1a;border-radius:12px;padding:14px;border:1px solid #2a2a2a;display:flex;align-items:center;gap:12px;">
+  const statCard = (emoji,label,value,color,onclick) => {
+    const clickable = !!onclick;
+    return `<div ${onclick?`onclick="${onclick}"`:''}
+      style="background:#1a1a1a;border-radius:12px;padding:14px;border:1px solid #2a2a2a;display:flex;align-items:center;gap:12px;${clickable?'cursor:pointer;transition:border-color .15s,background .15s;':''}"
+      ${clickable?`onmouseover="this.style.borderColor='${color}';this.style.background='#222'" onmouseout="this.style.borderColor='#2a2a2a';this.style.background='#1a1a1a'"`:''}
+    >
       <span style="font-size:1.6rem;">${emoji}</span>
-      <div><div style="color:#888;font-size:0.72rem;">${label}</div><div style="font-weight:700;font-size:1.1rem;color:${color};">${value}</div></div>
+      <div style="flex:1;min-width:0;">
+        <div style="color:#888;font-size:0.72rem;">${label}</div>
+        <div style="font-weight:700;font-size:1.1rem;color:${color};">${value}</div>
+      </div>
+      ${clickable?`<span style="color:${color};font-size:1rem;opacity:0.7;">›</span>`:''}
     </div>`;
+  };
+  const openFavs = `closeMyStatsModal();setTimeout(()=>window._openFavsModal&&window._openFavsModal(),80)`;
+  const openWatched = `closeMyStatsModal();setTimeout(()=>window._openWatchedModal&&window._openWatchedModal(),80)`;
   body.innerHTML = `<div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-      ${statCard('❤️','Oblíbené filmy',movies.length,'#fb7185')}
-      ${statCard('📺','Oblíbené seriály',tvShows.length,'#38bdf8')}
-      ${statCard('✅','Shlédnuto filmů',watchedMovies.length,'#4ade80')}
-      ${statCard('✅','Shlédnuto seriálů',watchedTv.length,'#4ade80')}
-      ${statCard('🎭','Oblíbení herci',actorFavs.length,'#a855f7')}
-      ${statCard('★','Průměrné hodnocení','★ '+avgRating,'#fbbf24')}
+      ${statCard('❤️','Oblíbené filmy',movies.length,'#fb7185',openFavs)}
+      ${statCard('📺','Oblíbené seriály',tvShows.length,'#38bdf8',openFavs)}
+      ${statCard('✅','Shlédnuto filmů',watchedMovies.length,'#4ade80',openWatched)}
+      ${statCard('✅','Shlédnuto seriálů',watchedTv.length,'#4ade80',openWatched)}
+      ${statCard('🎭','Oblíbení herci',actorFavs.length,'#a855f7',null)}
+      ${statCard('★','Průměrné hodnocení','★ '+avgRating,'#fbbf24',null)}
     </div>
     ${favs.length===0?`<div style="text-align:center;padding:20px;color:#555;font-size:0.85rem;">Zatím žádné oblíbené. Přidej filmy nebo seriály srdíčkem ❤️</div>`:''}
     ${topYears.length?`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:8px;">
