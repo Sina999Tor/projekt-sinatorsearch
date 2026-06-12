@@ -9510,6 +9510,34 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
             <span style="font-size:1.6rem;">🤖</span>
             <div><div style="font-weight:700;background:linear-gradient(135deg,#a78bfa,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">AI Zábava</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Doporučení, kvízy a hry s AI</div></div>
         </button>
+        <button onclick="closeZabavaModal();openNahodnyTipModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(255,107,107,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#ff6b6b'" onmouseout="this.style.borderColor='rgba(255,107,107,0.35)'">
+            <span style="font-size:1.6rem;">🎲</span>
+            <div><div style="font-weight:700;color:#ff6b6b;">Co dnes sledovat?</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Náhodný tip na film nebo seriál</div></div>
+        </button>
+        <button onclick="closeZabavaModal();openKvizModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(251,191,36,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#fbbf24'" onmouseout="this.style.borderColor='rgba(251,191,36,0.35)'">
+            <span style="font-size:1.6rem;">🧠</span>
+            <div><div style="font-weight:700;color:#fbbf24;">Filmový kvíz</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">5 otázek o filmech a seriálech s AI</div></div>
+        </button>
+        <button onclick="closeZabavaModal();openZebricky()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(34,197,94,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#22c55e'" onmouseout="this.style.borderColor='rgba(34,197,94,0.35)'">
+            <span style="font-size:1.6rem;">🏆</span>
+            <div><div style="font-weight:700;color:#22c55e;">Filmové žebříčky</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Nejlepší filmy všech dob, dekád a žánrů</div></div>
+        </button>
+        <button onclick="closeZabavaModal();openUpcomingModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(56,189,248,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#38bdf8'" onmouseout="this.style.borderColor='rgba(56,189,248,0.35)'">
+            <span style="font-size:1.6rem;">📅</span>
+            <div><div style="font-weight:700;color:#38bdf8;">Co se chystá</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Brzy v kinech a nové seriály</div></div>
+        </button>
+        <button onclick="closeZabavaModal();openPorovnaniModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(251,113,133,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#fb7185'" onmouseout="this.style.borderColor='rgba(251,113,133,0.35)'">
+            <span style="font-size:1.6rem;">🎭</span>
+            <div><div style="font-weight:700;color:#fb7185;">Porovnání filmů</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">AI porovná dva filmy nebo seriály</div></div>
+        </button>
+        <button onclick="closeZabavaModal();openMoodModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(168,85,247,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#a855f7'" onmouseout="this.style.borderColor='rgba(168,85,247,0.35)'">
+            <span style="font-size:1.6rem;">🎬</span>
+            <div><div style="font-weight:700;color:#a855f7;">Filmová nálada</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Vyber náladu — dostaneš 3 tipy</div></div>
+        </button>
+        <button onclick="closeZabavaModal();openMyStatsModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(251,146,60,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#fb923c'" onmouseout="this.style.borderColor='rgba(251,146,60,0.35)'">
+            <span style="font-size:1.6rem;">📊</span>
+            <div><div style="font-weight:700;color:#fb923c;">Moje statistiky</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Přehled tvé knihovny oblíbených</div></div>
+        </button>
     </div>
 </div>
 
@@ -18010,4 +18038,624 @@ const _origOpenSettings = window.openSettingsModal;
 if (_origOpenSettings) {
   window.openSettingsModal = function(...a) { _origOpenSettings(...a); setTimeout(updateAdminStatus, 100); };
 }
+</script>
+
+<!-- =====================================================
+     🎲 NÁHODNÝ TIP MODAL
+===================================================== -->
+<div id="nahodnyTipModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)closeNahodnyTipModal()">
+  <div style="background:#141414;border:1px solid #2a2a2a;border-radius:20px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.8);">
+    <div style="padding:16px 18px;border-bottom:1px solid #2a2a2a;display:flex;align-items:center;justify-content:space-between;">
+      <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">🎲 Co dnes sledovat?</h3>
+      <button onclick="closeNahodnyTipModal()" style="background:none;border:1px solid #333;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid #2a2a2a;">
+      <button onclick="ntSetFilter('movie')" id="ntBtnMovie" class="nt-filter-btn nt-active" style="flex:1;padding:9px;border-radius:10px;border:1px solid #e50914;background:rgba(229,9,20,0.15);color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;">🎬 Film</button>
+      <button onclick="ntSetFilter('tv')" id="ntBtnTv" class="nt-filter-btn" style="flex:1;padding:9px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.85rem;font-weight:600;cursor:pointer;">📺 Seriál</button>
+      <button onclick="ntSetFilter('both')" id="ntBtnBoth" class="nt-filter-btn" style="flex:1;padding:9px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.85rem;font-weight:600;cursor:pointer;">🎲 Obojí</button>
+    </div>
+    <div id="ntResult" style="padding:20px;min-height:180px;display:flex;align-items:center;justify-content:center;">
+      <p style="color:#888;font-size:0.9rem;text-align:center;">Stiskni tlačítko a dostaneš tip!</p>
+    </div>
+    <div style="padding:14px 16px;border-top:1px solid #2a2a2a;">
+      <button onclick="loadNahodnyTip()" id="ntBtn" style="width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,#ff6b6b,#e53e3e);border:none;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;transition:opacity .2s;">🎲 Dej mi tip!</button>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================
+     🧠 FILMOVÝ KVÍZ MODAL
+===================================================== -->
+<div id="kvizModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" onclick="if(event.target===this)closeKvizModal()">
+  <div style="background:#141414;width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #2a2a2a;">
+    <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">🧠 Filmový kvíz</h3>
+    <button onclick="closeKvizModal()" style="background:none;border:1px solid #333;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:16px;" id="kvizBody">
+    <div style="text-align:center;padding:30px 16px;">
+      <div style="font-size:3rem;margin-bottom:16px;">🎬</div>
+      <p style="color:#ccc;font-size:1rem;margin-bottom:8px;font-weight:600;">Otestuj své filmové znalosti!</p>
+      <p style="color:#888;font-size:0.85rem;margin-bottom:24px;">AI vygeneruje 5 otázek s možnostmi A–D. Na konci uvidíš výsledek.</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <button onclick="kvizSetDifficulty('easy')" id="kvizDiffEasy" class="kviz-diff-btn kviz-diff-active" style="flex:1;padding:9px;border-radius:10px;border:1px solid #22c55e;background:rgba(34,197,94,0.15);color:#fff;font-size:0.82rem;font-weight:600;cursor:pointer;min-width:80px;">😊 Lehký</button>
+        <button onclick="kvizSetDifficulty('medium')" id="kvizDiffMedium" class="kviz-diff-btn" style="flex:1;padding:9px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.82rem;font-weight:600;cursor:pointer;min-width:80px;">🤔 Střední</button>
+        <button onclick="kvizSetDifficulty('hard')" id="kvizDiffHard" class="kviz-diff-btn" style="flex:1;padding:9px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.82rem;font-weight:600;cursor:pointer;min-width:80px;">🔥 Těžký</button>
+      </div>
+      <button onclick="startKviz()" style="width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border:none;color:#000;font-size:1rem;font-weight:800;cursor:pointer;">🚀 Spustit kvíz</button>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================
+     🏆 FILMOVÉ ŽEBŘÍČKY MODAL
+===================================================== -->
+<div id="zebrickyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" onclick="if(event.target===this)closeZebrickyModal()">
+  <div style="background:#141414;width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #2a2a2a;">
+    <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">🏆 Filmové žebříčky</h3>
+    <button onclick="closeZebrickyModal()" style="background:none;border:1px solid #333;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
+  </div>
+  <div style="flex-shrink:0;display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid #2a2a2a;overflow-x:auto;scrollbar-width:none;">
+    <button onclick="zebrickySetTab('top_all')" id="ztab_top_all" class="zeb-tab zeb-tab-active" style="flex-shrink:0;padding:7px 14px;border-radius:16px;border:1px solid #22c55e;background:rgba(34,197,94,0.15);color:#fff;font-size:0.78rem;font-weight:700;cursor:pointer;white-space:nowrap;">⭐ Všech dob</button>
+    <button onclick="zebrickySetTab('popular')" id="ztab_popular" class="zeb-tab" style="flex-shrink:0;padding:7px 14px;border-radius:16px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">🔥 Populární</button>
+    <button onclick="zebrickySetTab('decade_2020')" id="ztab_decade_2020" class="zeb-tab" style="flex-shrink:0;padding:7px 14px;border-radius:16px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">📅 2020s</button>
+    <button onclick="zebrickySetTab('decade_2010')" id="ztab_decade_2010" class="zeb-tab" style="flex-shrink:0;padding:7px 14px;border-radius:16px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">📅 2010s</button>
+    <button onclick="zebrickySetTab('decade_2000')" id="ztab_decade_2000" class="zeb-tab" style="flex-shrink:0;padding:7px 14px;border-radius:16px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">📅 2000s</button>
+    <button onclick="zebrickySetTab('genre_28')" id="ztab_genre_28" class="zeb-tab" style="flex-shrink:0;padding:7px 14px;border-radius:16px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">💥 Akční</button>
+    <button onclick="zebrickySetTab('genre_35')" id="ztab_genre_35" class="zeb-tab" style="flex-shrink:0;padding:7px 14px;border-radius:16px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">😂 Komedie</button>
+    <button onclick="zebrickySetTab('genre_27')" id="ztab_genre_27" class="zeb-tab" style="flex-shrink:0;padding:7px 14px;border-radius:16px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">😱 Horor</button>
+    <button onclick="zebrickySetTab('genre_18')" id="ztab_genre_18" class="zeb-tab" style="flex-shrink:0;padding:7px 14px;border-radius:16px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">🎭 Drama</button>
+    <button onclick="zebrickySetTab('genre_878')" id="ztab_genre_878" class="zeb-tab" style="flex-shrink:0;padding:7px 14px;border-radius:16px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">🚀 Sci-Fi</button>
+  </div>
+  <div id="zebrickyBody" style="flex:1;overflow-y:auto;padding:12px;"></div>
+</div>
+
+<!-- =====================================================
+     📅 CO SE CHYSTÁ MODAL
+===================================================== -->
+<div id="upcomingModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" onclick="if(event.target===this)closeUpcomingModal()">
+  <div style="background:#141414;width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #2a2a2a;">
+    <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">📅 Co se chystá</h3>
+    <button onclick="closeUpcomingModal()" style="background:none;border:1px solid #333;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
+  </div>
+  <div style="flex-shrink:0;display:flex;gap:0;border-bottom:1px solid #2a2a2a;">
+    <button onclick="upcomingSetTab('movies')" id="upTabMovies" style="flex:1;padding:10px;background:rgba(56,189,248,0.15);border:none;border-bottom:2px solid #38bdf8;color:#fff;font-size:0.85rem;font-weight:700;cursor:pointer;">🎬 Filmy v kinech</button>
+    <button onclick="upcomingSetTab('tv')" id="upTabTv" style="flex:1;padding:10px;background:transparent;border:none;border-bottom:2px solid transparent;color:#888;font-size:0.85rem;font-weight:600;cursor:pointer;">📺 Nové seriály</button>
+  </div>
+  <div id="upcomingBody" style="flex:1;overflow-y:auto;padding:12px;"></div>
+</div>
+
+<!-- =====================================================
+     🎭 POROVNÁNÍ FILMŮ MODAL
+===================================================== -->
+<div id="porovnaniModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" onclick="if(event.target===this)closePorovnaniModal()">
+  <div style="background:#141414;width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #2a2a2a;">
+    <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">🎭 Porovnání filmů</h3>
+    <button onclick="closePorovnaniModal()" style="background:none;border:1px solid #333;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:16px;">
+    <div id="porovnaniInput">
+      <p style="color:#888;font-size:0.82rem;margin-bottom:14px;">Zadej dva filmy nebo seriály a AI je porovná z různých pohledů.</p>
+      <input id="porovnaniFilm1" type="text" placeholder="První film / seriál…" style="width:100%;padding:12px 14px;border-radius:10px;background:#0a0a0a;border:1.5px solid #333;color:#fff;font-size:0.95rem;margin-bottom:10px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='#fb7185'" onblur="this.style.borderColor='#333'">
+      <div style="text-align:center;color:#555;font-size:1.2rem;margin:4px 0;">VS</div>
+      <input id="porovnaniFilm2" type="text" placeholder="Druhý film / seriál…" style="width:100%;padding:12px 14px;border-radius:10px;background:#0a0a0a;border:1.5px solid #333;color:#fff;font-size:0.95rem;margin-bottom:16px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='#fb7185'" onblur="this.style.borderColor='#333'">
+      <button onclick="spustPorovnani()" style="width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,#fb7185,#e11d48);border:none;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;">⚔️ Porovnat!</button>
+    </div>
+    <div id="porovnaniResult" style="display:none;margin-top:16px;"></div>
+  </div>
+</div>
+
+<!-- =====================================================
+     🎬 FILMOVÁ NÁLADA MODAL
+===================================================== -->
+<div id="moodModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" onclick="if(event.target===this)closeMoodModal()">
+  <div style="background:#141414;width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #2a2a2a;">
+    <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">🎬 Filmová nálada</h3>
+    <button onclick="closeMoodModal()" style="background:none;border:1px solid #333;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:16px;">
+    <p style="color:#888;font-size:0.85rem;margin-bottom:16px;text-align:center;">Jak se teď cítíš? Vyber náladu a dostaneš 3 tipy!</p>
+    <div id="moodPicker" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      <button onclick="loadMoodTips('relax')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+        <span style="font-size:1.8rem;">😌</span><span>Relax</span><span style="font-size:0.7rem;color:#94a3b8;">Pohodová podívaná</span>
+      </button>
+      <button onclick="loadMoodTips('akce')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+        <span style="font-size:1.8rem;">💥</span><span>Akce</span><span style="font-size:0.7rem;color:#94a3b8;">Adrenalín a napětí</span>
+      </button>
+      <button onclick="loadMoodTips('smich')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+        <span style="font-size:1.8rem;">😂</span><span>Smích</span><span style="font-size:0.7rem;color:#94a3b8;">Komedie a závan humoru</span>
+      </button>
+      <button onclick="loadMoodTips('dojemny')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+        <span style="font-size:1.8rem;">🥺</span><span>Dojemný</span><span style="font-size:0.7rem;color:#94a3b8;">Drama a emoce</span>
+      </button>
+      <button onclick="loadMoodTips('napeti')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+        <span style="font-size:1.8rem;">😰</span><span>Napětí</span><span style="font-size:0.7rem;color:#94a3b8;">Thriller a horor</span>
+      </button>
+      <button onclick="loadMoodTips('inspirace')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+        <span style="font-size:1.8rem;">✨</span><span>Inspirace</span><span style="font-size:0.7rem;color:#94a3b8;">Motivující a silné příběhy</span>
+      </button>
+    </div>
+    <div id="moodResult" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- =====================================================
+     📊 MOJE STATISTIKY MODAL
+===================================================== -->
+<div id="myStatsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" onclick="if(event.target===this)closeMyStatsModal()">
+  <div style="background:#141414;width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #2a2a2a;">
+    <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">📊 Moje statistiky</h3>
+    <button onclick="closeMyStatsModal()" style="background:none;border:1px solid #333;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
+  </div>
+  <div id="myStatsBody" style="flex:1;overflow-y:auto;padding:16px;"></div>
+</div>
+
+<script>
+// =====================================================
+// 🎲 NÁHODNÝ TIP
+// =====================================================
+let _ntFilter = 'movie';
+function openNahodnyTipModal() {
+  const m = document.getElementById('nahodnyTipModal');
+  if (m) { m.style.display = 'flex'; }
+}
+function closeNahodnyTipModal() {
+  const m = document.getElementById('nahodnyTipModal');
+  if (m) m.style.display = 'none';
+}
+function ntSetFilter(f) {
+  _ntFilter = f;
+  ['movie','tv','both'].forEach(x => {
+    const btn = document.getElementById('ntBtn'+x.charAt(0).toUpperCase()+x.slice(1));
+    if (!btn) return;
+    if (x === f) {
+      btn.style.borderColor = '#e50914'; btn.style.background = 'rgba(229,9,20,0.15)'; btn.style.color = '#fff';
+    } else {
+      btn.style.borderColor = '#333'; btn.style.background = '#1a1a1a'; btn.style.color = '#aaa';
+    }
+  });
+}
+async function loadNahodnyTip() {
+  const res = document.getElementById('ntResult');
+  const btn = document.getElementById('ntBtn');
+  if (!res) return;
+  res.innerHTML = '<div style="text-align:center;color:#888;padding:20px;font-size:2rem;">⏳</div>';
+  if (btn) btn.disabled = true;
+  try {
+    const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+    if (!tmdbKey) { res.innerHTML = '<p style="color:#e50914;text-align:center;font-size:0.85rem;">Chybí TMDB API klíč v nastavení.</p>'; if(btn)btn.disabled=false; return; }
+    const type = _ntFilter === 'both' ? (Math.random() > 0.5 ? 'movie' : 'tv') : _ntFilter;
+    const page = Math.floor(Math.random() * 20) + 1;
+    const url = `https://api.themoviedb.org/3/discover/${type}?api_key=${tmdbKey}&language=cs-CZ&sort_by=popularity.desc&vote_count.gte=100&page=${page}`;
+    const data = await fetch(url).then(r => r.json());
+    const items = (data.results || []).filter(i => i.poster_path);
+    if (!items.length) { res.innerHTML = '<p style="color:#888;text-align:center;">Nic nenalezeno, zkus znovu.</p>'; if(btn)btn.disabled=false; return; }
+    const item = items[Math.floor(Math.random() * items.length)];
+    const title = item.title || item.name || '?';
+    const year = (item.release_date || item.first_air_date || '').substring(0,4);
+    const rating = item.vote_average?.toFixed(1) || '?';
+    const poster = item.poster_path ? `https://image.tmdb.org/t/p/w300${item.poster_path}` : '';
+    const badge = type === 'tv' ? '📺 Seriál' : '🎬 Film';
+    res.innerHTML = `<div style="display:flex;gap:14px;align-items:flex-start;width:100%;">
+      ${poster ? `<img src="${poster}" style="width:80px;border-radius:10px;flex-shrink:0;" onclick="closeNahodnyTipModal();typeof openDetail==='function'&&openDetail(${item.id},'${type}')" loading="lazy">` : ''}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:1rem;color:#fff;margin-bottom:4px;">${title}</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+          <span style="background:rgba(229,9,20,0.2);color:#ff6b6b;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600;">${badge}</span>
+          ${year ? `<span style="color:#888;font-size:0.78rem;">${year}</span>` : ''}
+          <span style="color:#fbbf24;font-size:0.78rem;">★ ${rating}</span>
+        </div>
+        <p style="color:#aaa;font-size:0.78rem;line-height:1.5;margin:0 0 10px;">${(item.overview||'Popis není k dispozici.').substring(0,160)}${item.overview?.length>160?'…':''}</p>
+        <button onclick="closeNahodnyTipModal();typeof openDetail==='function'&&openDetail(${item.id},'${type}')" style="padding:8px 16px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:0.82rem;font-weight:600;cursor:pointer;">Detail →</button>
+      </div>
+    </div>`;
+  } catch(e) { res.innerHTML = '<p style="color:#e50914;text-align:center;font-size:0.85rem;">Chyba načítání. Zkus znovu.</p>'; }
+  if (btn) btn.disabled = false;
+}
+
+// =====================================================
+// 🧠 FILMOVÝ KVÍZ
+// =====================================================
+let _kvizDiff = 'easy', _kvizQuestions = [], _kvizCurrent = 0, _kvizScore = 0, _kvizAnswered = false;
+function openKvizModal() { const m=document.getElementById('kvizModal'); if(m){m.style.display='flex';} resetKvizUI(); }
+function closeKvizModal() { const m=document.getElementById('kvizModal'); if(m)m.style.display='none'; }
+function resetKvizUI() {
+  _kvizQuestions=[]; _kvizCurrent=0; _kvizScore=0; _kvizAnswered=false;
+  const b=document.getElementById('kvizBody');
+  if(!b)return;
+  b.innerHTML=`<div style="text-align:center;padding:30px 16px;">
+    <div style="font-size:3rem;margin-bottom:16px;">🎬</div>
+    <p style="color:#ccc;font-size:1rem;margin-bottom:8px;font-weight:600;">Otestuj své filmové znalosti!</p>
+    <p style="color:#888;font-size:0.85rem;margin-bottom:24px;">AI vygeneruje 5 otázek s možnostmi A–D. Na konci uvidíš výsledek.</p>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <button onclick="kvizSetDifficulty('easy')" id="kvizDiffEasy" class="kviz-diff-btn kviz-diff-active" style="flex:1;padding:9px;border-radius:10px;border:1px solid #22c55e;background:rgba(34,197,94,0.15);color:#fff;font-size:0.82rem;font-weight:600;cursor:pointer;min-width:80px;">😊 Lehký</button>
+      <button onclick="kvizSetDifficulty('medium')" id="kvizDiffMedium" class="kviz-diff-btn" style="flex:1;padding:9px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.82rem;font-weight:600;cursor:pointer;min-width:80px;">🤔 Střední</button>
+      <button onclick="kvizSetDifficulty('hard')" id="kvizDiffHard" class="kviz-diff-btn" style="flex:1;padding:9px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.82rem;font-weight:600;cursor:pointer;min-width:80px;">🔥 Těžký</button>
+    </div>
+    <button onclick="startKviz()" style="width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border:none;color:#000;font-size:1rem;font-weight:800;cursor:pointer;">🚀 Spustit kvíz</button>
+  </div>`;
+}
+function kvizSetDifficulty(d) {
+  _kvizDiff = d;
+  ['easy','medium','hard'].forEach(x => {
+    const btn = document.getElementById('kvizDiff'+x.charAt(0).toUpperCase()+x.slice(1));
+    if (!btn) return;
+    const colors = {easy:'#22c55e',medium:'#fbbf24',hard:'#ef4444'};
+    if (x===d) { btn.style.borderColor=colors[x]; btn.style.background=`rgba(${x==='easy'?'34,197,94':x==='medium'?'251,191,36':'239,68,68'},0.15)`; btn.style.color='#fff'; }
+    else { btn.style.borderColor='#333'; btn.style.background='#1a1a1a'; btn.style.color='#aaa'; }
+  });
+}
+async function startKviz() {
+  const b = document.getElementById('kvizBody');
+  if (!b) return;
+  b.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;font-size:0.9rem;">🤖 AI generuje otázky…<br><br><span style="font-size:2rem;">⏳</span></div>';
+  const diffText = {easy:'lehké (slavné filmy, známí herci)',medium:'středně těžké (méně známé detaily)',hard:'těžké (detaily, méně známé filmy)'};
+  const prompt = `Vygeneruj přesně 5 filmových/seriálových kvízových otázek v češtině. Obtížnost: ${diffText[_kvizDiff]}.
+Vrať POUZE validní JSON (žádný markdown, žádný text navíc):
+{"questions":[{"q":"Otázka?","a":["A) ..","B) ..","C) ..","D) .."],"correct":0}]}
+correct je index správné odpovědi (0-3). Otázky musí být různé, fakticky správné.`;
+  try {
+    const raw = await _zabavaAiCall(prompt);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    _kvizQuestions = parsed.questions || [];
+    if (!_kvizQuestions.length) throw new Error('empty');
+    _kvizCurrent = 0; _kvizScore = 0;
+    renderKvizQuestion();
+  } catch(e) {
+    b.innerHTML = '<div style="padding:20px;text-align:center;"><p style="color:#e50914;margin-bottom:16px;">❌ Chyba generování. Zkontroluj AI klíč v nastavení.</p><button onclick="resetKvizUI()" style="padding:10px 20px;border-radius:10px;background:#333;border:none;color:#fff;cursor:pointer;">← Zpět</button></div>';
+  }
+}
+function renderKvizQuestion() {
+  const b = document.getElementById('kvizBody');
+  if (!b || _kvizCurrent >= _kvizQuestions.length) { renderKvizResult(); return; }
+  const q = _kvizQuestions[_kvizCurrent];
+  _kvizAnswered = false;
+  b.innerHTML = `<div style="padding:4px 0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <span style="color:#888;font-size:0.8rem;">Otázka ${_kvizCurrent+1} / ${_kvizQuestions.length}</span>
+      <span style="color:#fbbf24;font-weight:700;">Skóre: ${_kvizScore}</span>
+    </div>
+    <div style="background:#1a1a1a;border-radius:14px;padding:16px;margin-bottom:16px;border:1px solid #2a2a2a;">
+      <p style="color:#fff;font-size:0.95rem;font-weight:600;line-height:1.5;margin:0;">🎬 ${q.q}</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;" id="kvizAnswers">
+      ${q.a.map((ans,i)=>`<button onclick="checkKvizAnswer(${i})" id="kvizAns_${i}" style="padding:13px 14px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:0.88rem;font-weight:500;cursor:pointer;text-align:left;transition:0.2s;" onmouseover="if(!this.disabled)this.style.borderColor='#fbbf24'" onmouseout="if(!this.disabled&&!this.dataset.state)this.style.borderColor='#333'">${ans}</button>`).join('')}
+    </div>
+    <div id="kvizFeedback" style="margin-top:12px;min-height:40px;"></div>
+  </div>`;
+}
+function checkKvizAnswer(idx) {
+  if (_kvizAnswered) return;
+  _kvizAnswered = true;
+  const q = _kvizQuestions[_kvizCurrent];
+  const correct = q.correct;
+  for (let i = 0; i < 4; i++) {
+    const btn = document.getElementById('kvizAns_'+i);
+    if (!btn) continue;
+    btn.disabled = true;
+    if (i === correct) { btn.style.background='rgba(34,197,94,0.2)'; btn.style.borderColor='#22c55e'; btn.style.color='#4ade80'; }
+    else if (i === idx && idx !== correct) { btn.style.background='rgba(239,68,68,0.2)'; btn.style.borderColor='#ef4444'; btn.style.color='#f87171'; }
+  }
+  const fb = document.getElementById('kvizFeedback');
+  if (idx === correct) { _kvizScore++; if(fb) fb.innerHTML='<p style="color:#4ade80;font-weight:700;font-size:0.9rem;">✅ Správně!</p>'; }
+  else if(fb) fb.innerHTML='<p style="color:#f87171;font-weight:700;font-size:0.9rem;">❌ Špatně. Správná: '+q.a[correct]+'</p>';
+  setTimeout(() => { _kvizCurrent++; renderKvizQuestion(); }, 1600);
+}
+function renderKvizResult() {
+  const b = document.getElementById('kvizBody');
+  if (!b) return;
+  const total = _kvizQuestions.length;
+  const pct = Math.round((_kvizScore/total)*100);
+  const emoji = pct>=80?'🏆':pct>=60?'🎉':pct>=40?'👍':'💪';
+  const msg = pct>=80?'Filmový expert!':pct>=60?'Výborně!':pct>=40?'Dobrá práce!':'Příště to bude lepší!';
+  b.innerHTML = `<div style="text-align:center;padding:30px 16px;">
+    <div style="font-size:4rem;margin-bottom:12px;">${emoji}</div>
+    <h2 style="color:#fff;font-size:1.4rem;margin-bottom:6px;">${msg}</h2>
+    <p style="color:#888;font-size:0.9rem;margin-bottom:20px;">Skóre: <strong style="color:#fbbf24;">${_kvizScore} / ${total}</strong> (${pct}%)</p>
+    <div style="background:#1a1a1a;border-radius:12px;height:8px;margin-bottom:24px;overflow:hidden;">
+      <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#fbbf24,#f59e0b);border-radius:12px;transition:width 0.8s;"></div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="startKviz()" style="flex:1;padding:13px;border-radius:12px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border:none;color:#000;font-size:0.95rem;font-weight:700;cursor:pointer;">🔄 Hrát znovu</button>
+      <button onclick="resetKvizUI()" style="flex:1;padding:13px;border-radius:12px;background:#1a1a1a;border:1px solid #333;color:#fff;font-size:0.95rem;font-weight:600;cursor:pointer;">← Menu</button>
+    </div>
+  </div>`;
+}
+
+// =====================================================
+// 🏆 FILMOVÉ ŽEBŘÍČKY
+// =====================================================
+let _zebrickyTab = 'top_all', _zebrickyCache = {};
+function openZebricky() { const m=document.getElementById('zebrickyModal'); if(m){m.style.display='flex';} zebrickySetTab('top_all'); }
+function closeZebrickyModal() { const m=document.getElementById('zebrickyModal'); if(m)m.style.display='none'; }
+function zebrickySetTab(tab) {
+  _zebrickyTab = tab;
+  document.querySelectorAll('.zeb-tab').forEach(b => {
+    b.style.background='#1a1a1a'; b.style.borderColor='#333'; b.style.color='#aaa'; b.style.fontWeight='600';
+  });
+  const active = document.getElementById('ztab_'+tab);
+  if (active) { active.style.background='rgba(34,197,94,0.15)'; active.style.borderColor='#22c55e'; active.style.color='#fff'; active.style.fontWeight='700'; }
+  loadZebricky(tab);
+}
+async function loadZebricky(tab) {
+  const body = document.getElementById('zebrickyBody');
+  if (!body) return;
+  if (_zebrickyCache[tab]) { body.innerHTML = _zebrickyCache[tab]; return; }
+  body.innerHTML = '<div style="text-align:center;padding:40px;font-size:2rem;">⏳</div>';
+  const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+  if (!tmdbKey) { body.innerHTML='<p style="color:#e50914;text-align:center;padding:20px;">Chybí TMDB API klíč.</p>'; return; }
+  let url = '';
+  const base = 'https://api.themoviedb.org/3/discover/movie?api_key='+tmdbKey+'&language=cs-CZ&sort_by=vote_average.desc&vote_count.gte=500';
+  if (tab==='top_all') url=base+'&page=1';
+  else if (tab==='popular') url=`https://api.themoviedb.org/3/movie/popular?api_key=${tmdbKey}&language=cs-CZ&page=1`;
+  else if (tab==='decade_2020') url=base+'&primary_release_date.gte=2020-01-01&primary_release_date.lte=2029-12-31';
+  else if (tab==='decade_2010') url=base+'&primary_release_date.gte=2010-01-01&primary_release_date.lte=2019-12-31';
+  else if (tab==='decade_2000') url=base+'&primary_release_date.gte=2000-01-01&primary_release_date.lte=2009-12-31';
+  else if (tab.startsWith('genre_')) url=base+'&with_genres='+tab.replace('genre_','');
+  try {
+    const data = await fetch(url).then(r=>r.json());
+    const items = (data.results||[]).slice(0,20);
+    if (!items.length) { body.innerHTML='<p style="color:#888;text-align:center;padding:20px;">Žádné výsledky.</p>'; return; }
+    const html = items.map((it,idx)=>{
+      const title=it.title||it.name||'?';
+      const year=(it.release_date||'').substring(0,4);
+      const rating=it.vote_average?.toFixed(1)||'?';
+      const poster=it.poster_path?`https://image.tmdb.org/t/p/w92${it.poster_path}`:'';
+      return `<div onclick="closeZebrickyModal();typeof openDetail==='function'&&openDetail(${it.id},'movie')" style="display:flex;align-items:center;gap:12px;padding:10px 6px;border-bottom:1px solid #1e1e1e;cursor:pointer;transition:background 0.15s;border-radius:8px;" onmouseover="this.style.background='#1a1a1a'" onmouseout="this.style.background='transparent'">
+        <span style="color:#555;font-size:0.8rem;font-weight:700;min-width:22px;text-align:right;">${idx+1}.</span>
+        ${poster?`<img src="${poster}" style="width:38px;height:56px;object-fit:cover;border-radius:5px;flex-shrink:0;" loading="lazy">`:'<div style="width:38px;height:56px;background:#1a1a1a;border-radius:5px;flex-shrink:0;"></div>'}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;color:#fff;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
+          <div style="color:#888;font-size:0.75rem;">${year}</div>
+        </div>
+        <span style="color:#fbbf24;font-size:0.85rem;font-weight:700;flex-shrink:0;">★ ${rating}</span>
+      </div>`;
+    }).join('');
+    _zebrickyCache[tab] = '<div style="padding:4px 0;">'+html+'</div>';
+    body.innerHTML = _zebrickyCache[tab];
+  } catch(e) { body.innerHTML='<p style="color:#e50914;text-align:center;padding:20px;">Chyba načítání.</p>'; }
+}
+
+// =====================================================
+// 📅 CO SE CHYSTÁ
+// =====================================================
+let _upcomingTab = 'movies', _upcomingCache = {};
+function openUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m){m.style.display='flex';} upcomingSetTab('movies'); }
+function closeUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m)m.style.display='none'; }
+function upcomingSetTab(tab) {
+  _upcomingTab = tab;
+  const tabs = {movies:'upTabMovies',tv:'upTabTv'};
+  Object.entries(tabs).forEach(([k,id])=>{
+    const btn=document.getElementById(id);
+    if(!btn)return;
+    if(k===tab){btn.style.background='rgba(56,189,248,0.15)';btn.style.borderBottom='2px solid #38bdf8';btn.style.color='#fff';}
+    else{btn.style.background='transparent';btn.style.borderBottom='2px solid transparent';btn.style.color='#888';}
+  });
+  loadUpcoming(tab);
+}
+async function loadUpcoming(tab) {
+  const body = document.getElementById('upcomingBody');
+  if (!body) return;
+  if (_upcomingCache[tab]) { body.innerHTML = _upcomingCache[tab]; return; }
+  body.innerHTML='<div style="text-align:center;padding:40px;font-size:2rem;">⏳</div>';
+  const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+  if (!tmdbKey) { body.innerHTML='<p style="color:#e50914;text-align:center;padding:20px;">Chybí TMDB API klíč.</p>'; return; }
+  const url = tab==='movies'
+    ? `https://api.themoviedb.org/3/movie/upcoming?api_key=${tmdbKey}&language=cs-CZ&page=1&region=CZ`
+    : `https://api.themoviedb.org/3/tv/on_the_air?api_key=${tmdbKey}&language=cs-CZ&page=1`;
+  try {
+    const data = await fetch(url).then(r=>r.json());
+    const items = (data.results||[]).slice(0,30);
+    if (!items.length) { body.innerHTML='<p style="color:#888;text-align:center;padding:20px;">Žádné výsledky.</p>'; return; }
+    const html = items.map(it=>{
+      const title=it.title||it.name||'?';
+      const date=it.release_date||it.first_air_date||'';
+      const year=date.substring(0,4);
+      const poster=it.poster_path?`https://image.tmdb.org/t/p/w92${it.poster_path}`:'';
+      const type=tab==='movies'?'movie':'tv';
+      const rating=it.vote_average>0?`★ ${it.vote_average.toFixed(1)}`:'Nové';
+      const dateLabel=date?new Date(date).toLocaleDateString('cs-CZ',{day:'numeric',month:'long',year:'numeric'}):'';
+      return `<div onclick="closeUpcomingModal();typeof openDetail==='function'&&openDetail(${it.id},'${type}')" style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid #1a1a1a;cursor:pointer;border-radius:8px;transition:background 0.15s;" onmouseover="this.style.background='#1a1a1a'" onmouseout="this.style.background='transparent'">
+        ${poster?`<img src="${poster}" style="width:44px;height:64px;object-fit:cover;border-radius:6px;flex-shrink:0;" loading="lazy">`:'<div style="width:44px;height:64px;background:#1a1a1a;border-radius:6px;flex-shrink:0;"></div>'}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;color:#fff;font-size:0.88rem;margin-bottom:3px;">${title}</div>
+          ${dateLabel?`<div style="color:#38bdf8;font-size:0.72rem;margin-bottom:2px;">📅 ${dateLabel}</div>`:''}
+          <div style="color:#fbbf24;font-size:0.75rem;">${rating}</div>
+        </div>
+      </div>`;
+    }).join('');
+    _upcomingCache[tab] = '<div style="padding:4px 0;">'+html+'</div>';
+    body.innerHTML = _upcomingCache[tab];
+  } catch(e) { body.innerHTML='<p style="color:#e50914;text-align:center;padding:20px;">Chyba načítání.</p>'; }
+}
+
+// =====================================================
+// 🎭 POROVNÁNÍ FILMŮ
+// =====================================================
+function openPorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m){m.style.display='flex';resetPorovnani();} }
+function closePorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m)m.style.display='none'; }
+function resetPorovnani() {
+  const inp=document.getElementById('porovnaniInput'); const res=document.getElementById('porovnaniResult');
+  if(inp){inp.style.display='block';} if(res){res.style.display='none';res.innerHTML='';}
+  const f1=document.getElementById('porovnaniFilm1'); const f2=document.getElementById('porovnaniFilm2');
+  if(f1)f1.value=''; if(f2)f2.value='';
+}
+async function spustPorovnani() {
+  const f1 = document.getElementById('porovnaniFilm1')?.value?.trim();
+  const f2 = document.getElementById('porovnaniFilm2')?.value?.trim();
+  if (!f1 || !f2) { alert('Zadej oba filmy!'); return; }
+  const inp=document.getElementById('porovnaniInput'); const res=document.getElementById('porovnaniResult');
+  if(inp) inp.style.display='none';
+  if(res) { res.style.display='block'; res.innerHTML='<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI porovnává…<br><br>⏳</div>'; }
+  const prompt = `Porovnej tyto dva filmy/seriály v češtině: "${f1}" VS "${f2}".
+Vrať POUZE validní JSON (žádný markdown):
+{"title1":"${f1}","title2":"${f2}","categories":[{"name":"Žánr a atmosféra","v1":"...","v2":"..."},{"name":"Herci a výkony","v1":"...","v2":"..."},{"name":"Příběh a tempo","v1":"...","v2":"..."},{"name":"Pro koho je vhodný","v1":"...","v2":"..."}],"winner":"${f1} nebo ${f2} nebo nerozhodně","reason":"Krátké odůvodnění vítěze v 1-2 větách."}`;
+  try {
+    const raw = await _zabavaAiCall(prompt);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const d = JSON.parse(clean);
+    const html = `<div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+        <div style="background:rgba(251,113,133,0.1);border:1px solid rgba(251,113,133,0.3);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:1.4rem;">🎬</div>
+          <div style="font-weight:700;color:#fb7185;font-size:0.9rem;margin-top:4px;">${d.title1||f1}</div>
+        </div>
+        <div style="background:rgba(251,113,133,0.1);border:1px solid rgba(251,113,133,0.3);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:1.4rem;">🎬</div>
+          <div style="font-weight:700;color:#fb7185;font-size:0.9rem;margin-top:4px;">${d.title2||f2}</div>
+        </div>
+      </div>
+      ${(d.categories||[]).map(c=>`<div style="background:#1a1a1a;border-radius:10px;padding:12px;margin-bottom:8px;border:1px solid #2a2a2a;">
+        <div style="font-weight:700;color:#fb7185;font-size:0.8rem;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">${c.name}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="color:#ddd;font-size:0.8rem;line-height:1.4;">${c.v1}</div>
+          <div style="color:#ddd;font-size:0.8rem;line-height:1.4;">${c.v2}</div>
+        </div>
+      </div>`).join('')}
+      <div style="background:linear-gradient(135deg,rgba(251,113,133,0.15),rgba(239,68,68,0.1));border:1px solid rgba(251,113,133,0.4);border-radius:12px;padding:14px;margin-top:4px;">
+        <div style="font-weight:700;color:#fff;margin-bottom:4px;">🏆 Vítěz: <span style="color:#fbbf24;">${d.winner||'Nerozhodně'}</span></div>
+        <div style="color:#aaa;font-size:0.82rem;line-height:1.5;">${d.reason||''}</div>
+      </div>
+      <button onclick="resetPorovnani()" style="width:100%;margin-top:14px;padding:12px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#fff;font-size:0.88rem;cursor:pointer;">🔄 Porovnat jiné</button>
+    </div>`;
+    if(res) res.innerHTML = html;
+  } catch(e) {
+    if(res) res.innerHTML='<div style="padding:20px;text-align:center;"><p style="color:#e50914;margin-bottom:16px;">❌ Chyba. Zkontroluj AI klíč v nastavení.</p><button onclick="resetPorovnani()" style="padding:10px 20px;border-radius:10px;background:#333;border:none;color:#fff;cursor:pointer;">← Zpět</button></div>';
+  }
+}
+
+// =====================================================
+// 🎬 FILMOVÁ NÁLADA
+// =====================================================
+function openMoodModal() { const m=document.getElementById('moodModal'); if(m){m.style.display='flex';resetMood();} }
+function closeMoodModal() { const m=document.getElementById('moodModal'); if(m)m.style.display='none'; }
+function resetMood() {
+  const pick=document.getElementById('moodPicker'); const res=document.getElementById('moodResult');
+  if(pick)pick.style.display='grid'; if(res){res.style.display='none';res.innerHTML='';}
+}
+async function loadMoodTips(mood) {
+  const pick=document.getElementById('moodPicker'); const res=document.getElementById('moodResult');
+  if(pick)pick.style.display='none';
+  if(res){res.style.display='block';res.innerHTML='<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI vybírá tipy…<br><br>⏳</div>';}
+  const moodMap={relax:'relaxaci a pohodu (ne akční)',akce:'akci a adrenalín',smich:'smích a komedii',dojemny:'dojemný zážitek a emoce',napeti:'napětí, thriller nebo horor',inspirace:'inspiraci a motivaci'};
+  const prompt=`Doporuč 3 filmy nebo seriály na ${moodMap[mood]||mood}. Vrať POUZE validní JSON:
+{"tips":[{"title":"Název filmu","year":2020,"type":"film nebo seriál","reason":"Proč je vhodný pro tuto náladu — 1-2 věty."}]}`;
+  try {
+    const raw = await _zabavaAiCall(prompt);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const d = JSON.parse(clean);
+    const moodEmojis={relax:'😌',akce:'💥',smich:'😂',dojemny:'🥺',napeti:'😰',inspirace:'✨'};
+    const html=`<div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <span style="font-size:1.4rem;">${moodEmojis[mood]||'🎬'}</span>
+        <span style="color:#a855f7;font-weight:700;font-size:0.95rem;">Tipy pro tuto náladu:</span>
+      </div>
+      ${(d.tips||[]).map(t=>`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:0.95rem;">${t.title} ${t.year?`<span style="color:#888;font-size:0.8rem;">(${t.year})</span>`:''}</div>
+        <div style="color:#a855f7;font-size:0.72rem;font-weight:600;margin:4px 0;">${t.type||''}</div>
+        <div style="color:#aaa;font-size:0.82rem;line-height:1.5;">${t.reason||''}</div>
+      </div>`).join('')}
+      <button onclick="resetMood()" style="width:100%;margin-top:6px;padding:12px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#fff;font-size:0.88rem;cursor:pointer;">← Jiná nálada</button>
+    </div>`;
+    if(res) res.innerHTML = html;
+  } catch(e) {
+    if(res) res.innerHTML='<div style="padding:20px;text-align:center;"><p style="color:#e50914;margin-bottom:12px;">❌ Chyba AI.</p><button onclick="resetMood()" style="padding:10px 20px;border-radius:10px;background:#333;border:none;color:#fff;cursor:pointer;">← Zpět</button></div>';
+  }
+}
+
+// =====================================================
+// 📊 MOJE STATISTIKY
+// =====================================================
+function openMyStatsModal() { const m=document.getElementById('myStatsModal'); if(m){m.style.display='flex';renderMyStats();} }
+function closeMyStatsModal() { const m=document.getElementById('myStatsModal'); if(m)m.style.display='none'; }
+function renderMyStats() {
+  const body = document.getElementById('myStatsBody');
+  if (!body) return;
+  const st = window.state || {};
+  const favs = st.favs || [];
+  const watched = st.watched || {};
+  const actorFavs = st.actorFavs || [];
+  const movies = favs.filter(f=>(f.type||'movie')==='movie');
+  const tvShows = favs.filter(f=>f.type==='tv');
+  const watchedArr = Object.values(watched);
+  const watchedMovies = watchedArr.filter(w=>w.type==='movie');
+  const watchedTv = watchedArr.filter(w=>w.type==='tv');
+  // Year distribution
+  const yearCounts = {};
+  favs.forEach(f=>{ const y=String(f.year||'').substring(0,4); if(y&&y.length===4){yearCounts[y]=(yearCounts[y]||0)+1;} });
+  const topYears = Object.entries(yearCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  // Avg rating
+  const ratings = favs.filter(f=>f.rating>0).map(f=>f.rating);
+  const avgRating = ratings.length ? (ratings.reduce((a,b)=>a+b,0)/ratings.length).toFixed(1) : '—';
+  const statCard = (emoji,label,value,color='#fff') =>
+    `<div style="background:#1a1a1a;border-radius:12px;padding:14px;border:1px solid #2a2a2a;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:1.6rem;">${emoji}</span>
+      <div><div style="color:#888;font-size:0.72rem;">${label}</div><div style="font-weight:700;font-size:1.1rem;color:${color};">${value}</div></div>
+    </div>`;
+  body.innerHTML = `<div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+      ${statCard('❤️','Oblíbené filmy',movies.length,'#fb7185')}
+      ${statCard('📺','Oblíbené seriály',tvShows.length,'#38bdf8')}
+      ${statCard('✅','Shlédnuto filmů',watchedMovies.length,'#4ade80')}
+      ${statCard('✅','Shlédnuto seriálů',watchedTv.length,'#4ade80')}
+      ${statCard('🎭','Oblíbení herci',actorFavs.length,'#a855f7')}
+      ${statCard('★','Průměrné hodnocení','★ '+avgRating,'#fbbf24')}
+    </div>
+    ${favs.length===0?`<div style="text-align:center;padding:20px;color:#555;font-size:0.85rem;">Zatím žádné oblíbené. Přidej filmy nebo seriály srdíčkem ❤️</div>`:''}
+    ${topYears.length?`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:8px;">
+      <div style="font-weight:700;color:#fb923c;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">📅 TOP roky v oblíbených</div>
+      ${topYears.map(([y,c])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="color:#fff;font-size:0.85rem;min-width:40px;font-weight:600;">${y}</span>
+        <div style="flex:1;background:#2a2a2a;border-radius:4px;height:6px;overflow:hidden;">
+          <div style="height:100%;background:linear-gradient(90deg,#fb923c,#f59e0b);border-radius:4px;width:${Math.round((c/Math.max(...topYears.map(x=>x[1])))*100)}%;"></div>
+        </div>
+        <span style="color:#888;font-size:0.75rem;min-width:20px;text-align:right;">${c}</span>
+      </div>`).join('')}
+    </div>`:''}
+    ${actorFavs.length?`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;">
+      <div style="font-weight:700;color:#a855f7;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">🎭 Oblíbení herci</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${actorFavs.slice(0,12).map(a=>`<span style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);color:#c084fc;padding:4px 10px;border-radius:16px;font-size:0.75rem;font-weight:600;">${a.name}</span>`).join('')}
+      </div>
+    </div>`:''}
+  </div>`;
+}
+
+// =====================================================
+// 🤖 SDÍLENÁ AI HELPER FUNKCE
+// =====================================================
+async function _zabavaAiCall(prompt) {
+  const geminiKey = window._store?.getItem('sinator_gemini_api_key') || '';
+  const groqKey = window._store?.getItem('sinator_groq_api_key') || '';
+  async function _oai(url, key, model, hdrs) {
+    const res = await fetch(url, { method:'POST', headers:Object.assign({'Content-Type':'application/json','Authorization':'Bearer '+key},hdrs||{}), body:JSON.stringify({model,messages:[{role:'user',content:prompt}],max_tokens:1200,temperature:0.7}) });
+    if (!res.ok) throw new Error('err');
+    const j = await res.json();
+    return j?.choices?.[0]?.message?.content || '';
+  }
+  if (geminiKey) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+        {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1200,temperature:0.7}})});
+      if (res.ok) { const d=await res.json(); const t=d?.candidates?.[0]?.content?.parts?.[0]?.text||''; if(t) return t; }
+    } catch(e) {}
+  }
+  if (groqKey) { try { return await _oai('https://api.groq.com/openai/v1/chat/completions',groqKey,'llama-3.3-70b-versatile'); } catch(e) {} }
+  // OpenRouter fallback
+  try { return await _oai('https://openrouter.ai/api/v1/chat/completions','sk-or-free','meta-llama/llama-3.3-8b-instruct:free',{'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}); } catch(e) {}
+  throw new Error('Žádný AI klíč nebo selhání.');
+}
+
+// Register modal close keys
+(function() {
+  const orig = window._modalCloseMap || {};
+  orig['nahodnyTipModal'] = function() { if(typeof closeNahodnyTipModal==='function') closeNahodnyTipModal(); };
+  orig['kvizModal'] = function() { if(typeof closeKvizModal==='function') closeKvizModal(); };
+  orig['zebrickyModal'] = function() { if(typeof closeZebrickyModal==='function') closeZebrickyModal(); };
+  orig['upcomingModal'] = function() { if(typeof closeUpcomingModal==='function') closeUpcomingModal(); };
+  orig['porovnaniModal'] = function() { if(typeof closePorovnaniModal==='function') closePorovnaniModal(); };
+  orig['moodModal'] = function() { if(typeof closeMoodModal==='function') closeMoodModal(); };
+  orig['myStatsModal'] = function() { if(typeof closeMyStatsModal==='function') closeMyStatsModal(); };
+  window._modalCloseMap = orig;
+})();
 </script>
