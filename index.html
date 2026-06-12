@@ -18606,10 +18606,10 @@ function closeMyStatsModal() { const m=document.getElementById('myStatsModal'); 
 function renderMyStats() {
   const body = document.getElementById('myStatsBody');
   if (!body) return;
-  const st = window.state || {};
-  const favs = st.favs || [];
-  const watched = st.watched || {};
-  const actorFavs = st.actorFavs || [];
+  const _s = window._store || localStorage;
+  const favs = (()=>{ try { return JSON.parse(_s.getItem('sinator_favs')||'[]'); } catch(e){return[];} })();
+  const watched = (()=>{ try { const w=JSON.parse(_s.getItem('sinator_watched')||'{}'); return (w&&typeof w==='object'&&!Array.isArray(w))?w:{}; } catch(e){return{};} })();
+  const actorFavs = (()=>{ try { return JSON.parse(_s.getItem('sinator_actor_favs')||'[]'); } catch(e){return[];} })();
   const movies = favs.filter(f=>(f.type||'movie')==='movie');
   const tvShows = favs.filter(f=>f.type==='tv');
   const watchedArr = Object.values(watched);
