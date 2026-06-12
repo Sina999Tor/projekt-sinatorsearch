@@ -2229,11 +2229,13 @@
             }
             $('musicResultsContainer').innerHTML = '';
         }, 100);
+        if(window.updatePwaBtn) updatePwaBtn();
     }
     
     function closeMusicModal() { 
         $('musicModal')?.classList.remove('open'); 
-        $('btnMusicToggle')?.classList.remove('active'); 
+        $('btnMusicToggle')?.classList.remove('active');
+        if(window.updatePwaBtn) updatePwaBtn();
     }
 
     function openTraktModal() {
@@ -17485,7 +17487,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'nahodnyTipModal','kvizModal','zebrickyModal','upcomingModal',
             'porovnaniModal','moodModal','myStatsModal',
             'tvRadioModal','zabavaModal','listsModal','musicModal',
-            'slozkyModal','slozkyPickerModal','doporucujiModal','addDoporuceniModal'
+            'slozkyModal','slozkyPickerModal','doporucujiOverlay','addDoporuceniOverlay'
         ];
         var anyModalOpen = fullscreenModalIds.some(function(id) {
             var el = document.getElementById(id);
@@ -17774,13 +17776,16 @@ window.openDoporucujiModal = function() {
   document.getElementById('doporucujiOverlay').style.display = 'flex';
   document.getElementById('btnDoporucujiToggle')?.classList.add('active');
   loadDoporuceni();
+  if(window.updatePwaBtn) updatePwaBtn();
 };
 window.closeDoporucujiModal = function() {
   document.getElementById('doporucujiOverlay').style.display = 'none';
   document.getElementById('btnDoporucujiToggle')?.classList.remove('active');
+  if(window.updatePwaBtn) updatePwaBtn();
 };
 window.openAddDoporuceni = function() {
   document.getElementById('addDoporuceniOverlay').style.display = 'flex';
+  if(window.updatePwaBtn) updatePwaBtn();
   // prefill přezdívka z localStorage
   const nick = localStorage.getItem('sinator_d_nick') || '';
   document.getElementById('dNickname').value = nick;
@@ -17800,6 +17805,7 @@ window.closeAddDoporuceni = function() {
   document.getElementById('dSubmitMsg').innerHTML = '';
   document.getElementById('dSelectedTitle').style.display = 'none';
   _dSelected = null;
+  if(window.updatePwaBtn) updatePwaBtn();
 };
 
 // ---- TABS ----
