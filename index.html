@@ -18538,23 +18538,58 @@ async function loadMoodTips(mood) {
   if(pick)pick.style.display='none';
   if(res){res.style.display='block';res.innerHTML='<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI vybírá tipy…<br><br>⏳</div>';}
   const moodMap={relax:'relaxaci a pohodu (ne akční)',akce:'akci a adrenalín',smich:'smích a komedii',dojemny:'dojemný zážitek a emoce',napeti:'napětí, thriller nebo horor',inspirace:'inspiraci a motivaci'};
-  const prompt=`Doporuč 3 filmy nebo seriály na ${moodMap[mood]||mood}. Vrať POUZE validní JSON:
-{"tips":[{"title":"Název filmu","year":2020,"type":"film nebo seriál","reason":"Proč je vhodný pro tuto náladu — 1-2 věty."}]}`;
+  const prompt=`Doporuč 3 filmy nebo seriály na ${moodMap[mood]||mood}. Vrať POUZE validní JSON (žádný markdown):
+{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný pro tuto náladu — 1-2 věty."}]}`;
   try {
     const raw = await _zabavaAiCall(prompt);
     const clean = raw.replace(/```json|```/g,'').trim();
     const d = JSON.parse(clean);
+    const tips = d.tips || [];
+    const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+    // Fetch TMDB data for each tip in parallel
+    const enriched = await Promise.all(tips.map(async t => {
+      if (!tmdbKey) return {...t, tmdbId: null, poster: null};
+      try {
+        const mediaType = (t.media_type === 'tv') ? 'tv' : 'movie';
+        const q = encodeURIComponent(t.title || t.title_cs || '');
+        const url = `https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${q}&language=cs-CZ&page=1`;
+        const data = await fetch(url).then(r=>r.json());
+        const hit = (data.results||[]).find(r=>(r.media_type==='movie'||r.media_type==='tv') && r.poster_path);
+        if (hit) return {...t, tmdbId: hit.id, tmdbType: hit.media_type, poster: hit.poster_path, rating: hit.vote_average};
+      } catch(e) {}
+      return {...t, tmdbId: null, poster: null};
+    }));
     const moodEmojis={relax:'😌',akce:'💥',smich:'😂',dojemny:'🥺',napeti:'😰',inspirace:'✨'};
+    const cards = enriched.map(t => {
+      const displayTitle = t.title_cs || t.title || '?';
+      const mediaLabel = (t.tmdbType||t.media_type)==='tv' ? 'seriál' : 'film';
+      const posterHtml = t.poster
+        ? `<img src="https://image.tmdb.org/t/p/w92${t.poster}" style="width:52px;height:76px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">`
+        : `<div style="width:52px;height:76px;border-radius:8px;background:#2a2a2a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">${(t.tmdbType||t.media_type)==='tv'?'📺':'🎬'}</div>`;
+      const ratingHtml = t.rating>0 ? `<span style="color:#fbbf24;font-size:0.72rem;margin-left:6px;">★ ${t.rating.toFixed(1)}</span>` : '';
+      const clickable = t.tmdbId && typeof openDetail==='function';
+      const clickStyle = clickable ? 'cursor:pointer;' : '';
+      const clickAttr = clickable ? `onclick="closeMoodModal();openDetail(${t.tmdbId},'${t.tmdbType||'movie'}')"` : '';
+      const arrowHtml = clickable ? `<div style="flex-shrink:0;align-self:center;color:#a855f7;font-size:1rem;">›</div>` : '';
+      return `<div ${clickAttr} style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;${clickStyle}transition:background 0.15s,border-color 0.15s;" onmouseover="this.style.background='#222';this.style.borderColor='#a855f7'" onmouseout="this.style.background='#1a1a1a';this.style.borderColor='#2a2a2a'">
+        ${posterHtml}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;color:#fff;font-size:0.92rem;margin-bottom:2px;">${displayTitle} ${t.year?`<span style="color:#888;font-size:0.78rem;">(${t.year})</span>`:''}</div>
+          <div style="display:flex;align-items:center;margin-bottom:6px;">
+            <span style="color:#a855f7;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${mediaLabel}</span>${ratingHtml}
+          </div>
+          <div style="color:#aaa;font-size:0.8rem;line-height:1.5;">${t.reason||''}</div>
+          ${clickable?`<div style="color:#a855f7;font-size:0.75rem;margin-top:6px;font-weight:600;">Otevřít detail →</div>`:''}
+        </div>
+        ${arrowHtml}
+      </div>`;
+    }).join('');
     const html=`<div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
         <span style="font-size:1.4rem;">${moodEmojis[mood]||'🎬'}</span>
         <span style="color:#a855f7;font-weight:700;font-size:0.95rem;">Tipy pro tuto náladu:</span>
       </div>
-      ${(d.tips||[]).map(t=>`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:10px;">
-        <div style="font-weight:700;color:#fff;font-size:0.95rem;">${t.title} ${t.year?`<span style="color:#888;font-size:0.8rem;">(${t.year})</span>`:''}</div>
-        <div style="color:#a855f7;font-size:0.72rem;font-weight:600;margin:4px 0;">${t.type||''}</div>
-        <div style="color:#aaa;font-size:0.82rem;line-height:1.5;">${t.reason||''}</div>
-      </div>`).join('')}
+      ${cards}
       <button onclick="resetMood()" style="width:100%;margin-top:6px;padding:12px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#fff;font-size:0.88rem;cursor:pointer;">← Jiná nálada</button>
     </div>`;
     if(res) res.innerHTML = html;
