@@ -9463,6 +9463,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
 
     function closeKinoModal() {
         document.getElementById('kinoModal').classList.remove('open');
+    var stack = window.modalStack || [];
+    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
     }
 </script>
 
@@ -12578,6 +12580,8 @@ function openRadioModal() {
 
 function closeRadioModal() {
     document.getElementById('radioModal').classList.remove('open');
+    var stack = window.modalStack || [];
+    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
 }
 
 function playRadio(idx, streamIdx = 0) {
@@ -12820,6 +12824,8 @@ function openIvysilaniModal() {
 
 function closeIvysilaniModal() {
     document.getElementById('ivysilaniModal').classList.remove('open');
+    var stack = window.modalStack || [];
+    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
 }
 
 function ivysilaniSetTab(tab) {
@@ -13461,6 +13467,8 @@ function openIprimaModal() {
 
 function closeIprimaModal() {
     document.getElementById('iprimaModal').classList.remove('open');
+    var stack = window.modalStack || [];
+    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
 }
 
 function openAiModal() {
@@ -17105,6 +17113,8 @@ function openTvModal5() {
 function closeTvModal5() {
     document.getElementById('tvModal5').classList.remove('open');
     if(tv5State.clockInterval) { clearInterval(tv5State.clockInterval); tv5State.clockInterval = null; }
+    var stack = window.modalStack || [];
+    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
 }
 
 function renderTv5Tabs() {
