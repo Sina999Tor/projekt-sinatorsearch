@@ -18289,6 +18289,18 @@ if (_origOpenSettings) {
       <button onclick="loadMoodTips('inspirace')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
         <span style="font-size:1.8rem;">✨</span><span>Inspirace</span><span style="font-size:0.7rem;color:#94a3b8;">Motivující a silné příběhy</span>
       </button>
+      <button onclick="loadMoodTips('romantika')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+        <span style="font-size:1.8rem;">❤️</span><span>Romantika</span><span style="font-size:0.7rem;color:#94a3b8;">Láska a city</span>
+      </button>
+      <button onclick="loadMoodTips('scifi')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+        <span style="font-size:1.8rem;">🚀</span><span>Sci-fi</span><span style="font-size:0.7rem;color:#94a3b8;">Vesmír a budoucnost</span>
+      </button>
+      <button onclick="loadMoodTips('rodinny')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+        <span style="font-size:1.8rem;">👨‍👩‍👧</span><span>Rodinný</span><span style="font-size:0.7rem;color:#94a3b8;">Pro celou rodinu</span>
+      </button>
+      <button onclick="loadMoodTips('nostalgicky')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+        <span style="font-size:1.8rem;">📼</span><span>Nostalgický</span><span style="font-size:0.7rem;color:#94a3b8;">Retro a klasiky</span>
+      </button>
     </div>
     <div id="moodResult" style="display:none;"></div>
   </div>
@@ -18748,7 +18760,7 @@ async function loadMoodTips(mood) {
   const pick=document.getElementById('moodPicker'); const res=document.getElementById('moodResult');
   if(pick)pick.style.display='none';
   if(res){res.style.display='block';res.innerHTML='<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI vybírá tipy…<br><br>⏳</div>';}
-  const moodMap={relax:'relaxaci a pohodu (ne akční)',akce:'akci a adrenalín',smich:'smích a komedii',dojemny:'dojemný zážitek a emoce',napeti:'napětí, thriller nebo horor',inspirace:'inspiraci a motivaci'};
+  const moodMap={relax:'relaxaci a pohodu (ne akční)',akce:'akci a adrenalín',smich:'smích a komedii',dojemny:'dojemný zážitek a emoce',napeti:'napětí, thriller nebo horor',inspirace:'inspiraci a motivaci',romantika:'romantiku, lásku a city',scifi:'sci-fi, vesmír nebo budoucnost',rodinny:'celou rodinu — vhodné pro děti i dospělé',nostalgicky:'nostalgii, retro filmy nebo klasiky ze starších dob'};
   const prompt=`Doporuč 3 filmy nebo seriály na ${moodMap[mood]||mood}. Vrať POUZE validní JSON (žádný markdown):
 {"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný pro tuto náladu — 1-2 věty."}]}`;
   try {
@@ -18770,7 +18782,7 @@ async function loadMoodTips(mood) {
       } catch(e) {}
       return {...t, tmdbId: null, poster: null};
     }));
-    const moodEmojis={relax:'😌',akce:'💥',smich:'😂',dojemny:'🥺',napeti:'😰',inspirace:'✨'};
+    const moodEmojis={relax:'😌',akce:'💥',smich:'😂',dojemny:'🥺',napeti:'😰',inspirace:'✨',romantika:'❤️',scifi:'🚀',rodinny:'👨‍👩‍👧',nostalgicky:'📼'};
     const cards = enriched.map(t => {
       const displayTitle = t.title_cs || t.title || '?';
       const mediaLabel = (t.tmdbType||t.media_type)==='tv' ? 'seriál' : 'film';
