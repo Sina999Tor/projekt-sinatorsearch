@@ -18168,7 +18168,7 @@ if (_origOpenSettings) {
           onfocus="this.style.borderColor='#fb7185'"
           oninput="pvSearch(1,this.value)"
           onblur="setTimeout(()=>pvHide(1),180)">
-        <div id="pvDrop1" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid #333;border-radius:0 0 10px 10px;z-index:100;max-height:220px;overflow-y:auto;"></div>
+        <div id="pvDrop1" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid #444;border-top:none;border-radius:0 0 12px 12px;z-index:200;max-height:260px;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;overscroll-behavior:contain;box-shadow:0 8px 24px rgba(0,0,0,0.6);"></div>
       </div>
       <!-- Selected 1 chip -->
       <div id="pvChip1" style="display:none;background:rgba(251,113,133,0.12);border:1px solid rgba(251,113,133,0.35);border-radius:8px;padding:8px 10px;margin-bottom:10px;display:none;align-items:center;gap:10px;">
@@ -18186,7 +18186,7 @@ if (_origOpenSettings) {
           onfocus="this.style.borderColor='#fb7185'"
           oninput="pvSearch(2,this.value)"
           onblur="setTimeout(()=>pvHide(2),180)">
-        <div id="pvDrop2" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid #333;border-radius:0 0 10px 10px;z-index:100;max-height:220px;overflow-y:auto;"></div>
+        <div id="pvDrop2" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid #444;border-top:none;border-radius:0 0 12px 12px;z-index:200;max-height:260px;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;overscroll-behavior:contain;box-shadow:0 8px 24px rgba(0,0,0,0.6);"></div>
       </div>
       <!-- Selected 2 chip -->
       <div id="pvChip2" style="display:none;background:rgba(251,113,133,0.12);border:1px solid rgba(251,113,133,0.35);border-radius:8px;padding:8px 10px;margin-bottom:16px;display:none;align-items:center;gap:10px;">
@@ -18554,35 +18554,45 @@ function pvSearch(n, q) {
     if (!tmdbKey) return;
     try {
       const data = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${encodeURIComponent(q)}&language=cs-CZ&page=1`).then(r=>r.json());
-      const items = (data.results||[]).filter(r=>r.media_type==='movie'||r.media_type==='tv').slice(0,6);
+      const items = (data.results||[]).filter(r=>r.media_type==='movie'||r.media_type==='tv').slice(0,8);
       if (!items.length) { drop.style.display='none'; return; }
-      drop.innerHTML = items.map(it => {
+      // Store items on drop for event delegation
+      drop._pvItems = items;
+      drop._pvN = n;
+      drop.innerHTML = items.map((it,idx) => {
         const title = it.title||it.name||'?';
         const year = (it.release_date||it.first_air_date||'').substring(0,4);
         const poster = it.poster_path ? `https://image.tmdb.org/t/p/w92${it.poster_path}` : '';
         const typeIcon = it.media_type==='tv'?'📺':'🎬';
-        const safeTitle = title.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
-        const safePoster = poster.replace(/'/g,"\\'");
-        return `<div
-          onmousedown="event.preventDefault();pvSelect(${n},${it.id},'${it.media_type}','${safeTitle}','${year}','${safePoster}')"
-          ontouchstart="event.preventDefault();pvSelect(${n},${it.id},'${it.media_type}','${safeTitle}','${year}','${safePoster}')"
-          style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #2a2a2a;-webkit-tap-highlight-color:rgba(251,113,133,0.2);"
-          onmouseover="this.style.background='#2a2a2a'" onmouseout="this.style.background='transparent'">
-          ${poster?`<img src="${poster}" style="width:28px;height:40px;object-fit:cover;border-radius:3px;flex-shrink:0;" loading="lazy">`:'<div style="width:28px;height:40px;background:#333;border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.7rem;">'+typeIcon+'</div>'}
-          <div style="flex:1;min-width:0;">
+        return `<div data-pvidx="${idx}"
+          style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid #2a2a2a;background:transparent;user-select:none;-webkit-user-select:none;">
+          ${poster?`<img src="${poster}" style="width:30px;height:44px;object-fit:cover;border-radius:3px;flex-shrink:0;pointer-events:none;" loading="lazy">`:`<div style="width:30px;height:44px;background:#333;border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.75rem;pointer-events:none;">${typeIcon}</div>`}
+          <div style="flex:1;min-width:0;pointer-events:none;">
             <div style="color:#fff;font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
             <div style="color:#888;font-size:0.72rem;">${typeIcon} ${year||'?'}</div>
           </div>
         </div>`;
       }).join('');
       drop.style.display = 'block';
+      drop.style.touchAction = 'pan-y';
+      // Single delegated listener — replace each time
+      drop.onclick = (e) => {
+        const row = e.target.closest('[data-pvidx]');
+        if (!row) return;
+        const idx = parseInt(row.dataset.pvidx);
+        const it = drop._pvItems[idx];
+        if (!it) return;
+        const title = it.title||it.name||'?';
+        const year = (it.release_date||it.first_air_date||'').substring(0,4);
+        const poster = it.poster_path ? `https://image.tmdb.org/t/p/w92${it.poster_path}` : '';
+        pvSelect(n, it.id, it.media_type, title, year, poster);
+      };
     } catch(e) { drop.style.display='none'; }
-  }, 280);
+  }, 300);
 }
 
 function pvHide(n) {
-  // Longer timeout so touch/mousedown on item fires first
-  setTimeout(() => { const d=document.getElementById('pvDrop'+n); if(d) d.style.display='none'; }, 300);
+  setTimeout(() => { const d=document.getElementById('pvDrop'+n); if(d) d.style.display='none'; }, 250);
 }
 
 function pvSelect(n, id, type, title, year, poster) {
