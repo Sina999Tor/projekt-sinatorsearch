@@ -18994,17 +18994,92 @@ function resetKoukatS() {
   const pick=document.getElementById('koukatSPicker'); const res=document.getElementById('koukatSResult');
   if(pick)pick.style.display='grid'; if(res){res.style.display='none';res.innerHTML='';}
 }
+const KOUKAT_S_CFG = {
+  rodina: {emoji:'👨‍👩‍👧‍👦', label:'Koukat s rodinou', prompt:'Doporuč přesně 3 rodinné filmy nebo seriály vhodné pro sledování s celou rodinou (dospělí i děti společně, žádný explicitní obsah).', single:'Doporuč 1 další rodinný film nebo seriál vhodný pro sledování s celou rodinou (dospělí i děti společně, žádný explicitní obsah).'},
+  deti: {emoji:'🧸', label:'Koukat s dětmi', prompt:'Doporuč přesně 3 filmy nebo seriály pro děti — pohádky nebo animované pohádky, vhodné pro nejmenší diváky.', single:'Doporuč 1 další film nebo seriál pro děti — pohádku nebo animovanou pohádku, vhodnou pro nejmenší diváky.'},
+  partner: {emoji:'❤️', label:'Koukat s partnerem', prompt:'Doporuč přesně 3 filmy vhodné na společné sledování s partnerkou/partnerem — romantika, drama nebo příjemné filmy pro pár.', single:'Doporuč 1 další film vhodný na společné sledování s partnerkou/partnerem — romantika, drama nebo příjemný film pro pár.'},
+  sam: {emoji:'🛋️', label:'Koukat sám', prompt:'Doporuč přesně 4 filmy, každý z jiného žánru (např. akce, drama, sci-fi, komedie, thriller, horor — vyber 4 různé žánry), vhodné na sledování v klidu sám/sama.', single:'Doporuč 1 další film z žánru "{genre}", vhodný na sledování v klidu sám/sama.'}
+};
+let _koukatSWho = null;
+let _koukatSTips = [];
+
+function _koukatSTipCard(t, idx) {
+  const displayTitle = t.title_cs || t.title || '?';
+  const mediaLabel = (t.tmdbType||t.media_type)==='tv' ? 'seriál' : 'film';
+  const posterHtml = t.poster
+    ? `<img src="https://image.tmdb.org/t/p/w92${t.poster}" style="width:52px;height:76px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">`
+    : `<div style="width:52px;height:76px;border-radius:8px;background:#2a2a2a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">${(t.tmdbType||t.media_type)==='tv'?'📺':'🎬'}</div>`;
+  const ratingHtml = t.rating>0 ? `<span style="color:#fbbf24;font-size:0.72rem;margin-left:6px;">★ ${t.rating.toFixed(1)}</span>` : '';
+  const clickable = t.tmdbId && typeof openDetail==='function';
+  const clickStyle = clickable ? 'cursor:pointer;' : '';
+  const clickAttr = clickable ? `onclick="closeKoukatSModal();openDetail(${t.tmdbId},'${t.tmdbType||'movie'}')"` : '';
+  const arrowHtml = clickable ? `<div style="flex-shrink:0;align-self:center;color:#facc15;font-size:1rem;">›</div>` : '';
+  const genreHtml = t.genre ? `<span style="color:#facc15;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;">${t.genre}</span>` : '';
+  return `<div id="koukatSCard_${idx}" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:12px;margin-bottom:10px;">
+    <div style="display:flex;gap:12px;align-items:flex-start;${clickStyle}" ${clickAttr} onmouseover="this.parentElement.style.borderColor='#facc15'" onmouseout="this.parentElement.style.borderColor='#2a2a2a'">
+      ${posterHtml}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;color:#fff;font-size:0.92rem;margin-bottom:2px;">${displayTitle} ${t.year?`<span style="color:#888;font-size:0.78rem;">(${t.year})</span>`:''}</div>
+        <div style="display:flex;align-items:center;margin-bottom:6px;">
+          <span style="color:#facc15;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${mediaLabel}</span>${ratingHtml}${genreHtml}
+        </div>
+        <div style="color:#aaa;font-size:0.8rem;line-height:1.5;">${t.reason||''}</div>
+        ${clickable?`<div style="color:#facc15;font-size:0.75rem;margin-top:6px;font-weight:600;">Otevřít detail →</div>`:''}
+      </div>
+      ${arrowHtml}
+    </div>
+    <button onclick="event.stopPropagation();koukatSReplace(${idx})" id="koukatSBtn_${idx}" style="width:100%;margin-top:10px;padding:9px;border-radius:8px;background:#0a0a0a;border:1px solid #333;color:#facc15;font-size:0.78rem;font-weight:600;cursor:pointer;">🔄 Už jsem viděl/a — další tip</button>
+  </div>`;
+}
+
+async function _koukatSEnrich(t) {
+  const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+  if (!tmdbKey) return {...t, tmdbId: null, poster: null};
+  try {
+    const q = encodeURIComponent(t.title || t.title_cs || '');
+    const url = `https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${q}&language=cs-CZ&page=1`;
+    const data = await fetch(url).then(r=>r.json());
+    const hit = (data.results||[]).find(r=>(r.media_type==='movie'||r.media_type==='tv') && r.poster_path);
+    if (hit) return {...t, tmdbId: hit.id, tmdbType: hit.media_type, poster: hit.poster_path, rating: hit.vote_average};
+  } catch(e) {}
+  return {...t, tmdbId: null, poster: null};
+}
+
+function _koukatSExcludeList() {
+  return _koukatSTips.map(t => t.title_cs || t.title).filter(Boolean);
+}
+
+async function koukatSReplace(idx) {
+  const btn = document.getElementById('koukatSBtn_'+idx);
+  const cardEl = document.getElementById('koukatSCard_'+idx);
+  if (!cardEl) return;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generuji další tip…'; }
+  const c = KOUKAT_S_CFG[_koukatSWho] || KOUKAT_S_CFG.rodina;
+  const old = _koukatSTips[idx] || {};
+  let singlePrompt = c.single.replace('{genre}', old.genre || '');
+  const exclude = _koukatSExcludeList();
+  if (exclude.length) singlePrompt += ` Nedoporučuj tyto již navržené tituly: ${exclude.join(', ')}.`;
+  singlePrompt += ` Vrať POUZE validní JSON (žádný markdown): {"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr"}`;
+  try {
+    const raw = await _zabavaAiCall(singlePrompt);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    let t = JSON.parse(clean);
+    if (_koukatSWho !== 'sam') t.genre = old.genre || '';
+    else if (!t.genre) t.genre = old.genre || '';
+    t = await _koukatSEnrich(t);
+    _koukatSTips[idx] = t;
+    cardEl.outerHTML = _koukatSTipCard(t, idx);
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '❌ Chyba, zkus znovu'; }
+  }
+}
+
 async function loadKoukatS(who) {
   const pick=document.getElementById('koukatSPicker'); const res=document.getElementById('koukatSResult');
   if(pick)pick.style.display='none';
   if(res){res.style.display='block';res.innerHTML='<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI vybírá tipy…<br><br>⏳</div>';}
-  const cfg = {
-    rodina: {emoji:'👨‍👩‍👧‍👦', label:'Koukat s rodinou', prompt:'Doporuč přesně 3 rodinné filmy nebo seriály vhodné pro sledování s celou rodinou (dospělí i děti společně, žádný explicitní obsah).'},
-    deti: {emoji:'🧸', label:'Koukat s dětmi', prompt:'Doporuč přesně 3 filmy nebo seriály pro děti — pohádky nebo animované pohádky, vhodné pro nejmenší diváky.'},
-    partner: {emoji:'❤️', label:'Koukat s partnerem', prompt:'Doporuč přesně 3 filmy vhodné na společné sledování s partnerkou/partnerem — romantika, drama nebo příjemné filmy pro pár.'},
-    sam: {emoji:'🛋️', label:'Koukat sám', prompt:'Doporuč přesně 4 filmy, každý z jiného žánru (např. akce, drama, sci-fi, komedie, thriller, horor — vyber 4 různé žánry), vhodné na sledování v klidu sám/sama.'}
-  };
-  const c = cfg[who] || cfg.rodina;
+  _koukatSWho = who;
+  const c = KOUKAT_S_CFG[who] || KOUKAT_S_CFG.rodina;
   const prompt = `${c.prompt} Vrať POUZE validní JSON (žádný markdown):
 {"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr (jen u varianty 'sám', jinak nech prázdné)"}]}`;
   try {
@@ -19012,44 +19087,9 @@ async function loadKoukatS(who) {
     const clean = raw.replace(/```json|```/g,'').trim();
     const d = JSON.parse(clean);
     const tips = d.tips || [];
-    const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
-    const enriched = await Promise.all(tips.map(async t => {
-      if (!tmdbKey) return {...t, tmdbId: null, poster: null};
-      try {
-        const mediaType = (t.media_type === 'tv') ? 'tv' : 'movie';
-        const q = encodeURIComponent(t.title || t.title_cs || '');
-        const url = `https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${q}&language=cs-CZ&page=1`;
-        const data = await fetch(url).then(r=>r.json());
-        const hit = (data.results||[]).find(r=>(r.media_type==='movie'||r.media_type==='tv') && r.poster_path);
-        if (hit) return {...t, tmdbId: hit.id, tmdbType: hit.media_type, poster: hit.poster_path, rating: hit.vote_average};
-      } catch(e) {}
-      return {...t, tmdbId: null, poster: null};
-    }));
-    const cards = enriched.map(t => {
-      const displayTitle = t.title_cs || t.title || '?';
-      const mediaLabel = (t.tmdbType||t.media_type)==='tv' ? 'seriál' : 'film';
-      const posterHtml = t.poster
-        ? `<img src="https://image.tmdb.org/t/p/w92${t.poster}" style="width:52px;height:76px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">`
-        : `<div style="width:52px;height:76px;border-radius:8px;background:#2a2a2a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">${(t.tmdbType||t.media_type)==='tv'?'📺':'🎬'}</div>`;
-      const ratingHtml = t.rating>0 ? `<span style="color:#fbbf24;font-size:0.72rem;margin-left:6px;">★ ${t.rating.toFixed(1)}</span>` : '';
-      const clickable = t.tmdbId && typeof openDetail==='function';
-      const clickStyle = clickable ? 'cursor:pointer;' : '';
-      const clickAttr = clickable ? `onclick="closeKoukatSModal();openDetail(${t.tmdbId},'${t.tmdbType||'movie'}')"` : '';
-      const arrowHtml = clickable ? `<div style="flex-shrink:0;align-self:center;color:#facc15;font-size:1rem;">›</div>` : '';
-      const genreHtml = t.genre ? `<span style="color:#facc15;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;">${t.genre}</span>` : '';
-      return `<div ${clickAttr} style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;${clickStyle}transition:background 0.15s,border-color 0.15s;" onmouseover="this.style.background='#222';this.style.borderColor='#facc15'" onmouseout="this.style.background='#1a1a1a';this.style.borderColor='#2a2a2a'">
-        ${posterHtml}
-        <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;color:#fff;font-size:0.92rem;margin-bottom:2px;">${displayTitle} ${t.year?`<span style="color:#888;font-size:0.78rem;">(${t.year})</span>`:''}</div>
-          <div style="display:flex;align-items:center;margin-bottom:6px;">
-            <span style="color:#facc15;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${mediaLabel}</span>${ratingHtml}${genreHtml}
-          </div>
-          <div style="color:#aaa;font-size:0.8rem;line-height:1.5;">${t.reason||''}</div>
-          ${clickable?`<div style="color:#facc15;font-size:0.75rem;margin-top:6px;font-weight:600;">Otevřít detail →</div>`:''}
-        </div>
-        ${arrowHtml}
-      </div>`;
-    }).join('');
+    const enriched = await Promise.all(tips.map(t => _koukatSEnrich(t)));
+    _koukatSTips = enriched;
+    const cards = enriched.map((t,idx) => _koukatSTipCard(t, idx)).join('');
     const html=`<div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
         <span style="font-size:1.4rem;">${c.emoji}</span>
