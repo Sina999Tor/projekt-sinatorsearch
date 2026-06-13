@@ -18533,7 +18533,7 @@ async function loadNahodnyTip() {
           <span style="color:#fbbf24;font-size:0.78rem;">★ ${rating}</span>
         </div>
         <p style="color:#aaa;font-size:0.78rem;line-height:1.5;margin:0 0 10px;">${(item.overview||'Popis není k dispozici.').substring(0,160)}${item.overview?.length>160?'…':''}</p>
-        <button onclick="closeNahodnyTipModal();typeof openDetail==='function'&&openDetail(${item.id},'${type}')" style="padding:8px 16px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:0.82rem;font-weight:600;cursor:pointer;">Detail →</button>
+        <button onclick="typeof openDetail==='function'&&openDetail(${item.id},'${type}').then(()=>closeNahodnyTipModal())" style="padding:8px 16px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:0.82rem;font-weight:600;cursor:pointer;">Detail →</button>
       </div>
     </div>`;
   } catch(e) { res.innerHTML = '<p style="color:#e50914;text-align:center;font-size:0.85rem;">Chyba načítání. Zkus znovu.</p>'; }
