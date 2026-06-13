@@ -490,7 +490,8 @@
         .iprima-sync-btn:hover { background: var(--iprima-light); transform: translateY(-1px); }
         .modal-header-row { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); z-index: 10; }
         .modal-header-row h2 { font-family: 'Playfair Display', serif; font-size: 1.4rem; background: linear-gradient(135deg, #fff, var(--trakt)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .favs-modal-header h2, .settings-modal-header h2, .sources-modal-header h2 { background: linear-gradient(135deg, #fff, var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .favs-modal-header h2, .settings-modal-header h2 { background: linear-gradient(135deg, #fff, var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .sources-modal-header h2 { color: #fff; font-family: 'Playfair Display', serif; font-size: 1.1rem; }
         .settings-modal .modal-header-row { position: static; background: #141414; flex-shrink: 0; padding: 14px 16px; }
         .settings-modal .settings-modal-body { flex: 1; overflow-y: auto; min-height: 0; padding: 16px; }
         .close-modal-btn, .close-settings, .close-sources { background: var(--bg-elevated); border: 1px solid var(--border); color: #fff; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: grid; place-items: center; transition: 0.2s; }
@@ -827,8 +828,16 @@
         
         /* ✅ Z-INDEX OPRAVA - Sources modal musí být nad hlavním modalem */
         .sources-modal-overlay {
-            z-index: 10500 !important;
+            z-index: 10600 !important;
+            background: var(--bg-card) !important;
+            backdrop-filter: none !important;
+            align-items: stretch !important;
+            padding: 0 !important;
         }
+        .sources-modal-overlay.open { display: flex !important; flex-direction: column; }
+        .sources-modal { max-width: none !important; width: 100% !important; height: 100%; max-height: 100% !important; border-radius: 0 !important; border: none !important; box-shadow: none !important; display: flex; flex-direction: column; overflow: hidden; }
+        .sources-modal-header { flex-shrink: 0; padding: 14px 16px !important; }
+        .sources-modal-body { flex: 1; overflow-y: auto; }
         
         :fullscreen, ::-webkit-full-screen, :-moz-full-screen, :-ms-fullscreen { background: var(--bg-dark) !important; }
         @media(max-width: 700px) {
@@ -17274,16 +17283,16 @@ function playTvChannel5(idx) {
 
 /* ── Picker popup (add to folder) ── */
 #slozkyPicker {
-    display:none; position:fixed; inset:0; z-index:11000;
-    background:rgba(0,0,0,0.8); align-items:flex-end; justify-content:center;
+    display:none; position:fixed; inset:0; z-index:10600;
+    background:var(--bg-card); flex-direction:column; overflow:hidden;
 }
 #slozkyPicker.open { display:flex; }
 .slozky-picker-box {
-    background:#181818; border-radius:20px 20px 0 0;
-    width:100%; max-width:500px; padding:20px 16px 32px;
-    max-height:70vh; overflow-y:auto;
+    background:var(--bg-card); width:100%; height:100%;
+    display:flex; flex-direction:column; overflow:hidden; padding:0;
 }
-.slozky-picker-box h3 { font-size:1rem; margin:0 0 14px; color:#fff; text-align:center; }
+.slozky-picker-box h3 { font-size:1.1rem; margin:0; color:#fff; text-align:left; font-family:'Playfair Display',serif; flex-shrink:0; padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.slozky-picker-box .slozky-picker-body { flex:1; overflow-y:auto; padding:16px; }
 .slozky-picker-item {
     display:flex; align-items:center; gap:10px;
     padding:11px 12px; border-radius:10px; cursor:pointer;
@@ -17319,10 +17328,12 @@ function playTvChannel5(idx) {
 <!-- Picker: vyber složku při přidávání z detailu -->
 <div id="slozkyPicker" onclick="if(event.target===this)closeSlozkyPicker()">
     <div class="slozky-picker-box">
-        <h3 id="slozkyPickerTitle">Přidat do složky</h3>
-        <div id="slozkyPickerList"></div>
-        <button class="slozky-picker-new" onclick="newSlozkaFromPicker()">＋ Vytvořit novou složku</button>
-        <button class="slozky-picker-cancel" onclick="closeSlozkyPicker()">Zrušit</button>
+        <h3><span id="slozkyPickerTitle">Přidat do složky</span><button onclick="closeSlozkyPicker()" style="background:var(--bg-elevated);border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;flex-shrink:0;margin-left:10px;">✕</button></h3>
+        <div class="slozky-picker-body">
+            <div id="slozkyPickerList"></div>
+            <button class="slozky-picker-new" onclick="newSlozkaFromPicker()">＋ Vytvořit novou složku</button>
+            <button class="slozky-picker-cancel" onclick="closeSlozkyPicker()">Zrušit</button>
+        </div>
     </div>
 </div>
 
