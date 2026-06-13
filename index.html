@@ -17966,21 +17966,21 @@ const rtdb = getDatabase(fbApp);
   const sessionRef = ref(rtdb, 'presence/' + sessionId);
   const countRef = ref(rtdb, 'presence');
 
-  set(sessionRef, { t: Date.now() });
-  rtdbOnDisconnect(sessionRef).remove();
-
-  // Sleduj počet online
-  onValue(countRef, (snap) => {
-    const count = snap.exists() ? Object.keys(snap.val()).length : 0;
-    const badge = document.getElementById('onlineBadge');
-    if (!badge) return;
-    const isAdmin = localStorage.getItem('sinator_admin_mode') === '1';
-    if (isAdmin) {
-      badge.textContent = count;
-      badge.style.display = 'block';
-    } else {
-      badge.style.display = 'none';
-    }
+  // Nejprve zapiš session, pak začni poslouchat
+  set(sessionRef, { t: Date.now() }).then(() => {
+    rtdbOnDisconnect(sessionRef).remove();
+    onValue(countRef, (snap) => {
+      const count = snap.exists() ? Object.keys(snap.val()).length : 0;
+      const badge = document.getElementById('onlineBadge');
+      if (!badge) return;
+      const isAdmin = localStorage.getItem('sinator_admin_mode') === '1';
+      if (isAdmin) {
+        badge.textContent = count;
+        badge.style.display = 'block';
+      } else {
+        badge.style.display = 'none';
+      }
+    });
   });
 })();
 
