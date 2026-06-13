@@ -7152,7 +7152,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
 
         const overlay = document.createElement('div');
         overlay.id = 'directorsOverlay';
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10600;display:flex;align-items:flex-end;justify-content:center;';
+        overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-card);z-index:10600;display:flex;flex-direction:column;overflow:hidden;';
         const cards = dirs.map(d => {
             const img = d.profile_path ? `<img src="${IMG}w185${d.profile_path}" style="width:70px;height:95px;border-radius:8px;object-fit:cover;flex-shrink:0;">` : `<div style="width:70px;height:95px;border-radius:8px;background:var(--bg-elevated);display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0;">👤</div>`;
             return `<div onclick="document.getElementById('directorsOverlay').remove();document.body.style.overflow='';openPersonDetail(${d.id})" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:0.2s;" onmouseover="this.style.borderColor='#8a2be2'" onmouseout="this.style.borderColor='var(--border)'">
@@ -7164,13 +7164,11 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
                 <div style="margin-left:auto;color:#8a2be2;font-size:1.2rem;">›</div>
             </div>`;
         }).join('');
-        overlay.innerHTML = `<div style="width:100%;max-width:520px;background:var(--bg-card);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:70vh;overflow-y:auto;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        overlay.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
                 <span style="font-weight:700;font-size:1.1rem;">🎥 Režie</span>
-                <button onclick="this.closest('#directorsOverlay').remove();document.body.style.overflow=''" style="width:36px;height:36px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);color:#fff;cursor:pointer;font-size:1.1rem;">✕</button>
+                <button onclick="document.getElementById('directorsOverlay').remove();document.body.style.overflow=''" style="width:36px;height:36px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);color:#fff;cursor:pointer;font-size:1.1rem;">✕</button>
             </div>
-            <div style="display:flex;flex-direction:column;gap:10px;">${cards}</div>
-        </div>`;
+            <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">${cards}</div>`;
         overlay.addEventListener('click', e => { if(e.target === overlay) { overlay.remove(); document.body.style.overflow=''; } });
         document.body.appendChild(overlay);
         document.body.style.overflow = 'hidden';
@@ -7188,7 +7186,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
 
         const overlay = document.createElement('div');
         overlay.id = 'castOverlay';
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10600;display:flex;align-items:flex-end;justify-content:center;';
+        overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-card);z-index:10600;display:flex;flex-direction:column;overflow:hidden;';
         const cards = castList.map(c => {
             const img = c.profile_path ? `<img src="${IMG}w185${c.profile_path}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--border);">` : `<div style="width:56px;height:56px;border-radius:50%;background:var(--bg-elevated);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;">👤</div>`;
             return `<div onclick="document.getElementById('castOverlay').remove();document.body.style.overflow='';openPersonDetail(${c.id})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
@@ -7199,13 +7197,11 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
                 </div>
             </div>`;
         }).join('');
-        overlay.innerHTML = `<div style="width:100%;max-width:560px;background:var(--bg-card);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:75vh;overflow-y:auto;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        overlay.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
                 <span style="font-weight:700;font-size:1.1rem;">👥 Herci</span>
                 <button onclick="document.getElementById('castOverlay').remove();document.body.style.overflow=''" style="width:36px;height:36px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);color:#fff;cursor:pointer;font-size:1.1rem;">✕</button>
             </div>
-            <div style="display:flex;flex-direction:column;gap:8px;">${cards}</div>
-        </div>`;
+            <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;">${cards}</div>`;
         overlay.addEventListener('click', e => { if(e.target === overlay) { overlay.remove(); document.body.style.overflow=''; } });
         document.body.appendChild(overlay);
         document.body.style.overflow = 'hidden';
@@ -9159,7 +9155,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
 
             const overlay = document.createElement('div');
             overlay.id = 'similarOverlay';
-            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10600;display:flex;align-items:flex-end;justify-content:center;';
+            overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-card);z-index:10600;display:flex;flex-direction:column;overflow:hidden;';
 
             const cardsHtml = items.length ? items.map(it => {
                 const t = (it.title||it.name||'?').replace(/'/g,"&#39;");
@@ -9172,16 +9168,16 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
                 return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('similarOverlay').remove();document.body.style.overflow='';openDetail(${it.id},'${type}')">${img}${watchedOverlay}<div class="card-badge">${type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${t}','${y}',${it.vote_average||0},'${type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating">★ ${r}</span></div></div></div>`;
             }).join('') : '<div style="padding:24px;text-align:center;color:var(--text-muted);">😕 Žádné podobné tituly nenalezeny.</div>';
 
-            overlay.innerHTML = `<div style="width:100%;max-width:560px;background:var(--bg-card);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:80vh;overflow-y:auto;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            overlay.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
                     <span style="font-weight:700;font-size:1.1rem;">🎯 Podobné tituly</span>
                     <button onclick="document.getElementById('similarOverlay').remove();document.body.style.overflow=''" style="width:36px;height:36px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);color:#fff;cursor:pointer;font-size:1.1rem;">✕</button>
                 </div>
+                <div style="flex:1;overflow-y:auto;padding:16px;">
                 <div id="similarGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;">${cardsHtml}</div>
                 ${items.length ? `<div style="margin-top:14px;">
                     <button id="btnLoadMoreSimilar" onclick="loadMoreSimilar(${id},'${type}',2,this)" style="padding:11px 22px;background:rgba(100,160,255,0.13);border:1px solid rgba(100,160,255,0.35);border-radius:10px;color:#7db8f7;font-size:0.88rem;font-weight:600;cursor:pointer;width:100%;">➕ Další podobné tituly</button>
                 </div>` : ''}
-            </div>`;
+                </div>`;
             overlay.addEventListener('click', e => { if(e.target === overlay) { overlay.remove(); document.body.style.overflow=''; } });
             document.body.appendChild(overlay);
             document.body.style.overflow = 'hidden';
