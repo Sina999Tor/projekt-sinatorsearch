@@ -18561,10 +18561,14 @@ function pvSearch(n, q) {
         const year = (it.release_date||it.first_air_date||'').substring(0,4);
         const poster = it.poster_path ? `https://image.tmdb.org/t/p/w92${it.poster_path}` : '';
         const typeIcon = it.media_type==='tv'?'📺':'🎬';
-        return `<div onmousedown="pvSelect(${n},${it.id},'${it.media_type}',${JSON.stringify(title).replace(/'/g,"\\'")},'${year}','${poster}')"
-          style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid #2a2a2a;transition:background .15s;"
+        const safeTitle = title.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+        const safePoster = poster.replace(/'/g,"\\'");
+        return `<div
+          onmousedown="event.preventDefault();pvSelect(${n},${it.id},'${it.media_type}','${safeTitle}','${year}','${safePoster}')"
+          ontouchstart="event.preventDefault();pvSelect(${n},${it.id},'${it.media_type}','${safeTitle}','${year}','${safePoster}')"
+          style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #2a2a2a;-webkit-tap-highlight-color:rgba(251,113,133,0.2);"
           onmouseover="this.style.background='#2a2a2a'" onmouseout="this.style.background='transparent'">
-          ${poster?`<img src="${poster}" style="width:28px;height:40px;object-fit:cover;border-radius:3px;flex-shrink:0;">`:'<div style="width:28px;height:40px;background:#333;border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.7rem;">'+typeIcon+'</div>'}
+          ${poster?`<img src="${poster}" style="width:28px;height:40px;object-fit:cover;border-radius:3px;flex-shrink:0;" loading="lazy">`:'<div style="width:28px;height:40px;background:#333;border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.7rem;">'+typeIcon+'</div>'}
           <div style="flex:1;min-width:0;">
             <div style="color:#fff;font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
             <div style="color:#888;font-size:0.72rem;">${typeIcon} ${year||'?'}</div>
@@ -18576,7 +18580,10 @@ function pvSearch(n, q) {
   }, 280);
 }
 
-function pvHide(n) { const d=document.getElementById('pvDrop'+n); if(d) d.style.display='none'; }
+function pvHide(n) {
+  // Longer timeout so touch/mousedown on item fires first
+  setTimeout(() => { const d=document.getElementById('pvDrop'+n); if(d) d.style.display='none'; }, 300);
+}
 
 function pvSelect(n, id, type, title, year, poster) {
   _pvState[n].sel = {id, type, title, year, poster};
