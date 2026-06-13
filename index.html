@@ -9549,6 +9549,65 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
             <span style="font-size:1.6rem;">📊</span>
             <div><div style="font-weight:700;color:#fb923c;">Moje statistiky</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Přehled tvé knihovny oblíbených</div></div>
         </button>
+        <button onclick="closeZabavaModal();openTentodenModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(99,202,183,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#63cab7'" onmouseout="this.style.borderColor='rgba(99,202,183,0.35)'">
+            <span style="font-size:1.6rem;">🗓️</span>
+            <div><div style="font-weight:700;color:#63cab7;">Tento den v historii</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co vyšlo přesně dnes před lety</div></div>
+        </button>
+        <button onclick="closeZabavaModal();openCitatyModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(250,204,21,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#facc15'" onmouseout="this.style.borderColor='rgba(250,204,21,0.35)'">
+            <span style="font-size:1.6rem;">💬</span>
+            <div><div style="font-weight:700;color:#facc15;">Filmové citáty</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Uhádni film podle citátu</div></div>
+        </button>
+    </div>
+</div>
+
+<!-- TENTO DEN V HISTORII MODAL -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" id="tentodenModal" onclick="if(event.target===this)closeTentodenModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">🗓️ Tento den v historii</h3>
+        <button onclick="closeTentodenModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;">
+        <div id="tentodenDateBadge" style="text-align:center;font-size:0.85rem;color:#63cab7;font-weight:700;letter-spacing:1px;"></div>
+        <div id="tentodenBody" style="display:flex;flex-direction:column;gap:12px;">
+            <div style="text-align:center;padding:40px 20px;color:var(--text-muted);">
+                <div style="font-size:2.5rem;margin-bottom:12px;">🗓️</div>
+                <div style="font-size:0.9rem;">Načítám filmy z tohoto dne...</div>
+            </div>
+        </div>
+        <button onclick="loadTentoDen()" id="tentodenReloadBtn" style="display:none;margin:0 auto;padding:10px 24px;background:linear-gradient(135deg,#63cab7,#2a9d8f);border:none;border-radius:10px;color:#fff;font-weight:700;cursor:pointer;font-size:0.9rem;">🔄 Načíst znovu</button>
+    </div>
+</div>
+
+<!-- FILMOVÉ CITÁTY MODAL -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" id="citatyModal" onclick="if(event.target===this)closeCitatyModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">💬 Filmové citáty</h3>
+        <button onclick="closeCitatyModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;">
+        <!-- Score -->
+        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-elevated);border-radius:10px;padding:10px 16px;">
+            <span style="font-size:0.82rem;color:var(--text-muted);">Skóre kola</span>
+            <span id="citatyScore" style="font-size:1rem;font-weight:700;color:#facc15;">0 / 0</span>
+        </div>
+        <!-- Quote card -->
+        <div id="citatyCard" style="background:var(--bg-elevated);border:1px solid rgba(250,204,21,0.3);border-radius:14px;padding:22px 18px;text-align:center;">
+            <div style="font-size:1.5rem;margin-bottom:14px;">💬</div>
+            <div id="citatyQuote" style="font-size:1rem;color:#fff;font-style:italic;line-height:1.65;min-height:60px;">Načítám citát...</div>
+        </div>
+        <!-- Answer input -->
+        <div id="citatyAnswerWrap" style="display:flex;flex-direction:column;gap:10px;">
+            <input id="citatyInput" type="text" placeholder="Název filmu nebo seriálu..." style="width:100%;padding:12px 16px;border-radius:10px;background:#0a0a0a;border:1.5px solid #333;color:#fff;font-size:1rem;outline:none;box-sizing:border-box;" oninput="citatyAutocomplete(this.value)" onkeydown="if(event.key==='Enter')checkCitat()">
+            <div id="citatySuggest" style="display:none;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;overflow:hidden;"></div>
+            <button onclick="checkCitat()" style="padding:13px;background:linear-gradient(135deg,#facc15,#f59e0b);border:none;border-radius:10px;color:#000;font-size:1rem;font-weight:700;cursor:pointer;">✅ Zkontrolovat</button>
+        </div>
+        <!-- Result -->
+        <div id="citatyResult" style="display:none;border-radius:12px;padding:16px;text-align:center;"></div>
+        <!-- Next button -->
+        <button id="citatyNextBtn" onclick="loadCitat()" style="display:none;padding:12px;background:var(--bg-elevated);border:1px solid rgba(250,204,21,0.4);border-radius:10px;color:#facc15;font-size:0.95rem;font-weight:700;cursor:pointer;">➡️ Další citát</button>
+        <!-- Hint -->
+        <button id="citatyHintBtn" onclick="showCitatHint()" style="padding:10px;background:none;border:1px solid var(--border);border-radius:10px;color:var(--text-muted);font-size:0.85rem;cursor:pointer;">💡 Nápověda</button>
+        <div id="citatyHint" style="display:none;background:rgba(250,204,21,0.08);border:1px solid rgba(250,204,21,0.25);border-radius:10px;padding:12px;font-size:0.85rem;color:#facc15;text-align:center;"></div>
     </div>
 </div>
 
@@ -17491,7 +17550,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Hide when any fullscreen modal with its own close button is visible
         var fullscreenModalIds = [
             'nahodnyTipModal','kvizModal','zebrickyModal','upcomingModal',
-            'porovnaniModal','moodModal','myStatsModal',
+            'porovnaniModal','moodModal','myStatsModal','tentodenModal','citatyModal',
             'tvRadioModal','zabavaModal','listsModal','musicModal',
             'slozkyModal','slozkyPickerModal','doporucujiOverlay','addDoporuceniOverlay',
             'settingsModal'
@@ -18822,6 +18881,235 @@ function renderMyStats() {
 // =====================================================
 // 🤖 SDÍLENÁ AI HELPER FUNKCE
 // =====================================================
+// ═══════════════════════════════════════════════
+// 🗓️ TENTO DEN V HISTORII
+// ═══════════════════════════════════════════════
+function openTentodenModal() {
+  const m = document.getElementById('tentodenModal');
+  if (!m) return;
+  m.style.display = 'flex';
+  if (window.updatePwaBtn) updatePwaBtn();
+  loadTentoDen();
+}
+function closeTentodenModal() {
+  const m = document.getElementById('tentodenModal');
+  if (m) m.style.display = 'none';
+}
+
+async function loadTentoDen() {
+  const body = document.getElementById('tentodenBody');
+  const badge = document.getElementById('tentodenDateBadge');
+  const reloadBtn = document.getElementById('tentodenReloadBtn');
+  if (!body) return;
+
+  const now = new Date();
+  const day = now.getDate();
+  const month = now.getMonth() + 1;
+  const mesice = ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince'];
+  if (badge) badge.textContent = `📅 ${day}. ${mesice[month-1]}`;
+
+  body.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);"><div style="font-size:2rem;margin-bottom:10px;">⏳</div><div style="font-size:0.85rem;">Hledám filmy...</div></div>';
+  if (reloadBtn) reloadBtn.style.display = 'none';
+
+  const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+  if (!tmdbKey) {
+    body.innerHTML = '<p style="color:#e50914;text-align:center;padding:20px;font-size:0.85rem;">Chybí TMDB API klíč v nastavení.</p>';
+    return;
+  }
+
+  try {
+    const pad = n => String(n).padStart(2,'0');
+    const dateStr = `${pad(month)}-${pad(day)}`;
+    // Fetch movies released on this month/day across all years
+    const years = [2024,2023,2022,2021,2020,2019,2018,2017,2016,2015,2010,2005,2000,1995,1990,1985,1980];
+    const promises = years.slice(0,6).map(y =>
+      fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&language=cs-CZ&primary_release_date.gte=${y}-${dateStr}&primary_release_date.lte=${y}-${dateStr}&sort_by=popularity.desc&vote_count.gte=20`)
+        .then(r => r.json()).then(d => (d.results||[]).slice(0,2)).catch(()=>[])
+    );
+    const arrays = await Promise.all(promises);
+    let movies = arrays.flat().filter(m => m.poster_path);
+
+    // Also try TV
+    const tvPromises = years.slice(0,4).map(y =>
+      fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${tmdbKey}&language=cs-CZ&first_air_date.gte=${y}-${dateStr}&first_air_date.lte=${y}-${dateStr}&sort_by=popularity.desc&vote_count.gte=10`)
+        .then(r => r.json()).then(d => (d.results||[]).slice(0,1).map(x=>({...x,_isTv:true}))).catch(()=>[])
+    );
+    const tvArrays = await Promise.all(tvPromises);
+    const tvs = tvArrays.flat().filter(m => m.poster_path);
+
+    const all = [...movies, ...tvs].filter((m,i,a) => a.findIndex(x=>x.id===m.id)===i);
+
+    if (!all.length) {
+      body.innerHTML = '<div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:0.85rem;">Pro tento den nebyl nalezen žádný výsledek. Zkus znovu.</div>';
+      if (reloadBtn) reloadBtn.style.display = 'block';
+      return;
+    }
+
+    // Sort by year desc
+    all.sort((a,b) => {
+      const ya = parseInt((a.release_date||a.first_air_date||'0').slice(0,4));
+      const yb = parseInt((b.release_date||b.first_air_date||'0').slice(0,4));
+      return yb - ya;
+    });
+
+    body.innerHTML = all.map(item => {
+      const title = item.title || item.name || 'Neznámý titul';
+      const year = (item.release_date||item.first_air_date||'').slice(0,4);
+      const isTv = !!item._isTv || !!item.first_air_date;
+      const poster = item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : '';
+      const rating = item.vote_average ? item.vote_average.toFixed(1) : '—';
+      const ago = year ? `(před ${now.getFullYear()-parseInt(year)} lety)` : '';
+      const tmdbType = isTv ? 'tv' : 'movie';
+      return `<div style="display:flex;gap:12px;background:var(--bg-elevated);border-radius:12px;overflow:hidden;cursor:pointer;" onclick="closeTentodenModal();showMovieDetail(${item.id},'${tmdbType}')">
+        ${poster ? `<img src="${poster}" style="width:64px;height:96px;object-fit:cover;flex-shrink:0;" loading="lazy" onerror="this.style.display='none'">` : '<div style="width:64px;height:96px;background:#222;flex-shrink:0;display:grid;place-items:center;font-size:1.5rem;">🎬</div>'}
+        <div style="padding:10px 10px 10px 0;flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:0.9rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
+          <div style="font-size:0.75rem;color:#63cab7;margin-top:3px;">${year} ${ago}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${isTv?'📺 Seriál':'🎬 Film'} &nbsp;⭐ ${rating}</div>
+          ${item.overview ? `<div style="font-size:0.75rem;color:#999;margin-top:5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${item.overview}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+
+    if (reloadBtn) reloadBtn.style.display = 'block';
+  } catch(e) {
+    body.innerHTML = '<p style="color:#e50914;text-align:center;padding:20px;font-size:0.85rem;">Chyba při načítání. Zkus to znovu.</p>';
+    if (reloadBtn) reloadBtn.style.display = 'block';
+  }
+}
+
+// ═══════════════════════════════════════════════
+// 💬 FILMOVÉ CITÁTY
+// ═══════════════════════════════════════════════
+let _citatState = { quote:'', answer:'', hint:'', correct:0, total:0, answered:false };
+
+function openCitatyModal() {
+  const m = document.getElementById('citatyModal');
+  if (!m) return;
+  m.style.display = 'flex';
+  if (window.updatePwaBtn) updatePwaBtn();
+  _citatState = { quote:'', answer:'', hint:'', correct:0, total:0, answered:false };
+  _updateCitatScore();
+  loadCitat();
+}
+function closeCitatyModal() {
+  const m = document.getElementById('citatyModal');
+  if (m) m.style.display = 'none';
+}
+
+function _updateCitatScore() {
+  const el = document.getElementById('citatyScore');
+  if (el) el.textContent = `${_citatState.correct} / ${_citatState.total}`;
+}
+
+async function loadCitat() {
+  const quoteEl = document.getElementById('citatyQuote');
+  const resultEl = document.getElementById('citatyResult');
+  const nextBtn = document.getElementById('citatyNextBtn');
+  const hintBtn = document.getElementById('citatyHintBtn');
+  const hintEl = document.getElementById('citatyHint');
+  const inputEl = document.getElementById('citatyInput');
+  const answerWrap = document.getElementById('citatyAnswerWrap');
+  const suggestEl = document.getElementById('citatySuggest');
+
+  if (!quoteEl) return;
+
+  _citatState.answered = false;
+  if (resultEl) { resultEl.style.display='none'; resultEl.innerHTML=''; }
+  if (nextBtn) nextBtn.style.display='none';
+  if (hintBtn) hintBtn.style.display='block';
+  if (hintEl) { hintEl.style.display='none'; hintEl.textContent=''; }
+  if (inputEl) inputEl.value='';
+  if (suggestEl) { suggestEl.style.display='none'; suggestEl.innerHTML=''; }
+  if (answerWrap) answerWrap.style.display='flex';
+
+  quoteEl.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem;">⏳ Generuji citát...</span>';
+
+  try {
+    const prompt = `Vygeneruj slavný filmový nebo seriálový citát (česky nebo anglicky, jak byl původně). Vrať POUZE JSON objekt bez markdown bloků, ve formátu:
+{"quote":"...citát...","movie":"Název filmu/seriálu v originále","hint":"Jedna věta nápověda bez prozrazení názvu"}
+Vyber náhodně jeden ze slavných filmů nebo seriálů. Citát musí být skutečný a dohledatelný.`;
+    const raw = await _zabavaAiCall(prompt);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const data = JSON.parse(clean);
+    _citatState.quote = data.quote;
+    _citatState.answer = data.movie;
+    _citatState.hint = data.hint;
+    quoteEl.innerHTML = `„${data.quote}"`;
+  } catch(e) {
+    quoteEl.innerHTML = '<span style="color:#e50914;font-size:0.85rem;">Chyba při načítání citátu. Zkus znovu.</span>';
+    if (nextBtn) { nextBtn.style.display='block'; nextBtn.textContent='🔄 Zkusit znovu'; }
+  }
+}
+
+async function citatyAutocomplete(val) {
+  const suggestEl = document.getElementById('citatySuggest');
+  if (!suggestEl) return;
+  if (val.length < 2) { suggestEl.style.display='none'; return; }
+  const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || '';
+  if (!tmdbKey) return;
+  try {
+    const d = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${encodeURIComponent(val)}&language=cs-CZ&page=1`).then(r=>r.json());
+    const results = (d.results||[]).filter(x=>x.media_type!=='person').slice(0,5);
+    if (!results.length) { suggestEl.style.display='none'; return; }
+    suggestEl.style.display='block';
+    suggestEl.innerHTML = results.map(r => {
+      const t = r.title||r.name||'';
+      const y = (r.release_date||r.first_air_date||'').slice(0,4);
+      return `<div onclick="document.getElementById('citatyInput').value='${t.replace(/'/g,"\\'")}';document.getElementById('citatySuggest').style.display='none';" style="padding:10px 14px;cursor:pointer;font-size:0.88rem;color:#fff;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;" onmouseover="this.style.background='#333'" onmouseout="this.style.background=''">${t}<span style="color:var(--text-muted);font-size:0.78rem;">${y}</span></div>`;
+    }).join('');
+  } catch(e) { suggestEl.style.display='none'; }
+}
+
+async function checkCitat() {
+  if (_citatState.answered || !_citatState.answer) return;
+  const inputEl = document.getElementById('citatyInput');
+  const resultEl = document.getElementById('citatyResult');
+  const nextBtn = document.getElementById('citatyNextBtn');
+  const answerWrap = document.getElementById('citatyAnswerWrap');
+  const hintBtn = document.getElementById('citatyHintBtn');
+  if (!inputEl || !resultEl) return;
+
+  const userAns = inputEl.value.trim();
+  if (!userAns) { inputEl.style.borderColor='#e50914'; setTimeout(()=>inputEl.style.borderColor='#333',1000); return; }
+
+  _citatState.answered = true;
+  _citatState.total++;
+
+  // Fuzzy match — normalize and compare
+  const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,'').trim();
+  const correct = norm(_citatState.answer);
+  const user = norm(userAns);
+  const isCorrect = correct.includes(user) || user.includes(correct) || correct.split(' ').some(w=>w.length>3&&user.includes(w));
+
+  if (isCorrect) _citatState.correct++;
+  _updateCitatScore();
+
+  resultEl.style.display='block';
+  if (isCorrect) {
+    resultEl.style.background='rgba(34,197,94,0.12)';
+    resultEl.style.border='1px solid rgba(34,197,94,0.4)';
+    resultEl.innerHTML=`<div style="font-size:1.5rem;margin-bottom:6px;">✅</div><div style="color:#22c55e;font-weight:700;font-size:0.95rem;">Správně!</div><div style="color:var(--text-muted);font-size:0.82rem;margin-top:4px;">Film: <strong style="color:#fff;">${_citatState.answer}</strong></div>`;
+  } else {
+    resultEl.style.background='rgba(229,9,20,0.1)';
+    resultEl.style.border='1px solid rgba(229,9,20,0.3)';
+    resultEl.innerHTML=`<div style="font-size:1.5rem;margin-bottom:6px;">❌</div><div style="color:#e50914;font-weight:700;font-size:0.95rem;">Špatně!</div><div style="color:var(--text-muted);font-size:0.82rem;margin-top:4px;">Správná odpověď: <strong style="color:#fff;">${_citatState.answer}</strong></div>`;
+  }
+
+  if (answerWrap) answerWrap.style.display='none';
+  if (hintBtn) hintBtn.style.display='none';
+  if (nextBtn) { nextBtn.style.display='block'; nextBtn.textContent='➡️ Další citát'; }
+}
+
+function showCitatHint() {
+  const hintEl = document.getElementById('citatyHint');
+  const hintBtn = document.getElementById('citatyHintBtn');
+  if (!hintEl || !_citatState.hint) return;
+  hintEl.style.display='block';
+  hintEl.textContent='💡 ' + _citatState.hint;
+  if (hintBtn) hintBtn.style.display='none';
+}
+
 async function _zabavaAiCall(prompt) {
   const geminiKey = window._store?.getItem('sinator_gemini_api_key') || '';
   const groqKey = window._store?.getItem('sinator_groq_api_key') || '';
@@ -18854,6 +19142,8 @@ async function _zabavaAiCall(prompt) {
   orig['porovnaniModal'] = function() { if(typeof closePorovnaniModal==='function') closePorovnaniModal(); };
   orig['moodModal'] = function() { if(typeof closeMoodModal==='function') closeMoodModal(); };
   orig['myStatsModal'] = function() { if(typeof closeMyStatsModal==='function') closeMyStatsModal(); };
+  orig['tentodenModal'] = function() { if(typeof closeTentodenModal==='function') closeTentodenModal(); };
+  orig['citatyModal'] = function() { if(typeof closeCitatyModal==='function') closeCitatyModal(); };
   window._modalCloseMap = orig;
 })();
 </script>
