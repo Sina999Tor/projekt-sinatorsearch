@@ -17965,22 +17965,36 @@ const rtdb = getDatabase(fbApp);
   const sessionId = Math.random().toString(36).slice(2);
   const sessionRef = ref(rtdb, 'presence/' + sessionId);
   const countRef = ref(rtdb, 'presence');
+  const STALE_MS = 5 * 60 * 1000; // 5 minut
 
-  // Nejprve zapiš session, pak začni poslouchat
-  set(sessionRef, { t: Date.now() }).then(() => {
+  function updateBadge(count) {
+    const badge = document.getElementById('onlineBadge');
+    if (!badge) return;
+    if (localStorage.getItem('sinator_admin_mode') === '1') {
+      badge.textContent = count;
+      badge.style.display = 'block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  // Zápis vlastní session
+  function writeSession() {
+    set(sessionRef, { t: Date.now() });
     rtdbOnDisconnect(sessionRef).remove();
-    onValue(countRef, (snap) => {
-      const count = snap.exists() ? Object.keys(snap.val()).length : 0;
-      const badge = document.getElementById('onlineBadge');
-      if (!badge) return;
-      const isAdmin = localStorage.getItem('sinator_admin_mode') === '1';
-      if (isAdmin) {
-        badge.textContent = count;
-        badge.style.display = 'block';
-      } else {
-        badge.style.display = 'none';
-      }
-    });
+  }
+
+  writeSession();
+  // Obnovuj každé 2 minuty (keepalive)
+  setInterval(writeSession, 2 * 60 * 1000);
+
+  // Sleduj počet — filtruj zastaralé session
+  onValue(countRef, (snap) => {
+    if (!snap.exists()) { updateBadge(0); return; }
+    const now = Date.now();
+    const sessions = snap.val();
+    const active = Object.values(sessions).filter(s => (now - (s.t || 0)) < STALE_MS).length;
+    updateBadge(active);
   });
 })();
 
