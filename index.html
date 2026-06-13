@@ -19065,6 +19065,10 @@ function _koukatSExcludeList() {
   return _koukatSTips.map(t => t.title_cs || t.title).filter(Boolean);
 }
 
+function _koukatSNorm(s) {
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+}
+
 async function koukatSReplace(idx) {
   const btn = document.getElementById('koukatSBtn_'+idx);
   const cardEl = document.getElementById('koukatSCard_'+idx);
@@ -19072,23 +19076,32 @@ async function koukatSReplace(idx) {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Generuji další tip…'; }
   const c = KOUKAT_S_CFG[_koukatSWho] || KOUKAT_S_CFG.rodina;
   const old = _koukatSTips[idx] || {};
-  let singlePrompt = c.single.replace('{genre}', old.genre || '');
   const exclude = [..._koukatSExcludeList(), ...(_koukatSHistory[_koukatSWho]||[])];
-  if (exclude.length) singlePrompt += ` Nedoporučuj tyto již navržené tituly: ${exclude.join(', ')}.`;
-  singlePrompt += ` Vrať POUZE validní JSON (žádný markdown): {"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr"}`;
-  try {
-    const raw = await _zabavaAiCall(singlePrompt);
-    const clean = raw.replace(/```json|```/g,'').trim();
-    let t = JSON.parse(clean);
-    if (_koukatSWho !== 'sam' && _koukatSWho !== 'pratele') t.genre = old.genre || '';
-    else if (!t.genre) t.genre = old.genre || '';
-    t = await _koukatSEnrich(t);
-    _koukatSTips[idx] = t;
-    const newTitle = t.title_cs || t.title;
-    if (newTitle) _koukatSHistory[_koukatSWho] = [...(_koukatSHistory[_koukatSWho]||[]), newTitle].slice(-30);
-    cardEl.outerHTML = _koukatSTipCard(t, idx);
-  } catch(e) {
-    if (btn) { btn.disabled = false; btn.textContent = '❌ Chyba, zkus znovu'; }
+  const excludeNorm = new Set(exclude.map(_koukatSNorm));
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const seed = Math.floor(Math.random()*1000000) + attempt*999;
+    let singlePrompt = c.single.replace('{genre}', old.genre || '');
+    if (exclude.length) singlePrompt += ` Nedoporučuj tyto již navržené tituly: ${exclude.join(', ')}.`;
+    singlePrompt += ` Náhodné seed číslo pro jiný výběr: ${seed}.`;
+    singlePrompt += ` Vrať POUZE validní JSON (žádný markdown): {"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr"}`;
+    try {
+      const raw = await _zabavaAiCall(singlePrompt);
+      const clean = raw.replace(/```json|```/g,'').trim();
+      let t = JSON.parse(clean);
+      const norm = _koukatSNorm(t.title_cs || t.title);
+      if (norm && excludeNorm.has(norm) && attempt < 2) continue; // duplicate, retry
+      if (_koukatSWho !== 'sam' && _koukatSWho !== 'pratele') t.genre = old.genre || '';
+      else if (!t.genre) t.genre = old.genre || '';
+      t = await _koukatSEnrich(t);
+      _koukatSTips[idx] = t;
+      const newTitle = t.title_cs || t.title;
+      if (newTitle) _koukatSHistory[_koukatSWho] = [...(_koukatSHistory[_koukatSWho]||[]), newTitle].slice(-30);
+      cardEl.outerHTML = _koukatSTipCard(t, idx);
+      return;
+    } catch(e) {
+      if (attempt === 2) { if (btn) { btn.disabled = false; btn.textContent = '❌ Chyba, zkus znovu'; } return; }
+    }
   }
 }
 
