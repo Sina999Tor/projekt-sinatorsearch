@@ -186,6 +186,21 @@
         .header-actions.collapsed #btnToggleToolbar { transform: rotate(180deg); }
 
         /* 3D pill button */
+        .menu-row-btn {
+            display:flex;align-items:center;gap:14px;padding:16px;
+            background:linear-gradient(180deg, var(--bg-elevated) 0%, #0f0f0f 100%);
+            border:1px solid var(--border);
+            border-bottom:1px solid rgba(0,0,0,0.6);
+            border-radius:14px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;
+            width:100%;text-align:left;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.06) inset, 0 -2px 6px rgba(0,0,0,0.35) inset;
+            transform: translateY(0);
+            transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.2s;
+        }
+        .menu-row-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 -1px 4px rgba(0,0,0,0.3) inset;
+        }
         .action-btn.icon {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             gap: 4px; padding: 10px 6px 9px;
@@ -9543,27 +9558,27 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
         <button onclick="closeListsModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
-        <button onclick="closeListsModal();openTraktModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#ed2224'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="closeListsModal();openTraktModal()" class="menu-row-btn" onmouseover="this.style.borderColor='#ed2224'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📋</span>
             <div><div style="color:#ed2224;font-weight:700;">Trakt</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Sledované, watchlist, hodnocení</div></div>
         </button>
-        <button onclick="closeListsModal();openSimklModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#1cb99a'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="closeListsModal();openSimklModal()" class="menu-row-btn" onmouseover="this.style.borderColor='#1cb99a'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎯</span>
             <div><div style="color:#1cb99a;font-weight:700;">Simkl</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Sledované, watchlist</div></div>
         </button>
-        <button onclick="pushModalAndOpen('listsModal', openListsModal, openCollectionsModal)" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#9c27b0'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="pushModalAndOpen('listsModal', openListsModal, openCollectionsModal)" class="menu-row-btn" onmouseover="this.style.borderColor='#9c27b0'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📦</span>
             <div><div style="color:#ce93d8;font-weight:700;">Kolekce</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmové a seriálové kolekce</div></div>
         </button>
-        <button onclick="closeListsModal();openWatchedModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#1db954'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="closeListsModal();openWatchedModal()" class="menu-row-btn" onmouseover="this.style.borderColor='#1db954'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">✅</span>
             <div><div style="color:#1db954;font-weight:700;">Shlédnuté</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmy a seriály které jsi viděl/a</div></div>
         </button>
-        <button onclick="closeListsModal();openWatchingModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#00b4d8'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="closeListsModal();openWatchingModal()" class="menu-row-btn" onmouseover="this.style.borderColor='#00b4d8'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎭</span>
             <div><div style="color:#00b4d8;font-weight:700;">Rozkoukané seriály</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Seriály které sleduješ</div></div>
         </button>
-        <button onclick="closeListsModal();openMoviesProgressModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="closeListsModal();openMoviesProgressModal()" class="menu-row-btn" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">⏸️</span>
             <div><div style="color:var(--accent);font-weight:700;">Rozkoukané filmy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmy které jsi nedokoukoval/a</div></div>
         </button>
@@ -9577,39 +9592,39 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
         <button onclick="closeTvRadioModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
-        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openTvModal)" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#00b4d8'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openTvModal)" class="menu-row-btn" onmouseover="this.style.borderColor='#00b4d8'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📺</span>
             <div><div style="color:#00b4d8;font-weight:700;">Živá TV</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">CZ/SK a zahraniční kanály přes VLC</div></div>
         </button>
-        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openTvModal2)" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#00e5ff'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openTvModal2)" class="menu-row-btn" onmouseover="this.style.borderColor='#00e5ff'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📡</span>
             <div><div style="color:#00e5ff;font-weight:700;">Živá TV 2</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Alternativní CZ/SK streamy přes VLC</div></div>
         </button>
-        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openTvModal3)" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#a78bfa'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openTvModal3)" class="menu-row-btn" onmouseover="this.style.borderColor='#a78bfa'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🌍</span>
             <div><div style="color:#a78bfa;font-weight:700;">Živá TV 3</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Mezinárodní kanály — CZ, SK, DE, UK, US…</div></div>
         </button>
-        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openTvModal4)" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#ff9800'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openTvModal4)" class="menu-row-btn" onmouseover="this.style.borderColor='#ff9800'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🌏</span>
             <div><div style="color:#ff9800;font-weight:700;">Živá TV 4</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">India, Bangladesh, Sport, News, Music, US, UK…</div></div>
         </button>
-        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openTvModal5)" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#22c55e'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openTvModal5)" class="menu-row-btn" onmouseover="this.style.borderColor='#22c55e'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🗺️</span>
             <div><div style="color:#22c55e;font-weight:700;">Živá TV 5</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">CZ, DE, FR, ES, IT, HU, PL, PT, NL, UK, US…</div></div>
         </button>
-        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openRadioModal)" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#e53935'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openRadioModal)" class="menu-row-btn" onmouseover="this.style.borderColor='#e53935'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📻</span>
             <div><div style="color:#e53935;font-weight:700;">Rádio</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">České a slovenské rozhlasové stanice</div></div>
         </button>
-        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openIvysilaniModal)" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#0077cc'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openIvysilaniModal)" class="menu-row-btn" onmouseover="this.style.borderColor='#0077cc'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📡</span>
             <div><div style="color:#0077cc;font-weight:700;">iVysílání ČT</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Archiv a živé vysílání České televize</div></div>
         </button>
-        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openIprimaModal)" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#e30613'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openIprimaModal)" class="menu-row-btn" onmouseover="this.style.borderColor='#e30613'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🔴</span>
             <div><div style="color:#e30613;font-weight:700;">iPrima</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Archiv a živé vysílání Prima</div></div>
         </button>
-        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, function(){ openKinoModal(''); })" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, function(){ openKinoModal(''); })" class="menu-row-btn" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎦</span>
             <div><div style="color:var(--gold);font-weight:700;">Kino</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Program kin a rezervace vstupenek</div></div>
         </button>
@@ -9623,47 +9638,47 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
         <button onclick="closeZabavaModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
-        <button onclick="closeZabavaModal();openWebsitesModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#00b4d8'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="closeZabavaModal();openWebsitesModal()" class="menu-row-btn" onmouseover="this.style.borderColor='#00b4d8'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🌐</span>
             <div><div style="color:#00b4d8;font-weight:700;">Filmové magazíny</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Weby, recenze, tipy na filmy</div></div>
         </button>
-        <button onclick="pushModalAndOpen('zabavaModal', openZabavaModal, openAiModal)" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(99,102,241,0.4);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#a78bfa'" onmouseout="this.style.borderColor='rgba(99,102,241,0.4)'">
+        <button onclick="pushModalAndOpen('zabavaModal', openZabavaModal, openAiModal)" class="menu-row-btn" style="border-color:rgba(99,102,241,0.4);" onmouseover="this.style.borderColor='#a78bfa'" onmouseout="this.style.borderColor='rgba(99,102,241,0.4)'">
             <span style="font-size:1.6rem;">🤖</span>
             <div><div style="font-weight:700;background:linear-gradient(135deg,#a78bfa,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">AI Zábava</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Doporučení, kvízy a hry s AI</div></div>
         </button>
-        <button onclick="closeZabavaModal();openNahodnyTipModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(255,107,107,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#ff6b6b'" onmouseout="this.style.borderColor='rgba(255,107,107,0.35)'">
+        <button onclick="closeZabavaModal();openNahodnyTipModal()" class="menu-row-btn" style="border-color:rgba(255,107,107,0.35);" onmouseover="this.style.borderColor='#ff6b6b'" onmouseout="this.style.borderColor='rgba(255,107,107,0.35)'">
             <span style="font-size:1.6rem;">🎲</span>
             <div><div style="font-weight:700;color:#ff6b6b;">Co dnes sledovat?</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Náhodný tip na film nebo seriál</div></div>
         </button>
-        <button onclick="closeZabavaModal();openKvizModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(251,191,36,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#fbbf24'" onmouseout="this.style.borderColor='rgba(251,191,36,0.35)'">
+        <button onclick="closeZabavaModal();openKvizModal()" class="menu-row-btn" style="border-color:rgba(251,191,36,0.35);" onmouseover="this.style.borderColor='#fbbf24'" onmouseout="this.style.borderColor='rgba(251,191,36,0.35)'">
             <span style="font-size:1.6rem;">🧠</span>
             <div><div style="font-weight:700;color:#fbbf24;">Filmový kvíz</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">5 otázek o filmech a seriálech s AI</div></div>
         </button>
-        <button onclick="closeZabavaModal();openZebricky()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(34,197,94,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#22c55e'" onmouseout="this.style.borderColor='rgba(34,197,94,0.35)'">
+        <button onclick="closeZabavaModal();openZebricky()" class="menu-row-btn" style="border-color:rgba(34,197,94,0.35);" onmouseover="this.style.borderColor='#22c55e'" onmouseout="this.style.borderColor='rgba(34,197,94,0.35)'">
             <span style="font-size:1.6rem;">🏆</span>
             <div><div style="font-weight:700;color:#22c55e;">Filmové žebříčky</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Nejlepší filmy všech dob, dekád a žánrů</div></div>
         </button>
-        <button onclick="closeZabavaModal();openUpcomingModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(56,189,248,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#38bdf8'" onmouseout="this.style.borderColor='rgba(56,189,248,0.35)'">
+        <button onclick="closeZabavaModal();openUpcomingModal()" class="menu-row-btn" style="border-color:rgba(56,189,248,0.35);" onmouseover="this.style.borderColor='#38bdf8'" onmouseout="this.style.borderColor='rgba(56,189,248,0.35)'">
             <span style="font-size:1.6rem;">📅</span>
             <div><div style="font-weight:700;color:#38bdf8;">Co se chystá</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Brzy v kinech a nové seriály</div></div>
         </button>
-        <button onclick="closeZabavaModal();openPorovnaniModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(251,113,133,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#fb7185'" onmouseout="this.style.borderColor='rgba(251,113,133,0.35)'">
+        <button onclick="closeZabavaModal();openPorovnaniModal()" class="menu-row-btn" style="border-color:rgba(251,113,133,0.35);" onmouseover="this.style.borderColor='#fb7185'" onmouseout="this.style.borderColor='rgba(251,113,133,0.35)'">
             <span style="font-size:1.6rem;">🎭</span>
             <div><div style="font-weight:700;color:#fb7185;">Porovnání filmů</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">AI porovná dva filmy nebo seriály</div></div>
         </button>
-        <button onclick="closeZabavaModal();openMoodModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(168,85,247,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#a855f7'" onmouseout="this.style.borderColor='rgba(168,85,247,0.35)'">
+        <button onclick="closeZabavaModal();openMoodModal()" class="menu-row-btn" style="border-color:rgba(168,85,247,0.35);" onmouseover="this.style.borderColor='#a855f7'" onmouseout="this.style.borderColor='rgba(168,85,247,0.35)'">
             <span style="font-size:1.6rem;">🎬</span>
             <div><div style="font-weight:700;color:#a855f7;">Filmová nálada</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Vyber náladu — dostaneš 3 tipy</div></div>
         </button>
-        <button onclick="closeZabavaModal();openMyStatsModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(251,146,60,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#fb923c'" onmouseout="this.style.borderColor='rgba(251,146,60,0.35)'">
+        <button onclick="closeZabavaModal();openMyStatsModal()" class="menu-row-btn" style="border-color:rgba(251,146,60,0.35);" onmouseover="this.style.borderColor='#fb923c'" onmouseout="this.style.borderColor='rgba(251,146,60,0.35)'">
             <span style="font-size:1.6rem;">📊</span>
             <div><div style="font-weight:700;color:#fb923c;">Moje statistiky</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Přehled tvé knihovny oblíbených</div></div>
         </button>
-        <button onclick="closeZabavaModal();openTentodenModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(99,202,183,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#63cab7'" onmouseout="this.style.borderColor='rgba(99,202,183,0.35)'">
+        <button onclick="closeZabavaModal();openTentodenModal()" class="menu-row-btn" style="border-color:rgba(99,202,183,0.35);" onmouseover="this.style.borderColor='#63cab7'" onmouseout="this.style.borderColor='rgba(99,202,183,0.35)'">
             <span style="font-size:1.6rem;">🗓️</span>
             <div><div style="font-weight:700;color:#63cab7;">Tento den v historii</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co vyšlo přesně dnes před lety</div></div>
         </button>
-        <button onclick="closeZabavaModal();openKoukatSModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(250,204,21,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#facc15'" onmouseout="this.style.borderColor='rgba(250,204,21,0.35)'">
+        <button onclick="closeZabavaModal();openKoukatSModal()" class="menu-row-btn" style="border-color:rgba(250,204,21,0.35);" onmouseover="this.style.borderColor='#facc15'" onmouseout="this.style.borderColor='rgba(250,204,21,0.35)'">
             <span style="font-size:1.6rem;">👥</span>
             <div><div style="font-weight:700;color:#facc15;">Koukat s...</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">AI tipy podle toho, s kým díváš</div></div>
         </button>
