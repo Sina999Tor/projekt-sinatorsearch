@@ -17943,7 +17943,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- Firebase SDK + Doporučuji logika -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getDatabase, ref, onValue, set, remove, onDisconnect as rtdbOnDisconnect, serverTimestamp as rtdbServerTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -18106,7 +18106,10 @@ function renderDList() {
           <div style="font-size:0.75rem;color:#666;">👤 ${item.nickname||'Anonym'} · ${date}</div>
         </div>
       </div>
-      ${isOwner ? `<button onclick="window._deleteDoporuceni('${item.id}')" style="background:none;border:none;color:#666;font-size:1.1rem;cursor:pointer;padding:4px 8px;align-self:flex-start;flex-shrink:0;" title="Smazat">🗑️</button>` : ''}
+      ${isOwner ? `<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
+        ${isAdmin ? `<button onclick="window._editDoporuceni('${item.id}')" style="background:none;border:none;color:#aaa;font-size:1.1rem;cursor:pointer;padding:4px 8px;" title="Upravit">✏️</button>` : ''}
+        <button onclick="window._deleteDoporuceni('${item.id}')" style="background:none;border:none;color:#666;font-size:1.1rem;cursor:pointer;padding:4px 8px;" title="Smazat">🗑️</button>
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -18119,6 +18122,52 @@ window._deleteDoporuceni = async function(docId) {
     renderDTags();
     renderDList();
   } catch(e) { alert('Chyba: ' + e.message); }
+};
+
+window._editDoporuceni = function(docId) {
+  const item = _dAllItems.find(i => i.id === docId);
+  if (!item) return;
+  // Vytvoř edit dialog
+  const existing = document.getElementById('_dEditOverlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = '_dEditOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:flex-end;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:#1a1a1a;width:100%;max-width:600px;border-radius:18px 18px 0 0;padding:20px 16px 32px;border-top:2px solid var(--gold);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <span style="font-weight:700;font-size:1rem;color:var(--gold);">✏️ Upravit doporučení</span>
+        <button onclick="document.getElementById('_dEditOverlay').remove()" style="background:none;border:1px solid #444;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;">✕</button>
+      </div>
+      <div style="font-size:0.85rem;color:#aaa;margin-bottom:12px;">${item.title} (${item.year||''})</div>
+      <label style="font-size:0.78rem;color:#888;display:block;margin-bottom:4px;">Komentář</label>
+      <input id="_dEditComment" value="${(item.comment||'').replace(/"/g,'&quot;')}" placeholder="Komentář…" style="width:100%;background:#2a2a2a;border:1px solid #444;border-radius:8px;color:#fff;padding:9px 12px;font-size:0.88rem;margin-bottom:12px;box-sizing:border-box;">
+      <label style="font-size:0.78rem;color:#888;display:block;margin-bottom:4px;">Štítky (oddělené čárkou)</label>
+      <input id="_dEditTags" value="${(item.tags||[]).join(', ')}" placeholder="akce, drama…" style="width:100%;background:#2a2a2a;border:1px solid #444;border-radius:8px;color:#fff;padding:9px 12px;font-size:0.88rem;margin-bottom:12px;box-sizing:border-box;">
+      <label style="font-size:0.78rem;color:#888;display:block;margin-bottom:4px;">Přezdívka</label>
+      <input id="_dEditNick" value="${(item.nickname||'').replace(/"/g,'&quot;')}" placeholder="Přezdívka…" style="width:100%;background:#2a2a2a;border:1px solid #444;border-radius:8px;color:#fff;padding:9px 12px;font-size:0.88rem;margin-bottom:16px;box-sizing:border-box;">
+      <button onclick="window._saveEditDoporuceni('${docId}')" style="width:100%;padding:12px;background:var(--gold);color:#000;border:none;border-radius:10px;font-weight:700;font-size:0.95rem;cursor:pointer;">💾 Uložit</button>
+      <div id="_dEditMsg" style="text-align:center;font-size:0.82rem;margin-top:8px;"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
+};
+
+window._saveEditDoporuceni = async function(docId) {
+  const comment = document.getElementById('_dEditComment').value.trim();
+  const tagsRaw = document.getElementById('_dEditTags').value.trim();
+  const nick = document.getElementById('_dEditNick').value.trim();
+  const tags = tagsRaw ? tagsRaw.split(',').map(t=>t.trim()).filter(Boolean) : [];
+  const msg = document.getElementById('_dEditMsg');
+  try {
+    await updateDoc(doc(db, 'doporuceni', docId), { comment, tags, nickname: nick });
+    // update local cache
+    const idx = _dAllItems.findIndex(i => i.id === docId);
+    if (idx >= 0) { _dAllItems[idx].comment = comment; _dAllItems[idx].tags = tags; _dAllItems[idx].nickname = nick; }
+    renderDTags();
+    renderDList();
+    document.getElementById('_dEditOverlay')?.remove();
+  } catch(e) { if(msg) msg.innerHTML = `<span style="color:#e50914;">Chyba: ${e.message}</span>`; }
 };
 
 window._openDetailFromD = function(id, type) {
