@@ -9605,6 +9605,9 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
             <button onclick="loadKoukatS('sam')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
                 <span style="font-size:1.8rem;">🛋️</span><span>Sám</span><span style="font-size:0.7rem;color:#94a3b8;">Mix žánrů, 1 z každého</span>
             </button>
+            <button onclick="loadKoukatS('pratele')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;grid-column:1 / -1;">
+                <span style="font-size:1.8rem;">🎉</span><span>S přáteli</span><span style="font-size:0.7rem;color:#94a3b8;">Mix žánrů, 1 z každého</span>
+            </button>
         </div>
         <div id="koukatSResult" style="display:none;"></div>
     </div>
@@ -19010,7 +19013,8 @@ const KOUKAT_S_CFG = {
   rodina: {emoji:'👨‍👩‍👧‍👦', label:'Koukat s rodinou', prompt:'Doporuč přesně 3 rodinné filmy nebo seriály vhodné pro sledování s celou rodinou (dospělí i děti společně, žádný explicitní obsah).', single:'Doporuč 1 další rodinný film nebo seriál vhodný pro sledování s celou rodinou (dospělí i děti společně, žádný explicitní obsah).'},
   deti: {emoji:'🧸', label:'Koukat s dětmi', prompt:'Doporuč přesně 3 filmy nebo seriály pro děti — pohádky nebo animované pohádky, vhodné pro nejmenší diváky.', single:'Doporuč 1 další film nebo seriál pro děti — pohádku nebo animovanou pohádku, vhodnou pro nejmenší diváky.'},
   partner: {emoji:'❤️', label:'Koukat s partnerem', prompt:'Doporuč přesně 3 filmy vhodné na společné sledování s partnerkou/partnerem — romantika, drama nebo příjemné filmy pro pár.', single:'Doporuč 1 další film vhodný na společné sledování s partnerkou/partnerem — romantika, drama nebo příjemný film pro pár.'},
-  sam: {emoji:'🛋️', label:'Koukat sám', prompt:'Doporuč přesně 4 filmy, každý z jiného žánru (např. akce, drama, sci-fi, komedie, thriller, horor — vyber 4 různé žánry), vhodné na sledování v klidu sám/sama.', single:'Doporuč 1 další film z žánru "{genre}", vhodný na sledování v klidu sám/sama.'}
+  sam: {emoji:'🛋️', label:'Koukat sám', prompt:'Doporuč přesně 4 filmy, každý z jiného žánru (např. akce, drama, sci-fi, komedie, thriller, horor — vyber 4 různé žánry), vhodné na sledování v klidu sám/sama.', single:'Doporuč 1 další film z žánru "{genre}", vhodný na sledování v klidu sám/sama.'},
+  pratele: {emoji:'🎉', label:'Koukat s přáteli', prompt:'Doporuč přesně 4 filmy, každý z jiného žánru — povinně zahrň alespoň jeden horor, a dále vyber z žánrů jako komedie, akce, thriller, dobrodružství, sci-fi (celkem 4 různé žánry), vhodné na společné sledování s přáteli — zábavné, návykové nebo napínavé.', single:'Doporuč 1 další film z žánru "{genre}", vhodný na společné sledování s přáteli — zábavný, návykový nebo napínavý.'}
 };
 let _koukatSWho = null;
 let _koukatSTips = [];
@@ -19076,7 +19080,7 @@ async function koukatSReplace(idx) {
     const raw = await _zabavaAiCall(singlePrompt);
     const clean = raw.replace(/```json|```/g,'').trim();
     let t = JSON.parse(clean);
-    if (_koukatSWho !== 'sam') t.genre = old.genre || '';
+    if (_koukatSWho !== 'sam' && _koukatSWho !== 'pratele') t.genre = old.genre || '';
     else if (!t.genre) t.genre = old.genre || '';
     t = await _koukatSEnrich(t);
     _koukatSTips[idx] = t;
@@ -19098,7 +19102,7 @@ async function loadKoukatS(who) {
   const seed = Math.floor(Math.random()*1000000);
   const hist = _koukatSHistory[who] || [];
   let prompt = `${c.prompt} Vrať POUZE validní JSON (žádný markdown):
-{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr (jen u varianty 'sám', jinak nech prázdné)"}]}
+{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr (jen u variant 'sám' a 's přáteli', jinak nech prázdné)"}]}
 Pro zajištění rozmanitosti použij toto náhodné seed číslo k výběru jiných titulů než obvykle: ${seed}. Vyber pokaždé jiné, různorodé tituly (různé dekády, různí režiséři, méně očekávané volby).`;
   if (hist.length) prompt += ` Nedoporučuj tyto již dříve navržené tituly: ${hist.join(', ')}.`;
   try {
