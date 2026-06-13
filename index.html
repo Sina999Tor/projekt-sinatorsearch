@@ -355,10 +355,10 @@
         .settings-modal { background: #141414; width: 100%; height: 100%; display: flex; flex-direction: column; border-radius: 0; border: none; overflow: hidden; }
         .sources-modal { max-width: 600px; }
         /* ── iVysílání modal ── */
-        .ivysilani-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.94); backdrop-filter: blur(12px); z-index: 10500; justify-content: center; align-items: flex-start; padding: 20px 12px 20px; overflow-y: auto; }
+        .ivysilani-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.97); backdrop-filter: blur(20px); z-index: 10500; flex-direction: column; overflow: hidden; }
         .ivysilani-modal-overlay.open { display: flex; animation: fadeInScale 0.25s ease; }
         @keyframes fadeInScale { from { opacity:0; transform:scale(0.97); } to { opacity:1; transform:scale(1); } }
-        .ivysilani-modal { background: var(--bg-card); border-radius: 18px; max-width: 700px; width: 100%; max-height: calc(100dvh - 40px); overflow-y: auto; position: relative; border: 1px solid rgba(0,85,165,0.35); box-shadow: 0 24px 70px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,119,204,0.1); overscroll-behavior: contain; display: flex; flex-direction: column; }
+        .ivysilani-modal { background: var(--bg-card); border-radius: 0; max-width: 100%; width: 100%; height: 100%; max-height: 100%; overflow-y: auto; position: relative; border: none; border-top: 2px solid var(--ivysilani); box-shadow: none; overscroll-behavior: contain; display: flex; flex-direction: column; flex: 1; }
         .ivysilani-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); z-index: 10; border-radius: 18px 18px 0 0; flex-shrink: 0; gap: 10px; }
         .ivysilani-header h2 { font-family: 'Playfair Display', serif; font-size: 1.35rem; background: linear-gradient(135deg, #fff 0%, #60b0ff 50%, var(--ivysilani-light) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 8px; }
         .ivysilani-close { background: var(--bg-elevated); border: 1px solid var(--border); color: #fff; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: grid; place-items: center; transition: 0.2s; flex-shrink: 0; }
@@ -430,9 +430,9 @@
         .ai-item:hover { border-color: rgba(99,102,241,0.6); background: rgba(99,102,241,0.1); transform: translateX(3px); }
         .ai-name { font-weight: 600; font-size: 0.9rem; color: #fff; }
         .ai-best { font-size: 0.75rem; color: #a78bfa; line-height: 1.4; }
-        .iprima-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.94); backdrop-filter: blur(12px); z-index: 10500; justify-content: center; align-items: flex-start; padding: 20px 12px 20px; overflow-y: auto; }
+        .iprima-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.97); backdrop-filter: blur(20px); z-index: 10500; flex-direction: column; overflow: hidden; }
         .iprima-modal-overlay.open { display: flex; animation: fadeInScale 0.25s ease; }
-        .iprima-modal { background: var(--bg-card); border-radius: 18px; max-width: 700px; width: 100%; max-height: calc(100dvh - 40px); overflow-y: auto; position: relative; border: 1px solid rgba(227,6,19,0.35); box-shadow: 0 24px 70px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,32,48,0.1); overscroll-behavior: contain; display: flex; flex-direction: column; }
+        .iprima-modal { background: var(--bg-card); border-radius: 0; max-width: 100%; width: 100%; height: 100%; max-height: 100%; overflow-y: auto; position: relative; border: none; border-top: 2px solid var(--iprima); box-shadow: none; overscroll-behavior: contain; display: flex; flex-direction: column; flex: 1; }
         .iprima-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); z-index: 10; border-radius: 18px 18px 0 0; flex-shrink: 0; gap: 10px; }
         .iprima-header h2 { font-family: 'Playfair Display', serif; font-size: 1.35rem; background: linear-gradient(135deg, #fff 0%, #ff8a80 50%, var(--iprima-light) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 8px; }
         .iprima-close { background: var(--bg-elevated); border: 1px solid var(--border); color: #fff; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: grid; place-items: center; transition: 0.2s; flex-shrink: 0; }
@@ -794,9 +794,9 @@
         }
 
         /* KINO MODAL */
-        .kino-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); backdrop-filter: blur(10px); z-index: 4000; justify-content: center; align-items: flex-start; padding: 60px 20px 20px; overflow-y: auto; }
+        .kino-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.97); backdrop-filter: blur(20px); z-index: 4000; flex-direction: column; overflow: hidden; }
         .kino-modal-overlay.open { display: flex; }
-        .kino-modal { background: var(--bg-card); border-radius: 16px; max-width: 480px; width: 100%; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.8); overflow: hidden; }
+        .kino-modal { background: var(--bg-card); border-radius: 0; max-width: 100%; width: 100%; flex: 1; border: none; border-top: 2px solid var(--gold); box-shadow: none; overflow-y: auto; display: flex; flex-direction: column; }
         .kino-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border); background: var(--bg-elevated); }
         .kino-modal-header h3 { font-family: 'Playfair Display', serif; font-size: 1.2rem; background: linear-gradient(135deg, #fff, var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .kino-modal-header .close-kino { background: none; border: 1px solid var(--border); color: #fff; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 1rem; display: grid; place-items: center; transition: 0.2s; }
@@ -11153,7 +11153,12 @@ function closeTvModal() {
     stopTvChannel();
     if(tvState.clockInterval) clearInterval(tvState.clockInterval);
     var stack = window.modalStack || [];
-    if(stack.length > 0) { var p = stack.pop(); p.openFn(); }
+    if(stack.length > 0) {
+        var p = stack.pop(); p.openFn();
+    } else {
+        // Vrátit na TV/Rádio modal
+        openTvRadioModal();
+    }
 }
 
 
