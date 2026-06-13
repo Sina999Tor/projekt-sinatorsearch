@@ -18997,6 +18997,11 @@ async function loadTentoDen() {
 // =====================================================
 function openKoukatSModal() { const m=document.getElementById('koukatSModal'); if(m){m.style.display='flex';resetKoukatS();} if(window.updatePwaBtn)updatePwaBtn(); }
 function closeKoukatSModal() { const m=document.getElementById('koukatSModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
+function closeKoukatSModalFull() {
+  const m=document.getElementById('koukatSModal'); if(m)m.style.display='none';
+  if(typeof closeZabavaModal==='function') closeZabavaModal();
+  if(window.updatePwaBtn) updatePwaBtn();
+}
 function resetKoukatS() {
   const pick=document.getElementById('koukatSPicker'); const res=document.getElementById('koukatSResult');
   if(pick)pick.style.display='grid'; if(res){res.style.display='none';res.innerHTML='';}
@@ -19019,7 +19024,7 @@ function _koukatSTipCard(t, idx) {
   const ratingHtml = t.rating>0 ? `<span style="color:#fbbf24;font-size:0.72rem;margin-left:6px;">★ ${t.rating.toFixed(1)}</span>` : '';
   const clickable = t.tmdbId && typeof openDetail==='function';
   const clickStyle = clickable ? 'cursor:pointer;' : '';
-  const clickAttr = clickable ? `onclick="closeKoukatSModal();openDetail(${t.tmdbId},'${t.tmdbType||'movie'}')"` : '';
+  const clickAttr = clickable ? `onclick="closeKoukatSModalFull();openDetail(${t.tmdbId},'${t.tmdbType||'movie'}')"` : '';
   const arrowHtml = clickable ? `<div style="flex-shrink:0;align-self:center;color:#facc15;font-size:1rem;">›</div>` : '';
   const genreHtml = t.genre ? `<span style="color:#facc15;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;">${t.genre}</span>` : '';
   return `<div id="koukatSCard_${idx}" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:12px;margin-bottom:10px;">
