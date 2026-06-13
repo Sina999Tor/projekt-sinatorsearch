@@ -19051,13 +19051,26 @@ function _koukatSTipCard(t, idx) {
 async function _koukatSEnrich(t) {
   const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
   if (!tmdbKey) return {...t, tmdbId: null, poster: null};
-  try {
-    const q = encodeURIComponent(t.title || t.title_cs || '');
-    const url = `https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${q}&language=cs-CZ&page=1`;
-    const data = await fetch(url).then(r=>r.json());
-    const hit = (data.results||[]).find(r=>(r.media_type==='movie'||r.media_type==='tv') && r.poster_path);
-    if (hit) return {...t, tmdbId: hit.id, tmdbType: hit.media_type, poster: hit.poster_path, rating: hit.vote_average};
-  } catch(e) {}
+  const tryQuery = async (q) => {
+    if (!q) return null;
+    try {
+      const url = `https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${encodeURIComponent(q)}&language=cs-CZ&page=1`;
+      const data = await fetch(url).then(r=>r.json());
+      const results = (data.results||[]).filter(r=>(r.media_type==='movie'||r.media_type==='tv') && r.poster_path);
+      if (!results.length) return null;
+      if (t.year) {
+        const exact = results.find(r => {
+          const y = (r.release_date||r.first_air_date||'').slice(0,4);
+          return y && Math.abs(parseInt(y) - parseInt(t.year)) <= 1;
+        });
+        if (exact) return exact;
+      }
+      return results[0];
+    } catch(e) { return null; }
+  };
+  let hit = await tryQuery(t.title);
+  if (!hit && t.title_cs && t.title_cs !== t.title) hit = await tryQuery(t.title_cs);
+  if (hit) return {...t, tmdbId: hit.id, tmdbType: hit.media_type, poster: hit.poster_path, rating: hit.vote_average};
   return {...t, tmdbId: null, poster: null};
 }
 
@@ -19084,7 +19097,8 @@ async function koukatSReplace(idx) {
     let singlePrompt = c.single.replace('{genre}', old.genre || '');
     if (exclude.length) singlePrompt += ` Nedoporučuj tyto již navržené tituly: ${exclude.join(', ')}.`;
     singlePrompt += ` Náhodné seed číslo pro jiný výběr: ${seed}.`;
-    singlePrompt += ` Vrať POUZE validní JSON (žádný markdown): {"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr"}`;
+    singlePrompt += ` DŮLEŽITÉ: doporuč POUZE skutečně existující, reálný film/seriál se správným originálním názvem a rokem — žádné smyšlené tituly.`;
+    singlePrompt += ` Vrať POUZE validní JSON (žádný markdown): {"title":"Originální anglický název přesně tak, jak je na TMDB","title_cs":"Český název k zobrazení (pokud neexistuje, použij originální)","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr"}`;
     try {
       const raw = await _zabavaAiCall(singlePrompt);
       const clean = raw.replace(/```json|```/g,'').trim();
@@ -19115,7 +19129,8 @@ async function loadKoukatS(who) {
   const seed = Math.floor(Math.random()*1000000);
   const hist = _koukatSHistory[who] || [];
   let prompt = `${c.prompt} Vrať POUZE validní JSON (žádný markdown):
-{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr (jen u variant 'sám' a 's přáteli', jinak nech prázdné)"}]}
+{"tips":[{"title":"Originální anglický název filmu/seriálu přesně tak, jak je na TMDB (themoviedb.org)","title_cs":"Český název k zobrazení (pokud neexistuje, použij originální)","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr (jen u variant 'sám' a 's přáteli', jinak nech prázdné)"}]}
+DŮLEŽITÉ: Doporučuj POUZE skutečně existující, reálné filmy/seriály se správným originálním názvem a rokem vydání — žádné smyšlené nebo nejisté tituly. Pole "title" musí být přesný originální název použitelný pro vyhledávání na TMDB.
 Pro zajištění rozmanitosti použij toto náhodné seed číslo k výběru jiných titulů než obvykle: ${seed}. Vyber pokaždé jiné, různorodé tituly (různé dekády, různí režiséři, méně očekávané volby).`;
   if (hist.length) prompt += ` Nedoporučuj tyto již dříve navržené tituly: ${hist.join(', ')}.`;
   try {
