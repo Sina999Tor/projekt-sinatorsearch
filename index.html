@@ -2984,6 +2984,12 @@
         if(m) m.style.display = 'none';
         $('btnZabavaToggle')?.classList.remove('active');
     }
+    window._returnToZabava = function() {
+        const m = $('zabavaModal');
+        if(m) m.style.display = 'flex';
+        $('btnZabavaToggle')?.classList.add('active');
+        if(window.updatePwaBtn) updatePwaBtn();
+    };
     function openListsModal() {
         closeHelperModals();
         const m = $('listsModal');
@@ -18323,7 +18329,7 @@ function openNahodnyTipModal() {
 function closeNahodnyTipModal() {
   const m = document.getElementById('nahodnyTipModal');
   if (m) m.style.display = 'none';
-  if(window.updatePwaBtn) updatePwaBtn();
+  if(window._returnToZabava) _returnToZabava();
 }
 function ntSetFilter(f) {
   _ntFilter = f;
@@ -18380,7 +18386,7 @@ async function loadNahodnyTip() {
 // =====================================================
 let _kvizDiff = 'easy', _kvizQuestions = [], _kvizCurrent = 0, _kvizScore = 0, _kvizAnswered = false;
 function openKvizModal() { const m=document.getElementById('kvizModal'); if(m){m.style.display='flex';} resetKvizUI(); if(window.updatePwaBtn)updatePwaBtn(); }
-function closeKvizModal() { const m=document.getElementById('kvizModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
+function closeKvizModal() { const m=document.getElementById('kvizModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
 function resetKvizUI() {
   _kvizQuestions=[]; _kvizCurrent=0; _kvizScore=0; _kvizAnswered=false;
   const b=document.getElementById('kvizBody');
@@ -18490,7 +18496,7 @@ function renderKvizResult() {
 // =====================================================
 let _zebrickyTab = 'top_all', _zebrickyCache = {};
 function openZebricky() { const m=document.getElementById('zebrickyModal'); if(m){m.style.display='flex';} zebrickySetTab('top_all'); if(window.updatePwaBtn)updatePwaBtn(); }
-function closeZebrickyModal() { const m=document.getElementById('zebrickyModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
+function closeZebrickyModal() { const m=document.getElementById('zebrickyModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
 function zebrickySetTab(tab) {
   _zebrickyTab = tab;
   document.querySelectorAll('.zeb-tab').forEach(b => {
@@ -18544,7 +18550,7 @@ async function loadZebricky(tab) {
 // =====================================================
 let _upcomingTab = 'movies', _upcomingCache = {};
 function openUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m){m.style.display='flex';} upcomingSetTab('movies'); if(window.updatePwaBtn)updatePwaBtn(); }
-function closeUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
+function closeUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
 function upcomingSetTab(tab) {
   _upcomingTab = tab;
   const tabs = {movies:'upTabMovies',tv:'upTabTv'};
@@ -18596,7 +18602,7 @@ async function loadUpcoming(tab) {
 // 🎭 POROVNÁNÍ FILMŮ
 // =====================================================
 function openPorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m){m.style.display='flex';resetPorovnani();} if(window.updatePwaBtn)updatePwaBtn(); }
-function closePorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
+function closePorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
 function resetPorovnani() {
   const inp=document.getElementById('porovnaniInput'); const res=document.getElementById('porovnaniResult');
   if(inp){inp.style.display='block';} if(res){res.style.display='none';res.innerHTML='';}
@@ -18744,7 +18750,7 @@ Vrať POUZE validní JSON (žádný markdown):
 // 🎬 FILMOVÁ NÁLADA
 // =====================================================
 function openMoodModal() { const m=document.getElementById('moodModal'); if(m){m.style.display='flex';resetMood();} if(window.updatePwaBtn)updatePwaBtn(); }
-function closeMoodModal() { const m=document.getElementById('moodModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
+function closeMoodModal() { const m=document.getElementById('moodModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
 function resetMood() {
   const pick=document.getElementById('moodPicker'); const res=document.getElementById('moodResult');
   if(pick)pick.style.display='grid'; if(res){res.style.display='none';res.innerHTML='';}
@@ -18818,7 +18824,7 @@ async function loadMoodTips(mood) {
 // 📊 MOJE STATISTIKY
 // =====================================================
 function openMyStatsModal() { const m=document.getElementById('myStatsModal'); if(m){m.style.display='flex';renderMyStats();} if(window.updatePwaBtn)updatePwaBtn(); }
-function closeMyStatsModal() { const m=document.getElementById('myStatsModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
+function closeMyStatsModal() { const m=document.getElementById('myStatsModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
 function renderMyStats() {
   const body = document.getElementById('myStatsBody');
   if (!body) return;
@@ -18899,6 +18905,7 @@ function openTentodenModal() {
 function closeTentodenModal() {
   const m = document.getElementById('tentodenModal');
   if (m) m.style.display = 'none';
+  if(window._returnToZabava) _returnToZabava();
 }
 
 async function loadTentoDen() {
@@ -18989,7 +18996,7 @@ async function loadTentoDen() {
 // 👥 KOUKAT S...
 // =====================================================
 function openKoukatSModal() { const m=document.getElementById('koukatSModal'); if(m){m.style.display='flex';resetKoukatS();} if(window.updatePwaBtn)updatePwaBtn(); }
-function closeKoukatSModal() { const m=document.getElementById('koukatSModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
+function closeKoukatSModal() { const m=document.getElementById('koukatSModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
 function resetKoukatS() {
   const pick=document.getElementById('koukatSPicker'); const res=document.getElementById('koukatSResult');
   if(pick)pick.style.display='grid'; if(res){res.style.display='none';res.innerHTML='';}
