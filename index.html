@@ -3102,6 +3102,11 @@
         if(m) { m.style.display = 'flex'; }
         $('btnTvRadioToggle')?.classList.add('active');
     }
+    function _openTvRadioModalDirect() {
+        const m = $('tvRadioModal');
+        if(m) { m.style.display = 'flex'; }
+        $('btnTvRadioToggle')?.classList.add('active');
+    }
     function closeTvRadioModal() {
         const m = $('tvRadioModal');
         if(m) m.style.display = 'none';
@@ -3118,7 +3123,7 @@
         $('sourcesModal')?.classList.remove('open');
         $('websitesModal')?.classList.remove('open');
         const lm = $('listsModal'); if(lm) lm.style.display = 'none';
-        const tm = $('tvRadioModal'); if(tm) tm.style.display = 'none';
+        const tm = $('tvRadioModal'); if(tm && !(window.modalStack||[]).some(function(m){return m.id==='tvRadioModal';})) tm.style.display = 'none';
         const zm = $('zabavaModal'); if(zm) zm.style.display = 'none';
         $('btnMusicToggle')?.classList.remove('active');
         $('btnTraktToggle')?.classList.remove('active');
@@ -9464,7 +9469,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
     function closeKinoModal() {
         document.getElementById('kinoModal').classList.remove('open');
     var stack = window.modalStack || [];
-    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
+    if(stack.length > 0) { var p = stack.pop(); p.openFn(); }
     }
 </script>
 
@@ -9854,7 +9859,7 @@ function closeTvModal2() {
     document.getElementById('tvModal2').classList.remove('open');
     if(tv2ClockInterval) { clearInterval(tv2ClockInterval); tv2ClockInterval = null; }
     var stack = window.modalStack || [];
-    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
+    if(stack.length > 0) { var p = stack.pop(); p.openFn(); }
 }
 
 function switchTv2Group(g) {
@@ -11021,7 +11026,7 @@ function closeTvModal3() {
     document.getElementById('tvModal3').classList.remove('open');
     if(tv3State.clockInterval) { clearInterval(tv3State.clockInterval); tv3State.clockInterval = null; }
     var stack = window.modalStack || [];
-    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
+    if(stack.length > 0) { var p = stack.pop(); p.openFn(); }
 }
 
 function renderTv3Tabs() {
@@ -11148,7 +11153,7 @@ function closeTvModal() {
     stopTvChannel();
     if(tvState.clockInterval) clearInterval(tvState.clockInterval);
     var stack = window.modalStack || [];
-    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
+    if(stack.length > 0) { var p = stack.pop(); p.openFn(); }
 }
 
 
@@ -12581,7 +12586,7 @@ function openRadioModal() {
 function closeRadioModal() {
     document.getElementById('radioModal').classList.remove('open');
     var stack = window.modalStack || [];
-    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
+    if(stack.length > 0) { var p = stack.pop(); p.openFn(); }
 }
 
 function playRadio(idx, streamIdx = 0) {
@@ -12825,7 +12830,7 @@ function openIvysilaniModal() {
 function closeIvysilaniModal() {
     document.getElementById('ivysilaniModal').classList.remove('open');
     var stack = window.modalStack || [];
-    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
+    if(stack.length > 0) { var p = stack.pop(); p.openFn(); }
 }
 
 function ivysilaniSetTab(tab) {
@@ -13468,7 +13473,7 @@ function openIprimaModal() {
 function closeIprimaModal() {
     document.getElementById('iprimaModal').classList.remove('open');
     var stack = window.modalStack || [];
-    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
+    if(stack.length > 0) { var p = stack.pop(); p.openFn(); }
 }
 
 function openAiModal() {
@@ -15465,7 +15470,7 @@ function closeTvModal4() {
     document.getElementById('tvModal4').classList.remove('open');
     if(tv4State.clockInterval) { clearInterval(tv4State.clockInterval); tv4State.clockInterval = null; }
     var stack = window.modalStack || [];
-    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
+    if(stack.length > 0) { var p = stack.pop(); p.openFn(); }
 }
 
 function renderTv4Tabs() {
@@ -17114,7 +17119,7 @@ function closeTvModal5() {
     document.getElementById('tvModal5').classList.remove('open');
     if(tv5State.clockInterval) { clearInterval(tv5State.clockInterval); tv5State.clockInterval = null; }
     var stack = window.modalStack || [];
-    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
+    if(stack.length > 0) { var p = stack.pop(); p.openFn(); }
 }
 
 function renderTv5Tabs() {
