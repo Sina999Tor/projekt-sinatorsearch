@@ -11143,6 +11143,7 @@ function closeTvModal() {
     tvModal.style.display = 'none';
     stopTvChannel();
     if(tvState.clockInterval) clearInterval(tvState.clockInterval);
+    if(typeof openTvRadioModal === 'function') openTvRadioModal();
 }
 
 
