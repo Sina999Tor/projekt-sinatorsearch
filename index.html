@@ -19069,7 +19069,7 @@ async function koukatSReplace(idx) {
   const c = KOUKAT_S_CFG[_koukatSWho] || KOUKAT_S_CFG.rodina;
   const old = _koukatSTips[idx] || {};
   let singlePrompt = c.single.replace('{genre}', old.genre || '');
-  const exclude = _koukatSExcludeList();
+  const exclude = [..._koukatSExcludeList(), ...(_koukatSHistory[_koukatSWho]||[])];
   if (exclude.length) singlePrompt += ` Nedoporučuj tyto již navržené tituly: ${exclude.join(', ')}.`;
   singlePrompt += ` Vrať POUZE validní JSON (žádný markdown): {"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr"}`;
   try {
@@ -19080,20 +19080,27 @@ async function koukatSReplace(idx) {
     else if (!t.genre) t.genre = old.genre || '';
     t = await _koukatSEnrich(t);
     _koukatSTips[idx] = t;
+    const newTitle = t.title_cs || t.title;
+    if (newTitle) _koukatSHistory[_koukatSWho] = [...(_koukatSHistory[_koukatSWho]||[]), newTitle].slice(-30);
     cardEl.outerHTML = _koukatSTipCard(t, idx);
   } catch(e) {
     if (btn) { btn.disabled = false; btn.textContent = '❌ Chyba, zkus znovu'; }
   }
 }
 
+let _koukatSHistory = {};
 async function loadKoukatS(who) {
   const pick=document.getElementById('koukatSPicker'); const res=document.getElementById('koukatSResult');
   if(pick)pick.style.display='none';
   if(res){res.style.display='block';res.innerHTML='<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI vybírá tipy…<br><br>⏳</div>';}
   _koukatSWho = who;
   const c = KOUKAT_S_CFG[who] || KOUKAT_S_CFG.rodina;
-  const prompt = `${c.prompt} Vrať POUZE validní JSON (žádný markdown):
-{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr (jen u varianty 'sám', jinak nech prázdné)"}]}`;
+  const seed = Math.floor(Math.random()*1000000);
+  const hist = _koukatSHistory[who] || [];
+  let prompt = `${c.prompt} Vrať POUZE validní JSON (žádný markdown):
+{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr (jen u varianty 'sám', jinak nech prázdné)"}]}
+Pro zajištění rozmanitosti použij toto náhodné seed číslo k výběru jiných titulů než obvykle: ${seed}. Vyber pokaždé jiné, různorodé tituly (různé dekády, různí režiséři, méně očekávané volby).`;
+  if (hist.length) prompt += ` Nedoporučuj tyto již dříve navržené tituly: ${hist.join(', ')}.`;
   try {
     const raw = await _zabavaAiCall(prompt);
     const clean = raw.replace(/```json|```/g,'').trim();
@@ -19101,6 +19108,8 @@ async function loadKoukatS(who) {
     const tips = d.tips || [];
     const enriched = await Promise.all(tips.map(t => _koukatSEnrich(t)));
     _koukatSTips = enriched;
+    const newTitles = enriched.map(t => t.title_cs || t.title).filter(Boolean);
+    _koukatSHistory[who] = [...(hist), ...newTitles].slice(-30);
     const cards = enriched.map((t,idx) => _koukatSTipCard(t, idx)).join('');
     const html=`<div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
