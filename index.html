@@ -175,82 +175,18 @@
         #exitConfirmBox .btn-cancel { background: #2a2a2a; color: #fff; }
         #exitConfirmBox .btn-exit { background: var(--accent); color: #fff; }
         
-        /* ── HEADER ACTIONS – 3D tlačítka s popiskem ── */
-        .header-actions {
-            max-width: 500px; margin: 12px auto 0;
-            display: flex; justify-content: center; gap: 7px;
-            align-items: flex-start; flex-wrap: wrap; padding: 0 6px;
-        }
+        .header-actions { max-width: 450px; margin: 10px auto 0; display: flex; justify-content: center; gap: 8px; align-items: center; flex-wrap: wrap; }
         .header-actions.collapsed .action-btn.icon:not(#btnToggleToolbar):not(#btnSearchToggle):not(#btnFiltersToggle) { display: none; }
         #btnToggleToolbar { transition: transform 0.2s ease; }
         .header-actions.collapsed #btnToggleToolbar { transform: rotate(180deg); }
-
-        /* 3D pill button */
-        .action-btn.icon {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: 3px; padding: 9px 6px 7px;
-            width: 62px; min-height: 58px;
-            border-radius: 16px; cursor: pointer; position: relative;
-            font-size: 1.35rem; color: var(--text);
-            background: linear-gradient(160deg, #242424 0%, #181818 60%, #111 100%);
-            border: 1px solid rgba(255,255,255,0.08);
-            box-shadow:
-                0 1px 0 rgba(255,255,255,0.07) inset,
-                0 -1px 0 rgba(0,0,0,0.6) inset,
-                0 4px 10px rgba(0,0,0,0.55),
-                0 1px 3px rgba(0,0,0,0.9);
-            transition: all 0.15s ease;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        }
-        .action-btn.icon .btn-label {
-            font-size: 0.52rem; font-weight: 600; letter-spacing: 0.03em;
-            color: #888; text-transform: uppercase; line-height: 1;
-            white-space: nowrap; pointer-events: none;
-        }
-        .action-btn.icon:active {
-            transform: translateY(2px);
-            box-shadow:
-                0 1px 0 rgba(255,255,255,0.04) inset,
-                0 1px 4px rgba(0,0,0,0.8);
-        }
-        .action-btn.icon:hover {
-            background: linear-gradient(160deg, #2e2e2e 0%, #1f1f1f 60%, #151515 100%);
-            border-color: rgba(255,255,255,0.14);
-        }
-        .action-btn.icon.active {
-            background: linear-gradient(160deg, #ff2333 0%, #c40612 70%, #a00510 100%);
-            border-color: rgba(255,80,80,0.35);
-            color: #fff;
-            box-shadow:
-                0 1px 0 rgba(255,120,120,0.2) inset,
-                0 -1px 0 rgba(0,0,0,0.5) inset,
-                0 4px 14px rgba(229,9,20,0.5),
-                0 1px 3px rgba(0,0,0,0.9);
-        }
-        .action-btn.icon.active .btn-label { color: rgba(255,200,200,0.85); }
-        .action-btn.icon.active.music {
-            background: linear-gradient(160deg, #ff8888 0%, #e05050 70%, #c03030 100%);
-            border-color: rgba(255,107,107,0.4);
-        }
-        /* badge */
-        .action-btn.icon .badge {
-            position: absolute; top: -5px; right: -5px;
-            min-width: 18px; height: 18px; padding: 0 4px;
-            border-radius: 10px; font-size: 0.58rem;
-            display: grid; place-items: center; font-weight: 800;
-            border: 2px solid var(--bg-dark); z-index: 2;
-        }
+        .action-btn.icon { padding: 8px 12px; border-radius: 50%; width: 42px; height: 42px; display: grid; place-items: center; font-size: 1.2rem; cursor: pointer; transition: all 0.2s; border: 2px solid var(--border); background: var(--bg-card); color: var(--text); position: relative; }
+        .action-btn.icon:hover { background: rgba(255,255,255,0.1); transform: scale(1.1); border-color: var(--text-muted); }
+        .action-btn.icon.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .action-btn.icon.active.music { background: var(--music); border-color: var(--music); }
+        .action-btn.icon .badge { position: absolute; top: -4px; right: -4px; width: 18px; height: 18px; border-radius: 50%; font-size: 0.6rem; display: grid; place-items: center; font-weight: bold; border: 2px solid var(--bg-dark); }
         .action-btn.icon .badge.tmdb { background: var(--accent); color: #fff; }
-        .action-btn.icon .badge.fav  { background: var(--gold); color: #000; }
+        .action-btn.icon .badge.fav { background: var(--gold); color: #000; }
         .action-btn.icon .badge.trakt { background: var(--trakt); color: #000; }
-
-        /* schovat-tlacitko mensi */
-        #btnToggleToolbar {
-            width: 40px; min-height: 36px; font-size: 0.65rem;
-            border-radius: 10px; opacity: 0.55;
-        }
-        #btnToggleToolbar .btn-label { display: none; }
         
         .search-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; background: rgba(0,0,0,0.95); backdrop-filter: blur(20px); z-index: 10000 !important; padding: 16px 20px; border-bottom: 1px solid var(--border); }
         .search-overlay.show { display: block; animation: slideDown 0.3s ease; }
@@ -920,39 +856,17 @@
         <div class="by-sinator">by sinator</div>
     </div>
     <div class="header-actions">
-        <button class="action-btn icon" id="btnSearchToggle" onclick="toggleSearchOverlay()" title="Vyhledávání">
-            🔎<span class="btn-label">Hledat</span>
-        </button>
-        <button class="action-btn icon" id="btnFiltersToggle" onclick="toggleFiltersOverlay()" title="Filtry">
-            ⚙️<span class="btn-label">Filtry</span>
-        </button>
-        <button class="action-btn icon" id="btnMusicToggle" onclick="openMusicModal()" title="Hudba">
-            🎵<span class="btn-label">Hudba</span>
-        </button>
-        <button class="action-btn icon" id="btnTvRadioToggle" onclick="openTvRadioModal()" title="TV / Rádio / Kino">
-            📺<span class="btn-label">Živá TV</span>
-        </button>
-        <button class="action-btn icon" id="btnFavToggle" onclick="openFavsModal()" title="Oblíbené">
-            ❤️<span class="btn-label">Oblíbené</span>
-            <span class="badge fav" id="favBadge" style="display:none">0</span>
-        </button>
-        <button class="action-btn icon" onclick="openSlozkyModal()" title="Moje složky" style="color:#f9a825;">
-            📁<span class="btn-label" style="color:#b07a10;">Složky</span>
-        </button>
-        <button class="action-btn icon" id="btnListsToggle" onclick="openListsModal()" title="Seznamy — Trakt, Simkl, Shlédnuté…">
-            📋<span class="btn-label">Seznamy</span>
-            <span class="badge trakt" id="listsBadge" style="display:none">!</span>
-        </button>
-        <button class="action-btn icon" id="btnDoporucujiToggle" onclick="openDoporucujiModal()" title="Doporučuji — sdílená doporučení">
-            ⭐<span class="btn-label">Top tipy</span>
-        </button>
-        <button class="action-btn icon" id="btnZabavaToggle" onclick="openZabavaModal()" title="Zábava — Weby, AI…">
-            🎲<span class="btn-label">Zábava</span>
-        </button>
-        <button class="action-btn icon" onclick="openSettingsModal()" title="Nastavení">
-            🔧<span class="btn-label">Nastavení</span>
-        </button>
-        <button class="action-btn icon" id="btnToggleToolbar" onclick="toggleToolbar()" title="Schovat/zobrazit tlačítka">▲</button>
+        <button class="action-btn icon" id="btnSearchToggle" onclick="toggleSearchOverlay()" title="Vyhledávání">🔎</button>
+        <button class="action-btn icon" id="btnFiltersToggle" onclick="toggleFiltersOverlay()" title="Filtry">⚙️</button>
+        <button class="action-btn icon" id="btnMusicToggle" onclick="openMusicModal()" title="Hudba">🎵</button>
+        <button class="action-btn icon" id="btnTvRadioToggle" onclick="openTvRadioModal()" title="TV / Rádio / Kino">📺</button>
+        <button class="action-btn icon" id="btnFavToggle" onclick="openFavsModal()" title="Oblíbené">❤️<span class="badge fav" id="favBadge" style="display:none">0</span></button>
+        <button class="action-btn icon" onclick="openSlozkyModal()" title="Moje složky" style="font-size:1.2rem;font-weight:700;color:#f9a825;">📁</button>
+        <button class="action-btn icon" id="btnListsToggle" onclick="openListsModal()" title="Seznamy — Trakt, Simkl, Shlédnuté…">📋<span class="badge trakt" id="listsBadge" style="display:none">!</span></button>
+        <button class="action-btn icon" id="btnDoporucujiToggle" onclick="openDoporucujiModal()" title="Doporučuji — sdílená doporučení">⭐</button>
+        <button class="action-btn icon" id="btnZabavaToggle" onclick="openZabavaModal()" title="Zábava — Weby, AI…">🎲</button>
+        <button class="action-btn icon" onclick="openSettingsModal()" title="Nastavení">🔧</button>
+        <button class="action-btn icon" id="btnToggleToolbar" onclick="toggleToolbar()" title="Schovat/zobrazit tlačítka" style="font-size:0.7rem;opacity:0.6;">▲</button>
     </div>
 </header>
 
@@ -9842,6 +9756,7 @@ function openTvModal2() {
 function closeTvModal2() {
     document.getElementById('tvModal2').classList.remove('open');
     if(tv2ClockInterval) { clearInterval(tv2ClockInterval); tv2ClockInterval = null; }
+    openTvRadioModal();
 }
 
 function switchTv2Group(g) {
@@ -11007,6 +10922,7 @@ function openTvModal3() {
 function closeTvModal3() {
     document.getElementById('tvModal3').classList.remove('open');
     if(tv3State.clockInterval) { clearInterval(tv3State.clockInterval); tv3State.clockInterval = null; }
+    openTvRadioModal();
 }
 
 function renderTv3Tabs() {
@@ -11132,6 +11048,7 @@ function closeTvModal() {
     tvModal.style.display = 'none';
     stopTvChannel();
     if(tvState.clockInterval) clearInterval(tvState.clockInterval);
+    openTvRadioModal();
 }
 
 
@@ -15441,6 +15358,7 @@ function openTvModal4() {
 function closeTvModal4() {
     document.getElementById('tvModal4').classList.remove('open');
     if(tv4State.clockInterval) { clearInterval(tv4State.clockInterval); tv4State.clockInterval = null; }
+    openTvRadioModal();
 }
 
 function renderTv4Tabs() {
@@ -17088,6 +17006,7 @@ function openTvModal5() {
 function closeTvModal5() {
     document.getElementById('tvModal5').classList.remove('open');
     if(tv5State.clockInterval) { clearInterval(tv5State.clockInterval); tv5State.clockInterval = null; }
+    openTvRadioModal();
 }
 
 function renderTv5Tabs() {
