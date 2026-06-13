@@ -9553,9 +9553,9 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
             <span style="font-size:1.6rem;">🗓️</span>
             <div><div style="font-weight:700;color:#63cab7;">Tento den v historii</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co vyšlo přesně dnes před lety</div></div>
         </button>
-        <button onclick="closeZabavaModal();openCitatyModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(250,204,21,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#facc15'" onmouseout="this.style.borderColor='rgba(250,204,21,0.35)'">
-            <span style="font-size:1.6rem;">💬</span>
-            <div><div style="font-weight:700;color:#facc15;">Filmové citáty</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Uhádni film podle citátu</div></div>
+        <button onclick="closeZabavaModal();openKoukatSModal()" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid rgba(250,204,21,0.35);border-radius:12px;color:#fff;cursor:pointer;font-size:0.95rem;font-weight:600;width:100%;text-align:left;transition:0.2s;" onmouseover="this.style.borderColor='#facc15'" onmouseout="this.style.borderColor='rgba(250,204,21,0.35)'">
+            <span style="font-size:1.6rem;">👥</span>
+            <div><div style="font-weight:700;color:#facc15;">Koukat s...</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">AI tipy podle toho, s kým díváš</div></div>
         </button>
     </div>
 </div>
@@ -9578,36 +9578,29 @@ ${directors.length ? `<button class="action-btn-modal" style="background:rgba(13
     </div>
 </div>
 
-<!-- FILMOVÉ CITÁTY MODAL -->
-<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" id="citatyModal" onclick="if(event.target===this)closeCitatyModal()">
+<!-- KOUKAT S... MODAL -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" id="koukatSModal" onclick="if(event.target===this)closeKoukatSModal()">
     <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
-        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">💬 Filmové citáty</h3>
-        <button onclick="closeCitatyModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">👥 Koukat s...</h3>
+        <button onclick="closeKoukatSModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
     </div>
-    <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;">
-        <!-- Score -->
-        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-elevated);border-radius:10px;padding:10px 16px;">
-            <span style="font-size:0.82rem;color:var(--text-muted);">Skóre kola</span>
-            <span id="citatyScore" style="font-size:1rem;font-weight:700;color:#facc15;">0 / 0</span>
+    <div style="flex:1;overflow-y:auto;padding:16px;">
+        <p style="color:#888;font-size:0.85rem;margin-bottom:16px;text-align:center;">S kým dnes koukáš? AI vybere vhodné tipy.</p>
+        <div id="koukatSPicker" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+            <button onclick="loadKoukatS('rodina')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+                <span style="font-size:1.8rem;">👨‍👩‍👧‍👦</span><span>Rodina</span><span style="font-size:0.7rem;color:#94a3b8;">3 rodinné filmy</span>
+            </button>
+            <button onclick="loadKoukatS('deti')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+                <span style="font-size:1.8rem;">🧸</span><span>Děti</span><span style="font-size:0.7rem;color:#94a3b8;">Pohádky a animáky</span>
+            </button>
+            <button onclick="loadKoukatS('partner')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+                <span style="font-size:1.8rem;">❤️</span><span>Partner</span><span style="font-size:0.7rem;color:#94a3b8;">3 filmy pro oba</span>
+            </button>
+            <button onclick="loadKoukatS('sam')" class="mood-btn" style="padding:18px 12px;border-radius:14px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:0.2s;">
+                <span style="font-size:1.8rem;">🛋️</span><span>Sám</span><span style="font-size:0.7rem;color:#94a3b8;">Mix žánrů, 1 z každého</span>
+            </button>
         </div>
-        <!-- Quote card -->
-        <div id="citatyCard" style="background:var(--bg-elevated);border:1px solid rgba(250,204,21,0.3);border-radius:14px;padding:22px 18px;text-align:center;">
-            <div style="font-size:1.5rem;margin-bottom:14px;">💬</div>
-            <div id="citatyQuote" style="font-size:1rem;color:#fff;font-style:italic;line-height:1.65;min-height:60px;">Načítám citát...</div>
-        </div>
-        <!-- Answer input -->
-        <div id="citatyAnswerWrap" style="display:flex;flex-direction:column;gap:10px;">
-            <input id="citatyInput" type="text" placeholder="Název filmu nebo seriálu..." style="width:100%;padding:12px 16px;border-radius:10px;background:#0a0a0a;border:1.5px solid #333;color:#fff;font-size:1rem;outline:none;box-sizing:border-box;" oninput="citatyAutocomplete(this.value)" onkeydown="if(event.key==='Enter')checkCitat()">
-            <div id="citatySuggest" style="display:none;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;overflow:hidden;"></div>
-            <button onclick="checkCitat()" style="padding:13px;background:linear-gradient(135deg,#facc15,#f59e0b);border:none;border-radius:10px;color:#000;font-size:1rem;font-weight:700;cursor:pointer;">✅ Zkontrolovat</button>
-        </div>
-        <!-- Result -->
-        <div id="citatyResult" style="display:none;border-radius:12px;padding:16px;text-align:center;"></div>
-        <!-- Next button -->
-        <button id="citatyNextBtn" onclick="loadCitat()" style="display:none;padding:12px;background:var(--bg-elevated);border:1px solid rgba(250,204,21,0.4);border-radius:10px;color:#facc15;font-size:0.95rem;font-weight:700;cursor:pointer;">➡️ Další citát</button>
-        <!-- Hint -->
-        <button id="citatyHintBtn" onclick="showCitatHint()" style="padding:10px;background:none;border:1px solid var(--border);border-radius:10px;color:var(--text-muted);font-size:0.85rem;cursor:pointer;">💡 Nápověda</button>
-        <div id="citatyHint" style="display:none;background:rgba(250,204,21,0.08);border:1px solid rgba(250,204,21,0.25);border-radius:10px;padding:12px;font-size:0.85rem;color:#facc15;text-align:center;"></div>
+        <div id="koukatSResult" style="display:none;"></div>
     </div>
 </div>
 
@@ -17550,7 +17543,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Hide when any fullscreen modal with its own close button is visible
         var fullscreenModalIds = [
             'nahodnyTipModal','kvizModal','zebrickyModal','upcomingModal',
-            'porovnaniModal','moodModal','myStatsModal','tentodenModal','citatyModal',
+            'porovnaniModal','moodModal','myStatsModal','tentodenModal',
             'tvRadioModal','zabavaModal','listsModal','musicModal',
             'slozkyModal','slozkyPickerModal','doporucujiOverlay','addDoporuceniOverlay',
             'settingsModal'
@@ -18990,136 +18983,85 @@ async function loadTentoDen() {
   }
 }
 
-// ═══════════════════════════════════════════════
-// 💬 FILMOVÉ CITÁTY
-// ═══════════════════════════════════════════════
-let _citatState = { quote:'', answer:'', hint:'', correct:0, total:0, answered:false };
 
-function openCitatyModal() {
-  const m = document.getElementById('citatyModal');
-  if (!m) return;
-  m.style.display = 'flex';
-  if (window.updatePwaBtn) updatePwaBtn();
-  _citatState = { quote:'', answer:'', hint:'', correct:0, total:0, answered:false };
-  _updateCitatScore();
-  loadCitat();
+
+// =====================================================
+// 👥 KOUKAT S...
+// =====================================================
+function openKoukatSModal() { const m=document.getElementById('koukatSModal'); if(m){m.style.display='flex';resetKoukatS();} if(window.updatePwaBtn)updatePwaBtn(); }
+function closeKoukatSModal() { const m=document.getElementById('koukatSModal'); if(m)m.style.display='none'; if(window.updatePwaBtn)updatePwaBtn(); }
+function resetKoukatS() {
+  const pick=document.getElementById('koukatSPicker'); const res=document.getElementById('koukatSResult');
+  if(pick)pick.style.display='grid'; if(res){res.style.display='none';res.innerHTML='';}
 }
-function closeCitatyModal() {
-  const m = document.getElementById('citatyModal');
-  if (m) m.style.display = 'none';
-}
-
-function _updateCitatScore() {
-  const el = document.getElementById('citatyScore');
-  if (el) el.textContent = `${_citatState.correct} / ${_citatState.total}`;
-}
-
-async function loadCitat() {
-  const quoteEl = document.getElementById('citatyQuote');
-  const resultEl = document.getElementById('citatyResult');
-  const nextBtn = document.getElementById('citatyNextBtn');
-  const hintBtn = document.getElementById('citatyHintBtn');
-  const hintEl = document.getElementById('citatyHint');
-  const inputEl = document.getElementById('citatyInput');
-  const answerWrap = document.getElementById('citatyAnswerWrap');
-  const suggestEl = document.getElementById('citatySuggest');
-
-  if (!quoteEl) return;
-
-  _citatState.answered = false;
-  if (resultEl) { resultEl.style.display='none'; resultEl.innerHTML=''; }
-  if (nextBtn) nextBtn.style.display='none';
-  if (hintBtn) hintBtn.style.display='block';
-  if (hintEl) { hintEl.style.display='none'; hintEl.textContent=''; }
-  if (inputEl) inputEl.value='';
-  if (suggestEl) { suggestEl.style.display='none'; suggestEl.innerHTML=''; }
-  if (answerWrap) answerWrap.style.display='flex';
-
-  quoteEl.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem;">⏳ Generuji citát...</span>';
-
+async function loadKoukatS(who) {
+  const pick=document.getElementById('koukatSPicker'); const res=document.getElementById('koukatSResult');
+  if(pick)pick.style.display='none';
+  if(res){res.style.display='block';res.innerHTML='<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI vybírá tipy…<br><br>⏳</div>';}
+  const cfg = {
+    rodina: {emoji:'👨‍👩‍👧‍👦', label:'Koukat s rodinou', prompt:'Doporuč přesně 3 rodinné filmy nebo seriály vhodné pro sledování s celou rodinou (dospělí i děti společně, žádný explicitní obsah).'},
+    deti: {emoji:'🧸', label:'Koukat s dětmi', prompt:'Doporuč přesně 3 filmy nebo seriály pro děti — pohádky nebo animované pohádky, vhodné pro nejmenší diváky.'},
+    partner: {emoji:'❤️', label:'Koukat s partnerem', prompt:'Doporuč přesně 3 filmy vhodné na společné sledování s partnerkou/partnerem — romantika, drama nebo příjemné filmy pro pár.'},
+    sam: {emoji:'🛋️', label:'Koukat sám', prompt:'Doporuč přesně 4 filmy, každý z jiného žánru (např. akce, drama, sci-fi, komedie, thriller, horor — vyber 4 různé žánry), vhodné na sledování v klidu sám/sama.'}
+  };
+  const c = cfg[who] || cfg.rodina;
+  const prompt = `${c.prompt} Vrať POUZE validní JSON (žádný markdown):
+{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč je vhodný — 1-2 věty.","genre":"Žánr (jen u varianty 'sám', jinak nech prázdné)"}]}`;
   try {
-    const prompt = `Vygeneruj slavný filmový nebo seriálový citát (česky nebo anglicky, jak byl původně). Vrať POUZE JSON objekt bez markdown bloků, ve formátu:
-{"quote":"...citát...","movie":"Název filmu/seriálu v originále","hint":"Jedna věta nápověda bez prozrazení názvu"}
-Vyber náhodně jeden ze slavných filmů nebo seriálů. Citát musí být skutečný a dohledatelný.`;
     const raw = await _zabavaAiCall(prompt);
     const clean = raw.replace(/```json|```/g,'').trim();
-    const data = JSON.parse(clean);
-    _citatState.quote = data.quote;
-    _citatState.answer = data.movie;
-    _citatState.hint = data.hint;
-    quoteEl.innerHTML = `„${data.quote}"`;
-  } catch(e) {
-    quoteEl.innerHTML = '<span style="color:#e50914;font-size:0.85rem;">Chyba při načítání citátu. Zkus znovu.</span>';
-    if (nextBtn) { nextBtn.style.display='block'; nextBtn.textContent='🔄 Zkusit znovu'; }
-  }
-}
-
-async function citatyAutocomplete(val) {
-  const suggestEl = document.getElementById('citatySuggest');
-  if (!suggestEl) return;
-  if (val.length < 2) { suggestEl.style.display='none'; return; }
-  const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || '';
-  if (!tmdbKey) return;
-  try {
-    const d = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${encodeURIComponent(val)}&language=cs-CZ&page=1`).then(r=>r.json());
-    const results = (d.results||[]).filter(x=>x.media_type!=='person').slice(0,5);
-    if (!results.length) { suggestEl.style.display='none'; return; }
-    suggestEl.style.display='block';
-    suggestEl.innerHTML = results.map(r => {
-      const t = r.title||r.name||'';
-      const y = (r.release_date||r.first_air_date||'').slice(0,4);
-      return `<div onclick="document.getElementById('citatyInput').value='${t.replace(/'/g,"\\'")}';document.getElementById('citatySuggest').style.display='none';" style="padding:10px 14px;cursor:pointer;font-size:0.88rem;color:#fff;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;" onmouseover="this.style.background='#333'" onmouseout="this.style.background=''">${t}<span style="color:var(--text-muted);font-size:0.78rem;">${y}</span></div>`;
+    const d = JSON.parse(clean);
+    const tips = d.tips || [];
+    const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+    const enriched = await Promise.all(tips.map(async t => {
+      if (!tmdbKey) return {...t, tmdbId: null, poster: null};
+      try {
+        const mediaType = (t.media_type === 'tv') ? 'tv' : 'movie';
+        const q = encodeURIComponent(t.title || t.title_cs || '');
+        const url = `https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${q}&language=cs-CZ&page=1`;
+        const data = await fetch(url).then(r=>r.json());
+        const hit = (data.results||[]).find(r=>(r.media_type==='movie'||r.media_type==='tv') && r.poster_path);
+        if (hit) return {...t, tmdbId: hit.id, tmdbType: hit.media_type, poster: hit.poster_path, rating: hit.vote_average};
+      } catch(e) {}
+      return {...t, tmdbId: null, poster: null};
+    }));
+    const cards = enriched.map(t => {
+      const displayTitle = t.title_cs || t.title || '?';
+      const mediaLabel = (t.tmdbType||t.media_type)==='tv' ? 'seriál' : 'film';
+      const posterHtml = t.poster
+        ? `<img src="https://image.tmdb.org/t/p/w92${t.poster}" style="width:52px;height:76px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">`
+        : `<div style="width:52px;height:76px;border-radius:8px;background:#2a2a2a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">${(t.tmdbType||t.media_type)==='tv'?'📺':'🎬'}</div>`;
+      const ratingHtml = t.rating>0 ? `<span style="color:#fbbf24;font-size:0.72rem;margin-left:6px;">★ ${t.rating.toFixed(1)}</span>` : '';
+      const clickable = t.tmdbId && typeof openDetail==='function';
+      const clickStyle = clickable ? 'cursor:pointer;' : '';
+      const clickAttr = clickable ? `onclick="closeKoukatSModal();openDetail(${t.tmdbId},'${t.tmdbType||'movie'}')"` : '';
+      const arrowHtml = clickable ? `<div style="flex-shrink:0;align-self:center;color:#facc15;font-size:1rem;">›</div>` : '';
+      const genreHtml = t.genre ? `<span style="color:#facc15;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;">${t.genre}</span>` : '';
+      return `<div ${clickAttr} style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;${clickStyle}transition:background 0.15s,border-color 0.15s;" onmouseover="this.style.background='#222';this.style.borderColor='#facc15'" onmouseout="this.style.background='#1a1a1a';this.style.borderColor='#2a2a2a'">
+        ${posterHtml}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;color:#fff;font-size:0.92rem;margin-bottom:2px;">${displayTitle} ${t.year?`<span style="color:#888;font-size:0.78rem;">(${t.year})</span>`:''}</div>
+          <div style="display:flex;align-items:center;margin-bottom:6px;">
+            <span style="color:#facc15;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${mediaLabel}</span>${ratingHtml}${genreHtml}
+          </div>
+          <div style="color:#aaa;font-size:0.8rem;line-height:1.5;">${t.reason||''}</div>
+          ${clickable?`<div style="color:#facc15;font-size:0.75rem;margin-top:6px;font-weight:600;">Otevřít detail →</div>`:''}
+        </div>
+        ${arrowHtml}
+      </div>`;
     }).join('');
-  } catch(e) { suggestEl.style.display='none'; }
-}
-
-async function checkCitat() {
-  if (_citatState.answered || !_citatState.answer) return;
-  const inputEl = document.getElementById('citatyInput');
-  const resultEl = document.getElementById('citatyResult');
-  const nextBtn = document.getElementById('citatyNextBtn');
-  const answerWrap = document.getElementById('citatyAnswerWrap');
-  const hintBtn = document.getElementById('citatyHintBtn');
-  if (!inputEl || !resultEl) return;
-
-  const userAns = inputEl.value.trim();
-  if (!userAns) { inputEl.style.borderColor='#e50914'; setTimeout(()=>inputEl.style.borderColor='#333',1000); return; }
-
-  _citatState.answered = true;
-  _citatState.total++;
-
-  // Fuzzy match — normalize and compare
-  const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,'').trim();
-  const correct = norm(_citatState.answer);
-  const user = norm(userAns);
-  const isCorrect = correct.includes(user) || user.includes(correct) || correct.split(' ').some(w=>w.length>3&&user.includes(w));
-
-  if (isCorrect) _citatState.correct++;
-  _updateCitatScore();
-
-  resultEl.style.display='block';
-  if (isCorrect) {
-    resultEl.style.background='rgba(34,197,94,0.12)';
-    resultEl.style.border='1px solid rgba(34,197,94,0.4)';
-    resultEl.innerHTML=`<div style="font-size:1.5rem;margin-bottom:6px;">✅</div><div style="color:#22c55e;font-weight:700;font-size:0.95rem;">Správně!</div><div style="color:var(--text-muted);font-size:0.82rem;margin-top:4px;">Film: <strong style="color:#fff;">${_citatState.answer}</strong></div>`;
-  } else {
-    resultEl.style.background='rgba(229,9,20,0.1)';
-    resultEl.style.border='1px solid rgba(229,9,20,0.3)';
-    resultEl.innerHTML=`<div style="font-size:1.5rem;margin-bottom:6px;">❌</div><div style="color:#e50914;font-weight:700;font-size:0.95rem;">Špatně!</div><div style="color:var(--text-muted);font-size:0.82rem;margin-top:4px;">Správná odpověď: <strong style="color:#fff;">${_citatState.answer}</strong></div>`;
+    const html=`<div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <span style="font-size:1.4rem;">${c.emoji}</span>
+        <span style="color:#facc15;font-weight:700;font-size:0.95rem;">${c.label}:</span>
+      </div>
+      ${cards}
+      <button onclick="resetKoukatS()" style="width:100%;margin-top:6px;padding:12px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#fff;font-size:0.88rem;cursor:pointer;">← Vybrat jinou variantu</button>
+    </div>`;
+    if(res) res.innerHTML = html;
+  } catch(e) {
+    if(res) res.innerHTML='<div style="padding:20px;text-align:center;"><p style="color:#e50914;margin-bottom:12px;">❌ Chyba AI. Zkontroluj AI klíč v nastavení.</p><button onclick="resetKoukatS()" style="padding:10px 20px;border-radius:10px;background:#333;border:none;color:#fff;cursor:pointer;">← Zpět</button></div>';
   }
-
-  if (answerWrap) answerWrap.style.display='none';
-  if (hintBtn) hintBtn.style.display='none';
-  if (nextBtn) { nextBtn.style.display='block'; nextBtn.textContent='➡️ Další citát'; }
-}
-
-function showCitatHint() {
-  const hintEl = document.getElementById('citatyHint');
-  const hintBtn = document.getElementById('citatyHintBtn');
-  if (!hintEl || !_citatState.hint) return;
-  hintEl.style.display='block';
-  hintEl.textContent='💡 ' + _citatState.hint;
-  if (hintBtn) hintBtn.style.display='none';
 }
 
 async function _zabavaAiCall(prompt) {
@@ -19153,9 +19095,9 @@ async function _zabavaAiCall(prompt) {
   orig['upcomingModal'] = function() { if(typeof closeUpcomingModal==='function') closeUpcomingModal(); };
   orig['porovnaniModal'] = function() { if(typeof closePorovnaniModal==='function') closePorovnaniModal(); };
   orig['moodModal'] = function() { if(typeof closeMoodModal==='function') closeMoodModal(); };
+  orig['koukatSModal'] = function() { if(typeof closeKoukatSModal==='function') closeKoukatSModal(); };
   orig['myStatsModal'] = function() { if(typeof closeMyStatsModal==='function') closeMyStatsModal(); };
   orig['tentodenModal'] = function() { if(typeof closeTentodenModal==='function') closeTentodenModal(); };
-  orig['citatyModal'] = function() { if(typeof closeCitatyModal==='function') closeCitatyModal(); };
   window._modalCloseMap = orig;
 })();
 </script>
