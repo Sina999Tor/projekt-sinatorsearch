@@ -9851,7 +9851,8 @@ function openTvModal2() {
 function closeTvModal2() {
     document.getElementById('tvModal2').classList.remove('open');
     if(tv2ClockInterval) { clearInterval(tv2ClockInterval); tv2ClockInterval = null; }
-    if(typeof openTvRadioModal === 'function') openTvRadioModal();
+    var stack = window.modalStack || [];
+    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
 }
 
 function switchTv2Group(g) {
@@ -11017,7 +11018,8 @@ function openTvModal3() {
 function closeTvModal3() {
     document.getElementById('tvModal3').classList.remove('open');
     if(tv3State.clockInterval) { clearInterval(tv3State.clockInterval); tv3State.clockInterval = null; }
-    if(typeof openTvRadioModal === 'function') openTvRadioModal();
+    var stack = window.modalStack || [];
+    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
 }
 
 function renderTv3Tabs() {
@@ -11143,7 +11145,8 @@ function closeTvModal() {
     tvModal.style.display = 'none';
     stopTvChannel();
     if(tvState.clockInterval) clearInterval(tvState.clockInterval);
-    if(typeof openTvRadioModal === 'function') openTvRadioModal();
+    var stack = window.modalStack || [];
+    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
 }
 
 
@@ -15453,7 +15456,8 @@ function openTvModal4() {
 function closeTvModal4() {
     document.getElementById('tvModal4').classList.remove('open');
     if(tv4State.clockInterval) { clearInterval(tv4State.clockInterval); tv4State.clockInterval = null; }
-    if(typeof openTvRadioModal === 'function') openTvRadioModal();
+    var stack = window.modalStack || [];
+    if(stack.length > 0) { var p = stack.pop(); setTimeout(function(){ p.openFn(); }, 50); }
 }
 
 function renderTv4Tabs() {
