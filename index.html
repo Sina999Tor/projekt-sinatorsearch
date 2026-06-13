@@ -522,7 +522,7 @@
         .page-num.active { background: var(--accent); color: #fff; border-color: var(--accent); }
         .page-num.ellipsis { border: none; cursor: default; color: var(--text-muted); }
         
-        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); backdrop-filter: blur(10px); z-index: 1000; justify-content: center; align-items: center; padding: 12px; overflow: hidden; }
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); backdrop-filter: blur(10px); z-index: 4400; justify-content: center; align-items: center; padding: 12px; overflow: hidden; }
         .modal-overlay.open { display: flex; }
         .modal { background: var(--bg-card); border-radius: 16px; max-width: 950px; width: 100%; position: relative; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.8); margin: auto; display: flex; flex-direction: column; max-height: calc(100dvh - 24px); overflow: hidden; }
         .modal.watched-full { max-width: 100%; border-radius: 0; margin: 0; height: 100dvh; max-height: 100dvh; }
@@ -18524,7 +18524,7 @@ async function loadNahodnyTip() {
     const poster = item.poster_path ? `https://image.tmdb.org/t/p/w300${item.poster_path}` : '';
     const badge = type === 'tv' ? '📺 Seriál' : '🎬 Film';
     res.innerHTML = `<div style="display:flex;gap:14px;align-items:flex-start;width:100%;">
-      ${poster ? `<img src="${poster}" style="width:80px;border-radius:10px;flex-shrink:0;" onclick="closeNahodnyTipModal();typeof openDetail==='function'&&openDetail(${item.id},'${type}')" loading="lazy">` : ''}
+      ${poster ? `<img src="${poster}" style="width:80px;border-radius:10px;flex-shrink:0;" onclick="closeNahodnyTipModal();setTimeout(()=>typeof openDetail==='function'&&openDetail(${item.id},'${type}'),50)" loading="lazy">` : ''}
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:1rem;color:#fff;margin-bottom:4px;">${title}</div>
         <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
@@ -18533,7 +18533,7 @@ async function loadNahodnyTip() {
           <span style="color:#fbbf24;font-size:0.78rem;">★ ${rating}</span>
         </div>
         <p style="color:#aaa;font-size:0.78rem;line-height:1.5;margin:0 0 10px;">${(item.overview||'Popis není k dispozici.').substring(0,160)}${item.overview?.length>160?'…':''}</p>
-        <button onclick="typeof openDetail==='function'&&openDetail(${item.id},'${type}').then(()=>closeNahodnyTipModal())" style="padding:8px 16px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:0.82rem;font-weight:600;cursor:pointer;">Detail →</button>
+        <button onclick="closeNahodnyTipModal();setTimeout(()=>typeof openDetail==='function'&&openDetail(${item.id},'${type}'),50)" style="padding:8px 16px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:0.82rem;font-weight:600;cursor:pointer;">Detail →</button>
       </div>
     </div>`;
   } catch(e) { res.innerHTML = '<p style="color:#e50914;text-align:center;font-size:0.85rem;">Chyba načítání. Zkus znovu.</p>'; }
