@@ -3107,6 +3107,7 @@
         if(m) { m.style.display = 'flex'; }
         $('btnTvRadioToggle')?.classList.add('active');
     }
+    window._openTvRadioModalDirect = _openTvRadioModalDirect;
     function closeTvRadioModal() {
         const m = $('tvRadioModal');
         if(m) m.style.display = 'none';
@@ -11156,8 +11157,7 @@ function closeTvModal() {
     if(stack.length > 0) {
         var p = stack.pop(); p.openFn();
     } else {
-        // Vrátit na TV/Rádio modal
-        openTvRadioModal();
+        _openTvRadioModalDirect();
     }
 }
 
