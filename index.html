@@ -6655,11 +6655,15 @@ EXAMPLES:
     }
 
     function toggleFavInModal(id, title, type, poster, isActor = false, year = '') {
+        if (!isActor && currentDetailItem && Number(currentDetailItem.id) === Number(id)) {
+            title = currentDetailItem.title; type = currentDetailItem.type;
+            poster = currentDetailItem.poster; year = currentDetailItem.year;
+        }
         const favs = isActor ? state.actorFavs : state.favs;
         const idx = favs.findIndex(f => Number(f.id) === Number(id));
         const btn = document.querySelector('.modal-fav-btn');
         if (idx > -1) { favs.splice(idx, 1); if (btn) { btn.textContent = '🤍'; btn.classList.remove('liked'); btn.style.animation = 'none'; } }
-        else { const item = isActor ? { id, name: title, poster } : { id, title, year, rating: 0, type, poster }; favs.unshift(item); if (btn) { btn.textContent = '❤️'; btn.classList.add('liked'); btn.style.animation = 'pulse 0.3s ease-in-out'; } }
+        else { const item = isActor ? { id, name: title, poster } : { id, title, year, rating: currentDetailItem?.rating || 0, type, poster }; favs.unshift(item); if (btn) { btn.textContent = '❤️'; btn.classList.add('liked'); btn.style.animation = 'pulse 0.3s ease-in-out'; } }
         if (isActor) _store.setItem('sinator_actor_favs', JSON.stringify(state.actorFavs));
         else _store.setItem('sinator_favs', JSON.stringify(state.favs));
         updateFavBadge();
@@ -7125,7 +7129,7 @@ EXAMPLES:
             const safeTitle = title.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
             const origTitle = (d.original_title || d.original_name || title).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
             const isLiked = state.favs.some(f => Number(f.id) === Number(id));
-            currentDetailItem = { id, type, title: safeTitle };
+            currentDetailItem = { id, type, title: title, year, rating, poster: d.poster_path||'' };
             currentOverviewText = d.overview || '';
             
             const releaseDate = d.release_date || d.first_air_date || '';
