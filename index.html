@@ -9444,6 +9444,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     window.loadMdblistLists = (tab) => { loadMdblistLists(tab); };
     window.mdblistOpenIdx = () => {}; // zachováno pro kompatibilitu
     window.toggleFav = (id, title, year, rating, type, poster, e) => _toggleFav(id, title, year, rating, type, poster, e);
+    window.toggleFavInModal = (id, title, type, poster, isActor, year) => toggleFavInModal(id, title, type, poster, isActor, year);
     window.openDBSearch = (db) => _openDBSearch(db);
     window.searchMusic = () => _searchMusic();
     window.openDetailFromWatched = (id, type) => _openDetailFromWatched(id, type);
