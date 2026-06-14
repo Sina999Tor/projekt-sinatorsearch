@@ -18367,14 +18367,7 @@ window.submitDoporuceni = async function() {
 
 // ---- TLAČÍTKO V DETAILU FILMU/SERIÁLU ----
 // Přidá tlačítko "⭐ Doporučit" do detailu
-const _origOpenDetail = window.openDetail;
-if (_origOpenDetail) {
-  window.openDetail = async function(id, type, ...rest) {
-    await _origOpenDetail(id, type, ...rest);
-    // Počkáme na render detailu a přidáme tlačítko
-    setTimeout(() => injectDoporucitBtn(id, type), 600);
-  };
-}
+// Tlačítko Doporučit je renderováno přímo v actionBtns — wrapper není potřeba
 
 function injectDoporucitBtn(id, type) {
   if (document.getElementById('btnDoporucitDetail')) return;
