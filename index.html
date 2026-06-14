@@ -201,12 +201,6 @@
             transform: translateY(2px);
             box-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 -1px 4px rgba(0,0,0,0.3) inset;
         }
-        .menu-row-btn > span:first-child,
-        .action-btn-modal:not([style*="3a6ea5"]),
-        .card-fav,
-        .modal-genre {
-            filter: grayscale(1);
-        }
         @keyframes iconBounce {
             0%   { transform: scale(1); }
             30%  { transform: scale(1.22) rotate(-4deg); }
@@ -234,11 +228,9 @@
         }
         .action-btn.icon .btn-icon {
             display: block; line-height: 1;
-            filter: grayscale(1) brightness(0.9);
             transition: filter 0.2s;
         }
         .action-btn.icon:hover .btn-icon {
-            filter: grayscale(1) brightness(1.25);
             animation: iconBounce 0.45s ease forwards;
         }
         .action-btn.icon .btn-label {
@@ -624,7 +616,7 @@
 
         .modal-fav-btn { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
             background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: #fff;
-            font-size: 1rem; cursor: pointer; transition: 0.3s; display: grid; place-items: center; filter: grayscale(1); }
+            font-size: 1rem; cursor: pointer; transition: 0.3s; display: grid; place-items: center; }
         .modal-fav-btn:hover { background: rgba(255,255,255,0.18); transform: scale(1.1); border-color: rgba(255,255,255,0.3); }
         .modal-fav-btn.liked { color: var(--text); background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.3); }
         .action-btn-modal { padding: 10px; background: var(--bg-elevated); background-image: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.18)); border: 1px solid var(--border); border-bottom-color: rgba(0,0,0,0.6); border-radius: 10px; color: var(--text); cursor: pointer; transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.2s, border-color 0.2s; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.8rem; box-shadow: 0 3px 8px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05) inset, 0 -2px 5px rgba(0,0,0,0.3) inset; }
@@ -1763,6 +1755,20 @@
                 </div>
             </div>
             <div class="settings-divider"></div>
+            <div class="settings-section">
+                <span class="settings-label">🎨 Ikony</span>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+                    <span style="font-size:0.85rem;color:var(--text-muted);">Barevné ikony tlačítek</span>
+                    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+                        <input type="checkbox" id="coloredIconsToggle" onchange="applyIconColorMode(this.checked)" style="opacity:0;width:0;height:0;position:absolute;">
+                        <span id="coloredIconsSlider" style="position:absolute;inset:0;background:#333;border-radius:24px;transition:0.3s;border:1px solid var(--border);">
+                            <span style="position:absolute;left:3px;top:3px;width:16px;height:16px;background:#888;border-radius:50%;transition:0.3s;" id="coloredIconsThumb"></span>
+                        </span>
+                    </label>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Zapnout = barevné emoji ikony, Vypnout = šedé (výchozí)</div>
+            </div>
+            <div class="settings-divider"></div>
             <button class="settings-full-btn" onclick="toggleFullscreen()" id="settingsFullscreenBtn">🔒 Fullscreen (zapnuto)</button>
             <button class="settings-full-btn" id="pwaInstallBtn" onclick="installPWA()" style="display:none;">📲 Instalovat aplikaci</button>
             <div id="pwaInstallInfo" style="font-size:0.7rem; color:var(--text-muted); text-align:center; margin-top:4px; display:none;">Dostupné v Chrome/Edge na Androidu přes HTTPS</div>
@@ -2475,7 +2481,42 @@
         updateGeminiStatus(); updateGroqStatus(); updateOpenRouterStatus(); updateOmdbStatus();
         $('settingsModal')?.classList.add('open');
         if(window.updatePwaBtn) updatePwaBtn();
+        // sync toggle state
+        const colored = localStorage.getItem('coloredIcons') === '1';
+        const tog = $('coloredIconsToggle');
+        if(tog) tog.checked = colored;
+        _syncIconSlider(colored);
     }
+
+    window.applyIconColorMode = function(colored) {
+        localStorage.setItem('coloredIcons', colored ? '1' : '0');
+        _applyIconFilter(colored);
+        _syncIconSlider(colored);
+    };
+    function _applyIconFilter(colored) {
+        const style = document.getElementById('iconColorStyle');
+        if(colored) {
+            if(style) style.remove();
+        } else {
+            if(!style) {
+                const s = document.createElement('style');
+                s.id = 'iconColorStyle';
+                s.textContent = `.action-btn.icon .btn-icon { filter: grayscale(1) brightness(0.9); } .action-btn.icon:hover .btn-icon { filter: grayscale(1) brightness(1.25); } .action-btn.icon.active .btn-icon { filter: grayscale(1) brightness(1.35); } .menu-row-btn > span:first-child, .action-btn-modal:not([style*="3a6ea5"]), .card-fav, .modal-genre { filter: grayscale(1); } .modal-fav-btn { filter: grayscale(1); } .modal-fav-btn.liked { filter: grayscale(1); }`;
+                document.head.appendChild(s);
+            }
+        }
+    }
+    function _syncIconSlider(colored) {
+        const slider = $('coloredIconsSlider');
+        const thumb = $('coloredIconsThumb');
+        if(slider) slider.style.background = colored ? '#4a4a4a' : '#333';
+        if(thumb) { thumb.style.transform = colored ? 'translateX(20px)' : 'translateX(0)'; thumb.style.background = colored ? '#fff' : '#888'; }
+    }
+    // init on load
+    (function() {
+        const colored = localStorage.getItem('coloredIcons') === '1';
+        _applyIconFilter(colored);
+    })();
     
     function closeSettingsModal() {
         $('settingsModal')?.classList.remove('open');
