@@ -207,6 +207,13 @@
         .modal-genre {
             filter: grayscale(1);
         }
+        @keyframes iconBounce {
+            0%   { transform: scale(1); }
+            30%  { transform: scale(1.22) rotate(-4deg); }
+            55%  { transform: scale(0.93) rotate(2deg); }
+            75%  { transform: scale(1.06) rotate(-1deg); }
+            100% { transform: scale(1); }
+        }
         .action-btn.icon {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             gap: 4px; padding: 10px 6px 9px;
@@ -225,6 +232,15 @@
             -webkit-tap-highlight-color: transparent;
             user-select: none;
         }
+        .action-btn.icon .btn-icon {
+            display: block; line-height: 1;
+            filter: grayscale(1) brightness(0.9);
+            transition: filter 0.2s;
+        }
+        .action-btn.icon:hover .btn-icon {
+            filter: grayscale(1) brightness(1.25);
+            animation: iconBounce 0.45s ease forwards;
+        }
         .action-btn.icon .btn-label {
             font-size: 0.56rem; font-weight: 700; letter-spacing: 0.05em;
             color: rgba(200,200,215,0.80); text-transform: uppercase; line-height: 1;
@@ -239,13 +255,14 @@
         }
         .action-btn.icon:hover {
             background: linear-gradient(170deg, #363638 0%, #242426 50%, #171719 100%);
-            border-color: rgba(255,255,255,0.20);
+            border-color: rgba(255,255,255,0.24);
             box-shadow:
                 0 1px 0 rgba(255,255,255,0.14) inset,
                 0 -3px 0 rgba(0,0,0,0.75) inset,
-                0 8px 22px rgba(0,0,0,0.7),
+                0 10px 26px rgba(0,0,0,0.7),
                 0 2px 5px rgba(0,0,0,0.95),
-                0 0 0 1px rgba(255,255,255,0.05);
+                0 0 0 1px rgba(255,255,255,0.07),
+                0 0 18px rgba(255,255,255,0.04);
         }
         .action-btn.icon.active {
             background: linear-gradient(170deg, #3a3a3c 0%, #2a2a2c 60%, #1c1c1e 100%);
@@ -259,6 +276,7 @@
                 0 0 0 1px rgba(255,255,255,0.08);
         }
         .action-btn.icon.active .btn-label { color: rgba(255,255,255,0.92); }
+        .action-btn.icon.active .btn-icon { filter: grayscale(1) brightness(1.35); }
         .action-btn.icon.active.music {
             background: linear-gradient(170deg, #3a3a3c 0%, #2a2a2c 60%, #1c1c1e 100%);
             border-color: rgba(255,255,255,0.30);
@@ -961,36 +979,36 @@
     </div>
     <div class="header-actions">
         <button class="action-btn icon" id="btnSearchToggle" onclick="toggleSearchOverlay()" title="Vyhledávání">
-            🔎<span class="btn-label">Hledat</span>
+            <span class="btn-icon">🔎</span><span class="btn-label">Hledat</span>
         </button>
         <button class="action-btn icon" id="btnFiltersToggle" onclick="toggleFiltersOverlay()" title="Filtry">
-            ⚙️<span class="btn-label">Filtry</span>
+            <span class="btn-icon">⚙️</span><span class="btn-label">Filtry</span>
         </button>
         <button class="action-btn icon" id="btnMusicToggle" onclick="openMusicModal()" title="Hudba">
-            🎵<span class="btn-label">Hudba</span>
+            <span class="btn-icon">🎵</span><span class="btn-label">Hudba</span>
         </button>
         <button class="action-btn icon" id="btnTvRadioToggle" onclick="openTvRadioModal()" title="TV / Rádio / Kino">
-            📺<span class="btn-label">Živá TV</span>
+            <span class="btn-icon">📺</span><span class="btn-label">Živá TV</span>
         </button>
         <button class="action-btn icon" id="btnFavToggle" onclick="openFavsModal()" title="Oblíbené">
-            ❤️<span class="btn-label">Oblíbené</span>
+            <span class="btn-icon">❤️</span><span class="btn-label">Oblíbené</span>
             <span class="badge fav" id="favBadge" style="display:none">0</span>
         </button>
-        <button class="action-btn icon" onclick="openSlozkyModal()" title="Moje složky" style="color:#f9a825;">
-            📁<span class="btn-label" style="color:#b07a10;">Složky</span>
+        <button class="action-btn icon" onclick="openSlozkyModal()" title="Moje složky">
+            <span class="btn-icon">📁</span><span class="btn-label">Složky</span>
         </button>
         <button class="action-btn icon" id="btnListsToggle" onclick="openListsModal()" title="Seznamy — Trakt, Simkl, Shlédnuté…">
-            📋<span class="btn-label">Seznamy</span>
+            <span class="btn-icon">📋</span><span class="btn-label">Seznamy</span>
             <span class="badge trakt" id="listsBadge" style="display:none">!</span>
         </button>
         <button class="action-btn icon" id="btnDoporucujiToggle" onclick="openDoporucujiModal()" title="Doporučuji — sdílená doporučení">
-            ⭐<span class="btn-label">Top tipy</span>
+            <span class="btn-icon">⭐</span><span class="btn-label">Top tipy</span>
         </button>
         <button class="action-btn icon" id="btnZabavaToggle" onclick="openZabavaModal()" title="Zábava — Weby, AI…">
-            🎲<span class="btn-label">Zábava</span>
+            <span class="btn-icon">🎲</span><span class="btn-label">Zábava</span>
         </button>
         <button class="action-btn icon" onclick="openSettingsModal()" title="Nastavení" style="position:relative;">
-            🔧<span class="btn-label">Nastavení</span>
+            <span class="btn-icon">🔧</span><span class="btn-label">Nastavení</span>
             <span id="onlineBadge" style="display:none;position:absolute;top:2px;right:2px;background:#22c55e;color:#000;font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;line-height:14px;min-width:16px;text-align:center;pointer-events:none;">0</span>
         </button>
         <button class="action-btn icon" id="btnToggleToolbar" onclick="toggleToolbar()" title="Schovat/zobrazit tlačítka">▲</button>
