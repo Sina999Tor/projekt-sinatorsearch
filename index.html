@@ -8339,7 +8339,27 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         const mdbUser = mdblistApiKey || _MDBLIST_USER_SAVED || (state.trakt && state.trakt.username) || '';
         let slozky = [];
         try { slozky = JSON.parse(localStorage.getItem('sinator_slozky') || '[]'); } catch(e) {}
+
+        // Kompletní sweep všech sinator_* klíčů + nastavení vzhledu
+        const allKeys = [
+            'sinator_favs','sinator_actor_favs','sinator_coll_favs','sinator_watched',
+            'sinator_trakt','sinator_simkl','sinator_slozky',
+            'sinator_tmdb_api_key','sinator_gemini_api_key','sinator_groq_api_key',
+            'sinator_openrouter_key','sinator_omdb_api_key','sinator_mdblist_user','sinator_mdblist_manual',
+            'sinator_ivysilani_user','sinator_ivysilani_pass','sinator_ivysilani_lists','sinator_ivysilani_lastSync',
+            'sinator_iprima_lists','sinator_adult_content','sinator_toolbar_collapsed',
+            'sinator_themes','sinator_d_nick',
+            'sinator_rozkoukane','sinator_rozkoukane_filmy',
+            'coloredIcons'
+        ];
+        const raw = {};
+        allKeys.forEach(k => { const v = localStorage.getItem(k); if(v !== null) raw[k] = v; });
+
         const d = {
+            version: 2,
+            app: 'Sinator Search',
+            exported: new Date().toISOString(),
+            // Strukturovaná data pro kompatibilitu se starými zálohami
             movies: state.favs,
             actors: state.actorFavs,
             collFavs: state.collFavs || [],
@@ -8354,9 +8374,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 lists:    _store.getItem('sinator_ivysilani_lists') || '{}',
                 lastSync: _store.getItem('sinator_ivysilani_lastSync') || ''
             },
-            iprima: {
-                lists: _store.getItem('sinator_iprima_lists') || '{}'
-            },
+            iprima: { lists: _store.getItem('sinator_iprima_lists') || '{}' },
             apiKeys: {
                 tmdb:        tmdbApiKey        || '',
                 gemini:      geminiApiKey      || '',
@@ -8364,31 +8382,45 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 openRouter:  openRouterKey     || '',
                 omdb:        omdbApiKey        || ''
             },
-            exported: new Date().toISOString(),
-            app: 'Sinator Search'
+            settings: {
+                adultContent: _store.getItem('sinator_adult_content') || 'false',
+                coloredIcons: localStorage.getItem('coloredIcons') || '0',
+                toolbarCollapsed: _store.getItem('sinator_toolbar_collapsed') || '',
+                nick: _store.getItem('sinator_d_nick') || '',
+                themes: _store.getItem('sinator_themes') || ''
+            },
+            // Surová záloha všeho
+            raw: raw
         };
+
         const json = JSON.stringify(d, null, 2);
         try {
             const blob = new Blob([json], {type:'application/json'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `sinator-backup-${Date.now()}.json`;
-            document.body.appendChild(a);
-            a.click();
+            a.download = `sinator-backup-${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a); a.click();
             setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
         } catch(e) {
-            // Fallback: data URI
             const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(json);
             const a = document.createElement('a');
             a.href = dataUri;
             a.download = `sinator-backup-${Date.now()}.json`;
-            document.body.appendChild(a);
-            a.click();
+            document.body.appendChild(a); a.click();
             setTimeout(() => document.body.removeChild(a), 1000);
         }
         _embedBackupIntoFile(d);
-        alert('✅ Záloha exportována!\nObsahuje: ' + state.favs.length + ' filmů, ' + Object.keys(state.watched).length + ' shlédnutých, ' + slozky.length + ' složek' + (state.trakt.username ? ', Trakt: ' + state.trakt.username : '') + '.');
+        const stats = [
+            `📽️ Filmy/seriály: ${state.favs.length}`,
+            `👁️ Shlédnuté: ${Object.keys(state.watched).length}`,
+            `📁 Složky: ${slozky.length}`,
+            `👥 Herci: ${state.actorFavs.length}`,
+            state.trakt.username ? `📋 Trakt: ${state.trakt.username}` : '',
+            d.apiKeys.tmdb ? '🔑 API klíče: ✓' : '',
+            d.settings.coloredIcons === '1' ? '🎨 Barevné ikony: zapnuto' : '🎨 Barevné ikony: vypnuto'
+        ].filter(Boolean).join('\n');
+        alert('✅ Záloha exportována!\n\n' + stats);
     }
 
     function closeBackup() {
@@ -8420,8 +8452,18 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         r.onload = e => {
             try {
                 const d = JSON.parse(e.target.result);
-                if(d.movies) { state.favs = d.movies; _store.setItem('sinator_favs', JSON.stringify(state.favs)); }
-                if(d.actors) { state.actorFavs = d.actors; _store.setItem('sinator_actor_favs', JSON.stringify(state.actorFavs)); }
+                if(!d.app && !d.movies && !d.raw) { alert('❌ Neplatný soubor zálohy'); return; }
+
+                // 1) Surová záloha — obnoví vše najednou
+                if(d.raw && typeof d.raw === 'object') {
+                    Object.entries(d.raw).forEach(([k, v]) => {
+                        if(v !== null && v !== undefined) localStorage.setItem(k, v);
+                    });
+                }
+
+                // 2) Strukturovaná data (přepíše raw pro jistotu)
+                if(d.movies)   { state.favs = d.movies;       _store.setItem('sinator_favs', JSON.stringify(state.favs)); }
+                if(d.actors)   { state.actorFavs = d.actors;  _store.setItem('sinator_actor_favs', JSON.stringify(state.actorFavs)); }
                 if(d.collFavs) { state.collFavs = d.collFavs; _store.setItem('sinator_coll_favs', JSON.stringify(state.collFavs)); }
                 if(d.slozky && Array.isArray(d.slozky)) { localStorage.setItem('sinator_slozky', JSON.stringify(d.slozky)); }
                 if(d.simkl && typeof d.simkl === 'object') { state.simkl = d.simkl; _store.setItem('sinator_simkl', JSON.stringify(state.simkl)); }
@@ -8439,14 +8481,22 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     if(d.apiKeys.openRouter) { openRouterKey = d.apiKeys.openRouter;  _store.setItem('sinator_openrouter_key', openRouterKey); }
                     if(d.apiKeys.omdb)       { omdbApiKey = d.apiKeys.omdb;           _store.setItem('sinator_omdb_api_key', omdbApiKey); }
                 }
+                if(d.settings) {
+                    if(d.settings.adultContent)     _store.setItem('sinator_adult_content', d.settings.adultContent);
+                    if(d.settings.coloredIcons !== undefined) {
+                        localStorage.setItem('coloredIcons', d.settings.coloredIcons);
+                        if(window.applyIconColorMode) applyIconColorMode(d.settings.coloredIcons === '1');
+                    }
+                    if(d.settings.toolbarCollapsed) _store.setItem('sinator_toolbar_collapsed', d.settings.toolbarCollapsed);
+                    if(d.settings.nick)             _store.setItem('sinator_d_nick', d.settings.nick);
+                    if(d.settings.themes)           _store.setItem('sinator_themes', d.settings.themes);
+                }
                 if(d.trakt && d.trakt.accessToken) {
                     state.trakt = d.trakt;
                     _store.setItem('sinator_trakt', JSON.stringify(state.trakt));
                     _TRAKT_DATA_SAVED = JSON.stringify(state.trakt);
                     _mem['sinator_trakt'] = _TRAKT_DATA_SAVED;
-                    updateTraktStatus();
-                    updateFavBadge();
-                    syncMdblistFromTrakt();
+                    updateTraktStatus(); updateFavBadge(); syncMdblistFromTrakt();
                 }
                 if(d.watched && typeof d.watched === 'object' && !Array.isArray(d.watched)) {
                     state.watched = d.watched;
@@ -8455,13 +8505,21 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     _mem['sinator_watched'] = _WATCHED_DATA_SAVED;
                     updateWatchedCount();
                 }
-                if(d.mdblistUser) {
-                    _doSaveMdblistUser(d.mdblistUser);
-                }
-                alert('✅ Záloha importována!\nFilmy: ' + (d.movies||[]).length + ', Shlédnuté: ' + Object.keys(d.watched||{}).length + ', Složky: ' + (d.slozky||[]).length + (d.trakt && d.trakt.username ? ', Trakt: ' + d.trakt.username : '') + (d.apiKeys && d.apiKeys.tmdb ? ', API klíče: ✓' : '') + '.');
+                if(d.mdblistUser) { _doSaveMdblistUser(d.mdblistUser); }
+
+                const stats = [
+                    `📽️ Filmy/seriály: ${(d.movies||[]).length}`,
+                    `👁️ Shlédnuté: ${Object.keys(d.watched||{}).length}`,
+                    `📁 Složky: ${(d.slozky||[]).length}`,
+                    `👥 Herci: ${(d.actors||[]).length}`,
+                    d.trakt && d.trakt.username ? `📋 Trakt: ${d.trakt.username}` : '',
+                    d.apiKeys && d.apiKeys.tmdb ? '🔑 API klíče: ✓' : '',
+                    d.raw ? `💾 Raw klíčů: ${Object.keys(d.raw).length}` : ''
+                ].filter(Boolean).join('\n');
+                alert('✅ Záloha importována!\n\n' + stats + '\n\nAplikace se restartuje.');
                 closeBackup();
-                loadData();
-            } catch { alert('❌ Neplatný soubor'); }
+                setTimeout(() => location.reload(), 800);
+            } catch(err) { alert('❌ Neplatný soubor zálohy: ' + err.message); }
         };
         r.readAsText(f);
     }
