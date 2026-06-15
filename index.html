@@ -6674,7 +6674,7 @@ EXAMPLES:
 
     // Bezpečná verze pro tlačítko v nav-baru detailu — čte data z currentDetailItem,
     // takže se nikdy nevkládá uživatelský titulek (s apostrofy apod.) do onclick atributu.
-    function toggleFavInModalCurrent() {
+    function _toggleFavInModalCurrentImpl() {
         const it = currentDetailItem;
         if (!it) return;
         toggleFavInModal(it.id, it.title, it.type, it.poster || '', !!it.isActor, it.year || '');
@@ -9476,7 +9476,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     window.toggleFavInModalCurrent = () => {
         try {
             if (!currentDetailItem) { alert('DEBUG: currentDetailItem je null/undefined'); return; }
-            toggleFavInModalCurrent();
+            _toggleFavInModalCurrentImpl();
         } catch(e) {
             alert('DEBUG ERROR: ' + e.message);
         }
