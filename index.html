@@ -10088,7 +10088,8 @@ function openInVlcUrl(url) {
             window.location.href = `vlc://${url.replace(/^https?:\/\//, '')}`;
         }, 800);
     } else {
-        window.location.href = `intent:${url}#Intent;type=video/mp2ts;package=org.videolan.vlc;action=android.intent.action.VIEW;end`;
+        // Bez type= — VLC si MIME zjistí sám podle obsahu streamu
+        window.location.href = `intent:${url}#Intent;package=org.videolan.vlc;action=android.intent.action.VIEW;end`;
     }
 }
 
@@ -10125,7 +10126,7 @@ function openEpgDetail(ep) {
             </div>
             ${desc ? `<div style="font-size:0.85rem;color:var(--text-muted);line-height:1.6;margin-bottom:20px;padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;border-left:3px solid #00b4d8;">${desc}</div>` : ''}
             ${ep.isNow && ep.url ? `<div style="margin-bottom:16px;">
-                <button onclick="document.getElementById('epgDetailModal').style.display='none'; window.location.href='intent:${ep.url}#Intent;type=video/mp2ts;package=org.videolan.vlc;action=android.intent.action.VIEW;end';" style="width:100%;padding:11px 16px;background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶ Přehrát živě ve VLC</button>
+                <button onclick="document.getElementById('epgDetailModal').style.display='none'; window.location.href='intent:${ep.url}#Intent;package=org.videolan.vlc;action=android.intent.action.VIEW;end';" style="width:100%;padding:11px 16px;background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶ Přehrát živě ve VLC</button>
             </div>` : ''}
             <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Hledat / otevřít</div>
             <div style="display:flex;flex-wrap:wrap;gap:8px;">
@@ -10217,7 +10218,7 @@ function openInExo() {
 function openInVlc() {
     const url = window._tvLastUrl || (tvState.currentChannel && tvState.currentChannel.url);
     if(!url) return;
-    window.location.href = `intent:${url}#Intent;type=video/mp2ts;package=org.videolan.vlc;action=android.intent.action.VIEW;end`;
+    window.location.href = `intent:${url}#Intent;package=org.videolan.vlc;action=android.intent.action.VIEW;end`;
 }
 
 function _tvStop() {
