@@ -10085,11 +10085,13 @@ function openInVlcUrl(url) {
         const encoded = encodeURIComponent(url);
         window.location.href = `vlc-x-callback://x-callback-url/stream?url=${encoded}`;
         setTimeout(() => {
-            window.location.href = `vlc://${url.replace(/^https?:\/\//, '')}`;
+            window.location.href = `vlc://${url.replace(/^https?\/\//, '')}`;
         }, 800);
     } else {
-        // Bez type= — VLC si MIME zjistí sám podle obsahu streamu
-        window.location.href = `intent:${url}#Intent;package=org.videolan.vlc;action=android.intent.action.VIEW;end`;
+        // Android: intent:// s explicitním scheme parametrem (funguje i v Brave z content://)
+        const scheme = url.startsWith('https') ? 'https' : 'http';
+        const urlNoScheme = url.replace(/^https?:\/\//, '');
+        window.location.href = `intent://${urlNoScheme}#Intent;scheme=${scheme};package=org.videolan.vlc;action=android.intent.action.VIEW;end`;
     }
 }
 
