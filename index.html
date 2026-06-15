@@ -9868,7 +9868,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 <script>
 // --- TV PLAYER ---------------------------------------------------------------
 
-const TV_PLAYLIST_URL = 'https://raw.githubusercontent.com/antolikpiestany/CZ-IPTV/refs/heads/main/Moj%20playlist%20EPG%20III.m3u';
+const TV_PLAYLIST_URL = 'https://raw.githubusercontent.com/antolikpiestany/CZ-IPTV/main/Playlist%20CZ%20SK%20EPG.m3u';
 
 const TV_GROUPS = [
     { id: 'cz',    label: '🇨🇿 CZ',     match: ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
@@ -9896,18 +9896,14 @@ let tvState = window.tvState = { channels: [], activeGroup: 'cz', currentChannel
 
 function openTvModal() {
     const tvM = document.getElementById('tvModal');
-    tvM.style.display = '';  // reset případného display:none
+    tvM.style.display = '';
     tvM.classList.add('open');
     startTvClock();
-    switchTvTab('channels');  // vždy začni na záložce Kanály
-    // Na pozadí: načti EPG XML soubory
+    switchTvTab('channels');
     if(!tvState.epgLoaded) loadEpgData();
-    // Načti lokální EPG XML soubory (czech3.xml + slovakia1.xml)
     if(!tvState.xmlEpgLoaded) loadLocalXmlEpg();
-    // Skryj skupinové záložky
     const tabs = document.getElementById('tvGroupTabs');
     if(tabs) tabs.style.display = 'none';
-    // Načti playlist (vždy při otevření)
     loadTvPlaylist();
 }
 
@@ -9947,7 +9943,7 @@ async function loadTvPlaylist() {
             renderTvChannelList();
             return;
         }
-        if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e50914;">⚠️ Playlist neobsahuje kanály (#EXTINF nenalezeno).<br><small>' + text.substring(0,200) + '</small></div>';
+        if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e50914;">⚠️ Playlist neobsahuje kanály.</div>';
     } catch(e) {
         if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e50914;">⚠️ Chyba načtení: ' + e.message + '</div>';
     }
@@ -9987,9 +9983,7 @@ function switchTvTab(tab) {
 
 function renderTvGroups() {
     const tabs = document.getElementById('tvGroupTabs');
-    tabs.innerHTML = TV_GROUPS.map(g =>
-        `<button class="tv-group-tab ${g.id === tvState.activeGroup ? 'active' : ''}" onclick="switchTvGroup('${g.id}')">${g.label}</button>`
-    ).join('');
+    if(tabs) tabs.style.display = 'none';
 }
 
 function switchTvGroup(id) {
