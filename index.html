@@ -9933,6 +9933,7 @@ const EMBEDDED_M3U = `#EXTM3U
 `;
 
 async function loadTvPlaylist() {
+    const listEl = document.getElementById('tvChannelList');
     // Primárně použij embedded playlist — žádný fetch, žádný CORS
     tvState.channels = parseM3U(EMBEDDED_M3U);
     if(tvState.channels.length > 0) {
@@ -9951,22 +9952,27 @@ async function loadTvPlaylist() {
             }).catch(()=>{});
         return;
     }
-    // Embedded prázdný — zkus načíst z URL
+    // Embedded prázdný — načti z URL
     if(TV_PLAYLIST_URL) {
+        if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;">⏳ Načítám playlist…</div>';
         try {
-            const r = await fetch(TV_PLAYLIST_URL, { signal: AbortSignal.timeout(12000) });
+            const r = await fetch(TV_PLAYLIST_URL, { signal: AbortSignal.timeout(15000) });
             const text = await r.text();
             if(text.includes('#EXTINF')) {
                 tvState.channels = parseM3U(text);
+                // Auto-detekuj aktivní skupinu — pokud CZ nemá kanály, přepni na "all"
+                const grpCz = TV_GROUPS.find(g => g.id === 'cz');
+                const czCount = grpCz ? tvState.channels.filter(ch => grpCz.match(ch)).length : 0;
+                if(czCount === 0) tvState.activeGroup = 'all';
                 renderTvGroups();
                 renderTvChannelList();
                 return;
             }
-        } catch(e) {}
+        } catch(e) {
+            console.warn('IPTV fetch failed:', e);
+        }
     }
-    // Fallback: chyba
-    const listEl = document.getElementById('tvChannelList');
-    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e50914;">⚠️ Chyba načtení kanálů.</div>';
+    if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e50914;">⚠️ Chyba načtení kanálů.</div>';
 }
 
 function parseM3U(text) {
