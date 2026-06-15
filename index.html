@@ -9934,43 +9934,17 @@ const EMBEDDED_M3U = `#EXTM3U
 
 async function loadTvPlaylist() {
     const listEl = document.getElementById('tvChannelList');
-    // Primárně použij embedded playlist — žádný fetch, žádný CORS
-    tvState.channels = parseM3U(EMBEDDED_M3U);
-    if(tvState.channels.length > 0) {
-        // Na pozadí zkus načíst aktuálnější verzi z GitHubu (CORS OK)
-        fetch(TV_PLAYLIST_URL, { signal: AbortSignal.timeout(8000) })
-            .then(r => r.text())
-            .then(text => {
-                if(text.includes('#EXTINF')) {
-                    const chs = parseM3U(text);
-                    if(chs.length > tvState.channels.length) {
-                        tvState.channels = chs;
-                        renderTvGroups();
-                        renderTvChannelList();
-                    }
-                }
-            }).catch(()=>{});
-        return;
-    }
-    // Embedded prázdný — načti z URL
-    if(TV_PLAYLIST_URL) {
-        if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;">⏳ Načítám playlist…</div>';
-        try {
-            const r = await fetch(TV_PLAYLIST_URL, { signal: AbortSignal.timeout(15000) });
-            const text = await r.text();
-            if(text.includes('#EXTINF')) {
-                tvState.channels = parseM3U(text);
-                // Auto-detekuj aktivní skupinu — pokud CZ nemá kanály, přepni na "all"
-                const grpCz = TV_GROUPS.find(g => g.id === 'cz');
-                const czCount = grpCz ? tvState.channels.filter(ch => grpCz.match(ch)).length : 0;
-                if(czCount === 0) tvState.activeGroup = 'all';
-                renderTvGroups();
-                renderTvChannelList();
-                return;
-            }
-        } catch(e) {
-            console.warn('IPTV fetch failed:', e);
+    if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;">⏳ Načítám playlist…</div>';
+    try {
+        const r = await fetch(TV_PLAYLIST_URL, { signal: AbortSignal.timeout(15000) });
+        const text = await r.text();
+        if(text.includes('#EXTINF')) {
+            tvState.channels = parseM3U(text);
+            renderTvChannelList();
+            return;
         }
+    } catch(e) {
+        console.warn('IPTV fetch failed:', e);
     }
     if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e50914;">⚠️ Chyba načtení kanálů.</div>';
 }
@@ -10009,9 +9983,7 @@ function switchTvTab(tab) {
 
 function renderTvGroups() {
     const tabs = document.getElementById('tvGroupTabs');
-    tabs.innerHTML = TV_GROUPS.map(g =>
-        `<button class="tv-group-tab ${g.id === tvState.activeGroup ? 'active' : ''}" onclick="switchTvGroup('${g.id}')">${g.label}</button>`
-    ).join('');
+    if(tabs) tabs.style.display = 'none';
 }
 
 function switchTvGroup(id) {
@@ -10036,10 +10008,9 @@ function isAdultChannel(ch) {
 
 function renderTvChannelList() {
     const listEl = document.getElementById('tvChannelList');
-    const group = TV_GROUPS.find(g => g.id === tvState.activeGroup);
     const adultAllowed = localStorage.getItem('sinator_adult_content') === 'true';
-    const filtered = tvState.channels.filter(ch => group.match(ch) && (adultAllowed || !isAdultChannel(ch)));
-    if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Žádné kanály v této skupině.</div>'; return; }
+    const filtered = tvState.channels.filter(ch => adultAllowed || !isAdultChannel(ch));
+    if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Žádné kanály.</div>'; return; }
 
     listEl.innerHTML = filtered.map((ch) => {
         const isActive = tvState.currentChannel && tvState.currentChannel.url === ch.url;
