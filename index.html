@@ -9868,7 +9868,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 <script>
 // --- TV PLAYER ---------------------------------------------------------------
 
-const TV_PLAYLIST_URL = 'https://raw.githubusercontent.com/Sina999Tor/CZ-IPTV/refs/heads/main/CZ%20SK%20XXX%20playlist%20EPG.m3u';
+const TV_PLAYLIST_URL = '';
 
 const TV_GROUPS = [
     { id: 'cz',    label: '🇨🇿 CZ',     match: ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
@@ -9904,23 +9904,8 @@ function openTvModal() {
     if(!tvState.epgLoaded) loadEpgData();
     // Načti lokální EPG XML soubory (czech3.xml + slovakia1.xml)
     if(!tvState.xmlEpgLoaded) loadLocalXmlEpg();
-    // Načti playlist z GitHubu
-    if(!tvState.channels.length) {
-        const listEl = document.getElementById('tvChannelList');
-        if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">⏳ Načítám kanály…</div>';
-    }
-    fetch(TV_PLAYLIST_URL, { signal: AbortSignal.timeout(15000) })
-        .then(r => r.text())
-        .then(text => {
-            if(!text.includes('#EXTINF')) return;
-            tvState.channels = parseM3U(text);
-            renderTvGroups();
-            renderTvChannelList();
-        }).catch(()=>{
-            const listEl = document.getElementById('tvChannelList');
-            if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e55;">❌ Nepodařilo se načíst playlist. Zkontroluj připojení.</div>';
-        });
-    if(tvState.channels.length) { renderTvGroups(); renderTvChannelList(); }
+    renderTvGroups();
+    renderTvChannelList();
 }
 
 function closeTvModal() {
