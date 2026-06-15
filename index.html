@@ -9904,8 +9904,11 @@ function openTvModal() {
     if(!tvState.epgLoaded) loadEpgData();
     // Načti lokální EPG XML soubory (czech3.xml + slovakia1.xml)
     if(!tvState.xmlEpgLoaded) loadLocalXmlEpg();
-    renderTvGroups();
-    renderTvChannelList();
+    // Skryj skupinové záložky
+    const tabs = document.getElementById('tvGroupTabs');
+    if(tabs) tabs.style.display = 'none';
+    // Načti playlist (vždy při otevření)
+    loadTvPlaylist();
 }
 
 function closeTvModal() {
@@ -9937,16 +9940,17 @@ async function loadTvPlaylist() {
     if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;">⏳ Načítám playlist…</div>';
     try {
         const r = await fetch(TV_PLAYLIST_URL, { signal: AbortSignal.timeout(15000) });
+        if(!r.ok) throw new Error('HTTP ' + r.status);
         const text = await r.text();
         if(text.includes('#EXTINF')) {
             tvState.channels = parseM3U(text);
             renderTvChannelList();
             return;
         }
+        if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e50914;">⚠️ Playlist neobsahuje kanály (#EXTINF nenalezeno).<br><small>' + text.substring(0,200) + '</small></div>';
     } catch(e) {
-        console.warn('IPTV fetch failed:', e);
+        if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e50914;">⚠️ Chyba načtení: ' + e.message + '</div>';
     }
-    if(listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e50914;">⚠️ Chyba načtení kanálů.</div>';
 }
 
 function parseM3U(text) {
@@ -9983,7 +9987,9 @@ function switchTvTab(tab) {
 
 function renderTvGroups() {
     const tabs = document.getElementById('tvGroupTabs');
-    if(tabs) tabs.style.display = 'none';
+    tabs.innerHTML = TV_GROUPS.map(g =>
+        `<button class="tv-group-tab ${g.id === tvState.activeGroup ? 'active' : ''}" onclick="switchTvGroup('${g.id}')">${g.label}</button>`
+    ).join('');
 }
 
 function switchTvGroup(id) {
