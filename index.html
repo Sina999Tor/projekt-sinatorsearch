@@ -6669,6 +6669,15 @@ EXAMPLES:
             b.textContent = isNowLiked ? '❤️' : '🤍';
             b.classList.toggle('liked', isNowLiked);
         });
+        renderFavsModal();
+    }
+
+    // Bezpečná verze pro tlačítko v nav-baru detailu — čte data z currentDetailItem,
+    // takže se nikdy nevkládá uživatelský titulek (s apostrofy apod.) do onclick atributu.
+    function toggleFavInModalCurrent() {
+        const it = currentDetailItem;
+        if (!it) return;
+        toggleFavInModal(it.id, it.title, it.type, it.poster || '', !!it.isActor, it.year || '');
     }
 
     function pushNavigation(type, id, title) { navigationStack.push({ type, id, title }); }
@@ -7125,7 +7134,7 @@ EXAMPLES:
             const safeTitle = title.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
             const origTitle = (d.original_title || d.original_name || title).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
             const isLiked = state.favs.some(f => Number(f.id) === Number(id));
-            currentDetailItem = { id, type, title: safeTitle };
+            currentDetailItem = { id, type, title: safeTitle, poster: d.poster_path||'', year, isActor: false };
             currentOverviewText = d.overview || '';
             
             const releaseDate = d.release_date || d.first_air_date || '';
@@ -7161,7 +7170,7 @@ ${collectionBtn}
 ${cast ? `<button class="action-btn-modal" style="grid-column:1/-1" onclick="showCastModal(${id},'${type}')">👥 Herci</button>` : ''}
 ${directors.length ? `<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);grid-column:1/-1" onclick="showDirectorsModal(${id},'${type}')">🎥 Režie</button>` : ''}
 </div>`;
-            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModal(${id}, '${safeTitle}', '${type}', '${d.poster_path||''}', false, '${year}')">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${certChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${safeTitle}',${year},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p><div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div>${actionBtns}</div></div>`;
+            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${certChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${safeTitle}',${year},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p><div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div>${actionBtns}</div></div>`;
             
             if(type === 'tv') {
                 $('modalScrollBody').innerHTML += `<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);"><h3 style="margin-bottom:16px;font-size:1.2rem;">📺 Sezóny a epizody</h3><div id="seasons-container"></div></div>`;
@@ -7459,7 +7468,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     document.querySelector('.person-tab[data-tab="directing"]')?.classList.add('active');
                 }, 0);
             }
-            modalNav(name, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModal(${id}, '${name.replace(/'/g, "&#39;")}', 'actor', '${p.profile_path||''}', true)">${isLiked ? '❤️' : '🤍'}</button>`);
+            currentDetailItem = { id, type: 'actor', title: name.replace(/'/g, "&#39;"), poster: p.profile_path||'', year: '', isActor: true };
+            modalNav(name, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`);
         } catch(e) { console.error(e); $('modalScrollBody').innerHTML=`<div class="empty">Chyba načtení: ${e.message}</div>`; }
     }
 
@@ -9463,6 +9473,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     window.mdblistOpenIdx = () => {}; // zachováno pro kompatibilitu
     window.toggleFav = (id, title, year, rating, type, poster, e) => _toggleFav(id, title, year, rating, type, poster, e);
     window.toggleFavInModal = (id, title, type, poster, isActor, year) => toggleFavInModal(id, title, type, poster, isActor, year);
+    window.toggleFavInModalCurrent = () => toggleFavInModalCurrent();
     window.openDBSearch = (db) => _openDBSearch(db);
     window.searchMusic = () => _searchMusic();
     window.openDetailFromWatched = (id, type) => _openDetailFromWatched(id, type);
