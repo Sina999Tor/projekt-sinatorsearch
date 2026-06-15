@@ -10111,8 +10111,9 @@ function switchTvGroup(id) {
 const ADULT_CHANNEL_KEYWORDS = [
     'dorcel', 'playboy', 'penthouse', 'hustler', 'vivid', 'naughty',
     'brazzers', 'redlight', 'red light', 'spice', 'erotic', 'erotik',
-    'xxx', 'adult', 'dospel', '18+', 'blue hustler', 'alba xxx',
-    'satisfyer', 'extasy', 'xite', 'private tv'
+    'xxx', 'dospel', '18+', 'blue hustler', 'alba xxx',
+    'satisfyer', 'extasy', 'xite', 'private tv', 'babes tv', 'leo tv',
+    'true amateurs', 'desire', 'eroxxx'
 ];
 
 function isAdultChannel(ch) {
@@ -10125,7 +10126,9 @@ function renderTvChannelList() {
     const listEl = document.getElementById('tvChannelList');
     const group = TV_GROUPS.find(g => g.id === tvState.activeGroup);
     const adultAllowed = localStorage.getItem('sinator_adult_content') === 'true';
-    const filtered = tvState.channels.filter(ch => group.match(ch) && (adultAllowed || !isAdultChannel(ch)));
+    const isAdultGroup = tvState.activeGroup.includes('Adult') || tvState.activeGroup.includes('🔞');
+    const filtered = tvState.channels.filter(ch => group && group.match(ch) && (adultAllowed || isAdultGroup || !isAdultChannel(ch)));
+    if(!group) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Vyberte skupinu kanálů.</div>'; return; }
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Žádné kanály v této skupině.</div>'; return; }
 
     listEl.innerHTML = filtered.map((ch) => {
@@ -10167,6 +10170,20 @@ function playTvChannel(idx) {
 }
 
 function showTvLaunchPanel(name, url) {
+    // Zobraz info bar se záložními možnostmi
+    const infoBar = document.getElementById('tvVlcInfo');
+    if(infoBar) {
+        const scheme = url.startsWith('https') ? 'https' : 'http';
+        const urlNoScheme = url.replace(/^https?:\/\//, '');
+        const intentUrl = `intent://${urlNoScheme}#Intent;scheme=${scheme};package=org.videolan.vlc;action=android.intent.action.VIEW;end`;
+        infoBar.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;">
+            <span style="color:#aaa;font-size:0.72rem;">▶ ${name}</span>
+            <a href="${intentUrl}" style="padding:4px 10px;background:#f60;border-radius:6px;color:#fff;text-decoration:none;font-size:0.75rem;font-weight:700;">🎬 VLC (intent)</a>
+            <a href="vlc://${urlNoScheme}" style="padding:4px 10px;background:#e50914;border-radius:6px;color:#fff;text-decoration:none;font-size:0.75rem;font-weight:700;">🎬 VLC (vlc://)</a>
+            <a href="${url}" target="_blank" style="padding:4px 10px;background:#333;border-radius:6px;color:#fff;text-decoration:none;font-size:0.75rem;">🔗 URL</a>
+        </div>`;
+    }
+    // Také zkus otevřít přímo
     openInVlcUrl(url);
 }
 
@@ -10179,10 +10196,13 @@ function openInVlcUrl(url) {
             window.location.href = `vlc://${url.replace(/^https?\/\//, '')}`;
         }, 800);
     } else {
-        // Android: intent:// s explicitním scheme parametrem (funguje i v Brave z content://)
-        const scheme = url.startsWith('https') ? 'https' : 'http';
+        // Android Brave: zkus vlc:// schéma přímo — nejspolehlivější z content://
         const urlNoScheme = url.replace(/^https?:\/\//, '');
-        window.location.href = `intent://${urlNoScheme}#Intent;scheme=${scheme};package=org.videolan.vlc;action=android.intent.action.VIEW;end`;
+        const scheme = url.startsWith('https') ? 'https' : 'http';
+        // Pokus 1: vlc:// přímé schéma
+        const a = document.createElement('a');
+        a.href = `intent://${urlNoScheme}#Intent;scheme=${scheme};package=org.videolan.vlc;action=android.intent.action.VIEW;end`;
+        a.click();
     }
 }
 
