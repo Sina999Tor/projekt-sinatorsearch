@@ -10304,7 +10304,16 @@ function openInVlcUrl(url) {
     } else {
         // Android: intent:// s explicitním scheme parametrem (funguje i v Brave z content://)
         const scheme = url.startsWith('https') ? 'https' : 'http';
-        const urlNoScheme = url.replace(/^https?:\/\//, '');
+        let urlNoScheme = url.replace(/^https?:\/\//, '');
+        // Nešifrované ':' v query stringu (např. MAC adresa u Stalker portálů main.light-ott.net)
+        // rozbijí parser intent:// URI -> Android/Chrome pak spadne na Play Store fallback.
+        // Proto dvojtečky v části za '?' escapujeme na %3A.
+        const qIdx = urlNoScheme.indexOf('?');
+        if (qIdx !== -1) {
+            const base = urlNoScheme.slice(0, qIdx);
+            const query = urlNoScheme.slice(qIdx + 1).replace(/:/g, '%3A');
+            urlNoScheme = base + '?' + query;
+        }
         window.location.href = `intent://${urlNoScheme}#Intent;scheme=${scheme};package=org.videolan.vlc;action=android.intent.action.VIEW;end`;
     }
 }
