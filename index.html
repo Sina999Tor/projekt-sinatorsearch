@@ -10314,10 +10314,10 @@ function openInVlcUrl(url) {
             const query = urlNoScheme.slice(qIdx + 1).replace(/:/g, '%3A');
             urlNoScheme = base + '?' + query;
         }
-        // component= cílí přímo na VLC VideoPlayerActivity a obejde intent-filtry vázané
-        // na konkrétní přípony (.m3u8/.ts/...) - díky tomu fungují i Stalker/Xtream linky
-        // typu line.iptventes.site/.../774034, které žádnou příponu nemají.
-        window.location.href = `intent://${urlNoScheme}#Intent;scheme=${scheme};package=org.videolan.vlc;component=org.videolan.vlc/org.videolan.vlc.gui.video.VideoPlayerActivity;action=android.intent.action.VIEW;end`;
+        // type=video/* nutí Android párovat podle MIME typu, ne podle přípony souboru v cestě -
+        // díky tomu fungují i Stalker/Xtream linky typu line.iptventes.site/.../774034 bez přípony.
+        // (component= na konkrétní Activity nešel použít - novější VLC ji neexportuje pro cizí appky.)
+        window.location.href = `intent://${urlNoScheme}#Intent;scheme=${scheme};package=org.videolan.vlc;action=android.intent.action.VIEW;category=android.intent.category.DEFAULT;type=video/*;end`;
     }
 }
 
