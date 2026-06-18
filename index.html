@@ -9993,6 +9993,9 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     </div>
 
     <!-- Kanály: mřížka ikon –  Kanály tab -->
+    <div id="tvSearchWrap" style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
+        <input type="text" id="tvChannelSearchInput" oninput="filterTvChannels(this.value)" placeholder="🔍 Hledat ve všech kanálech…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
+    </div>
     <div id="tvChannelListWrap" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0;">
         <div class="tv-channel-list" id="tvChannelList"></div>
     </div>
@@ -16499,6 +16502,7 @@ function selectAltPlaylist(code) {
     if(!pl) return;
     altState.activeCode = code;
     altState.filterText = '';
+    altState._searchResults = null;
     const searchInput = document.getElementById('tvAltSearchInput');
     if(searchInput) searchInput.value = '';
     if(!altState.parsedCache[code]) {
@@ -16511,14 +16515,62 @@ function selectAltPlaylist(code) {
 }
 
 function filterAltChannels(text) {
-    altState.filterText = (text || '').toLowerCase();
-    altState.filtered = altState.filterText
-        ? altState.channels.filter(ch => ch.name.toLowerCase().includes(altState.filterText))
-        : altState.channels;
-    renderAltChannelList();
+    altState.filterText = (text || '').toLowerCase().trim();
+    if(!altState.filterText) {
+        // No search — show current playlist only
+        altState.filtered = altState.channels;
+        renderAltChannelList();
+        return;
+    }
+    // Search across ALL playlists
+    const allChannels = [];
+    Object.keys(ALT_PLAYLISTS).forEach(code => {
+        if(!altState.parsedCache[code]) {
+            altState.parsedCache[code] = parseM3U(ALT_PLAYLISTS[code].m3u);
+        }
+        altState.parsedCache[code].forEach(ch => {
+            if(ch.name.toLowerCase().includes(altState.filterText)) {
+                allChannels.push({ ...ch, _sourceCode: code });
+            }
+        });
+    });
+    altState._searchResults = allChannels;
+    altState.filtered = allChannels;
+    renderAltChannelListSearch();
 }
 
+function renderAltChannelListSearch() {
+    const listEl = document.getElementById('tvAltChannelList');
+    if(!listEl) return;
+    const filtered = altState._searchResults || [];
+    if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Žádné kanály neodpovídají hledání.</div>'; return; }
+    listEl.innerHTML = filtered.map((ch, i) => {
+        const label = ALT_PLAYLISTS[ch._sourceCode]?.label || ch._sourceCode;
+        const shortName = ch.name.replace(/\s*(HD|FHD|4K|hd)$/i,'').trim();
+        return '<div class="tv-ch-item" onclick="playAltChannelDirect(\'' + encodeURIComponent(JSON.stringify({url:ch.url,name:ch.name,logo:ch.logo||''})) + '\')" title="' + ch.name + '">'
+            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'">'
+                       + '<div class="tv-ch-logo-ph" style="display:none">📺</div>'
+                       : '<div class="tv-ch-logo-ph">📺</div>')
+            + '<div class="tv-ch-name">' + shortName + '<span style="font-size:0.65rem;color:var(--text-muted);display:block;">' + label + '</span></div>'
+            + '</div>';
+    }).join('');
+}
+
+function playAltChannelDirect(encoded) {
+    try {
+        const ch = JSON.parse(decodeURIComponent(encoded));
+        altState.currentChannel = ch;
+        const logo = document.getElementById('tvNowLogo');
+        if(logo) { logo.src = ch.logo || ''; logo.style.display = ch.logo ? 'block' : 'none'; }
+        const nameEl = document.getElementById('tvNowName');
+        if(nameEl) nameEl.textContent = ch.name;
+        openInVlcUrl(ch.url);
+    } catch(e) {}
+}
+window.playAltChannelDirect = playAltChannelDirect;
+
 function renderAltChannelList() {
+    if(altState.filterText && altState._searchResults) { renderAltChannelListSearch(); return; }
     const listEl = document.getElementById('tvAltChannelList');
     if(!listEl) return;
     if(!altState.activeCode) {
@@ -16556,6 +16608,7 @@ function playAltChannel(idx) {
 function switchTvTab(tab) {
     const isEpg = tab === 'epg';
     const isAlt = tab === 'alt';
+    document.getElementById('tvSearchWrap').style.display = (isEpg || isAlt) ? 'none' : '';
     document.getElementById('tvChannelListWrap').style.display = (isEpg || isAlt) ? 'none' : '';
     document.getElementById('tvEpgWrap').style.display = isEpg ? 'flex' : 'none';
     document.getElementById('tvAltWrap').style.display = isAlt ? 'flex' : 'none';
@@ -16587,10 +16640,29 @@ function renderTvGroups() {
 
 function switchTvGroup(id) {
     tvState.activeGroup = id;
-    document.querySelectorAll('.tv-group-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#tvGroupTabs .tv-group-tab').forEach(b => b.classList.remove('active'));
     event.target.classList.add('active');
+    // Clear search when switching group
+    const si = document.getElementById('tvChannelSearchInput');
+    if(si) { si.value = ''; tvState._searchText = ''; }
     renderTvChannelList();
 }
+
+function filterTvChannels(text) {
+    tvState._searchText = (text || '').toLowerCase().trim();
+    renderTvChannelList();
+    // When searching, highlight no specific group tab
+    if(tvState._searchText) {
+        document.querySelectorAll('#tvGroupTabs .tv-group-tab').forEach(b => b.classList.remove('active'));
+    } else {
+        // Restore active group highlight
+        document.querySelectorAll('#tvGroupTabs .tv-group-tab').forEach(b => {
+            const gid = b.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+            if(gid === tvState.activeGroup) b.classList.add('active');
+        });
+    }
+}
+window.filterTvChannels = filterTvChannels;
 
 const ADULT_CHANNEL_KEYWORDS = [
     'dorcel', 'playboy', 'penthouse', 'hustler', 'vivid', 'naughty',
@@ -16607,10 +16679,21 @@ function isAdultChannel(ch) {
 
 function renderTvChannelList() {
     const listEl = document.getElementById('tvChannelList');
-    const group = TV_GROUPS.find(g => g.id === tvState.activeGroup);
     const adultAllowed = localStorage.getItem('sinator_adult_content') === 'true';
-    const filtered = tvState.channels.filter(ch => group.match(ch) && (adultAllowed || !isAdultChannel(ch)));
-    if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Žádné kanály v této skupině.</div>'; return; }
+    const searchText = (tvState._searchText || '').toLowerCase().trim();
+
+    let filtered;
+    if(searchText) {
+        // Search across ALL channels regardless of group
+        filtered = tvState.channels.filter(ch =>
+            ch.name.toLowerCase().includes(searchText) && (adultAllowed || !isAdultChannel(ch))
+        );
+    } else {
+        const group = TV_GROUPS.find(g => g.id === tvState.activeGroup);
+        filtered = tvState.channels.filter(ch => group.match(ch) && (adultAllowed || !isAdultChannel(ch)));
+    }
+
+    if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály v této skupině.') + '</div>'; return; }
 
     listEl.innerHTML = filtered.map((ch) => {
         const isActive = tvState.currentChannel && tvState.currentChannel.url === ch.url;
