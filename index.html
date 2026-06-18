@@ -2183,14 +2183,25 @@
         // Service Worker registrace
         if ('serviceWorker' in navigator) {
             const swCode = `
+                const CACHE_VERSION = 'sinator-v${Date.now()}';
                 self.addEventListener('install', (e) => {
                     self.skipWaiting();
                 });
                 self.addEventListener('activate', (e) => {
-                    self.clients.claim();
+                    e.waitUntil(
+                        caches.keys().then(keys =>
+                            Promise.all(keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k)))
+                        ).then(() => self.clients.claim())
+                    );
                 });
                 self.addEventListener('fetch', (e) => {
-                    // Cache-first strategie pro offline fungování
+                    // Network-first pro HTML (vždy aktuální verze), cache-first pro ostatní
+                    if(e.request.mode === 'navigate' || e.request.destination === 'document') {
+                        e.respondWith(
+                            fetch(e.request).catch(() => caches.match(e.request))
+                        );
+                        return;
+                    }
                     e.respondWith(
                         caches.match(e.request).then((response) => {
                             return response || fetch(e.request);
@@ -10178,6 +10189,8 @@ async function loadTvPlaylist() {
     tvState.channels = parseM3U(EMBEDDED_M3U);
     if(tvState.channels.length > 0) {
         // Na pozadí zkus načíst aktuálnější verzi z GitHubu (CORS OK)
+        // Přeskočit pokud TV_PLAYLIST_URL je prázdný — jinak by se fetchoval samotný index.html
+        if(!TV_PLAYLIST_URL) return;
         fetch(TV_PLAYLIST_URL, { signal: AbortSignal.timeout(8000) })
             .then(r => r.text())
             .then(text => {
