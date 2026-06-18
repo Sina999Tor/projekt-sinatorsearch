@@ -507,6 +507,11 @@
         .iprima-list-item .item-del:hover { color: var(--accent); background: rgba(229,9,20,0.1); }
         .iprima-sync-btn { padding: 9px 18px; background: var(--iprima); border: none; border-radius: 10px; color: #fff; font-weight: 600; cursor: pointer; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s; }
         .iprima-sync-btn:hover { background: var(--iprima-light); transform: translateY(-1px); }
+        .live-official-btn { width:100%; display:flex; align-items:center; gap:12px; padding:11px 14px; background:var(--bg-elevated); border:1px solid var(--border); border-left:3px solid #22c55e; border-radius:10px; color:#fff; cursor:pointer; transition:0.2s; text-align:left; }
+        .live-official-btn:hover { background:rgba(255,255,255,0.06); transform:translateX(3px); }
+        .live-official-btn .lob-logo { width:38px; height:38px; border-radius:8px; background:rgba(255,255,255,0.08); display:grid; place-items:center; font-size:0.72rem; font-weight:700; flex-shrink:0; color:#fff; }
+        .live-official-btn .lob-name { flex:1; font-size:0.88rem; font-weight:600; }
+        .live-official-btn .lob-arrow { color:var(--text-muted); font-size:1rem; flex-shrink:0; }
         .modal-header-row { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); z-index: 10; }
         .modal-header-row h2 { font-family: 'Playfair Display', serif; font-size: 1.4rem; background: linear-gradient(135deg, #fff, var(--trakt)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .favs-modal-header h2, .settings-modal-header h2 { background: linear-gradient(135deg, #fff, var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
@@ -3175,6 +3180,20 @@
         if(m) m.style.display = 'none';
         $('btnTvRadioToggle')?.classList.remove('active');
     }
+    function openLiveOfficialModal() {
+        const m = $('liveOfficialModal');
+        if(m) m.style.display = 'flex';
+    }
+    window.openLiveOfficialModal = openLiveOfficialModal;
+    function closeLiveOfficialModal() {
+        const m = $('liveOfficialModal');
+        if(m) m.style.display = 'none';
+        // Return to tvRadioModal if it's in the stack
+        const stack = window.modalStack || [];
+        const tvIdx = stack.findIndex(function(x){ return x.id === 'tvRadioModal'; });
+        if(tvIdx !== -1) { _openTvRadioModalDirect(); }
+    }
+    window.closeLiveOfficialModal = closeLiveOfficialModal;
 
     function closeHelperModals() {
         $('musicModal')?.classList.remove('open');
@@ -3188,6 +3207,7 @@
         const lm = $('listsModal'); if(lm) lm.style.display = 'none';
         const tm = $('tvRadioModal'); if(tm && !(window.modalStack||[]).some(function(m){return m.id==='tvRadioModal';})) tm.style.display = 'none';
         const zm = $('zabavaModal'); if(zm) zm.style.display = 'none';
+        const lom = $('liveOfficialModal'); if(lom) lom.style.display = 'none';
         $('btnMusicToggle')?.classList.remove('active');
         $('btnTraktToggle')?.classList.remove('active');
         $('btnSimklToggle')?.classList.remove('active');
@@ -9721,10 +9741,125 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             <span style="font-size:1.6rem;">🔴</span>
             <div><div style="color:#e30613;font-weight:700;">iPrima</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Archiv a živé vysílání Prima</div></div>
         </button>
+        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openLiveOfficialModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🌐</span>
+            <div><div style="color:#22c55e;font-weight:700;">Živá TV — Oficiální weby</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Prima, Nova, ČT, JOJ, Seznam TV, Óčko, Slagr a další</div></div>
+        </button>
         <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, function(){ openKinoModal(''); })" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎦</span>
             <div><div style="color:var(--gold);font-weight:700;">Kino</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Program kin a rezervace vstupenek</div></div>
         </button>
+    </div>
+</div>
+
+<!-- 🌐 ŽIVÁ TV OFICIÁLNÍ WEBY MODAL -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.97);backdrop-filter:blur(20px);z-index:4300;flex-direction:column;overflow:hidden;" id="liveOfficialModal" onclick="if(event.target===this)closeLiveOfficialModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);border-top:2px solid #22c55e;">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;background:linear-gradient(135deg,#fff 0%,#86efac 50%,#22c55e 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">🌐 Živá TV — Oficiální weby</h3>
+        <button onclick="closeLiveOfficialModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px 14px 28px;">
+
+        <!-- Prima Group -->
+        <div style="font-size:0.8rem;font-weight:700;color:#e30613;letter-spacing:1px;text-transform:uppercase;margin:0 0 8px;display:flex;align-items:center;gap:8px;">🔴 Prima Group <span style="flex:1;height:1px;background:var(--border);display:block;"></span></div>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:18px;">
+            <button onclick="window.open('https://www.iprima.cz/zive','_blank')" class="live-official-btn" style="border-left-color:#e30613;">
+                <span class="lob-logo">Prima</span><span class="lob-name">Prima</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://www.iprima.cz/zive/max','_blank')" class="live-official-btn" style="border-left-color:#e30613;">
+                <span class="lob-logo">MAX</span><span class="lob-name">Prima MAX</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://www.iprima.cz/zive/love','_blank')" class="live-official-btn" style="border-left-color:#e30613;">
+                <span class="lob-logo">LOVE</span><span class="lob-name">Prima LOVE</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://www.iprima.cz/zive/krimi','_blank')" class="live-official-btn" style="border-left-color:#e30613;">
+                <span class="lob-logo">KRIMI</span><span class="lob-name">Prima KRIMI</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://www.iprima.cz/zive/zoom','_blank')" class="live-official-btn" style="border-left-color:#e30613;">
+                <span class="lob-logo">ZOOM</span><span class="lob-name">Prima ZOOM</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://www.iprima.cz/zive/cool','_blank')" class="live-official-btn" style="border-left-color:#e30613;">
+                <span class="lob-logo">COOL</span><span class="lob-name">Prima COOL</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://www.iprima.cz/zive/show','_blank')" class="live-official-btn" style="border-left-color:#e30613;">
+                <span class="lob-logo">SHOW</span><span class="lob-name">Prima SHOW</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://www.iprima.cz/zive/star','_blank')" class="live-official-btn" style="border-left-color:#e30613;">
+                <span class="lob-logo">STAR</span><span class="lob-name">Prima STAR</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://cnn.iprima.cz/vysilani','_blank')" class="live-official-btn" style="border-left-color:#cc0000;">
+                <span class="lob-logo" style="font-size:0.65rem;">CNN</span><span class="lob-name">CNN Prima NEWS</span><span class="lob-arrow">→</span>
+            </button>
+        </div>
+
+        <!-- Česká televize -->
+        <div style="font-size:0.8rem;font-weight:700;color:#0077cc;letter-spacing:1px;text-transform:uppercase;margin:0 0 8px;display:flex;align-items:center;gap:8px;">📡 Česká televize <span style="flex:1;height:1px;background:var(--border);display:block;"></span></div>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:18px;">
+            <button onclick="window.open('https://www.ceskatelevize.cz/ivysilani/','_blank')" class="live-official-btn" style="border-left-color:#0077cc;">
+                <span class="lob-logo" style="font-size:0.65rem;">iVys.</span><span class="lob-name">iVysílání ČT (všechny kanály)</span><span class="lob-arrow">→</span>
+            </button>
+        </div>
+
+        <!-- Nova Group -->
+        <div style="font-size:0.8rem;font-weight:700;color:#f59e0b;letter-spacing:1px;text-transform:uppercase;margin:0 0 8px;display:flex;align-items:center;gap:8px;">⭐ Nova Group <span style="flex:1;height:1px;background:var(--border);display:block;"></span></div>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:18px;">
+            <button onclick="window.open('https://tv.nova.cz/sledujte-zive/1-nova','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;">
+                <span class="lob-logo">Nova</span><span class="lob-name">Nova</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://tv.nova.cz/sledujte-zive/2-nova-cinema','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;">
+                <span class="lob-logo" style="font-size:0.65rem;">Cinema</span><span class="lob-name">Nova Cinema</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://tv.nova.cz/sledujte-zive/3-nova-action','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;">
+                <span class="lob-logo" style="font-size:0.65rem;">Action</span><span class="lob-name">Nova Action</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://tv.nova.cz/sledujte-zive/4-nova-fun','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;">
+                <span class="lob-logo">Fun</span><span class="lob-name">Nova Fun</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://tv.nova.cz/sledujte-zive/29-nova-lady','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;">
+                <span class="lob-logo">Lady</span><span class="lob-name">Nova Lady</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://tv.nova.cz/sledujte-zive/5-nova-krimi','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;">
+                <span class="lob-logo">Krimi</span><span class="lob-name">Nova Krimi</span><span class="lob-arrow">→</span>
+            </button>
+        </div>
+
+        <!-- JOJ Group -->
+        <div style="font-size:0.8rem;font-weight:700;color:#9333ea;letter-spacing:1px;text-transform:uppercase;margin:0 0 8px;display:flex;align-items:center;gap:8px;">🇸🇰 JOJ Group <span style="flex:1;height:1px;background:var(--border);display:block;"></span></div>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:18px;">
+            <button onclick="window.open('https://www.joj.sk/','_blank')" class="live-official-btn" style="border-left-color:#9333ea;">
+                <span class="lob-logo">JOJ</span><span class="lob-name">JOJ</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://www.joj.sk/live/2-plus','_blank')" class="live-official-btn" style="border-left-color:#9333ea;">
+                <span class="lob-logo">JOJ+</span><span class="lob-name">JOJ Plus</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://www.joj.sk/live/3-JOJKRIMI','_blank')" class="live-official-btn" style="border-left-color:#9333ea;">
+                <span class="lob-logo" style="font-size:0.6rem;">KRIMI</span><span class="lob-name">JOJ Krimi</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://www.joj.sk/live/16-joj24','_blank')" class="live-official-btn" style="border-left-color:#9333ea;">
+                <span class="lob-logo">24</span><span class="lob-name">JOJ 24</span><span class="lob-arrow">→</span>
+            </button>
+        </div>
+
+        <!-- Ostatní -->
+        <div style="font-size:0.8rem;font-weight:700;color:#22c55e;letter-spacing:1px;text-transform:uppercase;margin:0 0 8px;display:flex;align-items:center;gap:8px;">📺 Ostatní <span style="flex:1;height:1px;background:var(--border);display:block;"></span></div>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:18px;">
+            <button onclick="window.open('https://www.televizeseznam.cz/tv?tf=1781733600&dotId=5316518','_blank')" class="live-official-btn" style="border-left-color:#e9000b;">
+                <span class="lob-logo" style="font-size:0.6rem;">STV</span><span class="lob-name">Seznam TV</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://ocko.tv/zive','_blank')" class="live-official-btn" style="border-left-color:#e89700;">
+                <span class="lob-logo" style="font-size:0.65rem;">Óčko</span><span class="lob-name">Óčko</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://ocko.tv/zive?channel=expres','_blank')" class="live-official-btn" style="border-left-color:#e89700;">
+                <span class="lob-logo" style="font-size:0.6rem;">Expr.</span><span class="lob-name">Óčko Expres</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://ocko.tv/zive?channel=star','_blank')" class="live-official-btn" style="border-left-color:#e89700;">
+                <span class="lob-logo" style="font-size:0.6rem;">Star</span><span class="lob-name">Óčko Star</span><span class="lob-arrow">→</span>
+            </button>
+            <button onclick="window.open('https://slagrtv.cz/','_blank')" class="live-official-btn" style="border-left-color:#16a34a;">
+                <span class="lob-logo" style="font-size:0.6rem;">Slagr</span><span class="lob-name">Slagr TV</span><span class="lob-arrow">→</span>
+            </button>
+        </div>
+
     </div>
 </div>
 
