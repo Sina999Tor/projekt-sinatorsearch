@@ -703,7 +703,7 @@
         .settings-input:focus { border-color: var(--accent); outline: none; }
         .settings-actions { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
         .settings-btn-small { padding: 4px 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; color: var(--text-muted); cursor: pointer; font-size: 0.75rem; }
-        .show-key-btn { display: none !important; }
+        .show-key-btn { display: none; }
         .settings-btn-small:hover { border-color: var(--text-muted); }
         .settings-btn-remove { color: var(--accent); }
         .settings-btn-remove:hover { border-color: var(--accent); }
@@ -20683,14 +20683,14 @@ function updateAdminStatus() {
   lbl.style.color = active ? '#1db954' : '#888';
   // Zobrazit/skrýt tlačítka "Zobrazit klíč" jen pro admin
   document.querySelectorAll('.show-key-btn').forEach(btn => {
-    btn.style.display = active ? '' : 'none';
+    btn.style.display = active ? 'inline-block' : 'none';
   });
 }
 
 // Init admin status on settings open
 const _origOpenSettings = window.openSettingsModal;
 if (_origOpenSettings) {
-  window.openSettingsModal = function(...a) { _origOpenSettings(...a); setTimeout(updateAdminStatus, 100); };
+  window.openSettingsModal = function(...a) { _origOpenSettings(...a); updateAdminStatus(); setTimeout(updateAdminStatus, 200); };
 }
 </script>
 
