@@ -1689,12 +1689,12 @@
             <div class="settings-section">
                 <span class="settings-label">Explicitní obsah (dospělí)</span>
                 <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.88rem;color:var(--text-muted);">
-                        <div id="adultToggle" onclick="toggleAdultContent()" style="width:44px;height:24px;border-radius:12px;background:#333;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
-                            <div id="adultToggleKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;"></div>
+                    <div style="display:flex;align-items:center;gap:8px;font-size:0.88rem;color:var(--text-muted);">
+                        <div id="adultToggle" onclick="if(localStorage.getItem('sinator_admin_mode')==='1'){toggleAdultContent()}" style="width:44px;height:24px;border-radius:12px;background:#333;position:relative;cursor:not-allowed;transition:background 0.2s;flex-shrink:0;opacity:0.4;">
+                            <div id="adultToggleKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;pointer-events:none;"></div>
                         </div>
                         <span id="adultToggleLabel">Vypnuto</span>
-                    </label>
+                    </div>
                 </div>
                 <div style="font-size:0.7rem;color:var(--text-muted);opacity:0.6;margin-top:4px;">Zobrazuje filmy a seriály s explicitním obsahem ve výsledcích TMDB</div>
             </div>
@@ -1988,6 +1988,8 @@
     let openRouterKey = _store.getItem('sinator_openrouter_key') || '';
     let omdbApiKey = _store.getItem('sinator_omdb_api_key') || '';
     window._store = _store; // expose for external functions
+    // Default: zapnuto (pokud ještě nenastaveno)
+    if (_store.getItem('sinator_adult_content') === null) _store.setItem('sinator_adult_content', 'true');
     let adultContent = _store.getItem('sinator_adult_content') === 'true';
     let _aiAbortController = null;
     const TRAKT_CLIENT_ID = 'ba089b58552ecc359dbdda94b7dbfc298456679d181a6ed900ad192e3aad8a48';
@@ -3246,6 +3248,7 @@
     function tmdbAdult() { return adultContent ? '&include_adult=true' : '&include_adult=false'; }
 
     function toggleAdultContent() {
+        if (localStorage.getItem('sinator_admin_mode') !== '1') return;
         adultContent = !adultContent;
         _store.setItem('sinator_adult_content', adultContent ? 'true' : 'false');
         updateAdultToggleUI();
@@ -3256,6 +3259,7 @@
         const knob = $('adultToggleKnob');
         const label = $('adultToggleLabel');
         if (!toggle) return;
+        const isAdmin = localStorage.getItem('sinator_admin_mode') === '1';
         if (adultContent) {
             toggle.style.background = 'var(--accent)';
             knob.style.left = '22px';
@@ -3265,7 +3269,12 @@
             knob.style.left = '2px';
             label.textContent = 'Vypnuto';
         }
+        // Disabled stav bez admina
+        toggle.style.opacity = isAdmin ? '1' : '0.4';
+        toggle.style.cursor = isAdmin ? 'pointer' : 'not-allowed';
+        toggle.title = isAdmin ? '' : 'Vyžaduje admin přístup';
     }
+    window.updateAdultToggleUI = updateAdultToggleUI;
 
     function toggleApiKeyVisibility() { const input = $('tmdbApiKeyInput'); if (input) input.type = input.type === 'password' ? 'text' : 'password'; }
     function toggleGeminiKeyVisibility() { const input = $('geminiApiKeyInput'); if (input) input.type = input.type === 'password' ? 'text' : 'password'; }
@@ -20685,6 +20694,8 @@ function updateAdminStatus() {
   document.querySelectorAll('.show-key-btn').forEach(btn => {
     btn.style.display = active ? 'inline-block' : 'none';
   });
+  // Adult toggle – disabled bez admina
+  if (typeof updateAdultToggleUI === 'function') updateAdultToggleUI();
 }
 
 // Init admin status on settings open
