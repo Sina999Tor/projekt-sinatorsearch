@@ -20197,6 +20197,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.logoutApp = function() {
         if (!confirm('Odhlásit se? Aplikace bude znovu vyžadovat heslo.')) return;
         localStorage.removeItem(_SK);
+        localStorage.setItem('sinator_adult_content', 'false');
         window.location.reload();
     };
 
