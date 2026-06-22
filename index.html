@@ -1989,7 +1989,7 @@
     let omdbApiKey = _store.getItem('sinator_omdb_api_key') || '';
     window._store = _store; // expose for external functions
     // Default: zapnuto (pokud ještě nenastaveno)
-    if (_store.getItem('sinator_adult_content') === null) _store.setItem('sinator_adult_content', 'true');
+    if (_store.getItem('sinator_adult_content') === null) _store.setItem('sinator_adult_content', 'false');
     let adultContent = _store.getItem('sinator_adult_content') === 'true';
     let _aiAbortController = null;
     const TRAKT_CLIENT_ID = 'ba089b58552ecc359dbdda94b7dbfc298456679d181a6ed900ad192e3aad8a48';
