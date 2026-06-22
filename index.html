@@ -20141,6 +20141,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (el) el.classList.add('hidden');
         document.body.classList.remove('app-locked');
         localStorage.setItem(_SK, '1');
+        // Po odemčení synchronizuj adultContent proměnnou z localStorage (mohlo být resetováno při zamčení)
+        adultContent = localStorage.getItem('sinator_adult_content') === 'true';
+        if (typeof updateAdultToggleUI === 'function') updateAdultToggleUI();
     }
 
     function _showLock() {
@@ -20148,6 +20151,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (el) el.classList.remove('hidden');
         document.body.classList.add('app-locked');
         localStorage.removeItem(_SK);
+        localStorage.setItem('sinator_adult_content', 'false');
     }
 
     window.checkLockPassword = async function() {
