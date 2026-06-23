@@ -21797,7 +21797,7 @@ async function _zabavaAiCall(prompt) {
   let _activeGenre = null;
   let _allGenres = {};
 
-  const TMDB_KEY = () => window._store?.getItem('sinator_tmdb_key') || window._tmdbKey || '';
+  const TMDB_KEY = () => window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
 
   function getDateRange() {
     const to = new Date();
