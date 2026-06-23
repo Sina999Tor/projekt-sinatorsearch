@@ -9925,6 +9925,10 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             <span style="font-size:1.6rem;">👥</span>
             <div><div style="font-weight:700;color:#facc15;">Koukat s...</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">AI tipy podle toho, s kým díváš</div></div>
         </button>
+        <button onclick="closeZabavaModal();openUzByloVKineModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎟️</span>
+            <div><div style="font-weight:700;color:#c084fc;">Již bylo v kině</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmy z kin za posledních 6 měsíců</div></div>
+        </button>
     </div>
 </div>
 
@@ -9972,6 +9976,28 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             </button>
         </div>
         <div id="koukatSResult" style="display:none;"></div>
+    </div>
+</div>
+
+<!-- JIŽ BYLO V KINĚ MODAL -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" id="uzByloVKineModal" onclick="if(event.target===this)closeUzByloVKineModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">🎟️ Již bylo v kině</h3>
+        <button onclick="closeUzByloVKineModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;">
+        <p style="color:#888;font-size:0.85rem;margin-bottom:14px;text-align:center;">Filmy uvedené v českých kinech za posledních 6 měsíců</p>
+        <!-- Filtry žánrů -->
+        <div id="uzByloGenreFilters" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;justify-content:center;"></div>
+        <!-- Výsledky -->
+        <div id="uzByloVKineResult" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;"></div>
+        <div id="uzByloVKineLoader" style="display:none;text-align:center;padding:30px;color:#888;">
+            <div style="font-size:1.5rem;margin-bottom:8px;">⏳</div>Načítám…
+        </div>
+        <div id="uzByloVKineError" style="display:none;color:#f87171;text-align:center;padding:20px;font-size:0.9rem;"></div>
+        <div id="uzByloVKineLoadMore" style="display:none;text-align:center;margin-top:16px;">
+            <button onclick="uzByloLoadMore()" style="background:#1e293b;border:1px solid #334155;color:#c084fc;padding:10px 28px;border-radius:20px;cursor:pointer;font-size:0.9rem;font-weight:600;">Načíst další</button>
+        </div>
     </div>
 </div>
 
@@ -20028,7 +20054,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Hide when any fullscreen modal with its own close button is visible
         var fullscreenModalIds = [
             'nahodnyTipModal','kvizModal','zebrickyModal','upcomingModal',
-            'porovnaniModal','moodModal','myStatsModal','tentodenModal','koukatSModal',
+            'porovnaniModal','moodModal','myStatsModal','tentodenModal','koukatSModal','uzByloVKineModal',
             'tvRadioModal','zabavaModal','listsModal','musicModal',
             'slozkyModal','slozkyPickerModal','doporucujiOverlay','addDoporuceniOverlay',
             'settingsModal'
@@ -21764,6 +21790,155 @@ async function _zabavaAiCall(prompt) {
   throw new Error('Žádný AI klíč nebo selhání.');
 }
 
+// ===== JIŽ BYLO V KINĚ =====
+(function() {
+  let _page = 1;
+  let _totalPages = 1;
+  let _activeGenre = null;
+  let _allGenres = {};
+
+  const TMDB_KEY = () => window._store?.getItem('sinator_tmdb_key') || window._tmdbKey || '';
+
+  function getDateRange() {
+    const to = new Date();
+    const from = new Date();
+    from.setMonth(from.getMonth() - 6);
+    const fmt = d => d.toISOString().split('T')[0];
+    return { from: fmt(from), to: fmt(to) };
+  }
+
+  async function fetchPage(page, genreId) {
+    const key = TMDB_KEY();
+    if (!key) throw new Error('Chybí TMDB API klíč.');
+    const { from, to } = getDateRange();
+    const genreParam = genreId ? `&with_genres=${genreId}` : '';
+    const url = `https://api.themoviedb.org/3/discover/movie?api_key=${key}&language=cs-CZ&region=CZ&release_date.gte=${from}&release_date.lte=${to}&with_release_type=3|2&sort_by=release_date.desc&page=${page}${genreParam}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Chyba TMDB API.');
+    return res.json();
+  }
+
+  async function fetchGenres() {
+    const key = TMDB_KEY();
+    if (!key) return {};
+    const res = await fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${key}&language=cs-CZ`);
+    if (!res.ok) return {};
+    const d = await res.json();
+    const map = {};
+    (d.genres || []).forEach(g => { map[g.id] = g.name; });
+    return map;
+  }
+
+  function renderCard(m) {
+    const img = m.poster_path
+      ? `<img src="https://image.tmdb.org/t/p/w300${m.poster_path}" style="width:100%;height:195px;object-fit:cover;border-radius:10px 10px 0 0;" loading="lazy">`
+      : `<div style="width:100%;height:195px;background:#1e293b;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem;">🎬</div>`;
+    const year = m.release_date ? m.release_date.slice(0,4) : '';
+    const rating = m.vote_average ? `⭐ ${m.vote_average.toFixed(1)}` : '';
+    return `<div onclick="closeUzByloVKineModalFull();openDetail(${m.id},'movie')" style="background:#111827;border-radius:10px;border:1px solid #1e293b;cursor:pointer;overflow:hidden;transition:transform 0.15s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+      ${img}
+      <div style="padding:8px;">
+        <div style="font-size:0.8rem;font-weight:700;color:#e2e8f0;line-height:1.3;margin-bottom:4px;">${m.title}</div>
+        <div style="font-size:0.72rem;color:#94a3b8;">${year}${rating ? ' · ' + rating : ''}</div>
+      </div>
+    </div>`;
+  }
+
+  function renderGenreFilters(genreIds) {
+    const el = document.getElementById('uzByloGenreFilters');
+    if (!el) return;
+    const unique = [...new Set(genreIds)].slice(0, 12);
+    let html = `<button onclick="uzByloFilterGenre(null)" style="padding:5px 14px;border-radius:20px;border:1px solid ${_activeGenre===null?'#c084fc':'#334155'};background:${_activeGenre===null?'rgba(192,132,252,0.15)':'#111827'};color:${_activeGenre===null?'#c084fc':'#94a3b8'};font-size:0.78rem;cursor:pointer;">Vše</button>`;
+    unique.forEach(id => {
+      const name = _allGenres[id] || id;
+      const active = _activeGenre === id;
+      html += `<button onclick="uzByloFilterGenre(${id})" style="padding:5px 14px;border-radius:20px;border:1px solid ${active?'#c084fc':'#334155'};background:${active?'rgba(192,132,252,0.15)':'#111827'};color:${active?'#c084fc':'#94a3b8'};font-size:0.78rem;cursor:pointer;">${name}</button>`;
+    });
+    el.innerHTML = html;
+  }
+
+  async function loadMovies(page, append) {
+    const res = document.getElementById('uzByloVKineResult');
+    const loader = document.getElementById('uzByloVKineLoader');
+    const errEl = document.getElementById('uzByloVKineError');
+    const loadMoreBtn = document.getElementById('uzByloVKineLoadMore');
+    if (!res) return;
+    errEl.style.display = 'none';
+    loader.style.display = 'block';
+    loadMoreBtn.style.display = 'none';
+    try {
+      const data = await fetchPage(page, _activeGenre);
+      _totalPages = data.total_pages || 1;
+      if (!append) {
+        res.innerHTML = '';
+        // Collect genre IDs for filters
+        const genreIds = [];
+        (data.results || []).forEach(m => (m.genre_ids || []).forEach(g => genreIds.push(g)));
+        if (Object.keys(_allGenres).length === 0) {
+          _allGenres = await fetchGenres();
+        }
+        // get unique genre ids from all results for filters
+        const allGids = [];
+        (data.results || []).forEach(m => (m.genre_ids || []).forEach(g => allGids.push(g)));
+        renderGenreFilters(allGids);
+      }
+      const html = (data.results || []).map(renderCard).join('');
+      if (append) res.innerHTML += html;
+      else res.innerHTML = html;
+      if (_page < _totalPages) loadMoreBtn.style.display = 'block';
+    } catch(e) {
+      errEl.textContent = e.message || 'Chyba načítání.';
+      errEl.style.display = 'block';
+    } finally {
+      loader.style.display = 'none';
+    }
+  }
+
+  window.openUzByloVKineModal = function() {
+    const m = document.getElementById('uzByloVKineModal');
+    if (!m) return;
+    m.style.display = 'flex';
+    _page = 1; _activeGenre = null;
+    document.getElementById('uzByloVKineResult').innerHTML = '';
+    document.getElementById('uzByloGenreFilters').innerHTML = '';
+    loadMovies(1, false);
+    if (window.updatePwaBtn) updatePwaBtn();
+  };
+
+  window.closeUzByloVKineModal = function() {
+    const m = document.getElementById('uzByloVKineModal');
+    if (m) m.style.display = 'none';
+    if (window._returnToZabava) _returnToZabava();
+  };
+
+  window.closeUzByloVKineModalFull = function() {
+    const m = document.getElementById('uzByloVKineModal');
+    if (m) m.style.display = 'none';
+  };
+
+  window.uzByloFilterGenre = function(genreId) {
+    _activeGenre = genreId;
+    _page = 1;
+    // re-render filter buttons
+    const el = document.getElementById('uzByloGenreFilters');
+    if (el) {
+      el.querySelectorAll('button').forEach(btn => {
+        const btnGenre = btn.getAttribute('onclick').includes('null') ? null : parseInt(btn.getAttribute('onclick').match(/\d+/)?.[0]);
+        const active = btnGenre === _activeGenre;
+        btn.style.borderColor = active ? '#c084fc' : '#334155';
+        btn.style.background = active ? 'rgba(192,132,252,0.15)' : '#111827';
+        btn.style.color = active ? '#c084fc' : '#94a3b8';
+      });
+    }
+    loadMovies(1, false);
+  };
+
+  window.uzByloLoadMore = function() {
+    _page++;
+    loadMovies(_page, true);
+  };
+})();
+
 // Register modal close keys
 (function() {
   const orig = window._modalCloseMap || {};
@@ -21776,6 +21951,7 @@ async function _zabavaAiCall(prompt) {
   orig['koukatSModal'] = function() { if(typeof closeKoukatSModal==='function') closeKoukatSModal(); };
   orig['myStatsModal'] = function() { if(typeof closeMyStatsModal==='function') closeMyStatsModal(); };
   orig['tentodenModal'] = function() { if(typeof closeTentodenModal==='function') closeTentodenModal(); };
+  orig['uzByloVKineModal'] = function() { if(typeof closeUzByloVKineModal==='function') closeUzByloVKineModal(); };
   window._modalCloseMap = orig;
 })();
 </script>
