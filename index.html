@@ -2887,7 +2887,7 @@
 
                 <!-- Akční tlačítka — grid jako v TMDB detailu -->
                 <div class="action-buttons" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:14px 0;">
-                    <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1;font-size:0.92rem;padding:12px;" onclick="window.open('https://www.hellspy.to/?query='+encodeURIComponent('${safeT}'),'_blank')">▶️ Přehrát (Hellspy)</button>
+                    <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1;font-size:0.92rem;padding:12px;" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeT}'))">▶️ Přehrát (Hellspy)</button>
                     <button class="action-btn-modal" style="grid-column:1/-1;" onclick="openSourcesModal('${safeT}','${year}','${type}','${safeT}')">🔗 Kde sledovat</button>
                     <a href="https://www.imdb.com/title/${imdbId}/" target="_blank" class="action-btn-modal imdb" style="text-decoration:none;text-align:center;">🎬 IMDb</a>
                     <button class="action-btn-modal csfd" onclick="openCsfd('${safeT}',${year||0})">🎬 ČSFD</button>
@@ -3096,10 +3096,26 @@
             'mrkaj': `https://mrkaj.me/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}?t=${state.currentSearchType==='tv'?'s':'m'}`,
             'mrkni': `https://mrkni.tv/vyhledavani/?q=${encodeURIComponent(state.currentSearchTitle||'')}`
         };
-        if(urls[source]) {
+        if(source === 'hellspy') {
+            window.openHellspy(urls['hellspy']);
+        } else if(urls[source]) {
             window.open(urls[source], '_blank');
         }
     }
+
+    // ✅ FIX: Hellspy cold-start race condition — otevře blob redirect stránku
+    window.openHellspy = function(targetUrl) {
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Přesměrování...</title>
+<script>
+setTimeout(function(){ window.location.replace(${JSON.stringify(targetUrl)}); }, 300);
+<\/script>
+</head><body style="background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+<p>⏳ Přesměrování na Hellspy...</p></body></html>`;
+        const blob = new Blob([html], {type: 'text/html'});
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+    };
 
     // ✅ FUNKCE PRO ZKOPIROVÁNÍ NÁZVU DO SCHRÁNKY
     async function copyTitleToClipboard() {
@@ -7071,7 +7087,7 @@ EXAMPLES:
                             <button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${safeSeriesTitle}')">📊 Trakt</button>
                         </div>
                         <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${tvId},type:'tv',title:'${safeSeriesTitle}',year:'',poster:series?.poster_path||''})">📁 Složky</button>
-                        <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.open('https://www.hellspy.to/?query='+encodeURIComponent('${safeSeriesTitle} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}'),'_blank')">▶️ Přehrát</button>
+                        <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeSeriesTitle} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}'))">▶️ Přehrát</button>
                     </div>
                 </div></div>`;
         } catch(e) { console.error(e); $('modalScrollBody').innerHTML = `<div class="empty">Chyba načtení epizody: ${e.message}</div>`; }
@@ -7203,7 +7219,7 @@ ${collectionBtn}
 <button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${safeTitle}')">📊 Trakt hledat</button>
 </div>
 <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}',rating:${rating}})">📁 Složky</button>
-<button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.open('https://www.hellspy.to/?query='+encodeURIComponent('${safeTitle}'),'_blank')">▶️ Přehrát</button>
+<button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeTitle}'))">▶️ Přehrát</button>
 <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);grid-column:1/-1" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">📋 Trakt ▾</button>
 <div class="action-buttons" style="display:none;margin-top:4px;">
 <button class="action-btn-modal" onclick="toggleTraktWatchlist(${id},'${type}',this)" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">🔖 Watchlist</button>
