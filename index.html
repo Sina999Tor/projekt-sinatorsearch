@@ -3103,18 +3103,9 @@
         }
     }
 
-    // ✅ FIX: Hellspy cold-start race condition — otevře blob redirect stránku
+    // Hellspy — přímé otevření
     window.openHellspy = function(targetUrl) {
-        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>Přesměrování...</title>
-<script>
-setTimeout(function(){ window.location.replace(${JSON.stringify(targetUrl)}); }, 300);
-<\/script>
-</head><body style="background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-<p>⏳ Přesměrování na Hellspy...</p></body></html>`;
-        const blob = new Blob([html], {type: 'text/html'});
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
+        window.open(targetUrl, '_blank');
     };
 
     // ✅ FUNKCE PRO ZKOPIROVÁNÍ NÁZVU DO SCHRÁNKY
