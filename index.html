@@ -5801,7 +5801,7 @@ EXAMPLES:
         let url = '';
         if (state.view === 'movies') url = `${BASE}/movie/popular?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${state.page}`;
         else if (state.view === 'tv') url = `${BASE}/tv/popular?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${state.page}`;
-        else if (state.view === 'miniseries') url = `${BASE}/discover/tv?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_type=2&sort_by=popularity.desc&vote_count.gte=10&page=${state.page}`;
+        else if (state.view === 'miniseries') url = `${BASE}/discover/tv?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_type=2&sort_by=popularity.desc&vote_count.gte=10&number_of_seasons.lte=1&number_of_episodes.lte=12&page=${state.page}`;
         else if (state.view === 'actors') url = `${BASE}/person/popular?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${state.page}`;
         // Directors: pevný seznam TMDB ID světově známých režisérů
         if (state.view === 'directors') {
@@ -5958,7 +5958,7 @@ EXAMPLES:
             } else if (state.view === 'tv') {
                 url = `${BASE}/tv/popular?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${state.page}`;
             } else if (state.view === 'miniseries') {
-                url = `${BASE}/discover/tv?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_type=2&sort_by=popularity.desc&vote_count.gte=10&page=${state.page}`;
+                url = `${BASE}/discover/tv?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_type=2&sort_by=popularity.desc&vote_count.gte=10&number_of_seasons.lte=1&number_of_episodes.lte=12&page=${state.page}`;
             }
         } else {
             if (state.view === 'movies' || state.view === 'tv' || state.view === 'miniseries') {
@@ -5973,7 +5973,7 @@ EXAMPLES:
                         .replace('original_title', 'original_name');
                 }
                 url = `${BASE}/discover/${type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${state.page}`;
-                if (state.view === 'miniseries') url += `&with_type=2`;
+                if (state.view === 'miniseries') url += `&with_type=2&number_of_seasons.lte=1&number_of_episodes.lte=12`;
                 if (genreId) url += `&with_genres=${genreId}`;
                 if (year && !isNowPlayingCZ) {
                     if (type === 'movie') url += `&primary_release_year=${year}`;
@@ -6400,8 +6400,9 @@ EXAMPLES:
         if (!trigger) {
             trigger = document.createElement('div');
             trigger.id = 'mainAzTrigger';
-            trigger.style.cssText = 'position:fixed;right:0;top:0;bottom:0;width:18px;z-index:3500;cursor:pointer;';
-            trigger.addEventListener('touchstart', () => toggleMainAzBar(true));
+            trigger.style.cssText = 'position:fixed;right:0;bottom:120px;width:28px;height:64px;z-index:3500;cursor:pointer;background:rgba(20,20,30,0.92);border-radius:10px 0 0 10px;border:1px solid rgba(255,255,255,0.15);border-right:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;box-shadow:-2px 0 10px rgba(0,0,0,0.5);';
+            trigger.innerHTML = '<span style="font-size:0.75rem;color:#1db954;line-height:1;">↑</span><span style="font-size:0.6rem;color:#888;font-weight:700;line-height:1;">A-Z</span><span style="font-size:0.75rem;color:#e50914;line-height:1;">↓</span>';
+            trigger.addEventListener('touchstart', (e) => { e.preventDefault(); toggleMainAzBar(true); });
             trigger.addEventListener('click', () => toggleMainAzBar(true));
             document.body.appendChild(trigger);
         }
@@ -6409,27 +6410,28 @@ EXAMPLES:
         if (!bar) {
             bar = document.createElement('div');
             bar.id = 'mainAzBar';
-            bar.style.cssText = 'position:fixed;right:0;top:50%;transform:translateY(-50%) translateX(100%);display:flex;flex-direction:column;gap:0;z-index:3501;background:rgba(10,10,20,0.97);border-radius:12px 0 0 12px;padding:8px 4px;border:1px solid rgba(255,255,255,0.12);border-right:none;transition:transform 0.2s ease;pointer-events:none;';
+            bar.style.cssText = 'position:fixed;right:0;bottom:90px;transform:translateX(100%);display:flex;flex-direction:column;gap:0;z-index:3501;background:rgba(10,10,20,0.97);border-radius:12px 0 0 12px;padding:6px 4px;border:1px solid rgba(255,255,255,0.12);border-right:none;transition:transform 0.2s ease;pointer-events:none;max-height:80vh;overflow-y:auto;';
             document.addEventListener('click', e => { if (!bar.contains(e.target) && e.target.id !== 'mainAzTrigger') toggleMainAzBar(false); });
             document.body.appendChild(bar);
         }
         if (!letters.length) { bar.style.transform='translateY(-50%) translateX(100%)'; bar.style.pointerEvents='none'; trigger.style.display='none'; return; }
         trigger.style.display = 'block';
-        bar.innerHTML = `<a onclick="event.preventDefault();window.scrollTo({top:0,behavior:'smooth'});toggleMainAzBar(false)" style="font-size:0.8rem;color:#1db954;text-decoration:none;padding:3px 8px;display:block;text-align:center;cursor:pointer;">↑</a>`
-            + letters.map(l => `<a onclick="event.preventDefault();scrollToMainLetter('${l}');toggleMainAzBar(false)" style="font-size:0.7rem;color:#aaa;text-decoration:none;padding:3px 8px;border-radius:5px;line-height:1.4;font-weight:700;display:block;text-align:center;min-width:28px;cursor:pointer;">${l}</a>`).join('');
+        bar.innerHTML = `<a onclick="event.preventDefault();window.scrollTo({top:0,behavior:'smooth'});toggleMainAzBar(false)" style="font-size:0.9rem;color:#1db954;text-decoration:none;padding:4px 8px;display:block;text-align:center;cursor:pointer;" title="Nahoru">↑</a>`
+            + letters.map(l => `<a onclick="event.preventDefault();scrollToMainLetter('${l}');toggleMainAzBar(false)" style="font-size:0.7rem;color:#aaa;text-decoration:none;padding:3px 8px;border-radius:5px;line-height:1.4;font-weight:700;display:block;text-align:center;min-width:28px;cursor:pointer;">${l}</a>`).join('')
+            + `<a onclick="event.preventDefault();(function(){const sc=window.scrollY;window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});setTimeout(()=>{if(Math.abs(window.scrollY-sc)<50){const ev=new Event('scroll');window.dispatchEvent(ev);}},600);})()" style="font-size:0.9rem;color:#e50914;text-decoration:none;padding:4px 8px;display:block;text-align:center;cursor:pointer;border-top:1px solid rgba(255,255,255,0.1);margin-top:2px;" title="Dolů / načíst další">↓</a>`;
     }
 
     function toggleMainAzBar(show) {
         const bar = document.getElementById('mainAzBar');
         if (!bar) return;
         if (show === undefined) show = bar.style.pointerEvents === 'none';
-        bar.style.transform = show ? 'translateY(-50%) translateX(0)' : 'translateY(-50%) translateX(100%)';
+        bar.style.transform = show ? 'translateX(0)' : 'translateX(100%)';
         bar.style.pointerEvents = show ? 'all' : 'none';
     }
 
     function hideMainAzBar() {
         const bar = document.getElementById('mainAzBar');
-        if (bar) { bar.style.transform='translateY(-50%) translateX(100%)'; bar.style.pointerEvents='none'; }
+        if (bar) { bar.style.transform='translateX(100%)'; bar.style.pointerEvents='none'; }
         const t = document.getElementById('mainAzTrigger'); if(t) t.style.display='none';
     }
 
