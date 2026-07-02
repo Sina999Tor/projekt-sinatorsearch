@@ -2286,10 +2286,21 @@
         }
         window._bootHash = null;
         // Zjistíme hash aktuálně běžící verze hned po startu (baseline pro porovnání)
-        fetch(location.origin + location.pathname + '?_boot=' + Date.now(), { cache: 'no-store' })
-            .then(r => r.text())
-            .then(t => { window._bootHash = _cyrb53(t); })
-            .catch(() => {});
+        // Uloženo jako Promise, aby checkForUpdates mohl spolehlivě počkat na výsledek
+        // (i s retry, kdyby první pokus selhal — např. kvůli Brave Shields).
+        function _fetchBootHash(attempt) {
+            return fetch(location.origin + location.pathname + '?_boot=' + Date.now(), { cache: 'no-store' })
+                .then(r => r.text())
+                .then(t => { window._bootHash = _cyrb53(t); return window._bootHash; })
+                .catch(err => {
+                    if (attempt < 3) {
+                        return new Promise(res => setTimeout(res, 800)).then(() => _fetchBootHash(attempt + 1));
+                    }
+                    console.warn('Nepodařilo se získat baseline hash pro kontrolu aktualizací:', err);
+                    return null;
+                });
+        }
+        window._bootHashPromise = _fetchBootHash(1);
 
         window._forceUpdateNow = async function() {
             try {
@@ -2313,12 +2324,26 @@
             if (btn) { btn.disabled = true; btn.textContent = '🔄 Kontroluji…'; }
             if (statusEl) statusEl.innerHTML = '';
             try {
+                // Počkej na baseline hash (max ~3s), ať check neproběhne s null hodnotou
+                let bootHash = window._bootHash;
+                if (!bootHash) {
+                    bootHash = await Promise.race([
+                        window._bootHashPromise,
+                        new Promise(res => setTimeout(() => res(null), 3000))
+                    ]);
+                }
+                if (!bootHash) {
+                    if (statusEl) statusEl.innerHTML = '<span style="color:#e50914;">⚠️ Nepodařilo se zjistit aktuální verzi, zkus to znovu</span>';
+                    if (typeof _favToast === 'function') _favToast('⚠️ Nepodařilo se zjistit aktuální verzi, zkus to znovu');
+                    if (btn) { btn.disabled = false; btn.textContent = '🔄 Zkontrolovat aktualizace'; }
+                    return;
+                }
                 const url = location.origin + location.pathname + '?_chk=' + Date.now();
                 const res = await fetch(url, { cache: 'no-store' });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const text = await res.text();
                 const newHash = _cyrb53(text);
-                if (window._bootHash && newHash !== window._bootHash) {
+                if (newHash !== bootHash) {
                     if (statusEl) statusEl.innerHTML = '<span style="color:#22c55e;">🆕 Nalezena nová verze — aktualizuji…</span>';
                     if (typeof _favToast === 'function') _favToast('🆕 Nová verze nalezena, aktualizuji…');
                     await window._forceUpdateNow();
