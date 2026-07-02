@@ -1000,7 +1000,7 @@
             <span id="onlineBadge" style="display:none;position:absolute;top:2px;right:2px;background:#22c55e;color:#000;font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;line-height:14px;min-width:16px;text-align:center;pointer-events:none;">0</span>
         </button>
         <button class="action-btn icon" id="btnToggleToolbar" onclick="toggleToolbar()" title="Schovat tlačítka">▲</button>
-        <button class="action-btn icon" id="btnToggleToolbar2" onclick="_expandToolbar()" title="Rozbalit" style="display:none">▼</button>
+        <button class="action-btn icon" id="btnToggleToolbar2" onclick="_expandToolbar()" title="Rozbalit">▼</button>
     </div>
 </header>
 
@@ -9470,20 +9470,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     document.addEventListener('DOMContentLoaded', () => { updateWatchedCount(); if(state.trakt.accessToken) { setTimeout(syncWatchedFromTrakt, 3000); syncMdblistFromTrakt(); } updateMdblistStatus(); });
 
     function toggleToolbar() {
-        const ha = document.querySelector('.header-actions');
-        const logo = document.getElementById('logoContainer');
-        const btn1 = document.getElementById('btnToggleToolbar');   // "schovat dál" šipka
-        const btn2 = document.getElementById('btnToggleToolbar2');  // "rozbalit" šipka
         const state = parseInt(_store.getItem('sinator_toolbar_state') || '0');
-        // Zjistíme, které tlačítko bylo zmáčknuto – btn2 vždy rozbaluje (→ stav 0)
-        // btn1 vždy schovává dál (0→1, 1→2)
-        // Ale obě volají toggleToolbar(), takže rozlišíme podle stavu:
-        // Ze stavu 2 (vše skryto) → jediné viditelné je btn2 → jít na 0
-        // Ze stavu 1 → btn1 jde na 2, btn2 jde na 0 → ale obě volají stejnou fci
-        // Řešení: btn1 = cyklí dopředu (0→1→2), btn2 = vždy na 0
-        // Přiřadíme btn1 onclick=collapseMore, btn2 onclick=expandAll
-        // Ale teď jsou obě na toggleToolbar – opravíme to inline
-        const newState = (state === 0) ? 1 : (state === 1) ? 2 : 0;
+        const newState = Math.min(state + 1, 2);
         _applyToolbarState(newState);
     }
 
@@ -9494,22 +9482,24 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         const btn2 = document.getElementById('btnToggleToolbar2');
         if (!ha) return;
         ha.classList.remove('collapsed', 'collapsed2');
+        if (btn1) { btn1.style.display = ''; btn1.textContent = '▲'; }
+        if (btn2) { btn2.style.display = ''; btn2.textContent = '▼'; }
         if (newState === 0) {
-            // Plně rozbaleno: logo + vše + btn1(▲=schovat), btn2 skryt
-            if (btn1) { btn1.textContent = '▲'; btn1.title = 'Schovat tlačítka'; btn1.style.display = ''; }
-            if (btn2) btn2.style.display = 'none';
+            // Plně rozbaleno: logo + vše + obě šipky (▲ schovat, ▼ neaktivní)
+            if (btn1) { btn1.title = 'Schovat tlačítka'; btn1.style.opacity = ''; }
+            if (btn2) { btn2.title = 'Rozbalit'; btn2.style.opacity = '0.4'; }
             if (logo) { logo.classList.remove('hidden'); logo.classList.remove('logo-mini'); }
         } else if (newState === 1) {
-            // Částečně: logo + HLEDAT + FILTRY + btn1(▲=schovat vše) + btn2(▼=rozbalit)
+            // Částečně: logo + HLEDAT + FILTRY + obě šipky aktivní
             ha.classList.add('collapsed');
-            if (btn1) { btn1.textContent = '▲'; btn1.title = 'Schovat vše'; btn1.style.display = ''; }
-            if (btn2) { btn2.textContent = '▼'; btn2.title = 'Rozbalit vše'; btn2.style.display = ''; }
+            if (btn1) { btn1.title = 'Schovat vše'; btn1.style.opacity = ''; }
+            if (btn2) { btn2.title = 'Rozbalit vše'; btn2.style.opacity = ''; }
             if (logo) { logo.classList.remove('hidden'); logo.classList.remove('logo-mini'); }
         } else {
-            // Plně skryto: jen btn2(▼=rozbalit), btn1 skryt, logo malé vlevo
+            // Plně skryto: logo malé vlevo, ▲ neaktivní, ▼ rozbalit
             ha.classList.add('collapsed2');
-            if (btn1) btn1.style.display = 'none';
-            if (btn2) { btn2.textContent = '▼'; btn2.title = 'Rozbalit'; btn2.style.display = ''; }
+            if (btn1) { btn1.title = 'Schovat'; btn1.style.opacity = '0.4'; }
+            if (btn2) { btn2.title = 'Rozbalit'; btn2.style.opacity = ''; }
             if (logo) { logo.classList.remove('hidden'); logo.classList.add('logo-mini'); }
         }
         _store.setItem('sinator_toolbar_state', String(newState));
@@ -9520,7 +9510,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     // btn2 vždy rozbaluje do stavu 0 nebo 1 (zpět)
     function _expandToolbar() {
         const state = parseInt(_store.getItem('sinator_toolbar_state') || '0');
-        _applyToolbarState(state === 2 ? 1 : 0);
+        _applyToolbarState(Math.max(state - 1, 0));
     }
 
     // Obnovit stav toolbaru
