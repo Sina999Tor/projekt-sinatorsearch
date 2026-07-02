@@ -1572,6 +1572,16 @@
                 </div>
             </div>
             <div class="settings-divider"></div>
+            <!-- 🔄 Kontrola aktualizací -->
+            <div class="settings-section" style="background:rgba(29,185,84,0.07);border:1px solid rgba(29,185,84,0.25);border-radius:12px;padding:14px 16px;">
+                <span class="settings-label" style="color:#1db954;">🔄 Aktualizace aplikace</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;line-height:1.5;">
+                    Po nahrání nové verze na server appka někdy sama nepozná změnu. Klikni sem pro kontrolu a okamžitou aktualizaci.
+                </div>
+                <button class="settings-btn-small" id="checkUpdatesBtn" onclick="checkForUpdates()" style="width:100%;background:rgba(29,185,84,0.2);border:1px solid rgba(29,185,84,0.4);color:#1db954;font-weight:600;padding:10px;">🔄 Zkontrolovat aktualizace</button>
+                <div style="font-size:0.75rem;margin-top:8px;" id="checkUpdatesStatus"></div>
+            </div>
+            <div class="settings-divider"></div>
             <div class="settings-section">
                 <span class="settings-label">TMDB API Klíč</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">
@@ -2260,6 +2270,69 @@
                 .then(reg => console.log('SW registrován:', reg.scope))
                 .catch(err => console.log('SW registrace selhala:', err));
         }
+
+        // ── Kontrola aktualizací ─────────────────────────────────────
+        // Lehký nekryptografický hash (cyrb53) pro porovnání obsahu souboru
+        function _cyrb53(str) {
+            let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+            for (let i = 0; i < str.length; i++) {
+                const ch = str.charCodeAt(i);
+                h1 = Math.imul(h1 ^ ch, 2654435761);
+                h2 = Math.imul(h2 ^ ch, 1597334677);
+            }
+            h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+            h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+            return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
+        }
+        window._bootHash = null;
+        // Zjistíme hash aktuálně běžící verze hned po startu (baseline pro porovnání)
+        fetch(location.origin + location.pathname + '?_boot=' + Date.now(), { cache: 'no-store' })
+            .then(r => r.text())
+            .then(t => { window._bootHash = _cyrb53(t); })
+            .catch(() => {});
+
+        window._forceUpdateNow = async function() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (const reg of regs) await reg.unregister();
+                }
+                if (window.caches) {
+                    const keys = await caches.keys();
+                    await Promise.all(keys.map(k => caches.delete(k)));
+                }
+            } catch (err) { /* ignore */ }
+            setTimeout(() => {
+                location.href = location.origin + location.pathname + '?_v=' + Date.now();
+            }, 500);
+        };
+
+        window.checkForUpdates = async function() {
+            const btn = document.getElementById('checkUpdatesBtn');
+            const statusEl = document.getElementById('checkUpdatesStatus');
+            if (btn) { btn.disabled = true; btn.textContent = '🔄 Kontroluji…'; }
+            if (statusEl) statusEl.innerHTML = '';
+            try {
+                const url = location.origin + location.pathname + '?_chk=' + Date.now();
+                const res = await fetch(url, { cache: 'no-store' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const text = await res.text();
+                const newHash = _cyrb53(text);
+                if (window._bootHash && newHash !== window._bootHash) {
+                    if (statusEl) statusEl.innerHTML = '<span style="color:#22c55e;">🆕 Nalezena nová verze — aktualizuji…</span>';
+                    if (typeof _favToast === 'function') _favToast('🆕 Nová verze nalezena, aktualizuji…');
+                    await window._forceUpdateNow();
+                } else {
+                    if (statusEl) statusEl.innerHTML = '<span style="color:#888;">✅ Používáš nejnovější verzi</span>';
+                    if (typeof _favToast === 'function') _favToast('✅ Používáš nejnovější verzi');
+                    if (btn) { btn.disabled = false; btn.textContent = '🔄 Zkontrolovat aktualizace'; }
+                }
+            } catch (err) {
+                if (statusEl) statusEl.innerHTML = '<span style="color:#e50914;">⚠️ Kontrolu se nepodařilo provést</span>';
+                if (typeof _favToast === 'function') _favToast('⚠️ Kontrolu se nepodařilo provést');
+                if (btn) { btn.disabled = false; btn.textContent = '🔄 Zkontrolovat aktualizace'; }
+            }
+        };
 
         // Poslech na beforeinstallprompt pro zobrazení instalačního tlačítka
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -6878,6 +6951,21 @@ EXAMPLES:
         $('traktResultsContainer').innerHTML = count + grid;
     }
 
+    function _favToast(msg) {
+        try {
+            let t = document.getElementById('favToastEl');
+            if (!t) {
+                t = document.createElement('div');
+                t.id = 'favToastEl';
+                document.body.appendChild(t);
+            }
+            t.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:12px 22px;border-radius:24px;font-size:0.9rem;font-weight:600;z-index:2147483647;pointer-events:none;transition:opacity 0.25s ease;border:1px solid #444;box-shadow:0 4px 20px rgba(0,0,0,0.6);opacity:1;';
+            t.textContent = msg;
+            clearTimeout(t._hideTimer);
+            t._hideTimer = setTimeout(() => { t.style.opacity = '0'; }, 1800);
+        } catch (err) { /* no-op */ }
+    }
+
     function toggleFav(id, title, year, rating, type, poster, e) {
         e?.stopPropagation();
         const idx = state.favs.findIndex(f => Number(f.id) === Number(id));
@@ -6885,7 +6973,7 @@ EXAMPLES:
         if (idx > -1) state.favs.splice(idx, 1); else state.favs.unshift({ id, title, year, rating, type, poster });
         _store.setItem('sinator_favs', JSON.stringify(state.favs)); updateFavBadge();
         if (e?.target) { e.target.textContent = state.favs.some(f => Number(f.id) === Number(id)) ? '❤️' : '🤍'; e.target.classList.toggle('liked'); }
-        if(typeof showToast==='function') showToast(nowLiked ? `❤️ Přidáno do oblíbených` : `💔 Odebráno z oblíbených`);
+        _favToast(nowLiked ? '❤️ Přidáno do oblíbených' : '💔 Odebráno z oblíbených');
         renderFavsModal();
     }
 
@@ -6896,7 +6984,7 @@ EXAMPLES:
         if (idx > -1) state.actorFavs.splice(idx, 1); else state.actorFavs.unshift({ id, name, poster });
         _store.setItem('sinator_actor_favs', JSON.stringify(state.actorFavs)); updateFavBadge();
         if (e?.target) { e.target.textContent = state.actorFavs.some(f => Number(f.id) === Number(id)) ? '❤️' : '🤍'; e.target.classList.toggle('liked'); }
-        if(typeof showToast==='function') showToast(nowLiked ? `❤️ Přidáno do oblíbených` : `💔 Odebráno z oblíbených`);
+        _favToast(nowLiked ? '❤️ Přidáno do oblíbených' : '💔 Odebráno z oblíbených');
         renderFavsModal();
     }
 
@@ -6904,8 +6992,8 @@ EXAMPLES:
         const favs = isActor ? state.actorFavs : state.favs;
         const idx = favs.findIndex(f => Number(f.id) === Number(id));
         const btn = document.querySelector('.modal-fav-btn');
-        if (idx > -1) { favs.splice(idx, 1); if (btn) { btn.textContent = '🤍'; btn.classList.remove('liked'); btn.style.animation = 'none'; } if(typeof showToast==='function') showToast(`💔 Odebráno z oblíbených`); }
-        else { const item = isActor ? { id, name: title, poster } : { id, title, year, rating: 0, type, poster }; favs.unshift(item); if (btn) { btn.textContent = '❤️'; btn.classList.add('liked'); btn.style.animation = 'pulse 0.3s ease-in-out'; } if(typeof showToast==='function') showToast(`❤️ Přidáno do oblíbených`); }
+        if (idx > -1) { favs.splice(idx, 1); if (btn) { btn.textContent = '🤍'; btn.classList.remove('liked'); btn.style.animation = 'none'; } _favToast('💔 Odebráno z oblíbených'); }
+        else { const item = isActor ? { id, name: title, poster } : { id, title, year, rating: 0, type, poster }; favs.unshift(item); if (btn) { btn.textContent = '❤️'; btn.classList.add('liked'); btn.style.animation = 'pulse 0.3s ease-in-out'; } _favToast('❤️ Přidáno do oblíbených'); }
         if (isActor) _store.setItem('sinator_actor_favs', JSON.stringify(state.actorFavs));
         else _store.setItem('sinator_favs', JSON.stringify(state.favs));
         updateFavBadge();
