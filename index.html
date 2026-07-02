@@ -3239,7 +3239,7 @@
             // Hellspy: /?query={název}
             'hellspy': `https://www.hellspy.to/?query=${title}`,
             // Ostatní: standardní query parametry
-            'sledujteto': (()=>{ const s=title.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z','à':'a','â':'a','ä':'a','ô':'o','ö':'o','ü':'u'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); return `https://old.sledujteto.cz/vyhledat/${slug}.html`; })(),
+            'sledujteto': (()=>{ const s=(state.currentSearchTitle||'').toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z','à':'a','â':'a','ä':'a','ô':'o','ö':'o','ü':'u'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); return `https://old.sledujteto.cz/vyhledat/${slug}.html`; })(),
             'fastshare': `https://fastshare.cloud/search?q=${title}`,
             'sledujfilmy': `https://ww.sledujfilmy.io/?s=${title}`,
             'dokufilmy': `https://dokufilmy.cz/?s=${title}`,
