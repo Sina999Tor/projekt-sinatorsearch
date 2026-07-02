@@ -6881,18 +6881,22 @@ EXAMPLES:
     function toggleFav(id, title, year, rating, type, poster, e) {
         e?.stopPropagation();
         const idx = state.favs.findIndex(f => Number(f.id) === Number(id));
+        const nowLiked = idx === -1;
         if (idx > -1) state.favs.splice(idx, 1); else state.favs.unshift({ id, title, year, rating, type, poster });
         _store.setItem('sinator_favs', JSON.stringify(state.favs)); updateFavBadge();
         if (e?.target) { e.target.textContent = state.favs.some(f => Number(f.id) === Number(id)) ? '❤️' : '🤍'; e.target.classList.toggle('liked'); }
+        if(typeof showToast==='function') showToast(nowLiked ? `❤️ Přidáno do oblíbených` : `💔 Odebráno z oblíbených`);
         renderFavsModal();
     }
 
     function toggleActorFav(id, name, poster, e) {
         e?.stopPropagation();
         const idx = state.actorFavs.findIndex(f => Number(f.id) === Number(id));
+        const nowLiked = idx === -1;
         if (idx > -1) state.actorFavs.splice(idx, 1); else state.actorFavs.unshift({ id, name, poster });
         _store.setItem('sinator_actor_favs', JSON.stringify(state.actorFavs)); updateFavBadge();
         if (e?.target) { e.target.textContent = state.actorFavs.some(f => Number(f.id) === Number(id)) ? '❤️' : '🤍'; e.target.classList.toggle('liked'); }
+        if(typeof showToast==='function') showToast(nowLiked ? `❤️ Přidáno do oblíbených` : `💔 Odebráno z oblíbených`);
         renderFavsModal();
     }
 
@@ -6900,8 +6904,8 @@ EXAMPLES:
         const favs = isActor ? state.actorFavs : state.favs;
         const idx = favs.findIndex(f => Number(f.id) === Number(id));
         const btn = document.querySelector('.modal-fav-btn');
-        if (idx > -1) { favs.splice(idx, 1); if (btn) { btn.textContent = '🤍'; btn.classList.remove('liked'); btn.style.animation = 'none'; } }
-        else { const item = isActor ? { id, name: title, poster } : { id, title, year, rating: 0, type, poster }; favs.unshift(item); if (btn) { btn.textContent = '❤️'; btn.classList.add('liked'); btn.style.animation = 'pulse 0.3s ease-in-out'; } }
+        if (idx > -1) { favs.splice(idx, 1); if (btn) { btn.textContent = '🤍'; btn.classList.remove('liked'); btn.style.animation = 'none'; } if(typeof showToast==='function') showToast(`💔 Odebráno z oblíbených`); }
+        else { const item = isActor ? { id, name: title, poster } : { id, title, year, rating: 0, type, poster }; favs.unshift(item); if (btn) { btn.textContent = '❤️'; btn.classList.add('liked'); btn.style.animation = 'pulse 0.3s ease-in-out'; } if(typeof showToast==='function') showToast(`❤️ Přidáno do oblíbených`); }
         if (isActor) _store.setItem('sinator_actor_favs', JSON.stringify(state.actorFavs));
         else _store.setItem('sinator_favs', JSON.stringify(state.favs));
         updateFavBadge();
