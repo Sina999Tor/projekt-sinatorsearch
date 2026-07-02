@@ -680,7 +680,8 @@
         .action-btn-modal.search-sources { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); }
         .action-btn-modal.search-sources:hover { box-shadow: 0 6px 16px rgba(156, 39, 176, 0.4); }
         
-        .action-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-top: 20px; }
+        .action-buttons { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 20px; }
+        .action-btn-modal { width: 100%; }
         
         .rating-display { display: flex; gap: 12px; margin: 20px 0; flex-wrap: wrap; }
         .rating-item { background: var(--bg-elevated); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
@@ -909,7 +910,7 @@
             .modal-title { font-size: 1.3rem; }
             .modal-nav-title { font-size: 0.9rem; }
             .person-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
-            .action-buttons { grid-template-columns: repeat(2, 1fr); }
+            .action-buttons { grid-template-columns: 1fr; }
             .search-overlay-inner { flex-wrap: wrap; }
             .search-overlay input { min-width: 100%; }
             .music-results { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
@@ -7386,6 +7387,7 @@ EXAMPLES:
             
             const posterPath = d.poster_path || '';
             const actionBtns = `<div class="action-buttons">
+<button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeTitle}'))">▶️ Přehrát</button>
 <button class="action-btn-modal search-sources" onclick="openSourcesModal('${safeTitle}', ${year}, '${type}', '${origTitle}')">🔍 Vyhledat zdroje</button>
 <button class="action-btn-modal youtube" onclick="openYouTube('${safeTitle}')">▶️ Trailer</button>
 <button class="action-btn-modal" onclick="showMediaGallery(${id}, '${type}', '${safeTitle}')">🖼️ Galerie</button>
@@ -7402,16 +7404,15 @@ ${collectionBtn}
 <button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${safeTitle}')">📊 Trakt hledat</button>
 </div>
 <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}',rating:${rating}})">📁 Složky</button>
-<button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeTitle}'))">▶️ Přehrát</button>
-<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);grid-column:1/-1" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">📋 Trakt ▾</button>
+<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">📋 Trakt ▾</button>
 <div class="action-buttons" style="display:none;margin-top:4px;">
 <button class="action-btn-modal" onclick="toggleTraktWatchlist(${id},'${type}',this)" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">🔖 Watchlist</button>
 <button class="action-btn-modal" onclick="openTraktListPicker(${id},'${type}')" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">📋 Do seznamu</button>
 </div>
-<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);grid-column:1/-1" onclick="showSimilarInModal(${id},'${type}',this)">🎯 Podobné tituly</button>
-<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);grid-column:1/-1" onclick="window._dPrefill={tmdbId:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}'};openAddDoporuceni()">⭐ Doporučit</button>
-${cast ? `<button class="action-btn-modal" style="grid-column:1/-1" onclick="showCastModal(${id},'${type}')">👥 Herci</button>` : ''}
-${directors.length ? `<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);grid-column:1/-1" onclick="showDirectorsModal(${id},'${type}')">🎥 Režie</button>` : ''}
+<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="showSimilarInModal(${id},'${type}',this)">🎯 Podobné tituly</button>
+<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="window._dPrefill={tmdbId:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}'};openAddDoporuceni()">⭐ Doporučit</button>
+${cast ? `<button class="action-btn-modal" onclick="showCastModal(${id},'${type}')">👥 Herci</button>` : ''}
+${directors.length ? `<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="showDirectorsModal(${id},'${type}')">🎥 Režie</button>` : ''}
 </div>`;
             $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${certChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${safeTitle}',${year},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p><div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div>${actionBtns}</div></div>`;
             
