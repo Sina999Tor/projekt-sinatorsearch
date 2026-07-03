@@ -8947,11 +8947,41 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         const wasWatched = !!state.watched[key];
         if(wasWatched) { delete state.watched[key]; }
         else { state.watched[key] = { id, type, title, year, posterPath, addedAt: Date.now() }; }
-        saveWatched();
         const nowWatched = !wasWatched;
         if(btnEl) {
             btnEl.className = 'action-btn-modal watched-btn' + (nowWatched ? ' is-watched' : '');
+            btnEl.textContent = '⏳';
+            btnEl.disabled = true;
+        }
+        // U seriálu: zaškrtnout/odškrtnout rovnou VŠECHNY epizody (lokálně i na Traktu)
+        if(type === 'tv') {
+            try {
+                const seasons = await fetchSeasons(id);
+                for(const season of seasons) {
+                    const episodes = await fetchEpisodes(id, season.season_number);
+                    episodes.forEach(ep => {
+                        const epKey = `ep_${id}_${season.season_number}_${ep.episode_number}`;
+                        if(nowWatched) {
+                            state.watched[epKey] = { id: epKey, type: 'episode', title: `${title} S${season.season_number}E${ep.episode_number}`, year: year||'', posterPath: '', addedAt: Date.now(), tvId: id, seasonNumber: season.season_number, epNumber: ep.episode_number };
+                        } else {
+                            delete state.watched[epKey];
+                        }
+                    });
+                }
+            } catch(e) { console.warn('Cascade watched episodes error:', e); }
+        }
+        saveWatched();
+        if(btnEl) {
             btnEl.textContent = nowWatched ? '✅ Shlédnuto' : '☐ Shlédnuto';
+            btnEl.disabled = false;
+        }
+        // Pokud je otevřený seznam sezón u tohoto seriálu, obnov ho ať se projeví zaškrtnutí
+        const seasonsContainer = document.getElementById('seasons-container');
+        if(type === 'tv' && seasonsContainer?.dataset.seasons && String(seasonsContainer.dataset.tvid) === String(id)) {
+            const seasons = JSON.parse(seasonsContainer.dataset.seasons);
+            seasonsContainer.innerHTML = renderSeasons(seasons, id);
+            seasonsContainer.dataset.tvid = id;
+            seasonsContainer.dataset.seasons = JSON.stringify(seasons);
         }
         // Update card in grid live (find by onclick containing the id)
         document.querySelectorAll(`.card[onclick*="openDetail(${id}"]`).forEach(card => {
@@ -8965,7 +8995,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 if(img) img.after(overlay); else card.prepend(overlay);
             } else if(!nowWatched && overlay) { overlay.remove(); }
         });
-        // Sync s Trakt
+        // Sync s Trakt (pokud připojen) - u seriálu bez seasons/episodes v body označí Trakt automaticky celý seriál
         if(state.trakt.accessToken) {
             try {
                 await ensureTraktToken();
@@ -8974,6 +9004,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 await fetch(TRAKT_BASE + endpoint, { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
             } catch(e) { console.warn('Trakt sync error:', e); }
         }
+        // Pokud Trakt není připojen, zůstává jen lokální uložení (saveWatched() výše) - to je záměr.
     }
 
     async function syncWatchedFromTrakt() {
