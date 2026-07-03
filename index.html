@@ -9198,6 +9198,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 
             const results = [];
             let done = 0;
+            let autoMarkedComplete = false;
             const progressEl = $('watchingProgress');
             const gridEl = $('watchingGrid');
 
@@ -9237,6 +9238,25 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     const watchedEpsInSeasons = {};
                     (s.seasons||[]).forEach(se => { watchedEpsInSeasons[se.number] = (se.episodes||[]).length; });
 
+                    // Pokud appka lokálně eviduje seriál jako kompletně shlédnutý (viz toggleWatched/reconcileWatchedShows -
+                    // ten příznak se nastaví jen když je odvysílaný celý a všechny epizody shlédnuté) a zrovna neběží
+                    // žádná nová epizoda, bereme to jako dokoukané - nezobrazovat v Rozkoukaných, i kdyby Trakt měl
+                    // neúplná/chybějící data (např. import bez epizodního detailu, nebo starý údaj o počtu sezón).
+                    if (state.watched[`tv_${tmdbId}`] && !nextEpisode) return;
+
+                    // Trakt eviduje sledování, ale bez epizodního detailu (starý/hromadný import) - pokud je seriál
+                    // navíc ukončený a nic dalšího nepřibude, bereme ho jako dokoukaný: doplníme lokální příznak
+                    // "Shlédnuto" (ať se objeví ve Shlédnutých) a v Rozkoukaných ho nezobrazujeme.
+                    const noEpisodeDetail = watchedEps === 0 && (s.plays||0) > 0;
+                    const isEndedNoNext = !nextEpisode && (airStatus === 'Ended' || airStatus === 'Canceled');
+                    if (noEpisodeDetail && isEndedNoNext) {
+                        if (!state.watched[`tv_${tmdbId}`]) {
+                            state.watched[`tv_${tmdbId}`] = { id: tmdbId, type: 'tv', title: showName, year: showYear, posterPath, addedAt: Date.now() };
+                            autoMarkedComplete = true;
+                        }
+                        return;
+                    }
+
                     // Je nedokoukaný? (sledované ep < celkové, nebo běží nová sezóna)
                     const isIncomplete = watchedEps < totalEps || nextEpisode != null || (totalSeasons > maxWatchedSeason && totalSeasons > 0);
                     if (!isIncomplete) return; // přeskočit dokončené
@@ -9253,6 +9273,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 // Průběžně renderuj
                 if (gridEl && results.length) _renderWatchingGrid(gridEl, results);
             }
+
+            if (autoMarkedComplete) { saveWatched(); }
 
             // ── Doplnění: lokálně rozkoukané seriály, které Trakt nevrátil ──────────
             // (nový/nespárovaný titul na Traktu, selhaný sync epizody apod.) Bez tohoto
