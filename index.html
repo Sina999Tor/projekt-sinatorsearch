@@ -6913,6 +6913,31 @@ EXAMPLES:
         return h;
     }
 
+    // ── OBOUSMĚRNÝ SYNC LOKÁLNÍHO SHLÉDNUTÍ ↔ TRAKT ────────────────────────────
+    // Propíše lokální označení epizody jako shlédnuté/neshlédnuté i na Trakt server,
+    // aby "Rozkoukané seriály" (které čte přímo z Traktu) souhlasilo s lokálními zaškrtávátky.
+    async function syncEpisodeToTrakt(tvId, seasonNumber, epNumber, watched) {
+        if (!state.trakt.accessToken) return;
+        try {
+            await ensureTraktToken();
+            if (!state.trakt.accessToken) return;
+            const body = { shows: [{ ids: { tmdb: tvId }, seasons: [{ number: seasonNumber, episodes: [{ number: epNumber }] }] }] };
+            const url = watched ? `${TRAKT_BASE}/sync/history` : `${TRAKT_BASE}/sync/history/remove`;
+            await fetch(url, { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
+        } catch (e) { console.warn('Trakt episode sync error:', e); }
+    }
+
+    // Propíše označení celého seriálu jako shlédnutého na Trakt (všechny epizody).
+    async function syncShowToTrakt(tvId) {
+        if (!state.trakt.accessToken) return;
+        try {
+            await ensureTraktToken();
+            if (!state.trakt.accessToken) return;
+            const body = { shows: [{ ids: { tmdb: tvId } }] };
+            await fetch(`${TRAKT_BASE}/sync/history`, { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
+        } catch (e) { console.warn('Trakt show sync error:', e); }
+    }
+
     function renderTraktLists(lists, startIdx = 0) {
         window._traktListsCache = lists;
         if (!lists.length) { $('traktResultsContainer').innerHTML = '<div class="empty">Žádné Trakt seznamy.</div>'; return; }
@@ -7335,6 +7360,7 @@ EXAMPLES:
         if(wasWatched) { delete state.watched[key]; }
         else { state.watched[key] = { id: key, type: 'episode', title: epName, year: '', posterPath: '', addedAt: Date.now(), tvId, seasonNumber, epNumber }; }
         saveWatched();
+        syncEpisodeToTrakt(tvId, seasonNumber, epNumber, !wasWatched);
         // Update button
         const isNowWatched = !wasWatched;
         btn.textContent = isNowWatched ? '✅ Shlédnuto' : '○ Označit';
@@ -9151,6 +9177,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             if (card) { card.style.opacity = '0.4'; card.style.pointerEvents = 'none'; }
         }, 300);
         saveWatched(); updateWatchedCount();
+        syncShowToTrakt(id);
     };
 
     // ── ROZKOUKANNÉ FILMY ─────────────────────────────────────────────────────
