@@ -9238,16 +9238,25 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     const watchedEpsInSeasons = {};
                     (s.seasons||[]).forEach(se => { watchedEpsInSeasons[se.number] = (se.episodes||[]).length; });
 
+                    // Máme-li pro tento seriál lokální epizodní zaškrtávátka (uživatel klikal na jednotlivé epizody
+                    // přímo v appce), jsou spolehlivější než agregátní "plays" z Traktu bez epizodního detailu.
+                    const localEpKeys = Object.keys(state.watched).filter(k => k.startsWith(`ep_${tmdbId}_`));
+
+                    // Sebeoprava: pokud je seriál lokálně označený jako "Shlédnuto", ale máme k němu i lokální
+                    // epizodní data a ta jasně ukazují, že nejsou odškrtnuté všechny epizody, byl příznak nastaven
+                    // chybně (např. dřívější verzí této logiky) - zrušíme ho a necháme přepočítat níže.
+                    if (state.watched[`tv_${tmdbId}`] && localEpKeys.length && totalEps > 0 && localEpKeys.length < totalEps) {
+                        delete state.watched[`tv_${tmdbId}`];
+                        autoMarkedComplete = true; // znovu použito jako "je co uložit"
+                    }
+
                     // Pokud appka lokálně eviduje seriál jako kompletně shlédnutý (viz toggleWatched/reconcileWatchedShows -
                     // ten příznak se nastaví jen když je odvysílaný celý a všechny epizody shlédnuté) a zrovna neběží
                     // žádná nová epizoda, bereme to jako dokoukané - nezobrazovat v Rozkoukaných, i kdyby Trakt měl
                     // neúplná/chybějící data (např. import bez epizodního detailu, nebo starý údaj o počtu sezón).
                     if (state.watched[`tv_${tmdbId}`] && !nextEpisode) return;
 
-                    // Máme-li pro tento seriál lokální epizodní zaškrtávátka (uživatel klikal na jednotlivé epizody
-                    // přímo v appce), jsou spolehlivější než agregátní "plays" z Traktu bez epizodního detailu -
-                    // ty mají přednost, ať se seriál neoznačí jako dokoukaný předčasně.
-                    const localEpKeys = Object.keys(state.watched).filter(k => k.startsWith(`ep_${tmdbId}_`));
+                    // Lokální epizodní data mají přednost, ať se seriál neoznačí jako dokoukaný předčasně.
                     if (localEpKeys.length) {
                         const localWatchedEps = localEpKeys.length;
                         const localMaxSeason = Math.max(...localEpKeys.map(k => Number(k.split('_')[2])));
@@ -9300,8 +9309,6 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 if (gridEl && results.length) _renderWatchingGrid(gridEl, results);
             }
 
-            if (autoMarkedComplete) { saveWatched(); }
-
             // ── Doplnění: lokálně rozkoukané seriály, které Trakt nevrátil ──────────
             // (nový/nespárovaný titul na Traktu, selhaný sync epizody apod.) Bez tohoto
             // by seriál rozkoukaný jen lokálně (zaškrtnuté epizody v detailu) v tomto
@@ -9312,7 +9319,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 Object.keys(state.watched).forEach(k => {
                     if (k.startsWith('ep_')) {
                         const tvId = k.split('_')[1];
-                        if (tvId && !traktCoveredIds.has(String(tvId)) && !state.watched[`tv_${tvId}`]) localShowIds.add(tvId);
+                        if (tvId && !traktCoveredIds.has(String(tvId))) localShowIds.add(tvId);
                     }
                 });
                 if (localShowIds.size) {
@@ -9328,6 +9335,12 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                             const nextEpisode = d.next_episode_to_air || null;
                             const seasonNums = epKeys.map(k => Number(k.split('_')[2]));
                             const maxWatchedSeason = seasonNums.length ? Math.max(...seasonNums) : 0;
+                            // Sebeoprava: chybně nastavený "Shlédnuto" příznak z dřívějška, který lokální epizody nepodporují.
+                            if (state.watched[`tv_${tvId}`] && totalEps > 0 && watchedEps < totalEps) {
+                                delete state.watched[`tv_${tvId}`];
+                                autoMarkedComplete = true;
+                            }
+                            if (state.watched[`tv_${tvId}`] && !nextEpisode) return; // opravdu dokoukané, nezobrazovat
                             const isIncomplete = watchedEps < totalEps || nextEpisode != null || (totalSeasons > maxWatchedSeason && totalSeasons > 0);
                             if (!isIncomplete) return;
                             const fallbackTitle = (state.watched[epKeys[0]]?.title || '').split(' S')[0];
@@ -9342,6 +9355,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 }
             } catch (e) { console.warn('Local watching merge error:', e); }
 
+            if (autoMarkedComplete) { saveWatched(); }
             if (progressEl) progressEl.textContent = '';
             if (!results.length) {
                 $('modalScrollBody').innerHTML = '<div class="empty" style="padding:40px;text-align:center;">🎉 Všechny seriály máš dokoukané!</div>';
