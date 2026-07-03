@@ -9184,11 +9184,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             await ensureTraktToken();
             const res = await fetch(`${TRAKT_BASE}/sync/watched/shows`, { headers: getTraktHeaders() });
             if (!res.ok) throw new Error('HTTP ' + res.status);
-            const watchedShows = await res.json();
-            if (!Array.isArray(watchedShows) || !watchedShows.length) {
-                $('modalScrollBody').innerHTML = '<div class="empty" style="padding:40px;text-align:center;">😕 Žádné sledované seriály na Traktu.</div>';
-                return;
-            }
+            const watchedShowsRaw = await res.json();
+            const watchedShows = Array.isArray(watchedShowsRaw) ? watchedShowsRaw : [];
 
             // Pro každý seriál zjistíme počet shlédnutých vs celkový počet epizod
             $('modalScrollBody').innerHTML = `<div style="padding:16px 16px 0;">
@@ -9247,7 +9244,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     results.push({
                         id: tmdbId, title: showName, year: showYear, posterPath,
                         watchedEps, totalEps, maxWatchedSeason, totalSeasons,
-                        airStatus, nextEpisode, slug
+                        airStatus, nextEpisode, slug, plays: s.plays || 0
                     });
                 }));
                 done += batch.length;
@@ -9256,6 +9253,46 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 // Průběžně renderuj
                 if (gridEl && results.length) _renderWatchingGrid(gridEl, results);
             }
+
+            // ── Doplnění: lokálně rozkoukané seriály, které Trakt nevrátil ──────────
+            // (nový/nespárovaný titul na Traktu, selhaný sync epizody apod.) Bez tohoto
+            // by seriál rozkoukaný jen lokálně (zaškrtnuté epizody v detailu) v tomto
+            // seznamu chyběl, i když ve skutečnosti rozkoukaný je.
+            try {
+                const traktCoveredIds = new Set(results.map(r => String(r.id)));
+                const localShowIds = new Set();
+                Object.keys(state.watched).forEach(k => {
+                    if (k.startsWith('ep_')) {
+                        const tvId = k.split('_')[1];
+                        if (tvId && !traktCoveredIds.has(String(tvId)) && !state.watched[`tv_${tvId}`]) localShowIds.add(tvId);
+                    }
+                });
+                if (localShowIds.size) {
+                    if (progressEl) progressEl.textContent = 'Doplňuji lokální…';
+                    await Promise.all([...localShowIds].map(async tvId => {
+                        const epKeys = Object.keys(state.watched).filter(k => k.startsWith(`ep_${tvId}_`));
+                        const watchedEps = epKeys.length;
+                        if (!watchedEps) return;
+                        try {
+                            const d = tmdbApiKey ? await (await fetch(`${BASE}/tv/${tvId}?api_key=${tmdbApiKey}&language=cs-CZ`)).json() : {};
+                            const totalEps = d.number_of_episodes || 0;
+                            const totalSeasons = d.number_of_seasons || 0;
+                            const nextEpisode = d.next_episode_to_air || null;
+                            const seasonNums = epKeys.map(k => Number(k.split('_')[2]));
+                            const maxWatchedSeason = seasonNums.length ? Math.max(...seasonNums) : 0;
+                            const isIncomplete = watchedEps < totalEps || nextEpisode != null || (totalSeasons > maxWatchedSeason && totalSeasons > 0);
+                            if (!isIncomplete) return;
+                            const fallbackTitle = (state.watched[epKeys[0]]?.title || '').split(' S')[0];
+                            results.push({
+                                id: Number(tvId), title: d.name || fallbackTitle || 'Seriál', year: (d.first_air_date||'').slice(0,4), posterPath: d.poster_path || '',
+                                watchedEps, totalEps, maxWatchedSeason, totalSeasons,
+                                airStatus: d.status || '', nextEpisode, slug: null
+                            });
+                        } catch (e) { /* TMDB nedostupné - přeskočit */ }
+                    }));
+                    if (gridEl && results.length) _renderWatchingGrid(gridEl, results);
+                }
+            } catch (e) { console.warn('Local watching merge error:', e); }
 
             if (progressEl) progressEl.textContent = '';
             if (!results.length) {
@@ -9277,10 +9314,13 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         });
         container.innerHTML = sorted.map(it => {
             const poster = it.posterPath ? `<img src="${IMG}w185${it.posterPath}" style="width:70px;height:105px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">` : `<div style="width:70px;height:105px;background:var(--bg-elevated);border-radius:8px;display:grid;place-items:center;font-size:2rem;flex-shrink:0;">📺</div>`;
+            const noEpisodeDetail = it.watchedEps === 0 && (it.plays||0) > 0;
             const pct = it.totalEps > 0 ? Math.round((it.watchedEps / it.totalEps) * 100) : 0;
-            const progressBar = it.totalEps > 0 ? `<div style="background:rgba(255,255,255,0.1);border-radius:4px;height:5px;margin-top:6px;overflow:hidden;"><div style="background:#00b4d8;height:100%;border-radius:4px;width:${pct}%;transition:width 0.3s;"></div></div><div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">${it.watchedEps}/${it.totalEps} epizod (${pct}%)</div>` : '';
+            const progressBar = noEpisodeDetail
+                ? `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">✅ Trakt: sledováno (bez detailu odkoukaných epizod)</div>`
+                : (it.totalEps > 0 ? `<div style="background:rgba(255,255,255,0.1);border-radius:4px;height:5px;margin-top:6px;overflow:hidden;"><div style="background:#00b4d8;height:100%;border-radius:4px;width:${pct}%;transition:width 0.3s;"></div></div><div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">${it.watchedEps}/${it.totalEps} epizod (${pct}%)</div>` : '');
             const newEpBadge = it.nextEpisode ? `<div style="display:inline-block;background:rgba(229,9,20,0.2);border:1px solid #e50914;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#e50914;font-weight:700;margin-top:4px;">🆕 S${it.nextEpisode.season_number}E${it.nextEpisode.episode_number} dostupné</div>` : '';
-            const seasonBadge = it.totalSeasons > it.maxWatchedSeason ? `<div style="display:inline-block;background:rgba(0,180,216,0.15);border:1px solid #00b4d8;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#00b4d8;font-weight:700;margin-top:4px;">📺 Sezóna ${it.maxWatchedSeason+1} nevykoukána</div>` : '';
+            const seasonBadge = (!noEpisodeDetail && it.totalSeasons > it.maxWatchedSeason) ? `<div style="display:inline-block;background:rgba(0,180,216,0.15);border:1px solid #00b4d8;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#00b4d8;font-weight:700;margin-top:4px;">📺 Sezóna ${it.maxWatchedSeason+1} nevykoukána</div>` : '';
             const statusColor = {'Returning Series':'#1db954','Ended':'#666','Canceled':'#e50914','In Production':'#ff9800'}[it.airStatus] || '#888';
             const isWatched = isWatched_fn(it.id, 'tv');
             return `<div style="display:flex;gap:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;align-items:flex-start;cursor:pointer;" onclick="openDetailFromWatching(${it.id},'tv')">
