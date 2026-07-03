@@ -9244,9 +9244,35 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     // neúplná/chybějící data (např. import bez epizodního detailu, nebo starý údaj o počtu sezón).
                     if (state.watched[`tv_${tmdbId}`] && !nextEpisode) return;
 
-                    // Trakt eviduje sledování, ale bez epizodního detailu (starý/hromadný import) - pokud je seriál
-                    // navíc ukončený a nic dalšího nepřibude, bereme ho jako dokoukaný: doplníme lokální příznak
-                    // "Shlédnuto" (ať se objeví ve Shlédnutých) a v Rozkoukaných ho nezobrazujeme.
+                    // Máme-li pro tento seriál lokální epizodní zaškrtávátka (uživatel klikal na jednotlivé epizody
+                    // přímo v appce), jsou spolehlivější než agregátní "plays" z Traktu bez epizodního detailu -
+                    // ty mají přednost, ať se seriál neoznačí jako dokoukaný předčasně.
+                    const localEpKeys = Object.keys(state.watched).filter(k => k.startsWith(`ep_${tmdbId}_`));
+                    if (localEpKeys.length) {
+                        const localWatchedEps = localEpKeys.length;
+                        const localMaxSeason = Math.max(...localEpKeys.map(k => Number(k.split('_')[2])));
+                        watchedEps = Math.max(watchedEps, localWatchedEps);
+                        const effectiveMaxSeason = Math.max(maxWatchedSeason, localMaxSeason);
+                        const isLocalComplete = totalEps > 0 && watchedEps >= totalEps && !nextEpisode && !(totalSeasons > 0 && totalSeasons > effectiveMaxSeason);
+                        if (isLocalComplete) {
+                            if (!state.watched[`tv_${tmdbId}`]) {
+                                state.watched[`tv_${tmdbId}`] = { id: tmdbId, type: 'tv', title: showName, year: showYear, posterPath, addedAt: Date.now() };
+                                autoMarkedComplete = true;
+                            }
+                            return;
+                        }
+                        results.push({
+                            id: tmdbId, title: showName, year: showYear, posterPath,
+                            watchedEps, totalEps, maxWatchedSeason: effectiveMaxSeason, totalSeasons,
+                            airStatus, nextEpisode, slug, plays: s.plays || 0
+                        });
+                        return;
+                    }
+
+                    // Trakt eviduje sledování, ale bez epizodního detailu (starý/hromadný import) a bez lokálních
+                    // epizodních dat - pokud je seriál navíc ukončený a nic dalšího nepřibude, bereme ho jako
+                    // dokoukaný: doplníme lokální příznak "Shlédnuto" (ať se objeví ve Shlédnutých) a v Rozkoukaných
+                    // ho nezobrazujeme.
                     const noEpisodeDetail = watchedEps === 0 && (s.plays||0) > 0;
                     const isEndedNoNext = !nextEpisode && (airStatus === 'Ended' || airStatus === 'Canceled');
                     if (noEpisodeDetail && isEndedNoNext) {
