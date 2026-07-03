@@ -1675,6 +1675,10 @@
                     <button class="settings-btn-small" onclick="connectTrakt()">🔑 Připojit</button>
                     <button class="settings-btn-small settings-btn-remove" onclick="disconnectTrakt()">❌ Odhlásit</button>
                 </div>
+                <div class="settings-actions" style="margin-top:8px;">
+                    <button class="settings-btn-small" id="fullResyncWatchedBtn" style="width:100%;border-color:#1db954;color:#1db954;" onclick="fullResyncWatched(this)">🔄 Sync + přepočítat shlédnuté seriály</button>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">Stáhne aktuální stav z Traktu a opraví seriály, které se dřív omylem označily jako "Shlédnuto", i když ještě neměly odvysílané/shlédnuté všechny díly.</div>
             </div>
             <div class="settings-divider"></div>
             <div class="settings-section">
@@ -9101,6 +9105,56 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             await fetchMissingPosters();
         } catch(e) { console.warn('Trakt watched sync error:', e); }
     }
+
+    // ── PŘEPOČET/OPRAVA JIŽ ULOŽENÝCH "Shlédnuto" PŘÍZNAKŮ U SERIÁLŮ ──────────
+    // Projde všechny lokálně uložené tv_* příznaky (i ty staré, nastavené předchozí
+    // verzí aplikace) a ověří přes TMDB, zda je seriál skutečně celý odvysílaný a
+    // celý shlédnutý. Pokud ne, příznak zruší (seriál zůstane jen "rozkoukaný").
+    async function reconcileWatchedShows() {
+        if(!tmdbApiKey) return 0;
+        const tvKeys = Object.keys(state.watched).filter(k => k.startsWith('tv_'));
+        let changed = 0;
+        const batchSize = 6;
+        for(let i = 0; i < tvKeys.length; i += batchSize) {
+            const batch = tvKeys.slice(i, i + batchSize);
+            await Promise.all(batch.map(async k => {
+                const tmdbId = state.watched[k]?.id ?? Number(k.slice(3));
+                if(!tmdbId) return;
+                try {
+                    const d = await (await fetch(`${BASE}/tv/${tmdbId}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
+                    const totalEps = d.number_of_episodes || 0;
+                    const totalSeasons = d.number_of_seasons || 0;
+                    const nextEpisode = d.next_episode_to_air;
+                    const epKeys = Object.keys(state.watched).filter(x => x.startsWith(`ep_${tmdbId}_`));
+                    const watchedEps = epKeys.length;
+                    const watchedSeasonNums = epKeys.map(x => Number(x.split('_')[2]));
+                    const maxWatchedSeason = watchedSeasonNums.length ? Math.max(...watchedSeasonNums) : 0;
+                    const isComplete = totalEps > 0 && watchedEps >= totalEps && !nextEpisode && !(totalSeasons > maxWatchedSeason && totalSeasons > 0);
+                    if(!isComplete) { delete state.watched[k]; changed++; }
+                } catch(e) { /* při chybě necháme beze změny */ }
+            }));
+        }
+        if(changed) { saveWatched(); updateWatchedCount(); }
+        return changed;
+    }
+    window.reconcileWatchedShows = reconcileWatchedShows;
+
+    // Tlačítko v Nastavení: stáhne aktuální stav z Traktu a rovnou opraví staré nesprávné příznaky.
+    async function fullResyncWatched(btn) {
+        const orig = btn ? btn.textContent : '';
+        if(btn) { btn.disabled = true; btn.textContent = '⏳ Synchronizuji…'; }
+        try {
+            if(state.trakt.accessToken) await syncWatchedFromTrakt();
+            const changed = await reconcileWatchedShows();
+            const msg = changed > 0 ? `✅ Přepočítáno. Opraveno ${changed} seriálů zpět na "rozkoukané".` : '✅ Vše sedí, nic se neměnilo.';
+            if(typeof showToast === 'function') showToast(msg); else alert(msg);
+        } catch(e) {
+            if(typeof showToast === 'function') showToast('⚠️ Chyba synchronizace.'); else alert('⚠️ Chyba synchronizace.');
+        } finally {
+            if(btn) { btn.disabled = false; btn.textContent = orig; }
+        }
+    }
+    window.fullResyncWatched = fullResyncWatched;
 
     // ── ROZKOUKANÉ SERIÁLY ────────────────────────────────────────────────────
     async function openWatchingModal() {
