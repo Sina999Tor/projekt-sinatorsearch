@@ -9702,7 +9702,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     }
 
     function openWatchedModal() {
-        const items = Object.values(state.watched).sort((a,b) => b.addedAt - a.addedAt);
+        const items = Object.values(state.watched).filter(i => i.type !== 'episode').sort((a,b) => b.addedAt - a.addedAt);
         const movies = items.filter(i => i.type === 'movie');
         const shows = items.filter(i => i.type === 'tv');
 
@@ -9811,7 +9811,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         const activeBtn = $('wTab-'+tab);
         if(activeBtn) { activeBtn.style.background='#1db954'; activeBtn.style.color='#000'; activeBtn.style.borderColor='#1db954'; activeBtn.style.fontWeight='600'; }
         const sort = state._watchedSort || 'default';
-        let items = Object.values(state.watched);
+        let items = Object.values(state.watched).filter(i => i.type !== 'episode');
         if(sort === 'default') items.sort((a,b)=>b.addedAt-a.addedAt);
         else if(sort === 'az') items.sort((a,b)=>(a.title||'').localeCompare(b.title||'','cs'));
         else if(sort === 'za') items.sort((a,b)=>(b.title||'').localeCompare(a.title||'','cs'));
