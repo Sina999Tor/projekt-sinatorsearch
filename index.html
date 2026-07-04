@@ -89,6 +89,10 @@
         html[data-theme="light"] #exitConfirmBox { background: var(--bg-card); border-color: var(--border); }
         html[data-theme="light"] #exitConfirmBox h3 { color: var(--text); }
         html[data-theme="light"] #exitConfirmBox .btn-cancel { background: var(--bg-elevated); color: var(--text); }
+        html[data-theme="light"] .tab { background: var(--bg-card); color: var(--text-muted); border-color: var(--border); }
+        html[data-theme="light"] .tab.active, html[data-theme="light"] .tab:hover { background: var(--gold); color: #1a1a1a; border-color: var(--gold); }
+        html[data-theme="light"] .tab-sort-btn, html[data-theme="light"] .tab-sort-opt { background: var(--bg-card); color: var(--text-muted); border-color: var(--border); }
+        html[data-theme="light"] .tab-sort-btn:hover, html[data-theme="light"] .tab-sort-btn.active, html[data-theme="light"] .tab-sort-opt:hover, html[data-theme="light"] .tab-sort-opt.active { background: var(--gold); color: #1a1a1a; border-color: var(--gold); }
         .theme-toggle-switch { position:relative; width:50px; height:28px; border-radius:16px; background:rgba(255,255,255,0.12); cursor:pointer; flex-shrink:0; transition:background 0.25s; }
         .theme-toggle-knob { position:absolute; top:3px; left:25px; width:22px; height:22px; border-radius:50%; background:#2a2a2a; transition:left 0.25s, background 0.25s, box-shadow 0.25s; display:grid; place-items:center; font-size:13px; filter:grayscale(1) brightness(0.8); opacity:0.6; }
         html[data-theme="light"] .theme-toggle-switch { background: rgba(255,215,0,0.18); }
