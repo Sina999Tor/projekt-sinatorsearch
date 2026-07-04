@@ -9383,13 +9383,22 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 : (it.totalEps > 0 ? `<div style="background:rgba(255,255,255,0.1);border-radius:4px;height:5px;margin-top:6px;overflow:hidden;"><div style="background:#00b4d8;height:100%;border-radius:4px;width:${pct}%;transition:width 0.3s;"></div></div><div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">${it.watchedEps}/${it.totalEps} epizod (${pct}%)</div>` : '');
             const newEpBadge = it.nextEpisode ? `<div style="display:inline-block;background:rgba(229,9,20,0.2);border:1px solid #e50914;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#e50914;font-weight:700;margin-top:4px;">🆕 S${it.nextEpisode.season_number}E${it.nextEpisode.episode_number} dostupné</div>` : '';
             const seasonBadge = (!noEpisodeDetail && it.totalSeasons > it.maxWatchedSeason) ? `<div style="display:inline-block;background:rgba(0,180,216,0.15);border:1px solid #00b4d8;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#00b4d8;font-weight:700;margin-top:4px;">📺 Sezóna ${it.maxWatchedSeason+1} nevykoukána</div>` : '';
-            const statusColor = {'Returning Series':'#1db954','Ended':'#666','Canceled':'#e50914','In Production':'#ff9800'}[it.airStatus] || '#888';
+            const statusMap = {
+                'Returning Series': { label: 'Pokračuje', color: '#1db954' },
+                'Ended': { label: 'Ukončeno', color: '#666' },
+                'Canceled': { label: 'Zrušeno', color: '#e50914' },
+                'In Production': { label: 'Ve výrobě', color: '#f5a623' },
+                'Planned': { label: 'Plánováno', color: '#7db8f7' },
+                'Pilot': { label: 'Pilotní díl', color: '#7db8f7' }
+            };
+            const st = statusMap[it.airStatus] || { label: it.airStatus || '?', color: '#888' };
+            const statusColor = st.color;
             const isWatched = isWatched_fn(it.id, 'tv');
             return `<div style="display:flex;gap:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;align-items:flex-start;cursor:pointer;" onclick="openDetailFromWatching(${it.id},'tv')">
                 ${poster}
                 <div style="flex:1;min-width:0;">
                     <div style="font-weight:700;font-size:0.95rem;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.title}</div>
-                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;">${it.year||'—'} · <span style="color:${statusColor};">${it.airStatus||'?'}</span> · ${it.totalSeasons} sezón</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;">${it.year||'—'} · <span style="color:${statusColor};">${st.label}</span> · ${it.totalSeasons} sezón</div>
                     ${progressBar}
                     ${newEpBadge}
                     ${seasonBadge}
