@@ -224,15 +224,20 @@
         #exitConfirmBox .btn-exit { background: var(--accent); color: #fff; }
         
         /* ── HEADER ACTIONS – 3D tlačítka s popiskem ── */
+        /* Fixní mřížka 5×2 – zachová stejný vzhled na jakémkoliv displeji,
+           tlačítka se jen plynule zvětšují/zmenšují (clamp) podle šířky obrazovky */
         .header-actions {
-            max-width: 500px; margin: 6px auto 0;
-            display: flex; justify-content: center; gap: 5px;
-            align-items: flex-start; flex-wrap: wrap; padding: 0 6px;
+            max-width: 460px; margin: 6px auto 0;
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: clamp(3px, 1.6vw, 8px);
+            padding: 0 clamp(4px, 2vw, 10px);
+            width: 100%; box-sizing: border-box;
         }
-        /* Stav 1: skryta většina tlačítek, vidět jen HLEDAT, FILTRY a šipky */
-        .header-actions.collapsed .action-btn.icon:not(#btnToggleToolbar):not(#btnToggleToolbar2):not(#btnSearchToggle):not(#btnFiltersToggle) { display: none; }
-        /* Stav 2: skryto jen logo, HLEDAT+FILTRY+šipky zůstanou */
-        .header-actions.collapsed2 .action-btn.icon:not(#btnToggleToolbar):not(#btnToggleToolbar2):not(#btnSearchToggle):not(#btnFiltersToggle) { display: none; }
+        /* Stav 1: skryta většina tlačítek, vidět jen HLEDAT a FILTRY (šipky jsou mimo grid) */
+        .header-actions.collapsed .action-btn.icon:not(#btnSearchToggle):not(#btnFiltersToggle) { display: none; }
+        /* Stav 2: skryto jen logo, HLEDAT+FILTRY zůstanou */
+        .header-actions.collapsed2 .action-btn.icon:not(#btnSearchToggle):not(#btnFiltersToggle) { display: none; }
+        .toolbar-arrows { display: flex; justify-content: center; gap: 6px; margin-top: 4px; }
         #logoContainer.hidden { display: none !important; }
         #logoContainer.logo-mini {
             position: fixed !important;
@@ -275,10 +280,10 @@
         }
         .action-btn.icon {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: 3px; padding: 7px 5px 6px;
-            width: 56px; min-height: 52px;
+            gap: 3px; padding: clamp(5px, 1.6vw, 7px) 3px clamp(4px, 1.2vw, 6px);
+            width: 100%; aspect-ratio: 1 / 1; min-height: 44px;
             border-radius: 14px; cursor: pointer; position: relative;
-            font-size: 1.2rem; color: var(--text);
+            font-size: clamp(0.95rem, 5vw, 1.2rem); color: var(--text);
             background: linear-gradient(170deg, #2c2c2e 0%, #1c1c1e 50%, #111113 100%);
             border: 1px solid rgba(255,255,255,0.13);
             box-shadow:
@@ -299,7 +304,7 @@
             animation: iconBounce 0.45s ease forwards;
         }
         .action-btn.icon .btn-label {
-            font-size: 0.48rem; font-weight: 700; letter-spacing: 0.05em;
+            font-size: clamp(0.44rem, 1.8vw, 0.5rem); font-weight: 700; letter-spacing: 0.05em;
             color: rgba(200,200,215,0.80); text-transform: uppercase; line-height: 1;
             white-space: nowrap; pointer-events: none;
             text-shadow: 0 1px 3px rgba(0,0,0,0.9);
@@ -350,9 +355,9 @@
         .action-btn.icon .badge.fav  { background: var(--gold); color: #000; }
         .action-btn.icon .badge.trakt { background: var(--trakt); color: #000; }
 
-        /* šipky stejná velikost */
+        /* šipky stejná velikost — nyní mimo grid, vlastní řádek pod ním */
         #btnToggleToolbar, #btnToggleToolbar2 {
-            width: 40px; min-height: 36px; font-size: 0.65rem;
+            width: 40px; aspect-ratio: auto; min-height: 36px; font-size: 0.65rem;
             border-radius: 10px; opacity: 0.55;
         }
         #btnToggleToolbar .btn-label, #btnToggleToolbar2 .btn-label { display: none; }
@@ -1044,6 +1049,8 @@
             <span class="btn-icon">🔧</span><span class="btn-label">Nastavení</span>
             <span id="onlineBadge" style="display:none;position:absolute;top:2px;right:2px;background:#22c55e;color:#000;font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;line-height:14px;min-width:16px;text-align:center;pointer-events:none;">0</span>
         </button>
+    </div>
+    <div class="toolbar-arrows">
         <button class="action-btn icon" id="btnToggleToolbar" onclick="toggleToolbar()" title="Schovat tlačítka">▲</button>
         <button class="action-btn icon" id="btnToggleToolbar2" onclick="_expandToolbar()" title="Rozbalit">▼</button>
     </div>
