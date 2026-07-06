@@ -585,15 +585,16 @@
         .modal-header-row h2 { font-family: 'Playfair Display', serif; font-size: 1.4rem; background: linear-gradient(135deg, #fff, var(--trakt)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .favs-modal-header h2, .settings-modal-header h2 { background: linear-gradient(135deg, #fff, var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .sources-modal-header h2 { color: #fff; font-family: 'Playfair Display', serif; font-size: 1.1rem; }
-        .settings-modal .modal-header-row { position: static; background: #141414; flex-shrink: 0; padding: 14px 16px; }
+        .settings-modal .modal-header-row { position: static; background: var(--bg-card); flex-shrink: 0; padding: 14px 16px; border-bottom: 1px solid var(--border); }
         .settings-modal .settings-modal-body { flex: 1; overflow-y: auto; min-height: 0; padding: 16px; }
-        .settings-tabs { display:flex; gap:8px; flex-shrink:0; padding:0 16px 12px 16px; background:#141414; }
+        .settings-tabs { display:flex; gap:8px; flex-shrink:0; padding:0 16px 12px 16px; background:var(--bg-card); }
         .settings-tab-btn { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:8px 2px; border-radius:12px; border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text-muted); font-size:0.68rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
         .settings-tab-btn .settings-tab-icon { font-size:1.15rem; line-height:1; }
         .settings-tab-btn.active { background:rgba(255,215,0,0.12); border-color:var(--gold); color:var(--gold); }
         .settings-tab-content { display:none; }
         .settings-tab-content.active { display:block; }
         html[data-theme="light"] .settings-tab-btn { background:rgba(0,0,0,0.03); }
+        html[data-theme="light"] .favs-modal-header h2, html[data-theme="light"] .settings-modal-header h2 { background: linear-gradient(135deg, #333, var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .settings-subtabs { display:flex; gap:6px; margin-bottom:14px; }
         .settings-subtab-btn { flex:1; text-align:center; padding:8px 4px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text-muted); font-size:0.75rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
         .settings-subtab-btn.active { background:rgba(0,180,216,0.14); border-color:#00b4d8; color:#00b4d8; }
