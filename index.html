@@ -613,6 +613,17 @@
         .tabs { display: flex; justify-content: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
         .tab { padding: 8px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted); cursor: pointer; transition: 0.3s; font-weight: 500; font-size: 0.85rem; }
         .tab.active, .tab:hover { background: var(--bg-elevated); color: #fff; border-color: rgba(255,255,255,0.25); transform: translateY(-2px); }
+        .tabs-dropdown-wrap { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }
+        .tabs-dropdown-toggle { min-width: 180px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; color: var(--text); cursor: pointer; font-weight: 600; font-size: 0.88rem; transition: 0.2s; }
+        .tabs-dropdown-toggle:hover { border-color: rgba(255,255,255,0.25); }
+        .tabs-dropdown-toggle.open { border-color: var(--gold); }
+        .tabs-dropdown-arrow { font-size: 0.7rem; color: var(--text-muted); transition: transform 0.2s; }
+        .tabs-dropdown-toggle.open .tabs-dropdown-arrow { transform: rotate(180deg); }
+        .tabs-dropdown-panel { display: none; flex-direction: column; gap: 4px; position: absolute; top: calc(100% + 6px); left: 0; min-width: 200px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 8px; z-index: 600; box-shadow: 0 12px 32px rgba(0,0,0,0.5); }
+        .tabs-dropdown-panel.open { display: flex; }
+        .tabs-dropdown-panel .tab { width: 100%; text-align: left; transform: none !important; }
+        html[data-theme="light"] .tabs-dropdown-toggle { background: var(--bg-card); color: var(--text); border-color: var(--border); }
+        html[data-theme="light"] .tabs-dropdown-panel { background: var(--bg-card); border-color: var(--border); box-shadow: 0 12px 32px rgba(0,0,0,0.18); }
         .tab-wrap { display: flex; align-items: center; gap: 2px; }
         .tab-sort-btn { padding: 5px 7px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted); cursor: pointer; font-size: 0.75rem; transition: 0.2s; line-height: 1; }
         .tab-sort-btn:hover, .tab-sort-btn.active { background: var(--bg-elevated); color: #fff; border-color: rgba(255,255,255,0.3); }
@@ -2071,12 +2082,18 @@
 </div>
 
 <div class="main-content" id="mainContent">
-    <div class="tabs" id="mainTabs">
-        <button class="tab active" data-view="movies">🎬 Filmy</button>
-        <button class="tab" data-view="tv">📺 Seriály</button>
-        <button class="tab" data-view="miniseries">📖 Minisérie</button>
-        <button class="tab" data-view="actors">👥 Herci</button>
-        <button class="tab" data-view="directors">🎥 Režiséři</button>
+    <div class="tabs-dropdown-wrap" id="mainTabsWrap">
+        <button class="tabs-dropdown-toggle" id="mainTabsToggle" type="button">
+            <span id="mainTabsToggleLabel">🎬 Filmy</span>
+            <span class="tabs-dropdown-arrow">▾</span>
+        </button>
+        <div class="tabs-dropdown-panel" id="mainTabs">
+            <button class="tab active" data-view="movies">🎬 Filmy</button>
+            <button class="tab" data-view="tv">📺 Seriály</button>
+            <button class="tab" data-view="miniseries">📖 Minisérie</button>
+            <button class="tab" data-view="actors">👥 Herci</button>
+            <button class="tab" data-view="directors">🎥 Režiséři</button>
+        </div>
         <button class="tab-sort-btn" id="globalSortBtn" onclick="toggleTabSort(event)" title="Řadit" style="display:none;">⊿</button>
     </div>
     <!-- Inline sort dropdown -->
@@ -2258,6 +2275,7 @@
         updateFavBadge();
         
         bindTabs();
+        initMainTabsDropdown();
         
         const searchInput = $('searchInput');
         let _mainSearchTimer = null;
@@ -4610,6 +4628,44 @@
         }).join('')}</div>`;
         $('simklResultsContainer').innerHTML = count + grid;
     }
+
+        function initMainTabsDropdown() {
+            const toggle = $('mainTabsToggle');
+            const panel = $('mainTabs');
+            const label = $('mainTabsToggleLabel');
+            if (!toggle || !panel || !label) return;
+            function syncLabel() {
+                const active = panel.querySelector('.tab.active');
+                if (active) label.textContent = active.textContent;
+            }
+            function closePanel() {
+                panel.classList.remove('open');
+                toggle.classList.remove('open');
+            }
+            function openPanel() {
+                panel.classList.add('open');
+                toggle.classList.add('open');
+            }
+            toggle.onclick = function(e) {
+                e.stopPropagation();
+                if (panel.classList.contains('open')) closePanel(); else openPanel();
+            };
+            document.addEventListener('click', function(e) {
+                if (panel.classList.contains('open') && !panel.contains(e.target) && e.target !== toggle && !toggle.contains(e.target)) {
+                    closePanel();
+                }
+            });
+            panel.querySelectorAll('.tab').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    setTimeout(function() { syncLabel(); closePanel(); }, 0);
+                });
+            });
+            const mo = new MutationObserver(function() { syncLabel(); });
+            panel.querySelectorAll('.tab').forEach(function(btn) {
+                mo.observe(btn, { attributes: true, attributeFilter: ['class'] });
+            });
+            syncLabel();
+        }
 
         function bindTabs() {
         document.querySelectorAll('#mainTabs .tab').forEach(btn => {
