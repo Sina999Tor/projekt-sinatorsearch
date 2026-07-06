@@ -594,6 +594,12 @@
         .settings-tab-content { display:none; }
         .settings-tab-content.active { display:block; }
         html[data-theme="light"] .settings-tab-btn { background:rgba(0,0,0,0.03); }
+        .settings-subtabs { display:flex; gap:6px; margin-bottom:14px; }
+        .settings-subtab-btn { flex:1; text-align:center; padding:8px 4px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text-muted); font-size:0.75rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
+        .settings-subtab-btn.active { background:rgba(0,180,216,0.14); border-color:#00b4d8; color:#00b4d8; }
+        .settings-subtab-content { display:none; }
+        .settings-subtab-content.active { display:block; }
+        html[data-theme="light"] .settings-subtab-btn { background:rgba(0,0,0,0.03); }
         .close-modal-btn, .close-settings, .close-sources { background: var(--bg-elevated); border: 1px solid var(--border); color: #fff; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: grid; place-items: center; transition: 0.2s; }
         .close-modal-btn:hover, .close-settings:hover, .close-sources:hover { background: var(--accent); border-color: var(--accent); transform: rotate(90deg); }
         .trakt-modal-body, .favs-modal-body, .sources-modal-body { padding: 20px 24px; display: block; min-height: 200px; }
@@ -1622,6 +1628,13 @@
         <div class="settings-modal-body">
             <!-- ============ TAB: KLÍČE ============ -->
             <div class="settings-tab-content active" id="settingsTabContentKeys">
+            <div class="settings-subtabs">
+                <div class="settings-subtab-btn" id="settingsSubtabBtnAi" onclick="switchKeysSubTab('ai')">🤖 AI</div>
+                <div class="settings-subtab-btn active" id="settingsSubtabBtnTmdb" onclick="switchKeysSubTab('tmdb')">🎬 TMDB</div>
+                <div class="settings-subtab-btn" id="settingsSubtabBtnConnect" onclick="switchKeysSubTab('connect')">🔗 Propojení</div>
+            </div>
+            <!-- --- SUBTAB: TMDB --- -->
+            <div class="settings-subtab-content active" id="settingsSubtabContentTmdb">
             <div class="settings-section">
                 <span class="settings-label">TMDB API Klíč</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">
@@ -1653,7 +1666,9 @@
                 </div>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Bezplatný klíč: <a href="https://www.omdbapi.com/apikey.aspx" target="_blank" style="color:#f5c518;">omdbapi.com/apikey.aspx</a> → FREE plan (1000 req/den)</div>
             </div>
-            <div class="settings-divider"></div>
+            </div>
+            <!-- --- SUBTAB: AI --- -->
+            <div class="settings-subtab-content" id="settingsSubtabContentAi">
             <div class="settings-section">
                 <span class="settings-label" style="color:#a78bfa;">🤖 Gemini API Klíč (pro AI vyhledávání)</span>
                 <input type="password" class="settings-input" id="geminiApiKeyInput" placeholder="Zadejte Gemini API klíč (zdarma z AI Studio)" value="">
@@ -1698,7 +1713,9 @@
                 </div>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Klíč: <a href="https://openrouter.ai/keys" target="_blank" style="color:#38bdf8;">openrouter.ai/keys</a> → použije free modely</div>
             </div>
-            <div class="settings-divider"></div>
+            </div>
+            <!-- --- SUBTAB: PROPOJENÍ --- -->
+            <div class="settings-subtab-content" id="settingsSubtabContentConnect">
             <div class="settings-section">
                 <span class="settings-label">Trakt.tv</span>
                 <div class="settings-status">
@@ -1769,6 +1786,7 @@
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px; line-height:1.5;">
                     Přihlašovací údaje do <a href="https://www.ivysilani.cz" target="_blank" style="color:#60b0ff;">ivysilani.cz</a>. Po synchronizaci se zobrazí vaše oblíbené pořady a seznamy přímo v aplikaci. Přehrávání se spustí v přehrávači iVysílání.
                 </div>
+            </div>
             </div>
             </div>
             <!-- ============ TAB: VZHLED ============ -->
@@ -2754,6 +2772,17 @@
         document.documentElement.setAttribute('data-theme', next);
         updateThemeToggleUI();
     }
+    function switchKeysSubTab(tab) {
+        const tabs = { ai: 'Ai', tmdb: 'Tmdb', connect: 'Connect' };
+        Object.keys(tabs).forEach(function(key) {
+            const content = $('settingsSubtabContent' + tabs[key]);
+            const btn = $('settingsSubtabBtn' + tabs[key]);
+            if(content) content.classList.toggle('active', key === tab);
+            if(btn) btn.classList.toggle('active', key === tab);
+        });
+    }
+    window.switchKeysSubTab = switchKeysSubTab;
+
     function switchSettingsTab(tab) {
         const tabs = { keys: 'Keys', appearance: 'Appearance', other: 'Other', admin: 'Admin' };
         Object.keys(tabs).forEach(function(key) {
@@ -2768,6 +2797,7 @@
     function openSettingsModal() {
         closeHelperModals();
         switchSettingsTab('keys');
+        switchKeysSubTab('tmdb');
         if($('geminiApiKeyInput')) $('geminiApiKeyInput').value = geminiApiKey;
         if($('groqApiKeyInput')) $('groqApiKeyInput').value = groqApiKey;
         if($('openRouterKeyInput')) $('openRouterKeyInput').value = openRouterKey;
