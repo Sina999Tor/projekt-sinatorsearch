@@ -614,14 +614,15 @@
         .tab { padding: 8px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted); cursor: pointer; transition: 0.3s; font-weight: 500; font-size: 0.85rem; }
         .tab.active, .tab:hover { background: var(--bg-elevated); color: #fff; border-color: rgba(255,255,255,0.25); transform: translateY(-2px); }
         .tabs-dropdown-wrap { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }
+        .tabs-dropdown-inner { position: relative; display: inline-block; }
         .tabs-dropdown-toggle { min-width: 180px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; color: var(--text); cursor: pointer; font-weight: 600; font-size: 0.88rem; transition: 0.2s; }
         .tabs-dropdown-toggle:hover { border-color: rgba(255,255,255,0.25); }
         .tabs-dropdown-toggle.open { border-color: var(--gold); }
         .tabs-dropdown-arrow { font-size: 0.7rem; color: var(--text-muted); transition: transform 0.2s; }
         .tabs-dropdown-toggle.open .tabs-dropdown-arrow { transform: rotate(180deg); }
-        .tabs-dropdown-panel { display: none; flex-direction: column; gap: 4px; position: absolute; top: calc(100% + 6px); left: 0; min-width: 200px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 8px; z-index: 600; box-shadow: 0 12px 32px rgba(0,0,0,0.5); }
+        .tabs-dropdown-panel { display: none; flex-direction: column; gap: 4px; position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); width: max-content; min-width: 100%; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 8px; z-index: 600; box-shadow: 0 12px 32px rgba(0,0,0,0.5); }
         .tabs-dropdown-panel.open { display: flex; }
-        .tabs-dropdown-panel .tab { width: 100%; text-align: left; transform: none !important; }
+        .tabs-dropdown-panel .tab { width: 100%; text-align: left; transform: none !important; white-space: nowrap; }
         html[data-theme="light"] .tabs-dropdown-toggle { background: var(--bg-card); color: var(--text); border-color: var(--border); }
         html[data-theme="light"] .tabs-dropdown-panel { background: var(--bg-card); border-color: var(--border); box-shadow: 0 12px 32px rgba(0,0,0,0.18); }
         .tab-wrap { display: flex; align-items: center; gap: 2px; }
@@ -2083,16 +2084,18 @@
 
 <div class="main-content" id="mainContent">
     <div class="tabs-dropdown-wrap" id="mainTabsWrap">
-        <button class="tabs-dropdown-toggle" id="mainTabsToggle" type="button">
-            <span id="mainTabsToggleLabel">🎬 Filmy</span>
-            <span class="tabs-dropdown-arrow">▾</span>
-        </button>
-        <div class="tabs-dropdown-panel" id="mainTabs">
-            <button class="tab active" data-view="movies">🎬 Filmy</button>
-            <button class="tab" data-view="tv">📺 Seriály</button>
-            <button class="tab" data-view="miniseries">📖 Minisérie</button>
-            <button class="tab" data-view="actors">👥 Herci</button>
-            <button class="tab" data-view="directors">🎥 Režiséři</button>
+        <div class="tabs-dropdown-inner">
+            <button class="tabs-dropdown-toggle" id="mainTabsToggle" type="button">
+                <span id="mainTabsToggleLabel">🎬 Filmy</span>
+                <span class="tabs-dropdown-arrow">▾</span>
+            </button>
+            <div class="tabs-dropdown-panel" id="mainTabs">
+                <button class="tab active" data-view="movies">🎬 Filmy</button>
+                <button class="tab" data-view="tv">📺 Seriály</button>
+                <button class="tab" data-view="miniseries">📖 Minisérie</button>
+                <button class="tab" data-view="actors">👥 Herci</button>
+                <button class="tab" data-view="directors">🎥 Režiséři</button>
+            </div>
         </div>
         <button class="tab-sort-btn" id="globalSortBtn" onclick="toggleTabSort(event)" title="Řadit" style="display:none;">⊿</button>
     </div>
