@@ -587,6 +587,13 @@
         .sources-modal-header h2 { color: #fff; font-family: 'Playfair Display', serif; font-size: 1.1rem; }
         .settings-modal .modal-header-row { position: static; background: #141414; flex-shrink: 0; padding: 14px 16px; }
         .settings-modal .settings-modal-body { flex: 1; overflow-y: auto; min-height: 0; padding: 16px; }
+        .settings-tabs { display:flex; gap:8px; flex-shrink:0; padding:0 16px 12px 16px; background:#141414; }
+        .settings-tab-btn { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:10px 6px; border-radius:12px; border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text-muted); font-size:0.78rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
+        .settings-tab-btn .settings-tab-icon { font-size:1.15rem; line-height:1; }
+        .settings-tab-btn.active { background:rgba(255,215,0,0.12); border-color:var(--gold); color:var(--gold); }
+        .settings-tab-content { display:none; }
+        .settings-tab-content.active { display:block; }
+        html[data-theme="light"] .settings-tab-btn { background:rgba(0,0,0,0.03); }
         .close-modal-btn, .close-settings, .close-sources { background: var(--bg-elevated); border: 1px solid var(--border); color: #fff; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: grid; place-items: center; transition: 0.2s; }
         .close-modal-btn:hover, .close-settings:hover, .close-sources:hover { background: var(--accent); border-color: var(--accent); transform: rotate(90deg); }
         .trakt-modal-body, .favs-modal-body, .sources-modal-body { padding: 20px 24px; display: block; min-height: 200px; }
@@ -1606,49 +1613,14 @@
             <h2>🔧 Nastavení</h2>
             <button class="close-settings" onclick="closeSettingsModal()" title="Zavřít">✕</button>
         </div>
+        <div class="settings-tabs">
+            <div class="settings-tab-btn active" id="settingsTabBtnKeys" onclick="switchSettingsTab('keys')"><span class="settings-tab-icon">🔑</span><span>Klíče</span></div>
+            <div class="settings-tab-btn" id="settingsTabBtnAppearance" onclick="switchSettingsTab('appearance')"><span class="settings-tab-icon">🎨</span><span>Vzhled</span></div>
+            <div class="settings-tab-btn" id="settingsTabBtnAdmin" onclick="switchSettingsTab('admin')"><span class="settings-tab-icon">🛡️</span><span>Admin</span></div>
+        </div>
         <div class="settings-modal-body">
-            <!-- 🎨 Vzhled -->
-            <div class="settings-section" style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.25);border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <span id="themeBulbIcon">💡</span>
-                    <div>
-                        <span class="settings-label" style="color:var(--gold);display:block;">Vzhled aplikace</span>
-                        <span style="font-size:0.75rem;color:var(--text-muted);" id="themeModeLabel">Tmavý režim</span>
-                    </div>
-                </div>
-                <div class="theme-toggle-switch" id="themeToggleSwitch" onclick="toggleAppTheme()">
-                    <div class="theme-toggle-knob" id="themeToggleKnob">💡</div>
-                </div>
-            </div>
-            <div class="settings-divider"></div>
-            <!-- 🔐 Přístupové heslo -->
-            <div class="settings-section" style="background:rgba(229,9,20,0.07);border:1px solid rgba(229,9,20,0.25);border-radius:12px;padding:14px 16px;">
-                <span class="settings-label" style="color:#ff6b6b;">🔐 Přístupové heslo aplikace</span>
-                <input type="password" class="settings-input" id="settingsPwdInput" placeholder="Zadejte nové heslo…" autocomplete="off">
-                <div class="settings-actions">
-                    <button class="settings-btn-small show-key-btn" onclick="toggleSettingsPwdVisibility()">👁️ Zobrazit</button>
-                    <button class="settings-btn-small" onclick="saveAppPassword()" style="background:rgba(229,9,20,0.3);">💾 Uložit heslo</button>
-                    <button class="settings-btn-small settings-btn-remove" onclick="clearAppPassword()">🗑️ Odebrat heslo</button>
-                </div>
-                <div style="margin-top:10px;">
-                    <button class="settings-btn-small" onclick="logoutApp()" style="width:100%;background:rgba(229,9,20,0.18);border:1px solid rgba(229,9,20,0.4);color:#ff6b6b;font-weight:600;padding:10px;">🔒 Odhlásit se (zamknout aplikaci)</button>
-                </div>
-                <div style="font-size:0.75rem;color:#888;margin-top:6px;" id="settingsPwdStatus">
-                    Heslo chrání přístup do aplikace. Po uložení bude vyžadováno při každém spuštění.
-                </div>
-            </div>
-            <div class="settings-divider"></div>
-            <!-- 🔄 Kontrola aktualizací -->
-            <div class="settings-section" style="background:rgba(29,185,84,0.07);border:1px solid rgba(29,185,84,0.25);border-radius:12px;padding:14px 16px;">
-                <span class="settings-label" style="color:#1db954;">🔄 Aktualizace aplikace</span>
-                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;line-height:1.5;">
-                    Po nahrání nové verze na server appka někdy sama nepozná změnu. Klikni sem pro kontrolu a okamžitou aktualizaci.
-                </div>
-                <button class="settings-btn-small" id="checkUpdatesBtn" onclick="checkForUpdates()" style="width:100%;background:rgba(29,185,84,0.2);border:1px solid rgba(29,185,84,0.4);color:#1db954;font-weight:600;padding:10px;">🔄 Zkontrolovat aktualizace</button>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;" id="deployedVersionInfo">📅 Nahráno: —</div>
-                <div style="font-size:0.75rem;margin-top:8px;" id="checkUpdatesStatus"></div>
-            </div>
-            <div class="settings-divider"></div>
+            <!-- ============ TAB: KLÍČE ============ -->
+            <div class="settings-tab-content active" id="settingsTabContentKeys">
             <div class="settings-section">
                 <span class="settings-label">TMDB API Klíč</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">
@@ -1797,40 +1769,19 @@
                     Přihlašovací údaje do <a href="https://www.ivysilani.cz" target="_blank" style="color:#60b0ff;">ivysilani.cz</a>. Po synchronizaci se zobrazí vaše oblíbené pořady a seznamy přímo v aplikaci. Přehrávání se spustí v přehrávači iVysílání.
                 </div>
             </div>
-            <div class="settings-divider"></div>
-            <div class="settings-section">
-                <span class="settings-label">Explicitní obsah (dospělí)</span>
-                <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
-                    <div style="display:flex;align-items:center;gap:8px;font-size:0.88rem;color:var(--text-muted);">
-                        <div id="adultToggle" onclick="if(localStorage.getItem('sinator_admin_mode')==='1'){toggleAdultContent()}" style="width:44px;height:24px;border-radius:12px;background:#333;position:relative;cursor:not-allowed;transition:background 0.2s;flex-shrink:0;opacity:0.4;">
-                            <div id="adultToggleKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;pointer-events:none;"></div>
-                        </div>
-                        <span id="adultToggleLabel">Vypnuto</span>
+            </div>
+            <!-- ============ TAB: VZHLED ============ -->
+            <div class="settings-tab-content" id="settingsTabContentAppearance">
+            <div class="settings-section" style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.25);border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span id="themeBulbIcon">💡</span>
+                    <div>
+                        <span class="settings-label" style="color:var(--gold);display:block;">Vzhled aplikace</span>
+                        <span style="font-size:0.75rem;color:var(--text-muted);" id="themeModeLabel">Tmavý režim</span>
                     </div>
                 </div>
-                <div style="font-size:0.7rem;color:var(--text-muted);opacity:0.6;margin-top:4px;">Zobrazuje filmy a seriály s explicitním obsahem ve výsledcích TMDB</div>
-            </div>
-            <div class="settings-divider"></div>
-            <div class="settings-section">
-                <span class="settings-label">Záloha dat</span>
-                <div class="settings-actions">
-                    <button class="settings-btn-small" onclick="exportBackup()">📤 Export</button>
-                    <label class="settings-btn-small" style="cursor:pointer;">📥 Import
-                        <input type="file" accept=".json" style="display:none;" onchange="importBackup(this)">
-                    </label>
-                </div>
-            </div>
-            <div class="settings-divider"></div>
-            <div class="settings-section" style="background:rgba(255,165,0,0.07);border:1px solid rgba(255,165,0,0.25);border-radius:12px;padding:14px 16px;">
-                <span class="settings-label" style="color:#ffaa00;">🛡️ Admin přístup</span>
-                <input type="password" class="settings-input" id="adminPwdInput" placeholder="Admin heslo…" autocomplete="off">
-                <div class="settings-actions">
-                    <button class="settings-btn-small" onclick="toggleAdminPwdVisibility()">👁️ Zobrazit</button>
-                    <button class="settings-btn-small" onclick="activateAdminMode()" style="background:rgba(255,165,0,0.3);">🛡️ Aktivovat</button>
-                    <button class="settings-btn-small settings-btn-remove" onclick="deactivateAdminMode()">🔓 Odhlásit</button>
-                </div>
-                <div style="font-size:0.75rem;margin-top:6px;" id="adminModeStatus">
-                    <span style="color:#888;">Admin: <span id="adminModeLabel">Neaktivní</span></span>
+                <div class="theme-toggle-switch" id="themeToggleSwitch" onclick="toggleAppTheme()">
+                    <div class="theme-toggle-knob" id="themeToggleKnob">💡</div>
                 </div>
             </div>
             <div class="settings-divider"></div>
@@ -1851,6 +1802,71 @@
             <button class="settings-full-btn" onclick="toggleFullscreen()" id="settingsFullscreenBtn">🔒 Fullscreen (zapnuto)</button>
             <button class="settings-full-btn" id="pwaInstallBtn" onclick="installPWA()" style="display:none;">📲 Instalovat aplikaci</button>
             <div id="pwaInstallInfo" style="font-size:0.7rem; color:var(--text-muted); text-align:center; margin-top:4px; display:none;">Dostupné v Chrome/Edge na Androidu přes HTTPS</div>
+            </div>
+            <!-- ============ TAB: ADMIN ============ -->
+            <div class="settings-tab-content" id="settingsTabContentAdmin">
+            <div class="settings-section" style="background:rgba(255,165,0,0.07);border:1px solid rgba(255,165,0,0.25);border-radius:12px;padding:14px 16px;">
+                <span class="settings-label" style="color:#ffaa00;">🛡️ Admin přístup</span>
+                <input type="password" class="settings-input" id="adminPwdInput" placeholder="Admin heslo…" autocomplete="off">
+                <div class="settings-actions">
+                    <button class="settings-btn-small" onclick="toggleAdminPwdVisibility()">👁️ Zobrazit</button>
+                    <button class="settings-btn-small" onclick="activateAdminMode()" style="background:rgba(255,165,0,0.3);">🛡️ Aktivovat</button>
+                    <button class="settings-btn-small settings-btn-remove" onclick="deactivateAdminMode()">🔓 Odhlásit</button>
+                </div>
+                <div style="font-size:0.75rem;margin-top:6px;" id="adminModeStatus">
+                    <span style="color:#888;">Admin: <span id="adminModeLabel">Neaktivní</span></span>
+                </div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section" style="background:rgba(229,9,20,0.07);border:1px solid rgba(229,9,20,0.25);border-radius:12px;padding:14px 16px;">
+                <span class="settings-label" style="color:#ff6b6b;">🔐 Přístupové heslo aplikace</span>
+                <input type="password" class="settings-input" id="settingsPwdInput" placeholder="Zadejte nové heslo…" autocomplete="off">
+                <div class="settings-actions">
+                    <button class="settings-btn-small show-key-btn" onclick="toggleSettingsPwdVisibility()">👁️ Zobrazit</button>
+                    <button class="settings-btn-small" onclick="saveAppPassword()" style="background:rgba(229,9,20,0.3);">💾 Uložit heslo</button>
+                    <button class="settings-btn-small settings-btn-remove" onclick="clearAppPassword()">🗑️ Odebrat heslo</button>
+                </div>
+                <div style="margin-top:10px;">
+                    <button class="settings-btn-small" onclick="logoutApp()" style="width:100%;background:rgba(229,9,20,0.18);border:1px solid rgba(229,9,20,0.4);color:#ff6b6b;font-weight:600;padding:10px;">🔒 Odhlásit se (zamknout aplikaci)</button>
+                </div>
+                <div style="font-size:0.75rem;color:#888;margin-top:6px;" id="settingsPwdStatus">
+                    Heslo chrání přístup do aplikace. Po uložení bude vyžadováno při každém spuštění.
+                </div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section">
+                <span class="settings-label">Explicitní obsah (dospělí)</span>
+                <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+                    <div style="display:flex;align-items:center;gap:8px;font-size:0.88rem;color:var(--text-muted);">
+                        <div id="adultToggle" onclick="if(localStorage.getItem('sinator_admin_mode')==='1'){toggleAdultContent()}" style="width:44px;height:24px;border-radius:12px;background:#333;position:relative;cursor:not-allowed;transition:background 0.2s;flex-shrink:0;opacity:0.4;">
+                            <div id="adultToggleKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;pointer-events:none;"></div>
+                        </div>
+                        <span id="adultToggleLabel">Vypnuto</span>
+                    </div>
+                </div>
+                <div style="font-size:0.7rem;color:var(--text-muted);opacity:0.6;margin-top:4px;">Zobrazuje filmy a seriály s explicitním obsahem ve výsledcích TMDB</div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section" style="background:rgba(29,185,84,0.07);border:1px solid rgba(29,185,84,0.25);border-radius:12px;padding:14px 16px;">
+                <span class="settings-label" style="color:#1db954;">🔄 Aktualizace aplikace</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;line-height:1.5;">
+                    Po nahrání nové verze na server appka někdy sama nepozná změnu. Klikni sem pro kontrolu a okamžitou aktualizaci.
+                </div>
+                <button class="settings-btn-small" id="checkUpdatesBtn" onclick="checkForUpdates()" style="width:100%;background:rgba(29,185,84,0.2);border:1px solid rgba(29,185,84,0.4);color:#1db954;font-weight:600;padding:10px;">🔄 Zkontrolovat aktualizace</button>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;" id="deployedVersionInfo">📅 Nahráno: —</div>
+                <div style="font-size:0.75rem;margin-top:8px;" id="checkUpdatesStatus"></div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section">
+                <span class="settings-label">Záloha dat</span>
+                <div class="settings-actions">
+                    <button class="settings-btn-small" onclick="exportBackup()">📤 Export</button>
+                    <label class="settings-btn-small" style="cursor:pointer;">📥 Import
+                        <input type="file" accept=".json" style="display:none;" onchange="importBackup(this)">
+                    </label>
+                </div>
+            </div>
+            </div>
         </div>
     </div>
 </div>
@@ -2735,8 +2751,20 @@
         document.documentElement.setAttribute('data-theme', next);
         updateThemeToggleUI();
     }
+    function switchSettingsTab(tab) {
+        const tabs = { keys: 'Keys', appearance: 'Appearance', admin: 'Admin' };
+        Object.keys(tabs).forEach(function(key) {
+            const content = $('settingsTabContent' + tabs[key]);
+            const btn = $('settingsTabBtn' + tabs[key]);
+            if(content) content.classList.toggle('active', key === tab);
+            if(btn) btn.classList.toggle('active', key === tab);
+        });
+    }
+    window.switchSettingsTab = switchSettingsTab;
+
     function openSettingsModal() {
         closeHelperModals();
+        switchSettingsTab('keys');
         if($('geminiApiKeyInput')) $('geminiApiKeyInput').value = geminiApiKey;
         if($('groqApiKeyInput')) $('groqApiKeyInput').value = groqApiKey;
         if($('openRouterKeyInput')) $('openRouterKeyInput').value = openRouterKey;
