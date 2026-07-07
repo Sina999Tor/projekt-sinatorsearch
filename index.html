@@ -3558,6 +3558,27 @@
             return t;
         };
 
+        // 🆕 KRITICKÉ: stripDia sama o sobě NEODSTRAŇUJE HTML tagy/atributy —
+        // jen nealfanumerické znaky. To znamená, že slovo z názvu se dřív
+        // počítalo jako "nalezeno" i když se vyskytlo jen v <meta>, JSON-LD,
+        // odkazu na "podobné" štítky/kategorie, breadcrumb nebo skrytém inputu
+        // — kdekoli v celém zdrojovém kódu, nejen ve skutečném výpisu výsledků.
+        // Proto nejdřív vyřízneme <head>/<script>/<style>/komentáře a pak
+        // stáhneme VŠECHNY tagy (čímž zmizí i atributy typu href/content/data-*),
+        // takže se porovnává jen viditelný text těla stránky.
+        const extractVisibleText = (rawHtml) => {
+            let h = rawHtml || '';
+            h = h.replace(/<head[\s\S]*?<\/head>/gi, ' ');
+            h = h.replace(/<script[\s\S]*?<\/script>/gi, ' ');
+            h = h.replace(/<style[\s\S]*?<\/style>/gi, ' ');
+            h = h.replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ');
+            h = h.replace(/<!--[\s\S]*?-->/g, ' ');
+            h = h.replace(/<[^>]+>/g, ' '); // odstraní zbylé tagy VČETNĚ jejich atributů (href, content, data-*…)
+            h = h.replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&quot;/gi, '"')
+                 .replace(/&#0?39;/gi, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>');
+            return h;
+        };
+
         // 🛡️ Detekce anti-bot/challenge stránek (Cloudflare aj.) — takové stránky
         // nemají žádný reálný obsah, jen "ověřuji prohlížeč" text, a NESMÍ se
         // vyhodnotit jako "nenalezeno" (❌), protože to je lež — nedostali jsme
@@ -3580,7 +3601,8 @@
             if (isNegative) return 'notfound';
             if (zeroCountPatterns.some(re => re.test(rawText||''))) return 'notfound';
 
-            const cleaned = stripQueryEcho(rawText);
+            const visible = extractVisibleText(rawText);
+            const cleaned = stripQueryEcho(visible);
             const text = stripDia(cleaned);
             if (titleWords.length === 0) return 'found'; // nemáme podle čeho ověřit, spolehni se jen na negativní vzory
             const matchedCount = titleWords.filter(w => text.includes(w)).length;
