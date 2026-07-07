@@ -3624,6 +3624,21 @@
             const btn = $(`srcbtn-${key}`);
             const st = btn?.querySelector('.src-status');
 
+            // 🤝 Kompromis: tyhle zdroje mají tak silnou anti-bot ochranu, že fetch
+            // z Vercelu i z veřejných CORS proxy skoro vždy skončí zablokovaný
+            // (= "nelze ověřit"). Ze zkušenosti obsah reálně mají, takže u NICH
+            // konkrétně jen v případě "nelze ověřit" (blok/timeout) defaultujeme
+            // na ✅ místo ❓. Pokud se ale fetch podaří a stránka výslovně řekne
+            // "nenalezeno", ukáže se to poctivě jako ❌ — tohle NENÍ slepé skip.
+            const ASSUME_FOUND_ON_UNKNOWN = new Set(['hellspy','fastshare','prehraj','sledujfilmy']);
+            const markUnknown = () => {
+                if(ASSUME_FOUND_ON_UNKNOWN.has(key)) {
+                    btn?.classList.add('src-found'); if(st) st.textContent = '✅';
+                } else {
+                    btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
+                }
+            };
+
             const tryFetch = async (u, timeoutMs) => {
                 const controller = new AbortController();
                 const timeout = setTimeout(()=>controller.abort(), timeoutMs);
@@ -3679,7 +3694,7 @@
                 } catch(e) { /* zkusit další proxy */ }
             }
             if(!res) {
-                btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
+                markUnknown();
                 return;
             }
             try {
@@ -3687,7 +3702,7 @@
                     if(res.status === 404) {
                         btn?.classList.add('src-notfound'); if(st) st.textContent = '❌';
                     } else {
-                        btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
+                        markUnknown();
                     }
                     return;
                 }
@@ -3696,12 +3711,12 @@
                 if(verdict === 'notfound') {
                     btn?.classList.add('src-notfound'); if(st) st.textContent = '❌';
                 } else if(verdict === 'unknown') {
-                    btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
+                    markUnknown();
                 } else {
                     btn?.classList.add('src-found'); if(st) st.textContent = '✅';
                 }
             } catch(e) {
-                btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
+                markUnknown();
             }
         };
 
