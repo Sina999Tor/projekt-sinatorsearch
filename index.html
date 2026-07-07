@@ -3442,12 +3442,15 @@
     window.updateOmdbFilterInfo=updateOmdbFilterInfo;
 
     // ✅ OPRAVENÉ FUNKCE PRO ZDROJE VYHLEDÁVÁNÍ - podle požadovaných formátů
-    function openSourcesModal(title, year, type, origTitle) {
+    function openSourcesModal(title, year, type, origTitle, episodeTitle, seasonNum, episodeNum) {
         closeHelperModals();
         state.currentSearchTitle = title;
         state.currentSearchYear = year || '';
         state.currentSearchType = type || 'movie';
         state.currentSearchOrigTitle = origTitle || title;
+        state.currentSearchEpisodeTitle = episodeTitle || '';
+        state.currentSearchSeason = seasonNum || '';
+        state.currentSearchEpisode = episodeNum || '';
         $('sourcesTitle').textContent = title;
         $('sourcesModal')?.classList.add('open');
     }
@@ -3470,7 +3473,7 @@
             'sledujfilmy': `https://ww.sledujfilmy.io/?s=${title}`,
             'dokufilmy': `https://dokufilmy.cz/?s=${title}`,
             'hellspio': `https://hellspio.vercel.app/cs?search=${title}`,
-            'ceskarepublika': (()=>{ const tp=state.currentSearchType||'movie'; if(tp==='tv'){ const raw=state.currentSearchTitle||''; const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); return `https://ceskarepublika.wiki/serialy-online/${slug}/`; } return `https://ceskarepublika.wiki/filmy-online/?q=${title}`; })(),
+            'ceskarepublika': (()=>{ const tp=state.currentSearchType||'movie'; const slugify=(str)=>{ const s=(str||'').toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; return [...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }; if(tp==='tv'){ const showSlug=slugify(state.currentSearchOrigTitle||state.currentSearchTitle); if(state.currentSearchEpisodeTitle){ const epSlug=slugify(state.currentSearchEpisodeTitle); const s=String(state.currentSearchSeason||1).padStart(2,'0'); const e=String(state.currentSearchEpisode||1).padStart(2,'0'); return `https://ceskarepublika.wiki/serialy-online/${showSlug}/${epSlug}-s${s}e${e}/`; } return `https://ceskarepublika.wiki/serialy-online/${showSlug}/`; } return `https://ceskarepublika.wiki/filmy-online/?q=${title}`; })(),
             'streamimdb': `https://streamimdb.ru/search?q=${title}`,
             '123moviesfree': `https://ww8.123moviesfree.net/?s=${title}`,
             'bombuj': (()=>{ const tp=state.currentSearchType||'movie'; const raw=tp==='tv'?(state.currentSearchOrigTitle||state.currentSearchTitle||''):(state.currentSearchTitle||''); const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); if(tp==='tv') return `https://serialy.bombuj.si/serial-${slug}#serial`; const yr=state.currentSearchYear||''; return `https://www.bombuj.si/online-film-${slug}${yr?'-'+yr:''}`; })(),
@@ -7685,7 +7688,7 @@ EXAMPLES:
                     <div class="action-buttons">
                         <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${seriesTitleJs} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}'))">▶️ Přehrát</button>
                         <button class="action-btn-modal youtube" onclick="openYouTube('${seriesTitleJs} S${seasonNumber}E${episodeNumber}')">▶️ Trailer</button>
-                        <button class="action-btn-modal search-sources" onclick="openSourcesModal('${seriesTitleJs} S${seasonNumber}E${episodeNumber}')">🔍 Vyhledat zdroje</button>
+                        <button class="action-btn-modal search-sources" onclick="openSourcesModal('${seriesTitleJs} S${seasonNumber}E${episodeNumber}', '', 'tv', '${seriesTitleJs}', '${titleJs}', ${seasonNumber}, ${episodeNumber})">🔍 Vyhledat zdroje</button>
                         <button class="action-btn-modal" onclick="translateOverview()">🌐 Přeložit</button>
                         <button class="action-btn-modal" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">🎬 Katalogy ▾</button>
                         <div class="action-buttons" style="display:none;margin-top:4px;">
