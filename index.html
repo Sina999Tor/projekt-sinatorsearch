@@ -3527,10 +3527,15 @@
         const checkOne = async (key, url) => {
             const btn = $(`srcbtn-${key}`);
             const st = btn?.querySelector('.src-status');
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-            const tryFetch = async (u) => {
+            const attempts = [
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+                `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
+                `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+                url // přímý fetch jako poslední záloha
+            ];
+            const tryFetch = async (u, timeoutMs) => {
                 const controller = new AbortController();
-                const timeout = setTimeout(()=>controller.abort(), 9000);
+                const timeout = setTimeout(()=>controller.abort(), timeoutMs);
                 try {
                     const res = await fetch(u, { signal: controller.signal });
                     clearTimeout(timeout);
@@ -3540,13 +3545,18 @@
                     throw e;
                 }
             };
-            try {
-                let res;
+            let res = null;
+            for(const u of attempts) {
                 try {
-                    res = await tryFetch(proxyUrl);
-                } catch(e) {
-                    res = await tryFetch(url); // fallback: přímý fetch (funguje jen u zdrojů bez CORS blokace)
-                }
+                    res = await tryFetch(u, 8000);
+                    if(res && (res.ok || res.status === 404)) break;
+                } catch(e) { /* zkusit další proxy */ }
+            }
+            if(!res) {
+                btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
+                return;
+            }
+            try {
                 if(!res.ok) {
                     if(res.status === 404) {
                         btn?.classList.add('src-notfound'); if(st) st.textContent = '❌';
@@ -3563,12 +3573,17 @@
                     btn?.classList.add('src-found'); if(st) st.textContent = '✅';
                 }
             } catch(e) {
-                // proxy i přímý fetch selhaly — nelze ověřit, odkaz ale funguje ručně
                 btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
             }
         };
 
-        await Promise.allSettled(Object.entries(urls).map(([key, url]) => checkOne(key, url)));
+        const entries = Object.entries(urls);
+        const batchSize = 4;
+        for(let i=0; i<entries.length; i+=batchSize) {
+            const batch = entries.slice(i, i+batchSize);
+            await Promise.allSettled(batch.map(([key, url]) => checkOne(key, url)));
+            if(i+batchSize < entries.length) await new Promise(r=>setTimeout(r, 400));
+        }
 
         analyzeBtn.textContent = origLabel;
         analyzeBtn.disabled = false;
