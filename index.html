@@ -3513,7 +3513,29 @@
         analyzeBtn.disabled = true;
 
         const urls = getAllSourceUrls();
-        const negativePatterns = ['nenalezen','nenalezeno','nenašli jsme','nic nenalezeno','žádné výsledky','žádný výsledek','no results','0 results','not found','404 not found'];
+        const negativePatterns = ['nenalezen','nenalezeno','nenašli jsme','nic nenalezeno','nebyly nalezeny','žádné výsledky','žádný výsledek','žádné video','nic jsme nenašli','no results','no matches','0 results','not found','404 not found','stránka nenalezena'];
+
+        // 🎯 Pozitivní ověření: absence negativní fráze nestačí (mnoho stránek
+        // vrací generickou "no results" šablonu jinými slovy, nebo je výpis
+        // dotažen přes JS a v HTML žádný text není). Proto navíc ověřujeme,
+        // že se v odpovědi skutečně vyskytuje hledaný název.
+        const stripDia = (s) => (s||'').toString().toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9\s]/g, ' ');
+        const STOPWORDS = new Set(['a','the','of','and','to','po','na','za','se','si','je','ve','v','do','ze','od','pro','le','la','les','der','die','das']);
+        const titleRaw = state.currentSearchOrigTitle || state.currentSearchTitle || '';
+        const titleWords = stripDia(titleRaw).split(/\s+/).filter(w => w.length >= 3 && !STOPWORDS.has(w));
+
+        const evaluateText = (rawText) => {
+            const text = stripDia(rawText);
+            const isNegative = negativePatterns.some(p => (rawText||'').toLowerCase().includes(p));
+            if (isNegative) return 'notfound';
+            if (titleWords.length === 0) return 'found'; // nemáme podle čeho ověřit, spolehni se jen na negativní vzory
+            const matchedCount = titleWords.filter(w => text.includes(w)).length;
+            const ratio = matchedCount / titleWords.length;
+            // vyžadujeme aspoň polovinu slov z názvu (nebo min. 1, pokud je název jednoslovný)
+            return ratio >= 0.5 ? 'found' : 'notfound';
+        };
 
         // reset vizuálů
         Object.keys(urls).forEach(key => {
@@ -3550,10 +3572,9 @@
                         if(data.status === 404) {
                             btn?.classList.add('src-notfound'); if(st) st.textContent = '❌'; return;
                         }
-                        const text = data.text.toLowerCase();
-                        const isNegative = negativePatterns.some(p => text.includes(p));
-                        btn?.classList.add(isNegative ? 'src-notfound' : 'src-found');
-                        if(st) st.textContent = isNegative ? '❌' : '✅';
+                        const verdict = evaluateText(data.text);
+                        btn?.classList.add(verdict === 'found' ? 'src-found' : 'src-notfound');
+                        if(st) st.textContent = verdict === 'found' ? '✅' : '❌';
                         return;
                     }
                 }
@@ -3586,9 +3607,9 @@
                     }
                     return;
                 }
-                const text = (await res.text()).toLowerCase();
-                const isNegative = negativePatterns.some(p => text.includes(p));
-                if(isNegative) {
+                const text = await res.text();
+                const verdict = evaluateText(text);
+                if(verdict === 'notfound') {
                     btn?.classList.add('src-notfound'); if(st) st.textContent = '❌';
                 } else {
                     btn?.classList.add('src-found'); if(st) st.textContent = '✅';
