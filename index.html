@@ -3513,14 +3513,15 @@
         analyzeBtn.disabled = true;
 
         const urls = getAllSourceUrls();
+        // ⚠️ Jen fráze, které se v praxi vyskytují VÝHRADNĚ na stránkách s prázdným
+        // výsledkem vyhledávání — žádné obecné "helpbox"/FAQ texty typu "pokud se
+        // vám nepodařilo najít film...", protože ty bývají na stránce i u nalezených výsledků.
         const negativePatterns = ['nenalezen','nenalezeno','nenašli jsme','nic nenalezeno','nebyly nalezeny',
             'žádné výsledky','žádný výsledek','žádné video','nic jsme nenašli','no results','no matches',
             '0 results','not found','404 not found','stránka nenalezena',
-            // 🆕 fráze odchycené z reálných false-positive případů (dokufilmy, sledujte.to, ceskarepublika.wiki…)
             'nothing matched your search terms','sorry, but nothing','neodpovídá zvoleným filtrům',
             'žádný film neodpovídá','žádný výsledek neodpovídá','no matching results','no items found',
-            'no content found','se nepodařilo najít','nic k zobrazení','nebyl nalezen žádný',
-            'we could not find','could not be found','no matching'];
+            'nebyl nalezen žádný','we could not find'];
 
         // 🎯 Pozitivní ověření: absence negativní fráze nestačí (mnoho stránek
         // vrací generickou "no results" šablonu jinými slovy, nebo je výpis
@@ -3539,8 +3540,10 @@
         // výsledky/results/nalezeno explicitní nula, jde vždy o notfound
         // bez ohledu na to, kolik slov z názvu se v textu jinak najde.
         const zeroCountPatterns = [
-            /(?:výsledk\w*|results?|nalezen\w*|found|items?)\D{0,15}\(?\s*0\s*\)?/i,
-            /\(\s*0\s*\)\s*$/m
+            // pouze "výsledky/results ... (0)" — NE obecná slova jako "found"/"items",
+            // ta se snadno trefí do nesouvisejících čítačů (komentáře, sdílení, hodnocení…)
+            /(?:výsledk\w*|results?)\D{0,15}\(?\s*0\s*\)?/i,
+            /\(\s*0\s*\)\s*(?:výsledk|results?)/i
         ];
 
         // 🆕 Než počítáme shody slov, odstraníme z textu místa, kde web pouze
