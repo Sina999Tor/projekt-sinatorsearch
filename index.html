@@ -3442,7 +3442,7 @@
     window.updateOmdbFilterInfo=updateOmdbFilterInfo;
 
     // ✅ OPRAVENÉ FUNKCE PRO ZDROJE VYHLEDÁVÁNÍ - podle požadovaných formátů
-    function openSourcesModal(title, year, type, origTitle, episodeTitle, seasonNum, episodeNum) {
+    function openSourcesModal(title, year, type, origTitle, episodeTitle, seasonNum, episodeNum, czechShowTitle) {
         closeHelperModals();
         state.currentSearchTitle = title;
         state.currentSearchYear = year || '';
@@ -3451,6 +3451,7 @@
         state.currentSearchEpisodeTitle = episodeTitle || '';
         state.currentSearchSeason = seasonNum || '';
         state.currentSearchEpisode = episodeNum || '';
+        state.currentSearchCzechShowTitle = czechShowTitle || '';
         $('sourcesTitle').textContent = title;
         $('sourcesModal')?.classList.add('open');
     }
@@ -3473,7 +3474,7 @@
             'sledujfilmy': `https://ww.sledujfilmy.io/?s=${title}`,
             'dokufilmy': `https://dokufilmy.cz/?s=${title}`,
             'hellspio': `https://hellspio.vercel.app/cs?search=${title}`,
-            'ceskarepublika': (()=>{ const tp=state.currentSearchType||'movie'; const slugify=(str)=>{ const s=(str||'').toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; return [...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }; if(tp==='tv'){ const showSlug=slugify(state.currentSearchOrigTitle||state.currentSearchTitle); if(state.currentSearchEpisodeTitle && state.currentSearchSeason && state.currentSearchEpisode){ const epSlug=slugify(state.currentSearchEpisodeTitle); const s=String(state.currentSearchSeason).padStart(2,'0'); const e=String(state.currentSearchEpisode).padStart(2,'0'); return `https://ceskarepublika.wiki/serialy-online/${showSlug}/${epSlug}-s${s}e${e}/`; } return `https://ceskarepublika.wiki/serialy-online/${showSlug}/`; } return `https://ceskarepublika.wiki/filmy-online/?q=${title}`; })(),
+            'ceskarepublika': (()=>{ const tp=state.currentSearchType||'movie'; const slugify=(str)=>{ const s=(str||'').toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; return [...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }; if(tp==='tv'){ const showSlug=slugify(state.currentSearchCzechShowTitle||state.currentSearchOrigTitle||state.currentSearchTitle); if(state.currentSearchEpisodeTitle && state.currentSearchSeason && state.currentSearchEpisode){ const epSlug=slugify(state.currentSearchEpisodeTitle); const s=String(state.currentSearchSeason).padStart(2,'0'); const e=String(state.currentSearchEpisode).padStart(2,'0'); return `https://ceskarepublika.wiki/serialy-online/${showSlug}/${epSlug}-s${s}e${e}/`; } return `https://ceskarepublika.wiki/serialy-online/${showSlug}/`; } return `https://ceskarepublika.wiki/filmy-online/?q=${title}`; })(),
             'streamimdb': `https://streamimdb.ru/search?q=${title}`,
             '123moviesfree': `https://ww8.123moviesfree.net/?s=${title}`,
             'bombuj': (()=>{ const tp=state.currentSearchType||'movie'; const raw=tp==='tv'?(state.currentSearchOrigTitle||state.currentSearchTitle||''):(state.currentSearchTitle||''); const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); if(tp==='tv') return `https://serialy.bombuj.si/serial-${slug}#serial`; const yr=state.currentSearchYear||''; return `https://www.bombuj.si/online-film-${slug}${yr?'-'+yr:''}`; })(),
@@ -7667,6 +7668,12 @@ EXAMPLES:
             const ep = await epRes.json();
             const seriesRes = await fetch(`${BASE}/tv/${tvId}?api_key=${tmdbApiKey}&language=cs-CZ`);
             const series = await seriesRes.json();
+            let czSeriesName = '';
+            try {
+                const transRes = await fetch(`${BASE}/tv/${tvId}/translations?api_key=${tmdbApiKey}`);
+                const transData = await transRes.json();
+                czSeriesName = (transData.translations||[]).find(t=>t.iso_639_1==='cs' && t.data && t.data.name)?.data.name || '';
+            } catch(e) {}
             const title = ep.name || 'Neznámá epizoda';
             const airDate = ep.air_date || '';
             const rating = ep.vote_average ? ep.vote_average.toFixed(1) : '—';
@@ -7677,6 +7684,7 @@ EXAMPLES:
             const safeSeriesTitle = (series.name || '').replace(/'/g, "&#39;").replace(/"/g, '&quot;');
             const titleJs = jsq(title);
             const seriesTitleJs = jsq(series.name || '');
+            const czSeriesNameJs = jsq(czSeriesName || '');
             $('modalScrollBody').innerHTML = `${modalNav(safeSeriesTitle, hasBack)}
                 ${bg}
                 <div class="modal-body">
@@ -7688,7 +7696,7 @@ EXAMPLES:
                     <div class="action-buttons">
                         <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${seriesTitleJs} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}'))">▶️ Přehrát</button>
                         <button class="action-btn-modal youtube" onclick="openYouTube('${seriesTitleJs} S${seasonNumber}E${episodeNumber}')">▶️ Trailer</button>
-                        <button class="action-btn-modal search-sources" onclick="openSourcesModal('${seriesTitleJs} S${seasonNumber}E${episodeNumber}', '', 'tv', '${seriesTitleJs}', '${titleJs}', ${seasonNumber}, ${episodeNumber})">🔍 Vyhledat zdroje</button>
+                        <button class="action-btn-modal search-sources" onclick="openSourcesModal('${seriesTitleJs} S${seasonNumber}E${episodeNumber}', '', 'tv', '${seriesTitleJs}', '${titleJs}', ${seasonNumber}, ${episodeNumber}, '${czSeriesNameJs}')">🔍 Vyhledat zdroje</button>
                         <button class="action-btn-modal" onclick="translateOverview()">🌐 Přeložit</button>
                         <button class="action-btn-modal" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">🎬 Katalogy ▾</button>
                         <div class="action-buttons" style="display:none;margin-top:4px;">
@@ -7759,10 +7767,11 @@ EXAMPLES:
                 ? `${BASE}/movie/${id}/release_dates?api_key=${tmdbApiKey}`
                 : `${BASE}/tv/${id}/content_ratings?api_key=${tmdbApiKey}`;
 
-            const [d, credits, certData] = await Promise.all([
+            const [d, credits, certData, tvTranslations] = await Promise.all([
                 fetch(`${BASE}/${type}/${id}?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()),
                 fetch(`${BASE}/${type}/${id}/credits?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()),
-                fetch(certEndpoint).then(r=>r.json()).catch(()=>null)
+                fetch(certEndpoint).then(r=>r.json()).catch(()=>null),
+                (type === 'tv' ? fetch(`${BASE}/tv/${id}/translations?api_key=${tmdbApiKey}`).then(r=>r.json()).catch(()=>null) : Promise.resolve(null))
             ]);
 
             // Získání certifikace (věkové hodnocení)
@@ -7795,6 +7804,7 @@ EXAMPLES:
                 : '';
 
             const title = d.title||d.name; const year = (d.release_date||d.first_air_date||'').slice(0,4);
+            const czTvName = tvTranslations ? (tvTranslations.translations||[]).find(t=>t.iso_639_1==='cs' && t.data && t.data.name)?.data.name : '';
             const rating = d.vote_average?d.vote_average.toFixed(1):'—';
             const bg = d.backdrop_path?`<img class="modal-backdrop" src="${IMG}original${d.backdrop_path}">`:'';
             const genres = (d.genres||[]).map(g=>`<span class="modal-genre" style="cursor:pointer;" onclick="openGenreBrowse(${g.id},'${jsq(g.name)}','${type}')" title="Procházet žánr: ${g.name}">${g.name}</span>`).join('');
@@ -7838,7 +7848,7 @@ EXAMPLES:
             const posterPath = d.poster_path || '';
             const actionBtns = `<div class="action-buttons">
 <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeTitle}'))">▶️ Přehrát</button>
-<button class="action-btn-modal search-sources" onclick="openSourcesModal('${safeTitle}', '${year}', '${type}', '${origTitle}')">🔍 Vyhledat zdroje</button>
+<button class="action-btn-modal search-sources" onclick="openSourcesModal('${safeTitle}', '${year}', '${type}', '${origTitle}', '', '', '', '${jsq(czTvName||'')}')">🔍 Vyhledat zdroje</button>
 <button class="action-btn-modal youtube" onclick="openYouTube('${safeTitle}')">▶️ Trailer</button>
 <button class="action-btn-modal" onclick="showMediaGallery(${id}, '${type}', '${safeTitle}')">🖼️ Galerie</button>
 ${collectionBtn}
