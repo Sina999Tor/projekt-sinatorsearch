@@ -3597,11 +3597,18 @@
 
         const evaluateText = (rawText) => {
             if (looksBlocked(rawText)) return 'unknown';
-            const isNegative = negativePatterns.some(p => (rawText||'').toLowerCase().includes(p));
-            if (isNegative) return 'notfound'; // explicitní negativní fráze — spolehlivý signál
-            if (zeroCountPatterns.some(re => re.test(rawText||''))) return 'notfound'; // explicitní "(0)" — spolehlivý signál
 
+            // 🆕 Negativní/zero-count vzory se testují na VIDITELNÉM textu, ne na
+            // syrovém HTML — jinak je snadné dostat falešné "nenalezeno" z <script>
+            // bloků (knihovny jako DataTables/Select2 mívají v kódu zabalené anglické
+            // i18n řetězce typu "No matching results found", cookie lišty apod.),
+            // což by obešlo i shovívavý seznam níže (explicitní notfound má přednost).
             const visible = extractVisibleText(rawText);
+            const visibleLow = visible.toLowerCase();
+            const isNegative = negativePatterns.some(p => visibleLow.includes(p));
+            if (isNegative) return 'notfound'; // explicitní negativní fráze — spolehlivý signál
+            if (zeroCountPatterns.some(re => re.test(visible))) return 'notfound'; // explicitní "(0)" — spolehlivý signál
+
             const cleaned = stripQueryEcho(visible);
             const text = stripDia(cleaned);
             if (titleWords.length === 0) return 'found'; // nemáme podle čeho ověřit, spolehni se jen na negativní vzory
