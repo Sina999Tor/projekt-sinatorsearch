@@ -3527,11 +3527,26 @@
         const checkOne = async (key, url) => {
             const btn = $(`srcbtn-${key}`);
             const st = btn?.querySelector('.src-status');
-            try {
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+            const tryFetch = async (u) => {
                 const controller = new AbortController();
-                const timeout = setTimeout(()=>controller.abort(), 7000);
-                const res = await fetch(url, { signal: controller.signal, mode: 'cors' });
-                clearTimeout(timeout);
+                const timeout = setTimeout(()=>controller.abort(), 9000);
+                try {
+                    const res = await fetch(u, { signal: controller.signal });
+                    clearTimeout(timeout);
+                    return res;
+                } catch(e) {
+                    clearTimeout(timeout);
+                    throw e;
+                }
+            };
+            try {
+                let res;
+                try {
+                    res = await tryFetch(proxyUrl);
+                } catch(e) {
+                    res = await tryFetch(url); // fallback: přímý fetch (funguje jen u zdrojů bez CORS blokace)
+                }
                 if(!res.ok) {
                     if(res.status === 404) {
                         btn?.classList.add('src-notfound'); if(st) st.textContent = '❌';
@@ -3548,7 +3563,7 @@
                     btn?.classList.add('src-found'); if(st) st.textContent = '✅';
                 }
             } catch(e) {
-                // CORS blokace nebo síťová chyba — nelze ověřit, odkaz ale funguje ručně
+                // proxy i přímý fetch selhaly — nelze ověřit, odkaz ale funguje ručně
                 btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
             }
         };
