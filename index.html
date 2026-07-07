@@ -3558,7 +3558,24 @@
             return t;
         };
 
+        // 🛡️ Detekce anti-bot/challenge stránek (Cloudflare aj.) — takové stránky
+        // nemají žádný reálný obsah, jen "ověřuji prohlížeč" text, a NESMÍ se
+        // vyhodnotit jako "nenalezeno" (❌), protože to je lež — nedostali jsme
+        // skutečný obsah. Patří to do "nelze ověřit" (❓).
+        const blockPatterns = ['checking your browser','just a moment','cf-browser-verification',
+            'cf-chl','attention required','ddos protection by','enable javascript and cookies',
+            'please enable cookies','verify you are human','ověřuji prohlížeč','access denied',
+            '403 forbidden','rate limit exceeded','too many requests','pardon our interruption',
+            'radware','perimeterx','are you a robot'];
+
+        const looksBlocked = (rawText) => {
+            const low = (rawText||'').toLowerCase();
+            if (low.length < 400) return true; // podezřele krátká odpověď = pravděpodobně blok/chyba, ne reálná stránka
+            return blockPatterns.some(p => low.includes(p));
+        };
+
         const evaluateText = (rawText) => {
+            if (looksBlocked(rawText)) return 'unknown';
             const isNegative = negativePatterns.some(p => (rawText||'').toLowerCase().includes(p));
             if (isNegative) return 'notfound';
             if (zeroCountPatterns.some(re => re.test(rawText||''))) return 'notfound';
@@ -3607,9 +3624,17 @@
                         if(data.status === 404) {
                             btn?.classList.add('src-notfound'); if(st) st.textContent = '❌'; return;
                         }
+                        // ⚠️ Cílová stránka odpověděla chybovým/blokovacím stavem (403/429/503…) —
+                        // to NENÍ důkaz, že obsah neexistuje, jen že jsme byli odmítnuti (anti-bot
+                        // ochrana). Takové odpovědi nesmí spadnout do "notfound".
+                        if(data.ok === false) {
+                            btn?.classList.add('src-unknown'); if(st) st.textContent = '❓'; return;
+                        }
                         const verdict = evaluateText(data.text);
-                        btn?.classList.add(verdict === 'found' ? 'src-found' : 'src-notfound');
-                        if(st) st.textContent = verdict === 'found' ? '✅' : '❌';
+                        const cls = verdict === 'found' ? 'src-found' : (verdict === 'unknown' ? 'src-unknown' : 'src-notfound');
+                        const icon = verdict === 'found' ? '✅' : (verdict === 'unknown' ? '❓' : '❌');
+                        btn?.classList.add(cls);
+                        if(st) st.textContent = icon;
                         return;
                     }
                 }
@@ -3646,6 +3671,8 @@
                 const verdict = evaluateText(text);
                 if(verdict === 'notfound') {
                     btn?.classList.add('src-notfound'); if(st) st.textContent = '❌';
+                } else if(verdict === 'unknown') {
+                    btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
                 } else {
                     btn?.classList.add('src-found'); if(st) st.textContent = '✅';
                 }
