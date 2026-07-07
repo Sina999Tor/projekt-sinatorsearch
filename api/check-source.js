@@ -25,7 +25,7 @@ export default async function handler(req, res) {
         return res.status(200).json({
             ok: r.ok,
             status: r.status,
-            text: text.slice(0, 30000)
+            text: text.slice(0, 120000)
         });
     } catch (e) {
         return res.status(200).json({ ok: false, error: e.message || String(e) });
