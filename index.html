@@ -3476,7 +3476,7 @@
             'bombuj': (()=>{ const tp=state.currentSearchType||'movie'; const raw=tp==='tv'?(state.currentSearchOrigTitle||state.currentSearchTitle||''):(state.currentSearchTitle||''); const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); if(tp==='tv') return `https://serialy.bombuj.si/serial-${slug}#serial`; const yr=state.currentSearchYear||''; return `https://www.bombuj.si/online-film-${slug}${yr?'-'+yr:''}`; })(),
             'uzila': `https://uzi.la/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}`,
             'mrkaj': `https://mrkaj.me/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}?t=${state.currentSearchType==='tv'?'s':'m'}`,
-            'mrkni': `https://mrkni.tv/vyhledavani/?q=${encodeURIComponent(state.currentSearchTitle||'')}`
+            'mrkni': (()=>{ const raw=state.currentSearchTitle||''; const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); const yr=state.currentSearchYear||''; return `https://mrkni.tv/${slug}${yr?'-'+yr:''}/`; })()
         };
         if(source === 'hellspy') {
             window.openHellspy(urls['hellspy']);
