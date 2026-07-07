@@ -3598,8 +3598,8 @@
         const evaluateText = (rawText) => {
             if (looksBlocked(rawText)) return 'unknown';
             const isNegative = negativePatterns.some(p => (rawText||'').toLowerCase().includes(p));
-            if (isNegative) return 'notfound';
-            if (zeroCountPatterns.some(re => re.test(rawText||''))) return 'notfound';
+            if (isNegative) return 'notfound'; // explicitní negativní fráze — spolehlivý signál
+            if (zeroCountPatterns.some(re => re.test(rawText||''))) return 'notfound'; // explicitní "(0)" — spolehlivý signál
 
             const visible = extractVisibleText(rawText);
             const cleaned = stripQueryEcho(visible);
@@ -3607,8 +3607,13 @@
             if (titleWords.length === 0) return 'found'; // nemáme podle čeho ověřit, spolehni se jen na negativní vzory
             const matchedCount = titleWords.filter(w => text.includes(w)).length;
             const ratio = matchedCount / titleWords.length;
-            // vyžadujeme aspoň polovinu slov z názvu (nebo min. 1, pokud je název jednoslovný)
-            return ratio >= 0.5 ? 'found' : 'notfound';
+            if (ratio >= 0.5) return 'found';
+            // 🆕 Tohle NENÍ explicitní "nenalezeno" ze stránky — jen se nám v syrovém
+            // HTML nepovedlo najít název. Časté u stránek, které výsledky dotahují
+            // přes JS/AJAX až po načtení (server pošle jen prázdnou kostru) nebo
+            // kde jsme hádali URL a mohli trefit vedle. Odlišujeme to od jistého
+            // "notfound", aby to šlo u known-nespolehlivých zdrojů posoudit shovívavěji.
+            return 'notfound-ratio';
         };
 
         // reset vizuálů
@@ -3624,18 +3629,37 @@
             const btn = $(`srcbtn-${key}`);
             const st = btn?.querySelector('.src-status');
 
-            // 🤝 Kompromis: tyhle zdroje mají tak silnou anti-bot ochranu, že fetch
-            // z Vercelu i z veřejných CORS proxy skoro vždy skončí zablokovaný
-            // (= "nelze ověřit"). Ze zkušenosti obsah reálně mají, takže u NICH
-            // konkrétně jen v případě "nelze ověřit" (blok/timeout) defaultujeme
-            // na ✅ místo ❓. Pokud se ale fetch podaří a stránka výslovně řekne
-            // "nenalezeno", ukáže se to poctivě jako ❌ — tohle NENÍ slepé skip.
-            const ASSUME_FOUND_ON_UNKNOWN = new Set(['hellspy','fastshare','prehraj','sledujfilmy']);
+            // 🤝 Kompromis: tyhle zdroje se z Vercelu/veřejných CORS proxy nedají
+            // spolehlivě ověřit — buď mají silnou anti-bot ochranu (hellspy,
+            // fastshare, prehraj, sledujfilmy), nebo výsledky dotahují přes JS/AJAX
+            // takže syrový HTML fetch je nevidí (ceskarepublika.wiki), nebo se URL
+            // pro ně jen hádá a nemusí trefit (bombuj). Ze zkušenosti obsah reálně
+            // mívají, takže "nejisté" výsledky (blok i pouhé nenalezení názvu v textu)
+            // u nich bereme jako ✅. Pokud ale stránka VÝSLOVNĚ řekne "nenalezeno",
+            // pořád se poctivě ukáže ❌ — tohle není slepé skip.
+            const LENIENT_SOURCES = new Set(['hellspy','fastshare','prehraj','sledujfilmy','bombuj','ceskarepublika']);
             const markUnknown = () => {
-                if(ASSUME_FOUND_ON_UNKNOWN.has(key)) {
+                if(LENIENT_SOURCES.has(key)) {
                     btn?.classList.add('src-found'); if(st) st.textContent = '✅';
                 } else {
                     btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
+                }
+            };
+            // verdict → vizuál, s výjimkou pro LENIENT_SOURCES u 'notfound-ratio'
+            const applyVerdict = (verdict) => {
+                if(verdict === 'found') {
+                    btn?.classList.add('src-found'); if(st) st.textContent = '✅';
+                } else if(verdict === 'notfound') {
+                    // explicitní negativní signál ze stránky — vždy důvěryhodné, i pro lenient zdroje
+                    btn?.classList.add('src-notfound'); if(st) st.textContent = '❌';
+                } else if(verdict === 'notfound-ratio') {
+                    if(LENIENT_SOURCES.has(key)) {
+                        btn?.classList.add('src-found'); if(st) st.textContent = '✅';
+                    } else {
+                        btn?.classList.add('src-notfound'); if(st) st.textContent = '❌';
+                    }
+                } else {
+                    markUnknown();
                 }
             };
 
@@ -3668,8 +3692,7 @@
                         if(data.ok !== false) {
                             const verdict = evaluateText(data.text);
                             if(verdict !== 'unknown') {
-                                btn?.classList.add(verdict === 'found' ? 'src-found' : 'src-notfound');
-                                if(st) st.textContent = verdict === 'found' ? '✅' : '❌';
+                                applyVerdict(verdict);
                                 return;
                             }
                             // verdict 'unknown' → propadá se dál na proxy fallback níže
@@ -3708,13 +3731,7 @@
                 }
                 const text = await res.text();
                 const verdict = evaluateText(text);
-                if(verdict === 'notfound') {
-                    btn?.classList.add('src-notfound'); if(st) st.textContent = '❌';
-                } else if(verdict === 'unknown') {
-                    markUnknown();
-                } else {
-                    btn?.classList.add('src-found'); if(st) st.textContent = '✅';
-                }
+                applyVerdict(verdict);
             } catch(e) {
                 markUnknown();
             }
