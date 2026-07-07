@@ -3844,7 +3844,7 @@
                     btn.style.background = '';
                 }, 2000);
             } catch(e) {
-                alert('Nepodařilo se zkopírovat. Zde je název:\n' + title);
+                prompt('Zkopírujte název (podrž pole a vyber Kopírovat):', title);
             }
             document.body.removeChild(textArea);
         }
