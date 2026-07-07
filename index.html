@@ -2246,6 +2246,19 @@
     let deferredPrompt = null;
 
     const $ = id => document.getElementById(id);
+    // ✅ Bezpečné escapování textu pro vložení do onclick="...('...')" atributů.
+    // Prohlížeč nejdřív dekóduje HTML entity v atributu (např. &#39; -> ') a AŽ POTÉ
+    // spustí obsah jako JS. Proto &#39; escapování apostrofu v onclick NEFUNGUJE -
+    // apostrof se před spuštěním vrátí zpět a rozbije uvozovky JS řetězce.
+    // Toto místo escapuje na \' (zpětné lomítko), které entity-dekódování nezmění.
+    function jsq(str) {
+        return String(str == null ? '' : str)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/\n/g, ' ')
+            .replace(/\r/g, '');
+    }
+    window.jsq = jsq;
     const resultsEl = $('results');
     const paginationContainer = $('paginationContainer');
     const MUSIC_HEADERS = { 'User-Agent': 'SinatorSearch/1.0 (https://sinator.app)' };
@@ -3983,7 +3996,7 @@
             const watched = isWatched(it.id, it.type);
             const overlay = watched ? `<div class="card-watched-overlay"><span>✅</span></div>` : '';
             const liked = state.favs.some(f => Number(f.id) === Number(it.id));
-            return `<div class="card${watched?' is-watched':''}" data-mdb-id="${it.id}" data-mdb-type="${it.type}" onclick="window.openDetailFromMdb(${it.id},'${it.type}')">${img}${overlay}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="window.toggleFav(${it.id},'${(it.title||'').replace(/'/g,"&#39;")}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span></div></div></div>`;
+            return `<div class="card${watched?' is-watched':''}" data-mdb-id="${it.id}" data-mdb-type="${it.type}" onclick="window.openDetailFromMdb(${it.id},'${it.type}')">${img}${overlay}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="window.toggleFav(${it.id},'${jsq(it.title||'')}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span></div></div></div>`;
         }).join('');
     }
 
@@ -4627,7 +4640,7 @@
             const liked = state.favs.some(f => f.id === it.id);
             const watched = isWatched(it.id, it.type);
             const overlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
-            return `<div class="card${watched?' is-watched':''}" onclick="window.openDetailFromSimkl(${it.id}, '${it.type}')">${img}${overlay}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${it.title.replace(/'/g,"&#39;")}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span><span class="card-rating">★ ${it.vote_average?it.vote_average.toFixed(1):'—'}</span></div></div></div>`;
+            return `<div class="card${watched?' is-watched':''}" onclick="window.openDetailFromSimkl(${it.id}, '${it.type}')">${img}${overlay}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${jsq(it.title)}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span><span class="card-rating">★ ${it.vote_average?it.vote_average.toFixed(1):'—'}</span></div></div></div>`;
         }).join('')}</div>`;
         $('simklResultsContainer').innerHTML = count + grid;
     }
@@ -6959,14 +6972,16 @@ EXAMPLES:
             const isDir = isDirectorsView || a.known_for_department === 'Directing' || a.media_type === 'director';
             const badge = isDir ? '🎥' : '👥';
             const deptLabel = isDir ? 'Režisér' : (a.known_for_department === 'Acting' ? 'Herec/Herečka' : (a.known_for_department || 'Herec'));
-            return `<div class="card" onclick="openPersonDetail(${a.id})">${img}<div class="card-badge">${badge}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleActorFav(${a.id},'${a.name.replace(/'/g,"&#39;")}','${a.profile_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${a.name}</div><div class="card-meta"><span>${deptLabel}</span></div></div></div>`;
+            return `<div class="card" onclick="openPersonDetail(${a.id})">${img}<div class="card-badge">${badge}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleActorFav(${a.id},'${jsq(a.name)}','${a.profile_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${a.name}</div><div class="card-meta"><span>${deptLabel}</span></div></div></div>`;
         }).join('');
         if (isFirstPage) resultsEl.innerHTML = newHtml;
         else resultsEl.insertAdjacentHTML('beforeend', newHtml);
     }
 
     function cardHtml(it) {
-        const title = (it.title || it.name || 'Neznámý').replace(/'/g, "&#39;");
+        const titleRaw = it.title || it.name || 'Neznámý';
+        const title = titleRaw.replace(/'/g, "&#39;");
+        const titleJs = jsq(titleRaw);
         const year = (it.release_date||it.first_air_date||'').slice(0,4);
         const rating = it.vote_average ? it.vote_average.toFixed(1) : '—';
         const mediaType = it.media_type || 'movie';
@@ -6974,7 +6989,7 @@ EXAMPLES:
         const isActor = mediaType === 'actor' || mediaType === 'person' || mediaType === 'director';
         const liked = isActor ? state.actorFavs.some(f=>Number(f.id)===Number(it.id)) : state.favs.some(f=>Number(f.id)===Number(it.id));
         const clickAction = isActor ? `openPersonDetail(${it.id})` : `openDetail(${it.id}, '${mediaType}')`;
-        const favAction = isActor ? `toggleActorFav(${it.id},'${title}','${it.poster_path||''}',event)` : `toggleFav(${it.id},'${title}','${year}',${it.vote_average||0},'${mediaType}','${it.poster_path||''}',event)`;
+        const favAction = isActor ? `toggleActorFav(${it.id},'${titleJs}','${it.poster_path||''}',event)` : `toggleFav(${it.id},'${titleJs}','${year}',${it.vote_average||0},'${mediaType}','${it.poster_path||''}',event)`;
         const watched = !isActor && isWatched(it.id, mediaType);
         const watchedOverlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
         const personBadge = mediaType === 'director' ? '🎥' : '👥';
@@ -7017,7 +7032,7 @@ EXAMPLES:
         resultsEl.innerHTML = actors.map(a=>{
             const img = a.profile_path ? `<img class="card-image" src="${IMG}w185${a.profile_path}" loading="lazy">` : `<div class="card-placeholder">👤</div>`;
             const liked = state.actorFavs.some(f=>f.id===a.id);
-            return `<div class="card" onclick="openPersonDetail(${a.id})">${img}<button class="card-fav ${liked?'liked':''}" onclick="toggleActorFav(${a.id},'${a.name.replace(/'/g,"&#39;")}','${a.profile_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${a.name}</div><div class="card-meta"><span>${a.known_for_department||'Herec'}</span></div></div></div>`;
+            return `<div class="card" onclick="openPersonDetail(${a.id})">${img}<button class="card-fav ${liked?'liked':''}" onclick="toggleActorFav(${a.id},'${jsq(a.name)}','${a.profile_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${a.name}</div><div class="card-meta"><span>${a.known_for_department||'Herec'}</span></div></div></div>`;
         }).join('');
     }
 
@@ -7117,14 +7132,16 @@ EXAMPLES:
 
     function favCardHtml(it) {
         const isActor = it.media_type === 'actor';
-        const title = (it.title || it.name || 'Neznámý').replace(/'/g, "&#39;");
+        const titleRaw = it.title || it.name || 'Neznámý';
+        const title = titleRaw.replace(/'/g, "&#39;");
+        const titleJs = jsq(titleRaw);
         const year = it.year || (it.release_date||it.first_air_date||'').slice(0,4);
         const mediaType = isActor ? 'actor' : (it.media_type || it.type || 'movie');
         const poster = it.poster_path ? `${IMG}w500${it.poster_path}` : '';
         const clickAction = isActor ? `openPersonDetailFromFavs(${it.id})` : `openDetailFromFavs(${it.id},'${mediaType}')`;
         const favAction = isActor
-            ? `toggleActorFav(${it.id},'${title}','${it.poster_path||''}',event);renderFavsGrid()`
-            : `toggleFav(${it.id},'${title}','${year}',${it.vote_average||0},'${mediaType}','${it.poster_path||''}',event);renderFavsGrid()`;
+            ? `toggleActorFav(${it.id},'${titleJs}','${it.poster_path||''}',event);renderFavsGrid()`
+            : `toggleFav(${it.id},'${titleJs}','${year}',${it.vote_average||0},'${mediaType}','${it.poster_path||''}',event);renderFavsGrid()`;
         return `<div onclick="${clickAction}" style="position:relative;cursor:pointer;overflow:hidden;background:var(--bg-elevated);display:flex;align-items:flex-end;height:220px;border-radius:8px;">
             ${poster ? `<img src="${poster}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="position:absolute;inset:0;display:grid;place-items:center;font-size:3rem;">${isActor?'👤':(mediaType==='tv'?'📺':'🎬')}</div>`}
             <button onclick="${favAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.85rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;">❤️</button>
@@ -7255,7 +7272,7 @@ EXAMPLES:
             const liked = state.favs.some(f=>Number(f.id)===Number(it.id));
             const watched = isWatched(it.id, it.type);
             const overlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
-            return `<div class="card${watched?' is-watched':''}" onclick="window.openDetailFromTrakt(${it.id}, '${it.type}')">${img}${overlay}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="window.toggleFav(${it.id},'${it.title.replace(/'/g,"&#39;")}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span><span class="card-rating">★ ${it.vote_average?it.vote_average.toFixed(1):'—'}</span></div></div></div>`;
+            return `<div class="card${watched?' is-watched':''}" onclick="window.openDetailFromTrakt(${it.id}, '${it.type}')">${img}${overlay}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="window.toggleFav(${it.id},'${jsq(it.title)}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span><span class="card-rating">★ ${it.vote_average?it.vote_average.toFixed(1):'—'}</span></div></div></div>`;
         }).join('')}</div>`;
         $('traktResultsContainer').innerHTML = count + grid;
     }
@@ -7653,27 +7670,29 @@ EXAMPLES:
             currentOverviewText = ep.overview || '';
             const safeTitle = title.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
             const safeSeriesTitle = (series.name || '').replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+            const titleJs = jsq(title);
+            const seriesTitleJs = jsq(series.name || '');
             $('modalScrollBody').innerHTML = `${modalNav(safeSeriesTitle, hasBack)}
                 ${bg}
                 <div class="modal-body">
                     <h2 class="modal-title">${safeSeriesTitle}</h2>
                     <p style="color:var(--accent);font-size:1.1rem;margin-bottom:8px;">📺 S${seasonNumber}E${episodeNumber}: ${safeTitle}</p>
-                    <div class="modal-chips">${airDate ? `<div class="modal-chip"><b>📅 Premiéra:</b> <strong>${airDate}</strong></div>` : ''}${runtime ? `<div class="modal-chip"><b>⏱</b> ${runtime} min</div>` : ''}<div class="modal-chip"><b>★</b> ${rating}/10</div><button id="epWatchedBtn_${tvId}_${seasonNumber}_${episodeNumber}" class="modal-chip" style="cursor:pointer;border:1px solid ${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'#1db954':'var(--border)'};background:${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'rgba(29,185,84,0.15)':'transparent'};color:${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'#1db954':'var(--text-muted)'};font-weight:600;" onclick="window.toggleEpWatchedInModal(${tvId},${seasonNumber},${episodeNumber},'${safeTitle}',this)">${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>
+                    <div class="modal-chips">${airDate ? `<div class="modal-chip"><b>📅 Premiéra:</b> <strong>${airDate}</strong></div>` : ''}${runtime ? `<div class="modal-chip"><b>⏱</b> ${runtime} min</div>` : ''}<div class="modal-chip"><b>★</b> ${rating}/10</div><button id="epWatchedBtn_${tvId}_${seasonNumber}_${episodeNumber}" class="modal-chip" style="cursor:pointer;border:1px solid ${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'#1db954':'var(--border)'};background:${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'rgba(29,185,84,0.15)':'transparent'};color:${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'#1db954':'var(--text-muted)'};font-weight:600;" onclick="window.toggleEpWatchedInModal(${tvId},${seasonNumber},${episodeNumber},'${titleJs}',this)">${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>
                     <p class="modal-overview">${ep.overview || 'Popis není dostupný.'}</p>
                     <div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/tv/${tvId}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_ep_${tvId}" style="cursor:pointer;" title="Načítám..."><span class="rating-value" id="csfdRatingVal_ep_${tvId}">…</span><span class="rating-source">Trakt</span></div></div>
                     <div class="action-buttons">
-                        <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeSeriesTitle} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}'))">▶️ Přehrát</button>
-                        <button class="action-btn-modal youtube" onclick="openYouTube('${safeSeriesTitle} S${seasonNumber}E${episodeNumber}')">▶️ Trailer</button>
-                        <button class="action-btn-modal search-sources" onclick="openSourcesModal('${safeSeriesTitle} S${seasonNumber}E${episodeNumber}')">🔍 Vyhledat zdroje</button>
+                        <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${seriesTitleJs} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}'))">▶️ Přehrát</button>
+                        <button class="action-btn-modal youtube" onclick="openYouTube('${seriesTitleJs} S${seasonNumber}E${episodeNumber}')">▶️ Trailer</button>
+                        <button class="action-btn-modal search-sources" onclick="openSourcesModal('${seriesTitleJs} S${seasonNumber}E${episodeNumber}')">🔍 Vyhledat zdroje</button>
                         <button class="action-btn-modal" onclick="translateOverview()">🌐 Přeložit</button>
                         <button class="action-btn-modal" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">🎬 Katalogy ▾</button>
                         <div class="action-buttons" style="display:none;margin-top:4px;">
-                            <button class="action-btn-modal csfd" onclick="openCsfd('${safeSeriesTitle}', '')">🎬 ČSFD</button>
-                            <button class="action-btn-modal kinobox" onclick="openKinobox('${safeSeriesTitle}', '')">🎫 Kinobox</button>
-                            <button class="action-btn-modal imdb" onclick="openImdb('${safeSeriesTitle}', '')">🎬 IMDb</button>
-                            <button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${safeSeriesTitle}')">📊 Trakt</button>
+                            <button class="action-btn-modal csfd" onclick="openCsfd('${seriesTitleJs}', '')">🎬 ČSFD</button>
+                            <button class="action-btn-modal kinobox" onclick="openKinobox('${seriesTitleJs}', '')">🎫 Kinobox</button>
+                            <button class="action-btn-modal imdb" onclick="openImdb('${seriesTitleJs}', '')">🎬 IMDb</button>
+                            <button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${seriesTitleJs}')">📊 Trakt</button>
                         </div>
-                        <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${tvId},type:'tv',title:'${safeSeriesTitle}',year:'',poster:series?.poster_path||''})">📁 Složky</button>
+                        <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${tvId},type:'tv',title:'${seriesTitleJs}',year:'',poster:series?.poster_path||''})">📁 Složky</button>
                     </div>
                 </div></div>`;
         } catch(e) { console.error(e); $('modalScrollBody').innerHTML = `<div class="empty">Chyba načtení epizody: ${e.message}</div>`; }
@@ -7773,14 +7792,14 @@ EXAMPLES:
             const title = d.title||d.name; const year = (d.release_date||d.first_air_date||'').slice(0,4);
             const rating = d.vote_average?d.vote_average.toFixed(1):'—';
             const bg = d.backdrop_path?`<img class="modal-backdrop" src="${IMG}original${d.backdrop_path}">`:'';
-            const genres = (d.genres||[]).map(g=>`<span class="modal-genre" style="cursor:pointer;" onclick="openGenreBrowse(${g.id},'${g.name.replace(/'/g,"&#39;")}','${type}')" title="Procházet žánr: ${g.name}">${g.name}</span>`).join('');
+            const genres = (d.genres||[]).map(g=>`<span class="modal-genre" style="cursor:pointer;" onclick="openGenreBrowse(${g.id},'${jsq(g.name)}','${type}')" title="Procházet žánr: ${g.name}">${g.name}</span>`).join('');
             const cast = (credits.cast||[]).slice(0,8).map(c=>`<div class="cast-item" onclick="openPersonDetail(${c.id})"><img src="${c.profile_path?IMG+'w185'+c.profile_path:'https://via.placeholder.com/50'}"><div class="name">${c.name}</div><div class="role">${c.character}</div></div>`).join('');
             // Režiséři z crew
             const directors = (credits.crew||[]).filter(c=>c.job==='Director');
-            const safeTitle = title.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
-            const origTitle = (d.original_title || d.original_name || title).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+            const safeTitle = jsq(title);
+            const origTitle = jsq(d.original_title || d.original_name || title);
             const isLiked = state.favs.some(f => Number(f.id) === Number(id));
-            currentDetailItem = { id, type, title: safeTitle, poster: d.poster_path||'', year, isActor: false };
+            currentDetailItem = { id, type, title: title, poster: d.poster_path||'', year, isActor: false };
             currentOverviewText = d.overview || '';
             
             const releaseDate = d.release_date || d.first_air_date || '';
@@ -7809,7 +7828,7 @@ EXAMPLES:
                 }
             }
 
-            const collectionBtn = d.belongs_to_collection ? `<button class="action-btn-modal collection" onclick="showCollection(${d.belongs_to_collection.id}, '${d.belongs_to_collection.name.replace(/'/g, "&#39;")}')">📦 Kolekce</button>` : '';
+            const collectionBtn = d.belongs_to_collection ? `<button class="action-btn-modal collection" onclick="showCollection(${d.belongs_to_collection.id}, '${jsq(d.belongs_to_collection.name)}')">📦 Kolekce</button>` : '';
             
             const posterPath = d.poster_path || '';
             const actionBtns = `<div class="action-buttons">
@@ -7840,7 +7859,7 @@ ${collectionBtn}
 ${cast ? `<button class="action-btn-modal" onclick="showCastModal(${id},'${type}')">👥 Herci</button>` : ''}
 ${directors.length ? `<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="showDirectorsModal(${id},'${type}')">🎥 Režie</button>` : ''}
 </div>`;
-            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${safeTitle}',${year},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p><div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div>${actionBtns}</div></div>`;
+            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p><div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div>${actionBtns}</div></div>`;
             
             if(type === 'tv') {
                 $('modalScrollBody').innerHTML += `<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);"><h3 style="margin-bottom:16px;font-size:1.2rem;">📺 Sezóny a epizody</h3><div id="seasons-container"></div></div>`;
@@ -8138,7 +8157,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     document.querySelector('.person-tab[data-tab="directing"]')?.classList.add('active');
                 }, 0);
             }
-            currentDetailItem = { id, type: 'actor', title: name.replace(/'/g, "&#39;"), poster: p.profile_path||'', year: '', isActor: true };
+            currentDetailItem = { id, type: 'actor', title: name, poster: p.profile_path||'', year: '', isActor: true };
             modalNav(name, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`);
         } catch(e) { console.error(e); $('modalScrollBody').innerHTML=`<div class="empty">Chyba načtení: ${e.message}</div>`; }
     }
@@ -8395,7 +8414,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 const country = a.country || ''; 
                 const type = a.type ? a.type.charAt(0).toUpperCase() + a.type.slice(1) : '';
                 const lifeSpan = a.life_span ? `${a.life_span.begin || ''}${a.life_span.end ? ' – ' + a.life_span.end : ' – nyní'}` : '';
-                const safeName = a.name.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+                const safeName = jsq(a.name);
                 const safeNameEnc = encodeURIComponent(a.name);
                 const imgId = 'artist-img-' + a.id;
                 setTimeout(() => loadArtistThumb(a.id, a.name, imgId), 100);
@@ -8416,8 +8435,9 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             html += `<div class="music-section-title">🎵 Skladby (${results.recordings.length})</div>`;
             html += `<div class="music-results">${results.recordings.map(r => {
                 const artists = getArtistsName(r); const duration = formatDuration(r.length);
-                const safeTitle = r.title.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
-                return `<div class="music-card" onclick="playOnYouTube('${artists} - ${safeTitle}')">
+                const safeTitle = jsq(r.title);
+                const safeArtistsInline = jsq(artists);
+                return `<div class="music-card" onclick="playOnYouTube('${safeArtistsInline} - ${safeTitle}')">
                     <div class="card-image-placeholder" style="background: linear-gradient(135deg, rgba(245,197,24,0.2), var(--bg-card));">🎵</div>
                     <div class="music-card-info"><div class="music-card-title">${r.title}</div><div class="music-card-meta">${artists} ${duration ? `• ${duration}` : ''}</div></div>
                 </div>`;
@@ -8428,8 +8448,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             html += `<div class="music-section-title">💿 Alba (${results.releases.length})</div>`;
             html += `<div class="music-results">${results.releases.map(r => {
                 const artists = getArtistsName(r); const date = r.date ? r.date.split('-')[0] : '';
-                const safeTitle = r.title.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
-                const safeArtists = artists.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+                const safeTitle = jsq(r.title);
+                const safeArtists = jsq(artists);
                 const imgId = 'rel-img-' + r.id;
                 setTimeout(() => loadReleaseCover(r.id, imgId), 200);
                 return `<div class="music-card" onclick="playOnYouTube('${safeArtists} - ${safeTitle} album')">
@@ -8805,8 +8825,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:12px;">
                         ${albums.map(album => {
                             const artists = album['artist-credit']?.map(ac => ac.name).join(', ') || currentArtistName;
-                            const safeAlbum = album.title.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
-                            const safeArtists = artists.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+                            const safeAlbum = jsq(album.title);
+                            const safeArtists = jsq(artists);
                             const coverId = 'disc-cover-' + album.id;
                             setTimeout(() => loadReleaseCover(album.id, coverId), 300);
                             return `<div style="background:var(--bg-card); border-radius:8px; border:1px solid var(--border); overflow:hidden;">
@@ -9639,7 +9659,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     ${newEpBadge}
                     ${seasonBadge}
                 </div>
-                <button onclick="event.stopPropagation();markShowWatched(${it.id},'${(it.title||'').replace(/'/g,"&#39;")}',this)" style="flex-shrink:0;padding:6px 10px;background:rgba(29,185,84,0.1);border:1px solid #1db954;border-radius:8px;color:#1db954;font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Označit celý seriál jako shlédnutý">✅</button>
+                <button onclick="event.stopPropagation();markShowWatched(${it.id},'${jsq(it.title||'')}',this)" style="flex-shrink:0;padding:6px 10px;background:rgba(29,185,84,0.1);border:1px solid #1db954;border-radius:8px;color:#1db954;font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Označit celý seriál jako shlédnutý">✅</button>
             </div>`;
         }).join('');
     }
@@ -9757,7 +9777,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                         <div style="font-size:0.7rem;color:${pctColor};font-weight:700;margin-top:4px;">${it.pct}% dokoukaného${timeStr?' · '+timeStr:''}</div>
                     </div>
                     <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
-                        <button onclick="event.stopPropagation();markMovieWatched(${it.id},'${(it.title||'').replace(/'/g,"&#39;")}','${it.posterPath||''}',${it.year||0},this)" style="padding:7px 10px;background:${alreadyWatched?'rgba(29,185,84,0.3)':'rgba(29,185,84,0.1)'};border:1px solid #1db954;border-radius:8px;color:#1db954;font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Označit jako shlédnutý">${alreadyWatched?'✓ Shlédnuto':'✅ Hotovo'}</button>
+                        <button onclick="event.stopPropagation();markMovieWatched(${it.id},'${jsq(it.title||'')}','${it.posterPath||''}',${it.year||0},this)" style="padding:7px 10px;background:${alreadyWatched?'rgba(29,185,84,0.3)':'rgba(29,185,84,0.1)'};border:1px solid #1db954;border-radius:8px;color:#1db954;font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Označit jako shlédnutý">${alreadyWatched?'✓ Shlédnuto':'✅ Hotovo'}</button>
                         <button onclick="event.stopPropagation();removeTraktPlayback('${it.id}',this)" style="padding:7px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Smazat progress z Traktu">🗑️</button>
                     </div>
                 </div>`;
@@ -10227,13 +10247,14 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 
             const cardsHtml = items.length ? items.map(it => {
                 const t = (it.title||it.name||'?').replace(/'/g,"&#39;");
+                const tJs = jsq(it.title||it.name||'?');
                 const y = (it.release_date||it.first_air_date||'').slice(0,4);
                 const r = it.vote_average ? it.vote_average.toFixed(1) : '—';
                 const img = it.poster_path ? `<img class="card-image" src="${IMG}w342${it.poster_path}" loading="lazy">` : `<div class="card-placeholder">${type==='tv'?'📺':'🎬'}</div>`;
                 const liked = state.favs.some(f=>Number(f.id)===Number(it.id));
                 const watched = isWatched(it.id, type);
                 const watchedOverlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
-                return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('similarOverlay')?.remove();document.body.style.overflow='';openDetail(${it.id},'${type}')">${img}${watchedOverlay}<div class="card-badge">${type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${t}','${y}',${it.vote_average||0},'${type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating">★ ${r}</span></div></div></div>`;
+                return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('similarOverlay')?.remove();document.body.style.overflow='';openDetail(${it.id},'${type}')">${img}${watchedOverlay}<div class="card-badge">${type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${tJs}','${y}',${it.vote_average||0},'${type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating">★ ${r}</span></div></div></div>`;
             }).join('') : '<div style="padding:24px;text-align:center;color:var(--text-muted);">😕 Žádné podobné tituly nenalezeny.</div>';
 
             overlay.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
@@ -10289,6 +10310,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 
             const cardsHtml = items.map(it => {
                 const t = (it.title||it.name||'?').replace(/'/g,"&#39;");
+                const tJs = jsq(it.title||it.name||'?');
                 const y = (it.release_date||it.first_air_date||'').slice(0,4);
                 const r = it.vote_average ? it.vote_average.toFixed(1) : '—';
                 const img = it.poster_path
@@ -10297,7 +10319,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 const liked = state.favs.some(f=>Number(f.id)===Number(it.id));
                 const watched = isWatched(it.id, type);
                 const overlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
-                return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('similarOverlay')?.remove();document.body.style.overflow='';openDetail(${it.id},'${type}')">${img}${overlay}<div class="card-badge">${type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${t}','${y}',${it.vote_average||0},'${type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating">★ ${r}</span></div></div></div>`;
+                return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('similarOverlay')?.remove();document.body.style.overflow='';openDetail(${it.id},'${type}')">${img}${overlay}<div class="card-badge">${type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${tJs}','${y}',${it.vote_average||0},'${type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating">★ ${r}</span></div></div></div>`;
             }).join('');
 
             if (grid) grid.insertAdjacentHTML('beforeend', cardsHtml);
@@ -18595,7 +18617,7 @@ function renderCollections(colls) {
             html += groups[letter].map(c => {
                 const img = c.backdrop_path || c.poster_path || c.poster || '';
                 const count = c.parts ? c.parts.length : (c.part_count || '');
-                const safeName = (c.name||'').replace(/'/g,"&#39;");
+                const safeName = jsq(c.name||'');
                 const faved = isCollFav(c.id);
             return `<div class="coll-item" onclick="openCollFromModal(${c.id},'${safeName}')" style="position:relative;">
                     ${img ? `<img src="${IMG}w342${img}" loading="lazy">` : `<div class="coll-item-ph">📦</div>`}
@@ -18613,7 +18635,7 @@ function renderCollections(colls) {
         grid.innerHTML = colls.map(c => {
             const img = c.backdrop_path || c.poster_path || c.poster || '';
             const count = c.parts ? c.parts.length : (c.part_count || '');
-            const safeName = (c.name||'').replace(/'/g,"&#39;");
+            const safeName = jsq(c.name||'');
             const faved = isCollFav(c.id);
             return `<div class="coll-item" onclick="openCollFromModal(${c.id},'${safeName}')" style="position:relative;">
                 ${img ? `<img src="${IMG}w342${img}" loading="lazy">` : `<div class="coll-item-ph">📦</div>`}
