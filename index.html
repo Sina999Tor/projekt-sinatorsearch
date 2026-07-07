@@ -3513,7 +3513,14 @@
         analyzeBtn.disabled = true;
 
         const urls = getAllSourceUrls();
-        const negativePatterns = ['nenalezen','nenalezeno','nenašli jsme','nic nenalezeno','nebyly nalezeny','žádné výsledky','žádný výsledek','žádné video','nic jsme nenašli','no results','no matches','0 results','not found','404 not found','stránka nenalezena'];
+        const negativePatterns = ['nenalezen','nenalezeno','nenašli jsme','nic nenalezeno','nebyly nalezeny',
+            'žádné výsledky','žádný výsledek','žádné video','nic jsme nenašli','no results','no matches',
+            '0 results','not found','404 not found','stránka nenalezena',
+            // 🆕 fráze odchycené z reálných false-positive případů (dokufilmy, sledujte.to, ceskarepublika.wiki…)
+            'nothing matched your search terms','sorry, but nothing','neodpovídá zvoleným filtrům',
+            'žádný film neodpovídá','žádný výsledek neodpovídá','no matching results','no items found',
+            'no content found','se nepodařilo najít','nic k zobrazení','nebyl nalezen žádný',
+            'we could not find','could not be found','no matching'];
 
         // 🎯 Pozitivní ověření: absence negativní fráze nestačí (mnoho stránek
         // vrací generickou "no results" šablonu jinými slovy, nebo je výpis
@@ -3526,10 +3533,35 @@
         const titleRaw = state.currentSearchOrigTitle || state.currentSearchTitle || '';
         const titleWords = stripDia(titleRaw).split(/\s+/).filter(w => w.length >= 3 && !STOPWORDS.has(w));
 
+        // 🆕 Detekce "0 výsledků" v jakékoli podobě — stránky typicky echo-jí
+        // zpátky dotaz do nadpisu/inputu ("Výsledky hledání pro 'X' (0)"), takže
+        // samotné echo dotazu NENÍ důkaz nalezení. Když je vedle slova
+        // výsledky/results/nalezeno explicitní nula, jde vždy o notfound
+        // bez ohledu na to, kolik slov z názvu se v textu jinak najde.
+        const zeroCountPatterns = [
+            /(?:výsledk\w*|results?|nalezen\w*|found|items?)\D{0,15}\(?\s*0\s*\)?/i,
+            /\(\s*0\s*\)\s*$/m
+        ];
+
+        // 🆕 Než počítáme shody slov, odstraníme z textu místa, kde web pouze
+        // "echo-uje" zadaný dotaz zpátky (title tag, input value, breadcrumb
+        // "výsledky hledání pro ..."), aby to nevytvářelo falešně pozitivní shodu.
+        const stripQueryEcho = (rawText) => {
+            let t = rawText || '';
+            t = t.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, ' ');
+            t = t.replace(/value\s*=\s*["'][^"']*["']/gi, ' ');
+            t = t.replace(/(výsledky? hled[aá]n[íi][^<.\n]{0,120})/gi, ' ');
+            t = t.replace(/(search results? for[^<.\n]{0,120})/gi, ' ');
+            return t;
+        };
+
         const evaluateText = (rawText) => {
-            const text = stripDia(rawText);
             const isNegative = negativePatterns.some(p => (rawText||'').toLowerCase().includes(p));
             if (isNegative) return 'notfound';
+            if (zeroCountPatterns.some(re => re.test(rawText||''))) return 'notfound';
+
+            const cleaned = stripQueryEcho(rawText);
+            const text = stripDia(cleaned);
             if (titleWords.length === 0) return 'found'; // nemáme podle čeho ověřit, spolehni se jen na negativní vzory
             const matchedCount = titleWords.filter(w => text.includes(w)).length;
             const ratio = matchedCount / titleWords.length;
