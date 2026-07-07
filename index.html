@@ -820,7 +820,11 @@
         .settings-full-btn.install-ready { background: linear-gradient(135deg, #1db954, #148f3f); color: #fff; border-color: #1db954; }
         
         .sources-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-        .source-btn { padding: 12px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text); cursor: pointer; transition: 0.2s; text-align: center; font-weight: 500; }
+        .source-btn { padding: 12px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text); cursor: pointer; transition: 0.2s; text-align: center; font-weight: 500; position: relative; }
+        .source-btn .src-status { margin-right:4px; }
+        .source-btn.src-found { border-color:#22c55e; }
+        .source-btn.src-notfound { border-color:#ef4444; opacity:0.7; }
+        .source-btn.src-unknown { border-color:var(--border); }
         .source-btn:hover { background: var(--accent); border-color: var(--accent); transform: translateY(-2px); }
 
         /* ACTOR PORTRAIT LAYOUT */
@@ -2046,23 +2050,24 @@
         </div>
         <div class="sources-modal-body">
             <div class="sources-grid">
-                <button class="source-btn" onclick="searchOnSource('prehraj')">🎬 Prehraj.to</button>
-                <button class="source-btn" onclick="searchOnSource('hellspy')">👹 Hellspy</button>
-                <button class="source-btn" onclick="searchOnSource('sledujteto')">👁️ Sledujte.to</button>
-                <button class="source-btn" onclick="searchOnSource('fastshare')">⚡ FastShare</button>
-                <button class="source-btn" onclick="searchOnSource('sledujfilmy')">🎥 SledujFilmy</button>
-                <button class="source-btn" onclick="searchOnSource('dokufilmy')">🎥 Dokufilmy</button>
-                <button class="source-btn" onclick="searchOnSource('hellspio')">👹 Hellspio</button>
-                <button class="source-btn" onclick="searchOnSource('ceskarepublika')">🇨🇿 ČR Wiki</button>
-                <button class="source-btn" onclick="searchOnSource('streamimdb')">🎬 StreamIMDB</button>
-                <button class="source-btn" onclick="searchOnSource('123moviesfree')">🎬 123Movies</button>
-                <button class="source-btn" onclick="searchOnSource('bombuj')">💣 Bombuj.si</button>
-                <button class="source-btn" onclick="searchOnSource('uzila')">🔍 Uzi.la</button>
-                <button class="source-btn" onclick="searchOnSource('mrkaj')">👁️ Mrkaj.me</button>
-                <button class="source-btn" onclick="searchOnSource('mrkni')">📺 Mrkni.tv</button>
+                <button class="source-btn" id="srcbtn-prehraj" onclick="searchOnSource('prehraj')"><span class="src-status"></span>🎬 Prehraj.to</button>
+                <button class="source-btn" id="srcbtn-hellspy" onclick="searchOnSource('hellspy')"><span class="src-status"></span>👹 Hellspy</button>
+                <button class="source-btn" id="srcbtn-sledujteto" onclick="searchOnSource('sledujteto')"><span class="src-status"></span>👁️ Sledujte.to</button>
+                <button class="source-btn" id="srcbtn-fastshare" onclick="searchOnSource('fastshare')"><span class="src-status"></span>⚡ FastShare</button>
+                <button class="source-btn" id="srcbtn-sledujfilmy" onclick="searchOnSource('sledujfilmy')"><span class="src-status"></span>🎥 SledujFilmy</button>
+                <button class="source-btn" id="srcbtn-dokufilmy" onclick="searchOnSource('dokufilmy')"><span class="src-status"></span>🎥 Dokufilmy</button>
+                <button class="source-btn" id="srcbtn-hellspio" onclick="searchOnSource('hellspio')"><span class="src-status"></span>👹 Hellspio</button>
+                <button class="source-btn" id="srcbtn-ceskarepublika" onclick="searchOnSource('ceskarepublika')"><span class="src-status"></span>🇨🇿 ČR Wiki</button>
+                <button class="source-btn" id="srcbtn-streamimdb" onclick="searchOnSource('streamimdb')"><span class="src-status"></span>🎬 StreamIMDB</button>
+                <button class="source-btn" id="srcbtn-123moviesfree" onclick="searchOnSource('123moviesfree')"><span class="src-status"></span>🎬 123Movies</button>
+                <button class="source-btn" id="srcbtn-bombuj" onclick="searchOnSource('bombuj')"><span class="src-status"></span>💣 Bombuj.si</button>
+                <button class="source-btn" id="srcbtn-uzila" onclick="searchOnSource('uzila')"><span class="src-status"></span>🔍 Uzi.la</button>
+                <button class="source-btn" id="srcbtn-mrkaj" onclick="searchOnSource('mrkaj')"><span class="src-status"></span>👁️ Mrkaj.me</button>
+                <button class="source-btn" id="srcbtn-mrkni" onclick="searchOnSource('mrkni')"><span class="src-status"></span>📺 Mrkni.tv</button>
             </div>
             <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
                 <button class="source-btn" style="width:100%; background:var(--bg-card);" onclick="copyTitleToClipboard()">📋 Zkopírovat název do schránky</button>
+                <button class="source-btn" id="srcbtn-analyze" style="width:100%; background:var(--bg-card); margin-top:8px;" onclick="analyzeSources()">🔬 Analyzovat zdroje</button>
                 <p style="margin-top:8px; font-size:0.75rem; color:var(--text-muted); text-align:center;">
                     Pokud vyhledávání nefunguje, zkopírujte název a vložte ho ručně na danou stránku.
                 </p>
@@ -3453,6 +3458,11 @@
         state.currentSearchEpisode = episodeNum || '';
         state.currentSearchCzechShowTitle = czechShowTitle || '';
         $('sourcesTitle').textContent = title;
+        document.querySelectorAll('.source-btn').forEach(btn => {
+            btn.classList.remove('src-found','src-notfound','src-unknown');
+            const st = btn.querySelector('.src-status');
+            if(st) st.textContent = '';
+        });
         $('sourcesModal')?.classList.add('open');
     }
     
@@ -3461,9 +3471,9 @@
     }
 
     // ✅ OPRAVENÉ URL PRO VYHLEDÁVÁNÍ - podle přesných formátů stránek
-    function searchOnSource(source) {
+    function getAllSourceUrls() {
         const title = encodeURIComponent(state.currentSearchTitle);
-        const urls = {
+        return {
             // Prehraj.to: /hledej/{název}
             'prehraj': `https://prehraj.to/hledej/${title}`,
             // Hellspy: /?query={název}
@@ -3482,11 +3492,124 @@
             'mrkaj': `https://mrkaj.me/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}?t=${state.currentSearchType==='tv'?'s':'m'}`,
             'mrkni': (()=>{ const raw=state.currentSearchTitle||''; const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); const yr=state.currentSearchYear||''; return `https://mrkni.tv/${slug}${yr?'-'+yr:''}/`; })()
         };
+    }
+
+    function searchOnSource(source) {
+        const urls = getAllSourceUrls();
         if(source === 'hellspy') {
             window.openHellspy(urls['hellspy']);
         } else if(urls[source]) {
             window.open(urls[source], '_blank');
         }
+    }
+
+    // 🔬 Analyzovat zdroje — na pozadí zkusí ověřit dostupnost na všech zdrojích
+    async function analyzeSources() {
+        const analyzeBtn = $('srcbtn-analyze');
+        if(!analyzeBtn || analyzeBtn.dataset.busy === '1') return;
+        analyzeBtn.dataset.busy = '1';
+        const origLabel = analyzeBtn.textContent;
+        analyzeBtn.textContent = '⏳ Analyzuji zdroje…';
+        analyzeBtn.disabled = true;
+
+        const urls = getAllSourceUrls();
+        const negativePatterns = ['nenalezen','nenalezeno','nenašli jsme','nic nenalezeno','žádné výsledky','žádný výsledek','no results','0 results','not found','404 not found'];
+
+        // reset vizuálů
+        Object.keys(urls).forEach(key => {
+            const btn = $(`srcbtn-${key}`);
+            if(!btn) return;
+            btn.classList.remove('src-found','src-notfound','src-unknown');
+            const st = btn.querySelector('.src-status');
+            if(st) st.textContent = '⏳';
+        });
+
+        const checkOne = async (key, url) => {
+            const btn = $(`srcbtn-${key}`);
+            const st = btn?.querySelector('.src-status');
+
+            const tryFetch = async (u, timeoutMs) => {
+                const controller = new AbortController();
+                const timeout = setTimeout(()=>controller.abort(), timeoutMs);
+                try {
+                    const res = await fetch(u, { signal: controller.signal });
+                    clearTimeout(timeout);
+                    return res;
+                } catch(e) {
+                    clearTimeout(timeout);
+                    throw e;
+                }
+            };
+
+            // 1) Vlastní serverless endpoint (/api/check-source) — žádné CORS, žádný veřejný rate-limit
+            try {
+                const apiRes = await tryFetch(`/api/check-source?url=${encodeURIComponent(url)}`, 10000);
+                if(apiRes && apiRes.ok) {
+                    const data = await apiRes.json();
+                    if(data && typeof data.text === 'string') {
+                        if(data.status === 404) {
+                            btn?.classList.add('src-notfound'); if(st) st.textContent = '❌'; return;
+                        }
+                        const text = data.text.toLowerCase();
+                        const isNegative = negativePatterns.some(p => text.includes(p));
+                        btn?.classList.add(isNegative ? 'src-notfound' : 'src-found');
+                        if(st) st.textContent = isNegative ? '❌' : '✅';
+                        return;
+                    }
+                }
+            } catch(e) { /* endpoint není nasazený nebo selhal — jdeme na fallback */ }
+
+            // 2) Fallback: veřejné CORS proxy (méně spolehlivé, ale lepší než nic)
+            const attempts = [
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+                `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
+                `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+                url
+            ];
+            let res = null;
+            for(const u of attempts) {
+                try {
+                    res = await tryFetch(u, 8000);
+                    if(res && (res.ok || res.status === 404)) break;
+                } catch(e) { /* zkusit další proxy */ }
+            }
+            if(!res) {
+                btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
+                return;
+            }
+            try {
+                if(!res.ok) {
+                    if(res.status === 404) {
+                        btn?.classList.add('src-notfound'); if(st) st.textContent = '❌';
+                    } else {
+                        btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
+                    }
+                    return;
+                }
+                const text = (await res.text()).toLowerCase();
+                const isNegative = negativePatterns.some(p => text.includes(p));
+                if(isNegative) {
+                    btn?.classList.add('src-notfound'); if(st) st.textContent = '❌';
+                } else {
+                    btn?.classList.add('src-found'); if(st) st.textContent = '✅';
+                }
+            } catch(e) {
+                btn?.classList.add('src-unknown'); if(st) st.textContent = '❓';
+            }
+        };
+
+        const entries = Object.entries(urls);
+        const batchSize = 4;
+        for(let i=0; i<entries.length; i+=batchSize) {
+            const batch = entries.slice(i, i+batchSize);
+            await Promise.allSettled(batch.map(([key, url]) => checkOne(key, url)));
+            if(i+batchSize < entries.length) await new Promise(r=>setTimeout(r, 400));
+        }
+
+        analyzeBtn.textContent = origLabel;
+        analyzeBtn.disabled = false;
+        analyzeBtn.dataset.busy = '0';
+        try { showToast('Analýza dokončena — ✅ nalezeno, ❌ nenalezeno, ❓ nelze ověřit'); } catch(e) {}
     }
 
     // Hellspy — přímé otevření (rychlejší a plynulejší přechod)
