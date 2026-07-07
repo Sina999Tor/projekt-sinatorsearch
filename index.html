@@ -3591,7 +3591,7 @@
 
         const looksBlocked = (rawText) => {
             const low = (rawText||'').toLowerCase();
-            if (low.length < 400) return true; // podezřele krátká odpověď = pravděpodobně blok/chyba, ne reálná stránka
+            if (low.length < 150) return true; // podezřele krátká odpověď = pravděpodobně blok/chyba, ne reálná stránka
             return blockPatterns.some(p => low.includes(p));
         };
 
@@ -3646,18 +3646,20 @@
                         if(data.status === 404) {
                             btn?.classList.add('src-notfound'); if(st) st.textContent = '❌'; return;
                         }
-                        // ⚠️ Cílová stránka odpověděla chybovým/blokovacím stavem (403/429/503…) —
-                        // to NENÍ důkaz, že obsah neexistuje, jen že jsme byli odmítnuti (anti-bot
-                        // ochrana). Takové odpovědi nesmí spadnout do "notfound".
-                        if(data.ok === false) {
-                            btn?.classList.add('src-unknown'); if(st) st.textContent = '❓'; return;
+                        // ⚠️ Cílová stránka odpověděla chybovým/blokovacím stavem (403/429/503…) NEBO
+                        // vyhodnocení skončilo jako "unknown" (challenge stránka) — to není důkaz,
+                        // že obsah neexistuje, jen že server Vercelu byl odmítnut. Než se vzdáme,
+                        // dáme šanci fallback CORS proxy (běží z jiné IP, může projít).
+                        if(data.ok !== false) {
+                            const verdict = evaluateText(data.text);
+                            if(verdict !== 'unknown') {
+                                btn?.classList.add(verdict === 'found' ? 'src-found' : 'src-notfound');
+                                if(st) st.textContent = verdict === 'found' ? '✅' : '❌';
+                                return;
+                            }
+                            // verdict 'unknown' → propadá se dál na proxy fallback níže
                         }
-                        const verdict = evaluateText(data.text);
-                        const cls = verdict === 'found' ? 'src-found' : (verdict === 'unknown' ? 'src-unknown' : 'src-notfound');
-                        const icon = verdict === 'found' ? '✅' : (verdict === 'unknown' ? '❓' : '❌');
-                        btn?.classList.add(cls);
-                        if(st) st.textContent = icon;
-                        return;
+                        // data.ok === false (blok) → propadá se dál na proxy fallback níže
                     }
                 }
             } catch(e) { /* endpoint není nasazený nebo selhal — jdeme na fallback */ }
