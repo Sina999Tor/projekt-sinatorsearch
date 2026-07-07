@@ -3629,6 +3629,21 @@
             const btn = $(`srcbtn-${key}`);
             const st = btn?.querySelector('.src-status');
 
+            // 🪞 Hellspio je zrcadlo Hellspy (stejná databáze) — pokud Hellspy už má
+            // výsledek (v dávkovém zpracování níže se kontroluje dřív), převezmeme
+            // ho rovnou místo zbytečného druhého fetche na jinou doménu.
+            if(key === 'hellspio') {
+                const hellspyBtn = $('srcbtn-hellspy');
+                const mirroredClass = hellspyBtn && ['src-found','src-notfound','src-unknown'].find(c => hellspyBtn.classList.contains(c));
+                if(mirroredClass) {
+                    btn?.classList.add(mirroredClass);
+                    const hellspySt = hellspyBtn.querySelector('.src-status');
+                    if(st) st.textContent = hellspySt ? hellspySt.textContent : '✅';
+                    return;
+                }
+                // Hellspy ještě nemá výsledek (neočekávané pořadí dávek) → pokračuj normální kontrolou níže
+            }
+
             // 🤝 Kompromis: tyhle zdroje se z Vercelu/veřejných CORS proxy nedají
             // spolehlivě ověřit — buď mají silnou anti-bot ochranu (hellspy,
             // fastshare, prehraj, sledujfilmy), nebo výsledky dotahují přes JS/AJAX
