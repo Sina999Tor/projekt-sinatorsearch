@@ -2054,6 +2054,7 @@
                 <button class="source-btn" onclick="searchOnSource('dokufilmy')">🎥 Dokufilmy</button>
                 <button class="source-btn" onclick="searchOnSource('hellspio')">👹 Hellspio</button>
                 <button class="source-btn" onclick="searchOnSource('ceskarepublika')">🇨🇿 ČR Wiki</button>
+                <button class="source-btn" onclick="searchOnSource('streamimdb')">🎬 StreamIMDB</button>
                 <button class="source-btn" onclick="searchOnSource('123moviesfree')">🎬 123Movies</button>
                 <button class="source-btn" onclick="searchOnSource('bombuj')">💣 Bombuj.si</button>
                 <button class="source-btn" onclick="searchOnSource('uzila')">🔍 Uzi.la</button>
@@ -3469,7 +3470,8 @@
             'sledujfilmy': `https://ww.sledujfilmy.io/?s=${title}`,
             'dokufilmy': `https://dokufilmy.cz/?s=${title}`,
             'hellspio': `https://hellspio.vercel.app/cs?search=${title}`,
-            'ceskarepublika': `https://ceskarepublika.wiki/filmy-online/?s=${title}`,
+            'ceskarepublika': `https://ceskarepublika.wiki/filmy-online/?q=${title}`,
+            'streamimdb': `https://streamimdb.ru/search?q=${title}`,
             '123moviesfree': `https://ww8.123moviesfree.net/?s=${title}`,
             'bombuj': (()=>{ const tp=state.currentSearchType||'movie'; const raw=tp==='tv'?(state.currentSearchOrigTitle||state.currentSearchTitle||''):(state.currentSearchTitle||''); const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); if(tp==='tv') return `https://serialy.bombuj.si/serial-${slug}#serial`; const yr=state.currentSearchYear||''; return `https://www.bombuj.si/online-film-${slug}${yr?'-'+yr:''}`; })(),
             'uzila': `https://uzi.la/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}`,
