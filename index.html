@@ -102,6 +102,50 @@
         html[data-theme="dark"] .theme-toggle-knob { left:3px; }
         #themeBulbIcon { font-size:1.3rem; filter:grayscale(1) brightness(0.7); opacity:0.55; transition:filter 0.25s, opacity 0.25s, text-shadow 0.25s; }
         html[data-theme="light"] #themeBulbIcon { filter:none; opacity:1; text-shadow:0 0 8px rgba(255,215,0,0.8); }
+        /* ─── LIGHT THEME: Hudba modal ─── */
+        html[data-theme="light"] .music-modal-overlay { background: rgba(255,255,255,0.97); }
+        html[data-theme="light"] .music-modal-header { background: var(--bg-card); }
+        html[data-theme="light"] .music-modal-header .close-music { color: var(--text); background: var(--bg-elevated); }
+        /* ─── LIGHT THEME: Moje složky modal ─── */
+        html[data-theme="light"] #slozkyModal { background: var(--bg-dark); }
+        html[data-theme="light"] .slozky-header { background: var(--bg-card); border-bottom-color: var(--border); }
+        html[data-theme="light"] .slozky-header h2 { color: var(--text); }
+        html[data-theme="light"] .slozky-header button { color: var(--text-muted); }
+        html[data-theme="light"] .slozky-header button:hover { color: var(--text); }
+        html[data-theme="light"] .slozka-card { background: var(--bg-card); border-color: var(--border); }
+        html[data-theme="light"] .slozka-card:hover { background: var(--bg-elevated); border-color: #bbb; }
+        html[data-theme="light"] .slozka-card .slozka-name { color: var(--text); }
+        html[data-theme="light"] .slozka-card .slozka-count { color: var(--text-muted); }
+        html[data-theme="light"] .slozka-card .slozka-del { color: #999; }
+        html[data-theme="light"] .slozka-detail-header .back-btn { color: var(--text-muted); }
+        html[data-theme="light"] .slozka-detail-header .back-btn:hover { color: var(--text); }
+        html[data-theme="light"] .slozka-item { background: var(--bg-card); border-color: var(--border); }
+        html[data-theme="light"] .slozka-item:hover { background: var(--bg-elevated); }
+        html[data-theme="light"] .slozka-item-title { color: var(--text); }
+        html[data-theme="light"] .slozka-item-meta { color: var(--text-muted); }
+        html[data-theme="light"] .slozka-item-del { color: #999; }
+        html[data-theme="light"] .slozky-picker-box h3 { color: var(--text); }
+        html[data-theme="light"] .slozky-picker-item { background: var(--bg-card); border-color: var(--border); }
+        html[data-theme="light"] .slozky-picker-item:hover { background: var(--bg-elevated); }
+        html[data-theme="light"] .slozky-picker-item .pi-name { color: var(--text); }
+        html[data-theme="light"] .slozky-picker-item .pi-count { color: var(--text-muted); }
+        html[data-theme="light"] .slozky-picker-new { color: var(--text-muted); border-color: var(--border); }
+        html[data-theme="light"] .slozky-picker-new:hover { border-color: #999; color: var(--text); }
+        html[data-theme="light"] .slozky-picker-cancel { background: var(--bg-elevated); color: var(--text); }
+        /* ─── LIGHT THEME: Doporučuji modaly ─── */
+        html[data-theme="light"] #doporucujiOverlay,
+        html[data-theme="light"] #addDoporuceniOverlay { background: rgba(255,255,255,0.97); }
+        html[data-theme="light"] #doporucujiOverlay > div > div[style*="background:#141414"],
+        html[data-theme="light"] #addDoporuceniOverlay > div > div[style*="background:#141414"] { background: var(--bg-card) !important; }
+        html[data-theme="light"] #doporucujiOverlay button[onclick*="closeDoporucujiModal"],
+        html[data-theme="light"] #addDoporuceniOverlay button[onclick*="closeAddDoporuceni"] { color: var(--text); border-color: var(--border); }
+        html[data-theme="light"] #dSearchInput, html[data-theme="light"] #dComment,
+        html[data-theme="light"] #dTags, html[data-theme="light"] #dNickname { color: var(--text) !important; }
+        html[data-theme="light"] #dList, html[data-theme="light"] #addDoporuceniOverlay { color: var(--text); }
+        html[data-theme="light"] #_dEditOverlay > div { background: var(--bg-card) !important; }
+        html[data-theme="light"] #_dEditOverlay input { background: var(--bg-elevated) !important; border-color: var(--border) !important; color: var(--text) !important; }
+        html[data-theme="light"] #_dEditOverlay label, html[data-theme="light"] #_dEditOverlay div[style*="color:#aaa"] { color: var(--text-muted) !important; }
+        html[data-theme="light"] #_dEditOverlay button[onclick*="remove"] { color: var(--text) !important; border-color: var(--border) !important; }
         /* ─── LOCK SCREEN ─────────────────────────────────────── */
         #lockScreen {
             position: fixed; inset: 0; z-index: 99999;
