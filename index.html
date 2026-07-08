@@ -9743,15 +9743,22 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             const watchedShows = Array.isArray(watchedShowsRaw) ? watchedShowsRaw : [];
 
             // Pro každý seriál zjistíme počet shlédnutých vs celkový počet epizod
+            const sortBtnStyle = 'padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:20px;color:var(--text-muted);font-size:0.72rem;cursor:pointer;font-weight:600;white-space:nowrap;';
             $('modalScrollBody').innerHTML = `<div style="padding:16px 16px 0;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
                     <div style="font-size:0.85rem;color:var(--text-muted);">Načítám detaily seriálů… (${watchedShows.length} celkem)</div>
                     <div id="watchingProgress" style="font-size:0.8rem;color:#00b4d8;font-weight:600;"></div>
+                </div>
+                <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+                    <button class="watching-sort-btn" data-sort="new" onclick="setWatchingSort('new',this)" style="${sortBtnStyle}background:#00b4d8;color:#fff;border-color:#00b4d8;">🆕 Nové epizody</button>
+                    <button class="watching-sort-btn" data-sort="az" onclick="setWatchingSort('az',this)" style="${sortBtnStyle}">🔤 A-Z</button>
+                    <button class="watching-sort-btn" data-sort="recent" onclick="setWatchingSort('recent',this)" style="${sortBtnStyle}">🕐 Naposledy sledované</button>
                 </div>
                 <div id="watchingGrid" style="display:flex;flex-direction:column;gap:10px;"></div>
             </div>`;
 
             const results = [];
+            window._watchingItemsCache = results; // stejná reference, aktualizuje se s .push()
             let done = 0;
             let autoMarkedComplete = false;
             const progressEl = $('watchingProgress');
@@ -9828,7 +9835,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                         results.push({
                             id: tmdbId, title: showName, year: showYear, posterPath,
                             watchedEps, totalEps, maxWatchedSeason: effectiveMaxSeason, totalSeasons,
-                            airStatus, nextEpisode, slug, plays: s.plays || 0
+                            airStatus, nextEpisode, slug, plays: s.plays || 0,
+                            lastWatchedAt: s.last_watched_at ? new Date(s.last_watched_at).getTime() : 0
                         });
                         return;
                     }
@@ -9854,7 +9862,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     results.push({
                         id: tmdbId, title: showName, year: showYear, posterPath,
                         watchedEps, totalEps, maxWatchedSeason, totalSeasons,
-                        airStatus, nextEpisode, slug, plays: s.plays || 0
+                        airStatus, nextEpisode, slug, plays: s.plays || 0,
+                        lastWatchedAt: s.last_watched_at ? new Date(s.last_watched_at).getTime() : 0
                     });
                 }));
                 done += batch.length;
@@ -9902,7 +9911,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                             results.push({
                                 id: Number(tvId), title: d.name || fallbackTitle || 'Seriál', year: (d.first_air_date||'').slice(0,4), posterPath: d.poster_path || '',
                                 watchedEps, totalEps, maxWatchedSeason, totalSeasons,
-                                airStatus: d.status || '', nextEpisode, slug: null
+                                airStatus: d.status || '', nextEpisode, slug: null, lastWatchedAt: 0
                             });
                         } catch (e) { /* TMDB nedostupné - přeskočit */ }
                     }));
@@ -9922,9 +9931,13 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         }
     }
 
-    function _renderWatchingGrid(container, items) {
-        // Seřadit: nejdřív ty s novými epizodami (nextEpisode), pak zbylé
+    function _renderWatchingGrid(container, items, mode) {
+        mode = mode || window._watchingSortMode || 'new';
+        // Seřadit podle zvoleného režimu
         const sorted = [...items].sort((a, b) => {
+            if (mode === 'az') return (a.title||'').localeCompare(b.title||'', 'cs');
+            if (mode === 'recent') return (b.lastWatchedAt||0) - (a.lastWatchedAt||0);
+            // 'new' (výchozí): nejdřív ty s novými epizodami, pak abecedně
             if (a.nextEpisode && !b.nextEpisode) return -1;
             if (!a.nextEpisode && b.nextEpisode) return 1;
             return (a.title||'').localeCompare(b.title||'', 'cs');
@@ -9964,6 +9977,16 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     }
 
     function isWatched_fn(id, type) { return !!state.watched[`${type}_${id}`]; }
+
+    window.setWatchingSort = function(mode, btn) {
+        window._watchingSortMode = mode;
+        document.querySelectorAll('.watching-sort-btn').forEach(b => {
+            b.style.background = 'var(--bg-elevated)'; b.style.color = 'var(--text-muted)'; b.style.borderColor = 'var(--border)';
+        });
+        if (btn) { btn.style.background = '#00b4d8'; btn.style.color = '#fff'; btn.style.borderColor = '#00b4d8'; }
+        const gridEl = $('watchingGrid');
+        if (gridEl && window._watchingItemsCache) _renderWatchingGrid(gridEl, window._watchingItemsCache, mode);
+    };
 
     window.openDetailFromWatching = function(id, type) {
         closeModal();
@@ -10033,8 +10056,14 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 return;
             }
 
+            const sortBtnStyleM = 'padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:20px;color:var(--text-muted);font-size:0.72rem;cursor:pointer;font-weight:600;white-space:nowrap;';
             $('modalScrollBody').innerHTML = `<div style="padding:16px 16px 0;">
-                <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;">${inProgress.length} filmů s nedokončeným přehráváním</div>
+                <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px;">${inProgress.length} filmů s nedokončeným přehráváním</div>
+                <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+                    <button class="moviesprogress-sort-btn" data-sort="progress" onclick="setMoviesProgressSort('progress',this)" style="${sortBtnStyleM}background:var(--accent);color:#fff;border-color:var(--accent);">📊 Rozkoukanost</button>
+                    <button class="moviesprogress-sort-btn" data-sort="az" onclick="setMoviesProgressSort('az',this)" style="${sortBtnStyleM}">🔤 A-Z</button>
+                    <button class="moviesprogress-sort-btn" data-sort="recent" onclick="setMoviesProgressSort('recent',this)" style="${sortBtnStyleM}">🕐 Naposledy sledované</button>
+                </div>
                 <div id="moviesProgressGrid" style="display:flex;flex-direction:column;gap:10px;"></div>
             </div>`;
 
@@ -10052,16 +10081,28 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 }
                 const pct = Math.round(p.progress || 0);
                 const watchedMin = runtime ? Math.round(runtime * pct / 100) : null;
-                return { id: tmdbId, title, year, posterPath, pct, runtime, watchedMin, pausedAt: p.paused_at };
+                return { id: tmdbId, title, year, posterPath, pct, runtime, watchedMin, pausedAt: p.paused_at, pausedAtTs: p.paused_at ? new Date(p.paused_at).getTime() : 0 };
             }));
 
             const grid = $('moviesProgressGrid');
             if (!grid) return;
 
-            // Seřadit podle procent (nejvíc dokoukané první)
-            items.sort((a,b) => b.pct - a.pct);
+            window._moviesProgressItemsCache = items;
+            _renderMoviesProgressGrid(grid, items, window._moviesProgressSortMode || 'progress');
+        } catch(e) {
+            $('modalScrollBody').innerHTML = `<div class="empty" style="padding:30px;text-align:center;">⚠️ Chyba: ${e.message}<br><br><button onclick="openMoviesProgressModal()" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
+        }
+    }
 
-            grid.innerHTML = items.map(it => {
+    function _renderMoviesProgressGrid(grid, items, mode) {
+        mode = mode || window._moviesProgressSortMode || 'progress';
+        const sortedItems = [...items].sort((a, b) => {
+            if (mode === 'az') return (a.title||'').localeCompare(b.title||'', 'cs');
+            if (mode === 'recent') return (b.pausedAtTs||0) - (a.pausedAtTs||0);
+            return b.pct - a.pct; // 'progress' (výchozí): nejvíc dokoukané první
+        });
+
+            grid.innerHTML = sortedItems.map(it => {
                 const poster = it.posterPath ? `<img src="${IMG}w185${it.posterPath}" style="width:70px;height:105px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">` : `<div style="width:70px;height:105px;background:var(--bg-elevated);border-radius:8px;display:grid;place-items:center;font-size:2rem;flex-shrink:0;">🎬</div>`;
                 const pctColor = it.pct >= 80 ? '#1db954' : it.pct >= 50 ? '#ff9800' : '#00b4d8';
                 const timeStr = it.watchedMin ? `${it.watchedMin}/${it.runtime} min` : '';
@@ -10081,10 +10122,17 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     </div>
                 </div>`;
             }).join('');
-        } catch(e) {
-            $('modalScrollBody').innerHTML = `<div class="empty" style="padding:30px;text-align:center;">⚠️ Chyba: ${e.message}<br><br><button onclick="openMoviesProgressModal()" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
-        }
     }
+
+    window.setMoviesProgressSort = function(mode, btn) {
+        window._moviesProgressSortMode = mode;
+        document.querySelectorAll('.moviesprogress-sort-btn').forEach(b => {
+            b.style.background = 'var(--bg-elevated)'; b.style.color = 'var(--text-muted)'; b.style.borderColor = 'var(--border)';
+        });
+        if (btn) { btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; btn.style.borderColor = 'var(--accent)'; }
+        const gridEl = $('moviesProgressGrid');
+        if (gridEl && window._moviesProgressItemsCache) _renderMoviesProgressGrid(gridEl, window._moviesProgressItemsCache, mode);
+    };
 
     window.markMovieWatched = function(id, title, poster, year, btn) {
         const k = `movie_${id}`;
