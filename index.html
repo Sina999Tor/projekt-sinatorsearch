@@ -173,6 +173,66 @@
         html[data-theme="light"] .tv-modal-header .close-tv { color: var(--text) !important; }
         html[data-theme="light"] .kino-modal-header h3 { background: linear-gradient(135deg, #333, var(--gold)) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; }
         html[data-theme="light"] .kino-modal-header .close-kino { color: var(--text) !important; }
+        /* ─── LIGHT THEME: plošná oprava natvrdo zakódovaných tmavých barev napříč všemi modaly ─── */
+        html[data-theme="light"] [style*="background:#1a1a1a"] { background: var(--bg-card) !important; }
+        html[data-theme="light"] [style*="background:#141414"] { background: var(--bg-card) !important; }
+        html[data-theme="light"] [style*="background:#111827"] { background: var(--bg-elevated) !important; }
+        html[data-theme="light"] [style*="background:#1e293b"] { background: var(--bg-elevated) !important; }
+        html[data-theme="light"] [style*="background:#111"] { background: var(--bg-card) !important; }
+        html[data-theme="light"] [style*="background:#0d0d0d"] { background: var(--bg-dark) !important; }
+        html[data-theme="light"] [style*="background:#0a0a0a"] { background: var(--bg-dark) !important; }
+        html[data-theme="light"] [style*="background:#2a2a2a"] { background: var(--bg-elevated) !important; }
+        html[data-theme="light"] [style*="background:#242424"] { background: var(--bg-elevated) !important; }
+        html[data-theme="light"] [style*="background:#333"] { background: var(--bg-elevated) !important; }
+        html[data-theme="light"] [style*="background:#222"] { background: var(--bg-elevated) !important; }
+        html[data-theme="light"] [style*="background:rgba(0,0,0,0.92)"] { background: rgba(255,255,255,0.97) !important; }
+        html[data-theme="light"] [style*="background:rgba(0,0,0,0.97)"] { background: rgba(255,255,255,0.97) !important; }
+        html[data-theme="light"] [style*="background:rgba(0,0,0,0.96)"] { background: rgba(255,255,255,0.96) !important; }
+        html[data-theme="light"] [style*="background:rgba(0,0,0,0.95)"] { background: rgba(255,255,255,0.95) !important; }
+        html[data-theme="light"] [style*="background:rgba(0,0,0,0.85)"] { background: rgba(255,255,255,0.93) !important; }
+        html[data-theme="light"] [style*="background:rgba(0,0,0,0.8)"] { background: rgba(255,255,255,0.92) !important; }
+        html[data-theme="light"] [style*="background:rgba(0,0,0,0.75)"] { background: rgba(255,255,255,0.9) !important; }
+        html[data-theme="light"] [style*="background:rgba(0,0,0,0.7)"] { background: rgba(255,255,255,0.88) !important; }
+        html[data-theme="light"] [style*="color:#fff"]:not([style*="background:var(--accent)"]):not([style*="background:linear-gradient(135deg,#1db954"]):not([style*="background:linear-gradient(135deg,#ff9800"]):not([style*="background:linear-gradient(135deg,#ff6b6b"]):not([style*="background:linear-gradient(135deg,#fb7185"]):not([style*="background:linear-gradient(135deg,#e50914"]):not([style*="background:linear-gradient(135deg,#63cab7"]):not([style*="background:#e53935"]):not([style*="background:#9c27b0"]):not([style*="background:#1cb99a"]):not([style*="background:#00b4d8"]):not([style*="background:#f60"]):not([style*="background:rgba(34,197,94"]):not([style*="background:rgba(229,9,20"]):not([style*="background:rgba(56,189,248"]) { color: var(--text) !important; }
+        html[data-theme="light"] [style*="color: #fff"] { color: var(--text) !important; }
+        html[data-theme="light"] [style*="color:#aaa"] { color: var(--text-muted) !important; }
+        html[data-theme="light"] [style*="color:#888"] { color: var(--text-muted) !important; }
+        html[data-theme="light"] [style*="color:#666"] { color: var(--text-muted) !important; }
+        html[data-theme="light"] [style*="color:#555"] { color: var(--text-muted) !important; }
+        html[data-theme="light"] [style*="color:#999"] { color: var(--text-muted) !important; }
+        html[data-theme="light"] [style*="border:1px solid #333"] { border-color: var(--border) !important; }
+        html[data-theme="light"] [style*="border-color:#333"] { border-color: var(--border) !important; }
+        html[data-theme="light"] [style*="border:1px solid #2a2a2a"] { border-color: var(--border) !important; }
+        html[data-theme="light"] [style*="border-bottom:1px solid #2a2a2a"] { border-color: var(--border) !important; }
+        html[data-theme="light"] [style*="border:1px solid #444"] { border-color: var(--border) !important; }
+        html[data-theme="light"] [style*="border:1px dashed #444"] { border-color: #999 !important; }
+        /* ─── LIGHT THEME: prvky s adaptivním pozadím ale natvrdo bílým textem (neviditelné na světlém) ─── */
+        html[data-theme="light"] [style*="background:var(--bg-elevated)"][style*="color:#fff"] { color: var(--text) !important; }
+        html[data-theme="light"] [style*="background: var(--bg-elevated)"][style*="color:#fff"] { color: var(--text) !important; }
+        html[data-theme="light"] [style*="background:var(--bg-card)"][style*="color:#fff"] { color: var(--text) !important; }
+        /* ─── LIGHT THEME: obsah AI Zábava sub-modálů a dalších full-screen modálů s natvrdo tmavými barvami ─── */
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="background:#1a1a1a"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="background:#141414"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="background:#1e293b"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="background:#0a0a0a"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="background:#2a2a2a"] {
+            background: var(--bg-elevated) !important;
+        }
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="color:#fff"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="color:#aaa"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="color:#888"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="color:#94a3b8"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="color:#ccc"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="color:#555"] {
+            color: var(--text) !important;
+        }
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="border:1px solid #333"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="border:1.5px solid #333"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="border:1px solid #334155"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="border:1px solid #444"],
+        html[data-theme="light"] :is(div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"], div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"]) [style*="border-bottom:1px solid #2a2a2a"] {
+            border-color: var(--border) !important;
+        }
         /* ─── LOCK SCREEN ─────────────────────────────────────── */
         #lockScreen {
             position: fixed; inset: 0; z-index: 99999;
