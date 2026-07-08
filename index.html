@@ -457,6 +457,18 @@
         .trakt-modal, .favs-modal, .sources-modal { background: var(--bg-card); border-radius: 16px; max-width: 700px; width: 100%; max-height: 92vh; overflow-y: auto; position: relative; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.8); overscroll-behavior: contain; }
         .settings-modal { background: #141414; width: 100%; height: 100%; display: flex; flex-direction: column; border-radius: 0; border: none; overflow: hidden; }
         .sources-modal { max-width: 600px; }
+        /* ── TRAKT/SIMKL sjednocený modal (fullscreen, jako ostatní) ── */
+        .ts-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.97); backdrop-filter: blur(16px); z-index: 10500; flex-direction: column; overflow: hidden; }
+        .ts-modal-overlay.open { display: flex; }
+        .ts-modal { background: #141414; width: 100%; height: 100%; display: flex; flex-direction: column; border-radius: 0; border: none; overflow: hidden; }
+        .ts-modal .modal-header-row { position: static; background: var(--bg-card); flex-shrink: 0; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+        .ts-source-tabs { flex-shrink: 0; display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--bg-card); }
+        .ts-source-btn { flex: 1; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font-weight: 700; cursor: pointer; font-size: 0.9rem; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .ts-source-btn.active { color: #fff; }
+        .ts-source-btn[data-src="trakt"].active { background: linear-gradient(135deg, rgba(237,34,36,0.28), rgba(237,34,36,0.08)); border-color: #ed2224; }
+        .ts-source-btn[data-src="simkl"].active { background: linear-gradient(135deg, rgba(28,185,154,0.28), rgba(28,185,154,0.08)); border-color: #1cb99a; }
+        .ts-modal-body-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+        .ts-modal-body-scroll #traktListTabsWrap, .ts-modal-body-scroll #simklListTabsWrap { position: sticky; top: 0; z-index: 9; }
         /* ── iVysílání modal ── */
         .ivysilani-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.97); backdrop-filter: blur(20px); z-index: 10500; flex-direction: column; overflow: hidden; }
         .ivysilani-modal-overlay.open { display: flex; animation: fadeInScale 0.25s ease; }
@@ -1570,31 +1582,27 @@
     </div>
 </div>
 
-<!-- 📋 Trakt modal -->
-<div class="trakt-modal-overlay" id="traktModal" onclick="if(event.target===this)closeTraktModal()">
-    <div class="trakt-modal">
+<!-- 📋🎯 TRAKT/SIMKL modal (sjednocený) -->
+<div class="ts-modal-overlay" id="traktModal" onclick="if(event.target===this)closeTraktModal()">
+    <div class="ts-modal">
         <div class="modal-header-row">
-            <h2>📋 Trakt Seznamy</h2>
+            <h2 id="tsModalHeading">📋 <span style="color:#ed2224;">TRAKT</span><span style="opacity:.4;"> / </span><span style="opacity:.5;">SIMKL</span></h2>
             <button class="close-modal-btn" onclick="closeTraktModal()" title="Zavřít">✕</button>
         </div>
-        <div id="traktListTabsWrap" style="display:none;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);background:var(--bg-card);position:sticky;top:61px;z-index:9;">
-            <div id="traktListTabs" style="display:flex;gap:6px;padding:10px 16px;min-width:max-content;"></div>
+        <div class="ts-source-tabs">
+            <button class="ts-source-btn active" id="tsSrcBtnTrakt" data-src="trakt" onclick="switchTsSource('trakt')">📋 Trakt</button>
+            <button class="ts-source-btn" id="tsSrcBtnSimkl" data-src="simkl" onclick="switchTsSource('simkl')">🎯 Simkl</button>
         </div>
-        <div class="trakt-modal-body" id="traktResultsContainer"></div>
-    </div>
-</div>
-
-<!-- 🎯 Simkl modal -->
-<div class="trakt-modal-overlay" id="simklModal" onclick="if(event.target===this)closeSimklModal()">
-    <div class="trakt-modal">
-        <div class="modal-header-row">
-            <h2 style="color:#1cb99a;">🎯 Simkl Seznamy</h2>
-            <button class="close-modal-btn" onclick="closeSimklModal()" title="Zavřít">✕</button>
+        <div class="ts-modal-body-scroll">
+            <div id="traktListTabsWrap" style="display:none;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);background:var(--bg-card);">
+                <div id="traktListTabs" style="display:flex;gap:6px;padding:10px 16px;min-width:max-content;"></div>
+            </div>
+            <div class="trakt-modal-body" id="traktResultsContainer"></div>
+            <div id="simklListTabsWrap" style="display:none;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);background:var(--bg-card);">
+                <div id="simklListTabs" style="display:flex;gap:6px;padding:10px 16px;min-width:max-content;"></div>
+            </div>
+            <div class="trakt-modal-body" id="simklResultsContainer" style="display:none;"></div>
         </div>
-        <div id="simklListTabsWrap" style="display:none;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);background:var(--bg-card);position:sticky;top:61px;z-index:9;">
-            <div id="simklListTabs" style="display:flex;gap:6px;padding:10px 16px;min-width:max-content;"></div>
-        </div>
-        <div class="trakt-modal-body" id="simklResultsContainer"></div>
     </div>
 </div>
 
@@ -2722,23 +2730,51 @@
         if(window.updatePwaBtn) updatePwaBtn();
     }
 
-    function openTraktModal() {
+    // ── TRAKT/SIMKL sjednocený modal ──────────────────────────────
+    window._tsSource = window._tsSource || 'trakt';
+    function switchTsSource(src) {
+        window._tsSource = src;
+        const isTrakt = src === 'trakt';
+        $('tsSrcBtnTrakt')?.classList.toggle('active', isTrakt);
+        $('tsSrcBtnSimkl')?.classList.toggle('active', !isTrakt);
+        const heading = $('tsModalHeading');
+        if (heading) {
+            heading.innerHTML = isTrakt
+                ? '📋 <span style="color:#ed2224;">TRAKT</span><span style="opacity:.4;"> / </span><span style="opacity:.5;">SIMKL</span>'
+                : '<span style="opacity:.5;">TRAKT</span><span style="opacity:.4;"> / </span>🎯 <span style="color:#1cb99a;">SIMKL</span>';
+        }
+        if ($('traktResultsContainer')) $('traktResultsContainer').style.display = isTrakt ? '' : 'none';
+        if ($('simklResultsContainer')) $('simklResultsContainer').style.display = isTrakt ? 'none' : '';
+        if ($('traktListTabsWrap')) $('traktListTabsWrap').style.display = (isTrakt && window._traktListsCache?.length) ? 'block' : 'none';
+        if ($('simklListTabsWrap')) $('simklListTabsWrap').style.display = (!isTrakt && window._simklListsCache?.length) ? 'block' : 'none';
+        if (isTrakt) {
+            if (window._traktListsCache?.length) {
+                const idx = state._traktActiveIdx != null ? state._traktActiveIdx : (window._traktActiveIdx || 0);
+                state._traktActiveIdx = null;
+                renderTraktLists(window._traktListsCache, idx);
+            } else {
+                loadTraktLists();
+            }
+        } else {
+            if (window._simklListsCache?.length) {
+                const idx = state._simklActiveIdx != null ? state._simklActiveIdx : (window._simklActiveIdx || 0);
+                state._simklActiveIdx = null;
+                renderSimklLists(window._simklListsCache, idx);
+            } else {
+                loadSimklLists();
+            }
+        }
+    }
+    window.switchTsSource = switchTsSource;
+
+    function openTraktModal(source) {
         closeHelperModals();
         $('traktModal')?.classList.add('open');
-        $('btnTraktToggle')?.classList.add('active');
-        // Pokud se vracíme zpět a máme cache, obnov konkrétní seznam
-        if (window._traktListsCache?.length && state._traktActiveIdx != null) {
-            const idx = state._traktActiveIdx;
-            state._traktActiveIdx = null;
-            renderTraktLists(window._traktListsCache, idx);
-        } else {
-            loadTraktLists();
-        }
+        switchTsSource(source || window._tsSource || 'trakt');
     }
     
     function closeTraktModal() { 
         $('traktModal')?.classList.remove('open'); 
-        $('btnTraktToggle')?.classList.remove('active'); 
     }
 
     function openMdblistModal() {
@@ -3913,7 +3949,6 @@
     function closeHelperModals() {
         $('musicModal')?.classList.remove('open');
         $('traktModal')?.classList.remove('open');
-        $('simklModal')?.classList.remove('open');
         $('mdblistModal')?.classList.remove('open');
         $('favsModal')?.classList.remove('open');
         $('settingsModal')?.classList.remove('open');
@@ -3924,8 +3959,6 @@
         const zm = $('zabavaModal'); if(zm) zm.style.display = 'none';
         const lom = $('liveOfficialModal'); if(lom) lom.style.display = 'none';
         $('btnMusicToggle')?.classList.remove('active');
-        $('btnTraktToggle')?.classList.remove('active');
-        $('btnSimklToggle')?.classList.remove('active');
         $('btnMdblistToggle')?.classList.remove('active');
         $('btnFavToggle')?.classList.remove('active');
         $('btnWebsitesToggle')?.classList.remove('active');
@@ -4673,18 +4706,9 @@
     
 
     function openSimklModal() {
-        closeHelperModals();
-        $('simklModal')?.classList.add('open');
-        // Pokud se vracíme zpět a máme cache, obnov konkrétní seznam
-        if (window._simklListsCache?.length && state._simklActiveIdx != null) {
-            const idx = state._simklActiveIdx;
-            state._simklActiveIdx = null;
-            renderSimklLists(window._simklListsCache, idx);
-        } else {
-            loadSimklLists();
-        }
+        openTraktModal('simkl');
     }
-    function closeSimklModal() { $('simklModal')?.classList.remove('open'); }
+    function closeSimklModal() { closeTraktModal(); }
 
     function updateSimklStatus() {
         const dot = $('simklStatusDot'); const text = $('simklStatusText');
@@ -9711,10 +9735,30 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     }
     window.fullResyncWatched = fullResyncWatched;
 
-    // ── ROZKOUKANÉ (sjednocené: seriály + filmy, s přepínačem Vše/Seriály/Filmy) ─
-    async function _fetchWatchingShowsData() {
-        const results = [];
-        let autoMarkedComplete = false;
+    // ── ROZKOUKANÉ SERIÁLY ────────────────────────────────────────────────────
+    async function openWatchingModal() {
+        closeHelperModals();
+        const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
+        if(nav && left && right) {
+            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">📺 Rozkoukané seriály ↑</span>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            nav.style.display = 'flex';
+        }
+        $('modalScrollBody').innerHTML = '<div class="loading"><div class="spinner"></div>Načítám seriály z Traktu...</div>';
+        $('modal').classList.add('open');
+        $('modalContent').classList.remove('watched-full');
+        $('modalContent').classList.add('watched-full');
+
+        if (!state.trakt.accessToken) {
+            $('modalScrollBody').innerHTML = `<div style="padding:40px;text-align:center;">
+                <div style="font-size:3rem;margin-bottom:16px;">📺</div>
+                <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">Vyžaduje Trakt přihlášení</div>
+                <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:24px;">Přihlaste se k Trakt.tv pro zobrazení rozkoukaných seriálů</div>
+                <button onclick="closeModal();connectTrakt();" style="padding:12px 28px;background:linear-gradient(135deg,#1db954,#17a244);border:none;border-radius:10px;color:#fff;font-weight:700;cursor:pointer;">🔑 Přihlásit přes Trakt</button>
+            </div>`;
+            return;
+        }
+
         try {
             await ensureTraktToken();
             const res = await fetch(`${TRAKT_BASE}/sync/watched/shows`, { headers: getTraktHeaders() });
@@ -9722,6 +9766,29 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             const watchedShowsRaw = await res.json();
             const watchedShows = Array.isArray(watchedShowsRaw) ? watchedShowsRaw : [];
 
+            // Pro každý seriál zjistíme počet shlédnutých vs celkový počet epizod
+            const sortBtnStyle = 'padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:20px;color:var(--text-muted);font-size:0.72rem;cursor:pointer;font-weight:600;white-space:nowrap;';
+            $('modalScrollBody').innerHTML = `<div style="padding:16px 16px 0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+                    <div style="font-size:0.85rem;color:var(--text-muted);">Načítám detaily seriálů… (${watchedShows.length} celkem)</div>
+                    <div id="watchingProgress" style="font-size:0.8rem;color:#00b4d8;font-weight:600;"></div>
+                </div>
+                <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+                    <button class="watching-sort-btn" data-sort="new" onclick="setWatchingSort('new',this)" style="${sortBtnStyle}background:#00b4d8;color:#fff;border-color:#00b4d8;">🆕 Nové epizody</button>
+                    <button class="watching-sort-btn" data-sort="az" onclick="setWatchingSort('az',this)" style="${sortBtnStyle}">🔤 A-Z</button>
+                    <button class="watching-sort-btn" data-sort="recent" onclick="setWatchingSort('recent',this)" style="${sortBtnStyle}">🕐 Naposledy sledované</button>
+                </div>
+                <div id="watchingGrid" style="display:flex;flex-direction:column;gap:10px;"></div>
+            </div>`;
+
+            const results = [];
+            window._watchingItemsCache = results; // stejná reference, aktualizuje se s .push()
+            let done = 0;
+            let autoMarkedComplete = false;
+            const progressEl = $('watchingProgress');
+            const gridEl = $('watchingGrid');
+
+            // Zpracuj po dávkách
             const batchSize = 6;
             for (let i = 0; i < watchedShows.length; i += batchSize) {
                 const batch = watchedShows.slice(i, i + batchSize);
@@ -9753,6 +9820,10 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     const watchedSeasons = (s.seasons||[]).filter(se => se.number > 0).map(se => se.number);
                     const maxWatchedSeason = watchedSeasons.length ? Math.max(...watchedSeasons) : 0;
 
+                    // Počet epizod ve sledovaných sezónách (z Traktu)
+                    const watchedEpsInSeasons = {};
+                    (s.seasons||[]).forEach(se => { watchedEpsInSeasons[se.number] = (se.episodes||[]).length; });
+
                     // Máme-li pro tento seriál lokální epizodní zaškrtávátka (uživatel klikal na jednotlivé epizody
                     // přímo v appce), jsou spolehlivější než agregátní "plays" z Traktu bez epizodního detailu.
                     const localEpKeys = Object.keys(state.watched).filter(k => k.startsWith(`ep_${tmdbId}_`));
@@ -9765,11 +9836,11 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                         autoMarkedComplete = true; // znovu použito jako "je co uložit"
                     }
 
-                    // Pokud appka lokálně eviduje seriál jako kompletně shlédnutý a zrovna neběží žádná nová
-                    // epizoda, bereme to jako dokoukané - nezobrazovat v Rozkoukaných.
+                    // Pokud appka lokálně eviduje seriál jako kompletně shlédnutý (viz toggleWatched/reconcileWatchedShows -
+                    // ten příznak se nastaví jen když je odvysílaný celý a všechny epizody shlédnuté) a zrovna neběží
+                    // žádná nová epizoda, bereme to jako dokoukané - nezobrazovat v Rozkoukaných, i kdyby Trakt měl
+                    // neúplná/chybějící data (např. import bez epizodního detailu, nebo starý údaj o počtu sezón).
                     if (state.watched[`tv_${tmdbId}`] && !nextEpisode) return;
-
-                    const lastWatchedAt = s.last_watched_at ? new Date(s.last_watched_at).getTime() : 0;
 
                     // Lokální epizodní data mají přednost, ať se seriál neoznačí jako dokoukaný předčasně.
                     if (localEpKeys.length) {
@@ -9786,15 +9857,18 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                             return;
                         }
                         results.push({
-                            mediaType: 'tv', id: tmdbId, title: showName, year: showYear, posterPath,
+                            id: tmdbId, title: showName, year: showYear, posterPath,
                             watchedEps, totalEps, maxWatchedSeason: effectiveMaxSeason, totalSeasons,
-                            airStatus, nextEpisode, slug, plays: s.plays || 0, lastWatchedAt
+                            airStatus, nextEpisode, slug, plays: s.plays || 0,
+                            lastWatchedAt: s.last_watched_at ? new Date(s.last_watched_at).getTime() : 0
                         });
                         return;
                     }
 
-                    // Trakt eviduje sledování, ale bez epizodního detailu a bez lokálních epizodních dat -
-                    // pokud je seriál navíc ukončený a nic dalšího nepřibude, bereme ho jako dokoukaný.
+                    // Trakt eviduje sledování, ale bez epizodního detailu (starý/hromadný import) a bez lokálních
+                    // epizodních dat - pokud je seriál navíc ukončený a nic dalšího nepřibude, bereme ho jako
+                    // dokoukaný: doplníme lokální příznak "Shlédnuto" (ať se objeví ve Shlédnutých) a v Rozkoukaných
+                    // ho nezobrazujeme.
                     const noEpisodeDetail = watchedEps === 0 && (s.plays||0) > 0;
                     const isEndedNoNext = !nextEpisode && (airStatus === 'Ended' || airStatus === 'Canceled');
                     if (noEpisodeDetail && isEndedNoNext) {
@@ -9810,14 +9884,23 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     if (!isIncomplete) return; // přeskočit dokončené
 
                     results.push({
-                        mediaType: 'tv', id: tmdbId, title: showName, year: showYear, posterPath,
+                        id: tmdbId, title: showName, year: showYear, posterPath,
                         watchedEps, totalEps, maxWatchedSeason, totalSeasons,
-                        airStatus, nextEpisode, slug, plays: s.plays || 0, lastWatchedAt
+                        airStatus, nextEpisode, slug, plays: s.plays || 0,
+                        lastWatchedAt: s.last_watched_at ? new Date(s.last_watched_at).getTime() : 0
                     });
                 }));
+                done += batch.length;
+                if (progressEl) progressEl.textContent = `${done}/${watchedShows.length}`;
+
+                // Průběžně renderuj
+                if (gridEl && results.length) _renderWatchingGrid(gridEl, results);
             }
 
             // ── Doplnění: lokálně rozkoukané seriály, které Trakt nevrátil ──────────
+            // (nový/nespárovaný titul na Traktu, selhaný sync epizody apod.) Bez tohoto
+            // by seriál rozkoukaný jen lokálně (zaškrtnuté epizody v detailu) v tomto
+            // seznamu chyběl, i když ve skutečnosti rozkoukaný je.
             try {
                 const traktCoveredIds = new Set(results.map(r => String(r.id)));
                 const localShowIds = new Set();
@@ -9828,6 +9911,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                     }
                 });
                 if (localShowIds.size) {
+                    if (progressEl) progressEl.textContent = 'Doplňuji lokální…';
                     await Promise.all([...localShowIds].map(async tvId => {
                         const epKeys = Object.keys(state.watched).filter(k => k.startsWith(`ep_${tvId}_`));
                         const watchedEps = epKeys.length;
@@ -9839,219 +9923,94 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                             const nextEpisode = d.next_episode_to_air || null;
                             const seasonNums = epKeys.map(k => Number(k.split('_')[2]));
                             const maxWatchedSeason = seasonNums.length ? Math.max(...seasonNums) : 0;
+                            // Sebeoprava: chybně nastavený "Shlédnuto" příznak z dřívějška, který lokální epizody nepodporují.
                             if (state.watched[`tv_${tvId}`] && totalEps > 0 && watchedEps < totalEps) {
                                 delete state.watched[`tv_${tvId}`];
                                 autoMarkedComplete = true;
                             }
-                            if (state.watched[`tv_${tvId}`] && !nextEpisode) return;
+                            if (state.watched[`tv_${tvId}`] && !nextEpisode) return; // opravdu dokoukané, nezobrazovat
                             const isIncomplete = watchedEps < totalEps || nextEpisode != null || (totalSeasons > maxWatchedSeason && totalSeasons > 0);
                             if (!isIncomplete) return;
                             const fallbackTitle = (state.watched[epKeys[0]]?.title || '').split(' S')[0];
                             results.push({
-                                mediaType: 'tv', id: Number(tvId), title: d.name || fallbackTitle || 'Seriál', year: (d.first_air_date||'').slice(0,4), posterPath: d.poster_path || '',
+                                id: Number(tvId), title: d.name || fallbackTitle || 'Seriál', year: (d.first_air_date||'').slice(0,4), posterPath: d.poster_path || '',
                                 watchedEps, totalEps, maxWatchedSeason, totalSeasons,
                                 airStatus: d.status || '', nextEpisode, slug: null, lastWatchedAt: 0
                             });
                         } catch (e) { /* TMDB nedostupné - přeskočit */ }
                     }));
+                    if (gridEl && results.length) _renderWatchingGrid(gridEl, results);
                 }
             } catch (e) { console.warn('Local watching merge error:', e); }
-        } catch(e) { console.warn('Fetch watching shows error:', e); }
-        return { results, autoMarkedComplete };
-    }
 
-    async function _fetchMoviesProgressData() {
-        try {
-            await ensureTraktToken();
-            const res = await fetch(`${TRAKT_BASE}/sync/playback/movies?limit=100`, { headers: getTraktHeaders() });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const playback = await res.json();
-            if (!Array.isArray(playback) || !playback.length) return [];
-            const inProgress = playback.filter(p => p.progress != null && p.progress < 100);
-            if (!inProgress.length) return [];
-            const items = await Promise.all(inProgress.map(async p => {
-                const tmdbId = p.movie?.ids?.tmdb;
-                let posterPath = '', title = p.movie?.title || '?', year = p.movie?.year || '', runtime = 0;
-                if (tmdbId && tmdbApiKey) {
-                    try {
-                        const d = await (await fetch(`${BASE}/movie/${tmdbId}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
-                        posterPath = d.poster_path || '';
-                        title = d.title || title;
-                        runtime = d.runtime || 0;
-                    } catch {}
-                }
-                const pct = Math.round(p.progress || 0);
-                const watchedMin = runtime ? Math.round(runtime * pct / 100) : null;
-                const lastWatchedAt = p.paused_at ? new Date(p.paused_at).getTime() : 0;
-                return { mediaType: 'movie', id: tmdbId, title, year, posterPath, pct, runtime, watchedMin, pausedAt: p.paused_at, lastWatchedAt };
-            }));
-            return items;
-        } catch(e) { console.warn('Fetch movies progress error:', e); return []; }
-    }
-
-    async function openWatchingModal(filter) {
-        filter = filter || window._continueFilter || 'all';
-        window._continueFilter = filter;
-        closeHelperModals();
-        const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
-        if(nav && left && right) {
-            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">🎭 Rozkoukané ↑</span>`;
-            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
-            nav.style.display = 'flex';
-        }
-        $('modalScrollBody').innerHTML = '<div class="loading"><div class="spinner"></div>Načítám seriály a filmy z Traktu...</div>';
-        $('modal').classList.add('open');
-        $('modalContent').classList.remove('watched-full');
-        $('modalContent').classList.add('watched-full');
-
-        if (!state.trakt.accessToken) {
-            $('modalScrollBody').innerHTML = `<div style="padding:40px;text-align:center;">
-                <div style="font-size:3rem;margin-bottom:16px;">🎭</div>
-                <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">Vyžaduje Trakt přihlášení</div>
-                <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:24px;">Přihlaste se k Trakt.tv pro zobrazení rozkoukaných seriálů a filmů</div>
-                <button onclick="closeModal();connectTrakt();" style="padding:12px 28px;background:linear-gradient(135deg,#1db954,#17a244);border:none;border-radius:10px;color:#fff;font-weight:700;cursor:pointer;">🔑 Přihlásit přes Trakt</button>
-            </div>`;
-            return;
-        }
-
-        try {
-            const [showsResult, movieItems] = await Promise.all([
-                _fetchWatchingShowsData(),
-                _fetchMoviesProgressData()
-            ]);
-            if (showsResult.autoMarkedComplete) saveWatched();
-            const allItems = [...showsResult.results, ...movieItems];
-            window._continueItemsCache = allItems;
-            _renderContinueModal(allItems, filter);
+            if (autoMarkedComplete) { saveWatched(); }
+            if (progressEl) progressEl.textContent = '';
+            if (!results.length) {
+                $('modalScrollBody').innerHTML = '<div class="empty" style="padding:40px;text-align:center;">🎉 Všechny seriály máš dokoukané!</div>';
+            } else {
+                if (gridEl) _renderWatchingGrid(gridEl, results);
+            }
         } catch(e) {
-            $('modalScrollBody').innerHTML = `<div class="empty" style="padding:30px;text-align:center;">⚠️ Chyba: ${e.message}<br><br><button onclick="openWatchingModal('${filter}')" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
+            $('modalScrollBody').innerHTML = `<div class="empty" style="padding:30px;text-align:center;">⚠️ Chyba: ${e.message}<br><br><button onclick="openWatchingModal()" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
         }
     }
 
-    // Zachováno pro zpětnou kompatibilitu (starší volání typu backTo==='moviesprogress')
-    async function openMoviesProgressModal() { return openWatchingModal('movie'); }
-
-    function _continuePill(label, count, active, filterVal) {
-        return `<button onclick="setContinueFilter('${filterVal}')" style="padding:6px 14px;border-radius:20px;border:1px solid ${active?'#1db954':'var(--border)'};background:${active?'#1db954':'var(--bg-elevated)'};color:${active?'#000':'var(--text)'};cursor:pointer;font-weight:${active?'600':'normal'};font-size:0.8rem;white-space:nowrap;">${label} (${count})</button>`;
-    }
-
-    function _renderContinueModal(allItems, filter) {
-        filter = filter || 'all';
-        if (!allItems.length) {
-            $('modalScrollBody').innerHTML = '<div class="empty" style="padding:40px;text-align:center;">🎉 Všechno máš dokoukané!</div>';
-            return;
-        }
-        const tvCount = allItems.filter(it => it.mediaType === 'tv').length;
-        const movieCount = allItems.filter(it => it.mediaType === 'movie').length;
-        const sortBtnStyle = 'padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:20px;color:var(--text-muted);font-size:0.72rem;cursor:pointer;font-weight:600;white-space:nowrap;';
-        const mode = window._continueSortMode || 'default';
-        $('modalScrollBody').innerHTML = `<div style="padding:16px 16px 0;">
-            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-                ${_continuePill('Vše', allItems.length, filter==='all', 'all')}
-                ${_continuePill('Seriály', tvCount, filter==='tv', 'tv')}
-                ${_continuePill('Filmy', movieCount, filter==='movie', 'movie')}
-            </div>
-            <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
-                <button class="continue-sort-btn" data-sort="default" onclick="setContinueSort('default',this)" style="${sortBtnStyle}${mode==='default'?'background:#00b4d8;color:#fff;border-color:#00b4d8;':''}">🆕 Výchozí</button>
-                <button class="continue-sort-btn" data-sort="az" onclick="setContinueSort('az',this)" style="${sortBtnStyle}${mode==='az'?'background:#00b4d8;color:#fff;border-color:#00b4d8;':''}">🔤 A-Z</button>
-                <button class="continue-sort-btn" data-sort="recent" onclick="setContinueSort('recent',this)" style="${sortBtnStyle}${mode==='recent'?'background:#00b4d8;color:#fff;border-color:#00b4d8;':''}">🕐 Naposledy sledované</button>
-            </div>
-            <div id="continueGrid" style="display:flex;flex-direction:column;gap:10px;"></div>
-        </div>`;
-        const gridEl = $('continueGrid');
-        const filtered = filter === 'all' ? allItems : allItems.filter(it => it.mediaType === filter);
-        if (!filtered.length) {
-            gridEl.innerHTML = `<div class="empty" style="padding:30px;text-align:center;color:var(--text-muted);">Žádné položky v této kategorii.</div>`;
-            return;
-        }
-        _renderContinueGrid(gridEl, allItems, filter, mode);
-    }
-
-    window.setContinueFilter = function(val) {
-        window._continueFilter = val;
-        if (window._continueItemsCache) _renderContinueModal(window._continueItemsCache, val);
-    };
-
-    window.setContinueSort = function(mode, btn) {
-        window._continueSortMode = mode;
-        document.querySelectorAll('.continue-sort-btn').forEach(b => {
-            b.style.background = 'var(--bg-elevated)'; b.style.color = 'var(--text-muted)'; b.style.borderColor = 'var(--border)';
-        });
-        if (btn) { btn.style.background = '#00b4d8'; btn.style.color = '#fff'; btn.style.borderColor = '#00b4d8'; }
-        const gridEl = $('continueGrid');
-        if (gridEl && window._continueItemsCache) _renderContinueGrid(gridEl, window._continueItemsCache, window._continueFilter||'all', mode);
-    };
-
-    function _renderContinueGrid(container, allItems, filter, mode) {
-        filter = filter || window._continueFilter || 'all';
-        mode = mode || window._continueSortMode || 'default';
-        const items = filter === 'all' ? allItems : allItems.filter(it => it.mediaType === filter);
+    function _renderWatchingGrid(container, items, mode) {
+        mode = mode || window._watchingSortMode || 'new';
+        // Seřadit podle zvoleného režimu
         const sorted = [...items].sort((a, b) => {
             if (mode === 'az') return (a.title||'').localeCompare(b.title||'', 'cs');
             if (mode === 'recent') return (b.lastWatchedAt||0) - (a.lastWatchedAt||0);
-            // 'default': seriály s novou epizodou první, pak abecedně
-            const aNew = a.mediaType === 'tv' && !!a.nextEpisode;
-            const bNew = b.mediaType === 'tv' && !!b.nextEpisode;
-            if (aNew && !bNew) return -1;
-            if (!aNew && bNew) return 1;
+            // 'new' (výchozí): nejdřív ty s novými epizodami, pak abecedně
+            if (a.nextEpisode && !b.nextEpisode) return -1;
+            if (!a.nextEpisode && b.nextEpisode) return 1;
             return (a.title||'').localeCompare(b.title||'', 'cs');
         });
-        container.innerHTML = sorted.map(it => it.mediaType === 'movie' ? _movieContinueCard(it) : _showContinueCard(it)).join('');
-    }
-
-    function _showContinueCard(it) {
-        const poster = it.posterPath ? `<img src="${IMG}w185${it.posterPath}" style="width:70px;height:105px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">` : `<div style="width:70px;height:105px;background:var(--bg-elevated);border-radius:8px;display:grid;place-items:center;font-size:2rem;flex-shrink:0;">📺</div>`;
-        const noEpisodeDetail = it.watchedEps === 0 && (it.plays||0) > 0;
-        const pct = it.totalEps > 0 ? Math.round((it.watchedEps / it.totalEps) * 100) : 0;
-        const progressBar = noEpisodeDetail
-            ? `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">✅ Trakt: sledováno (bez detailu odkoukaných epizod)</div>`
-            : (it.totalEps > 0 ? `<div style="background:rgba(255,255,255,0.1);border-radius:4px;height:5px;margin-top:6px;overflow:hidden;"><div style="background:#00b4d8;height:100%;border-radius:4px;width:${pct}%;transition:width 0.3s;"></div></div><div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">${it.watchedEps}/${it.totalEps} epizod (${pct}%)</div>` : '');
-        const newEpBadge = it.nextEpisode ? `<div style="display:inline-block;background:rgba(229,9,20,0.2);border:1px solid #e50914;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#e50914;font-weight:700;margin-top:4px;">🆕 S${it.nextEpisode.season_number}E${it.nextEpisode.episode_number} dostupné</div>` : '';
-        const seasonBadge = (!noEpisodeDetail && it.totalSeasons > it.maxWatchedSeason) ? `<div style="display:inline-block;background:rgba(0,180,216,0.15);border:1px solid #00b4d8;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#00b4d8;font-weight:700;margin-top:4px;">📺 Sezóna ${it.maxWatchedSeason+1} nevykoukána</div>` : '';
-        const statusMap = {
-            'Returning Series': { label: 'Pokračuje', color: '#1db954' },
-            'Ended': { label: 'Ukončeno', color: '#666' },
-            'Canceled': { label: 'Zrušeno', color: '#e50914' },
-            'In Production': { label: 'Ve výrobě', color: '#f5a623' },
-            'Planned': { label: 'Plánováno', color: '#7db8f7' },
-            'Pilot': { label: 'Pilotní díl', color: '#7db8f7' }
-        };
-        const st = statusMap[it.airStatus] || { label: it.airStatus || '?', color: '#888' };
-        return `<div style="display:flex;gap:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;align-items:flex-start;cursor:pointer;" onclick="openDetailFromWatching(${it.id},'tv')">
-            ${poster}
-            <div style="flex:1;min-width:0;">
-                <div style="font-weight:700;font-size:0.95rem;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📺 ${it.title}</div>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;">${it.year||'—'} · <span style="color:${st.color};">${st.label}</span> · ${it.totalSeasons} sezón</div>
-                ${progressBar}
-                ${newEpBadge}
-                ${seasonBadge}
-            </div>
-            <button onclick="event.stopPropagation();markShowWatched(${it.id},'${jsq(it.title||'')}',this)" style="flex-shrink:0;padding:6px 10px;background:rgba(29,185,84,0.1);border:1px solid #1db954;border-radius:8px;color:#1db954;font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Označit celý seriál jako shlédnutý">✅</button>
-        </div>`;
-    }
-
-    function _movieContinueCard(it) {
-        const poster = it.posterPath ? `<img src="${IMG}w185${it.posterPath}" style="width:70px;height:105px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">` : `<div style="width:70px;height:105px;background:var(--bg-elevated);border-radius:8px;display:grid;place-items:center;font-size:2rem;flex-shrink:0;">🎬</div>`;
-        const pctColor = it.pct >= 80 ? '#1db954' : it.pct >= 50 ? '#ff9800' : '#00b4d8';
-        const timeStr = it.watchedMin ? `${it.watchedMin}/${it.runtime} min` : '';
-        const dateStr = it.pausedAt ? new Date(it.pausedAt).toLocaleDateString('cs-CZ') : '';
-        const alreadyWatched = !!state.watched[`movie_${it.id}`];
-        return `<div style="display:flex;gap:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;align-items:flex-start;cursor:pointer;" onclick="openDetailFromWatching(${it.id},'movie')">
-            ${poster}
-            <div style="flex:1;min-width:0;">
-                <div style="font-weight:700;font-size:0.95rem;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🎬 ${it.title}</div>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px;">${it.year||'—'}${dateStr?' · Naposledy: '+dateStr:''}</div>
-                <div style="background:rgba(255,255,255,0.1);border-radius:4px;height:6px;overflow:hidden;"><div style="background:${pctColor};height:100%;border-radius:4px;width:${it.pct}%;transition:width 0.3s;"></div></div>
-                <div style="font-size:0.7rem;color:${pctColor};font-weight:700;margin-top:4px;">${it.pct}% dokoukaného${timeStr?' · '+timeStr:''}</div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
-                <button onclick="event.stopPropagation();markMovieWatched(${it.id},'${jsq(it.title||'')}','${it.posterPath||''}',${it.year||0},this)" style="padding:7px 10px;background:${alreadyWatched?'rgba(29,185,84,0.3)':'rgba(29,185,84,0.1)'};border:1px solid #1db954;border-radius:8px;color:#1db954;font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Označit jako shlédnutý">${alreadyWatched?'✓ Shlédnuto':'✅ Hotovo'}</button>
-                <button onclick="event.stopPropagation();removeTraktPlayback('${it.id}',this)" style="padding:7px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Smazat progress z Traktu">🗑️</button>
-            </div>
-        </div>`;
+        container.innerHTML = sorted.map(it => {
+            const poster = it.posterPath ? `<img src="${IMG}w185${it.posterPath}" style="width:70px;height:105px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">` : `<div style="width:70px;height:105px;background:var(--bg-elevated);border-radius:8px;display:grid;place-items:center;font-size:2rem;flex-shrink:0;">📺</div>`;
+            const noEpisodeDetail = it.watchedEps === 0 && (it.plays||0) > 0;
+            const pct = it.totalEps > 0 ? Math.round((it.watchedEps / it.totalEps) * 100) : 0;
+            const progressBar = noEpisodeDetail
+                ? `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">✅ Trakt: sledováno (bez detailu odkoukaných epizod)</div>`
+                : (it.totalEps > 0 ? `<div style="background:rgba(255,255,255,0.1);border-radius:4px;height:5px;margin-top:6px;overflow:hidden;"><div style="background:#00b4d8;height:100%;border-radius:4px;width:${pct}%;transition:width 0.3s;"></div></div><div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">${it.watchedEps}/${it.totalEps} epizod (${pct}%)</div>` : '');
+            const newEpBadge = it.nextEpisode ? `<div style="display:inline-block;background:rgba(229,9,20,0.2);border:1px solid #e50914;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#e50914;font-weight:700;margin-top:4px;">🆕 S${it.nextEpisode.season_number}E${it.nextEpisode.episode_number} dostupné</div>` : '';
+            const seasonBadge = (!noEpisodeDetail && it.totalSeasons > it.maxWatchedSeason) ? `<div style="display:inline-block;background:rgba(0,180,216,0.15);border:1px solid #00b4d8;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#00b4d8;font-weight:700;margin-top:4px;">📺 Sezóna ${it.maxWatchedSeason+1} nevykoukána</div>` : '';
+            const statusMap = {
+                'Returning Series': { label: 'Pokračuje', color: '#1db954' },
+                'Ended': { label: 'Ukončeno', color: '#666' },
+                'Canceled': { label: 'Zrušeno', color: '#e50914' },
+                'In Production': { label: 'Ve výrobě', color: '#f5a623' },
+                'Planned': { label: 'Plánováno', color: '#7db8f7' },
+                'Pilot': { label: 'Pilotní díl', color: '#7db8f7' }
+            };
+            const st = statusMap[it.airStatus] || { label: it.airStatus || '?', color: '#888' };
+            const statusColor = st.color;
+            const isWatched = isWatched_fn(it.id, 'tv');
+            return `<div style="display:flex;gap:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;align-items:flex-start;cursor:pointer;" onclick="openDetailFromWatching(${it.id},'tv')">
+                ${poster}
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:0.95rem;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.title}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;">${it.year||'—'} · <span style="color:${statusColor};">${st.label}</span> · ${it.totalSeasons} sezón</div>
+                    ${progressBar}
+                    ${newEpBadge}
+                    ${seasonBadge}
+                </div>
+                <button onclick="event.stopPropagation();markShowWatched(${it.id},'${jsq(it.title||'')}',this)" style="flex-shrink:0;padding:6px 10px;background:rgba(29,185,84,0.1);border:1px solid #1db954;border-radius:8px;color:#1db954;font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Označit celý seriál jako shlédnutý">✅</button>
+            </div>`;
+        }).join('');
     }
 
     function isWatched_fn(id, type) { return !!state.watched[`${type}_${id}`]; }
+
+    window.setWatchingSort = function(mode, btn) {
+        window._watchingSortMode = mode;
+        document.querySelectorAll('.watching-sort-btn').forEach(b => {
+            b.style.background = 'var(--bg-elevated)'; b.style.color = 'var(--text-muted)'; b.style.borderColor = 'var(--border)';
+        });
+        if (btn) { btn.style.background = '#00b4d8'; btn.style.color = '#fff'; btn.style.borderColor = '#00b4d8'; }
+        const gridEl = $('watchingGrid');
+        if (gridEl && window._watchingItemsCache) _renderWatchingGrid(gridEl, window._watchingItemsCache, mode);
+    };
 
     window.openDetailFromWatching = function(id, type) {
         closeModal();
@@ -10075,6 +10034,128 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         }, 300);
         saveWatched(); updateWatchedCount();
         syncShowToTrakt(id);
+    };
+
+    // ── ROZKOUKANNÉ FILMY ─────────────────────────────────────────────────────
+    async function openMoviesProgressModal() {
+        closeHelperModals();
+        const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
+        if(nav && left && right) {
+            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">🎬 Rozkoukanné filmy ↑</span>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            nav.style.display = 'flex';
+        }
+        $('modalScrollBody').innerHTML = '<div class="loading"><div class="spinner"></div>Načítám filmy z Traktu...</div>';
+        $('modal').classList.add('open');
+        $('modalContent').classList.add('watched-full');
+
+        if (!state.trakt.accessToken) {
+            $('modalScrollBody').innerHTML = `<div style="padding:40px;text-align:center;">
+                <div style="font-size:3rem;margin-bottom:16px;">🎬</div>
+                <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">Vyžaduje Trakt přihlášení</div>
+                <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:24px;">Přihlaste se k Trakt.tv pro zobrazení filmů s progresem</div>
+                <button onclick="closeModal();connectTrakt();" style="padding:12px 28px;background:linear-gradient(135deg,#1db954,#17a244);border:none;border-radius:10px;color:#fff;font-weight:700;cursor:pointer;">🔑 Přihlásit přes Trakt</button>
+            </div>`;
+            return;
+        }
+
+        try {
+            await ensureTraktToken();
+            const res = await fetch(`${TRAKT_BASE}/sync/playback/movies?limit=100`, { headers: getTraktHeaders() });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const playback = await res.json();
+            if (!Array.isArray(playback) || !playback.length) {
+                $('modalScrollBody').innerHTML = `<div style="padding:40px;text-align:center;">
+                    <div style="font-size:3rem;margin-bottom:16px;">🎉</div>
+                    <div style="font-size:1rem;font-weight:700;margin-bottom:8px;">Žádné rozkoukanné filmy</div>
+                    <div style="font-size:0.85rem;color:var(--text-muted);">Trakt neeviduje žádný nedokončený přehrávací progress filmů.</div>
+                </div>`;
+                return;
+            }
+
+            // Pouze filmy s progress < 100%
+            const inProgress = playback.filter(p => p.progress != null && p.progress < 100);
+            if (!inProgress.length) {
+                $('modalScrollBody').innerHTML = '<div class="empty" style="padding:40px;text-align:center;">🎉 Žádné nedokončené filmy!</div>';
+                return;
+            }
+
+            const sortBtnStyleM = 'padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:20px;color:var(--text-muted);font-size:0.72rem;cursor:pointer;font-weight:600;white-space:nowrap;';
+            $('modalScrollBody').innerHTML = `<div style="padding:16px 16px 0;">
+                <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px;">${inProgress.length} filmů s nedokončeným přehráváním</div>
+                <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+                    <button class="moviesprogress-sort-btn" data-sort="progress" onclick="setMoviesProgressSort('progress',this)" style="${sortBtnStyleM}background:var(--accent);color:#fff;border-color:var(--accent);">📊 Rozkoukanost</button>
+                    <button class="moviesprogress-sort-btn" data-sort="az" onclick="setMoviesProgressSort('az',this)" style="${sortBtnStyleM}">🔤 A-Z</button>
+                    <button class="moviesprogress-sort-btn" data-sort="recent" onclick="setMoviesProgressSort('recent',this)" style="${sortBtnStyleM}">🕐 Naposledy sledované</button>
+                </div>
+                <div id="moviesProgressGrid" style="display:flex;flex-direction:column;gap:10px;"></div>
+            </div>`;
+
+            // Fetch TMDB detaily
+            const items = await Promise.all(inProgress.map(async p => {
+                const tmdbId = p.movie?.ids?.tmdb;
+                let posterPath = '', title = p.movie?.title || '?', year = p.movie?.year || '', runtime = 0;
+                if (tmdbId && tmdbApiKey) {
+                    try {
+                        const d = await (await fetch(`${BASE}/movie/${tmdbId}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
+                        posterPath = d.poster_path || '';
+                        title = d.title || title;
+                        runtime = d.runtime || 0;
+                    } catch {}
+                }
+                const pct = Math.round(p.progress || 0);
+                const watchedMin = runtime ? Math.round(runtime * pct / 100) : null;
+                return { id: tmdbId, title, year, posterPath, pct, runtime, watchedMin, pausedAt: p.paused_at, pausedAtTs: p.paused_at ? new Date(p.paused_at).getTime() : 0 };
+            }));
+
+            const grid = $('moviesProgressGrid');
+            if (!grid) return;
+
+            window._moviesProgressItemsCache = items;
+            _renderMoviesProgressGrid(grid, items, window._moviesProgressSortMode || 'progress');
+        } catch(e) {
+            $('modalScrollBody').innerHTML = `<div class="empty" style="padding:30px;text-align:center;">⚠️ Chyba: ${e.message}<br><br><button onclick="openMoviesProgressModal()" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
+        }
+    }
+
+    function _renderMoviesProgressGrid(grid, items, mode) {
+        mode = mode || window._moviesProgressSortMode || 'progress';
+        const sortedItems = [...items].sort((a, b) => {
+            if (mode === 'az') return (a.title||'').localeCompare(b.title||'', 'cs');
+            if (mode === 'recent') return (b.pausedAtTs||0) - (a.pausedAtTs||0);
+            return b.pct - a.pct; // 'progress' (výchozí): nejvíc dokoukané první
+        });
+
+            grid.innerHTML = sortedItems.map(it => {
+                const poster = it.posterPath ? `<img src="${IMG}w185${it.posterPath}" style="width:70px;height:105px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">` : `<div style="width:70px;height:105px;background:var(--bg-elevated);border-radius:8px;display:grid;place-items:center;font-size:2rem;flex-shrink:0;">🎬</div>`;
+                const pctColor = it.pct >= 80 ? '#1db954' : it.pct >= 50 ? '#ff9800' : '#00b4d8';
+                const timeStr = it.watchedMin ? `${it.watchedMin}/${it.runtime} min` : '';
+                const dateStr = it.pausedAt ? new Date(it.pausedAt).toLocaleDateString('cs-CZ') : '';
+                const alreadyWatched = !!state.watched[`movie_${it.id}`];
+                return `<div style="display:flex;gap:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;align-items:flex-start;" onclick="openDetailFromWatching(${it.id},'movie')" style="cursor:pointer;">
+                    ${poster}
+                    <div style="flex:1;min-width:0;cursor:pointer;" onclick="openDetailFromWatching(${it.id},'movie')">
+                        <div style="font-weight:700;font-size:0.95rem;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.title}</div>
+                        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px;">${it.year||'—'}${dateStr?' · Naposledy: '+dateStr:''}</div>
+                        <div style="background:rgba(255,255,255,0.1);border-radius:4px;height:6px;overflow:hidden;"><div style="background:${pctColor};height:100%;border-radius:4px;width:${it.pct}%;transition:width 0.3s;"></div></div>
+                        <div style="font-size:0.7rem;color:${pctColor};font-weight:700;margin-top:4px;">${it.pct}% dokoukaného${timeStr?' · '+timeStr:''}</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+                        <button onclick="event.stopPropagation();markMovieWatched(${it.id},'${jsq(it.title||'')}','${it.posterPath||''}',${it.year||0},this)" style="padding:7px 10px;background:${alreadyWatched?'rgba(29,185,84,0.3)':'rgba(29,185,84,0.1)'};border:1px solid #1db954;border-radius:8px;color:#1db954;font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Označit jako shlédnutý">${alreadyWatched?'✓ Shlédnuto':'✅ Hotovo'}</button>
+                        <button onclick="event.stopPropagation();removeTraktPlayback('${it.id}',this)" style="padding:7px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Smazat progress z Traktu">🗑️</button>
+                    </div>
+                </div>`;
+            }).join('');
+    }
+
+    window.setMoviesProgressSort = function(mode, btn) {
+        window._moviesProgressSortMode = mode;
+        document.querySelectorAll('.moviesprogress-sort-btn').forEach(b => {
+            b.style.background = 'var(--bg-elevated)'; b.style.color = 'var(--text-muted)'; b.style.borderColor = 'var(--border)';
+        });
+        if (btn) { btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; btn.style.borderColor = 'var(--accent)'; }
+        const gridEl = $('moviesProgressGrid');
+        if (gridEl && window._moviesProgressItemsCache) _renderMoviesProgressGrid(gridEl, window._moviesProgressItemsCache, mode);
     };
 
     window.markMovieWatched = function(id, title, poster, year, btn) {
@@ -10939,11 +11020,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
         <button onclick="closeListsModal();openTraktModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📋</span>
-            <div><div style="color:#ed2224;font-weight:700;">Trakt</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Sledované, watchlist, hodnocení</div></div>
-        </button>
-        <button onclick="closeListsModal();openSimklModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:1.6rem;">🎯</span>
-            <div><div style="color:#1cb99a;font-weight:700;">Simkl</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Sledované, watchlist</div></div>
+            <div><div style="font-weight:700;"><span style="color:#ed2224;">Trakt</span><span style="color:var(--text-muted);"> / </span><span style="color:#1cb99a;">Simkl</span></div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Sledované, watchlist, hodnocení</div></div>
         </button>
         <button onclick="pushModalAndOpen('listsModal', openListsModal, openCollectionsModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📦</span>
@@ -10953,9 +11030,13 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             <span style="font-size:1.6rem;">✅</span>
             <div><div style="color:#1db954;font-weight:700;">Shlédnuté</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmy a seriály které jsi viděl/a</div></div>
         </button>
-        <button onclick="closeListsModal();openWatchingModal('all')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="closeListsModal();openWatchingModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎭</span>
-            <div><div style="color:#00b4d8;font-weight:700;">Rozkoukané</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Seriály a filmy, které máš rozkoukané</div></div>
+            <div><div style="color:#00b4d8;font-weight:700;">Rozkoukané seriály</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Seriály které sleduješ</div></div>
+        </button>
+        <button onclick="closeListsModal();openMoviesProgressModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">⏸️</span>
+            <div><div style="color:var(--accent);font-weight:700;">Rozkoukané filmy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmy které jsi nedokoukoval/a</div></div>
         </button>
     </div>
 </div>
