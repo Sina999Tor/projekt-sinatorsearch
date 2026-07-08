@@ -594,7 +594,7 @@
         .live-official-btn .lob-name { flex:1; font-size:0.88rem; font-weight:600; }
         .live-official-btn .lob-arrow { color:var(--text-muted); font-size:1rem; flex-shrink:0; }
         .modal-header-row { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); z-index: 10; }
-        .modal-header-row h2 { font-family: 'Playfair Display', serif; font-size: 1.4rem; background: linear-gradient(135deg, #fff, var(--trakt)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .modal-header-row h2 { font-family: 'Playfair Display', serif; font-size: 1.1rem; background: linear-gradient(135deg, #fff, var(--trakt)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .favs-modal-header h2, .settings-modal-header h2 { background: linear-gradient(135deg, #fff, var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .sources-modal-header h2 { color: #fff; font-family: 'Playfair Display', serif; font-size: 1.1rem; }
         .settings-modal .modal-header-row { position: static; background: var(--bg-card); flex-shrink: 0; padding: 14px 16px; border-bottom: 1px solid var(--border); }
@@ -696,7 +696,7 @@
         .modal-nav-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
         .modal-nav-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .modal-nav-title {
-            font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 700;
+            font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700;
             background: linear-gradient(135deg, #fff, var(--gold));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1002,7 +1002,7 @@
             .modal-backdrop { height: 180px; }
             .modal-body { padding: 16px 16px 24px; }
             .modal-title { font-size: 1.3rem; }
-            .modal-nav-title { font-size: 0.9rem; }
+            .modal-nav-title { font-size: 1.1rem; }
             .person-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
             .action-buttons { grid-template-columns: 1fr; }
             .search-overlay-inner { flex-wrap: wrap; }
@@ -9772,7 +9772,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         window._rozkSource = 'tv';
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if(nav && left && right) {
-            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">🎭 Rozkoukané · Seriály ↑</span>`;
+            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;background:none;-webkit-text-fill-color:#00b4d8;color:#00b4d8;" title="Zpět nahoru">🎭 Rozkoukané · Seriály ↑</span>`;
             right.innerHTML = `<button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
             nav.style.display = 'flex';
         }
@@ -10075,7 +10075,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         window._rozkSource = 'movie';
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if(nav && left && right) {
-            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">🎭 Rozkoukané · Filmy ↑</span>`;
+            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;background:none;-webkit-text-fill-color:#00b4d8;color:#00b4d8;" title="Zpět nahoru">🎭 Rozkoukané · Filmy ↑</span>`;
             right.innerHTML = `<button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
             nav.style.display = 'flex';
         }
@@ -10277,7 +10277,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         // Use modal nav bar for proper close button
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if(nav && left && right) {
-            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">✅ Shlédnuté ↑</span>`;
+            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;background:none;-webkit-text-fill-color:#1db954;color:#1db954;" title="Zpět nahoru">✅ Shlédnuté ↑</span>`;
             right.innerHTML = `<button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
             nav.style.display = 'flex';
         }
