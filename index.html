@@ -1587,7 +1587,10 @@
     <div class="ts-modal">
         <div class="modal-header-row">
             <h2 id="tsModalHeading">📋 <span style="color:#ed2224;">TRAKT</span><span style="opacity:.4;"> / </span><span style="opacity:.5;">SIMKL</span></h2>
-            <button class="close-modal-btn" onclick="closeTraktModal()" title="Zavřít">✕</button>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button onclick="closeTraktModal();openListsModal();" title="Zpět na Seznamy" style="background:none;border:1px solid var(--border);color:#fff;padding:0 12px;height:34px;border-radius:17px;cursor:pointer;font-size:0.85rem;">← Seznamy</button>
+                <button class="close-modal-btn" onclick="closeTraktModal()" title="Zavřít">✕</button>
+            </div>
         </div>
         <div class="ts-source-tabs">
             <button class="ts-source-btn active" id="tsSrcBtnTrakt" data-src="trakt" onclick="switchTsSource('trakt')">📋 Trakt</button>
@@ -9773,7 +9776,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if(nav && left && right) {
             left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;background:none;-webkit-text-fill-color:#00b4d8;color:#00b4d8;" title="Zpět nahoru">🎭 Rozkoukané · Seriály ↑</span>`;
-            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openListsModal();" title="Zpět na Seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
             nav.style.display = 'flex';
         }
         _updateRozkTabsUI('tv');
@@ -10076,7 +10079,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if(nav && left && right) {
             left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;background:none;-webkit-text-fill-color:#00b4d8;color:#00b4d8;" title="Zpět nahoru">🎭 Rozkoukané · Filmy ↑</span>`;
-            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openListsModal();" title="Zpět na Seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
             nav.style.display = 'flex';
         }
         _updateRozkTabsUI('movie');
@@ -10278,7 +10281,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if(nav && left && right) {
             left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;background:none;-webkit-text-fill-color:#1db954;color:#1db954;" title="Zpět nahoru">✅ Shlédnuté ↑</span>`;
-            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openListsModal();" title="Zpět na Seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
             nav.style.display = 'flex';
         }
 
@@ -10990,7 +10993,10 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     <div class="coll-modal-inner">
         <div class="coll-modal-header">
             <h3 onclick="document.getElementById('collGrid').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">📦 Kolekce ↑</h3>
-            <button onclick="closeCollectionsModal()" style="background:none;border:1px solid var(--border);color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;">✕</button>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button onclick="closeCollectionsModal();openListsModal();" title="Zpět na Seznamy" style="background:none;border:1px solid var(--border);color:#fff;padding:0 12px;height:30px;border-radius:15px;cursor:pointer;font-size:0.82rem;">← Seznamy</button>
+                <button onclick="closeCollectionsModal()" style="background:none;border:1px solid var(--border);color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;">✕</button>
+            </div>
         </div>
         <div class="coll-tabs">
             <button class="coll-tab active" id="collTabPopular" onclick="loadCollections('popular')">⭐ Populární</button>
