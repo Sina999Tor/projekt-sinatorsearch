@@ -2147,6 +2147,10 @@
             <div class="modal-nav-left" id="modalNavLeft"></div>
             <div class="modal-nav-right" id="modalNavRight"></div>
         </div>
+        <div id="rozkSourceTabsWrap" style="display:none;flex-shrink:0;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg-card);">
+            <button id="rozkSrcBtnTv" onclick="openRozkoukaneModal('tv')" style="flex:1;padding:9px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);font-weight:700;cursor:pointer;font-size:0.85rem;transition:0.2s;">🎭 Seriály</button>
+            <button id="rozkSrcBtnMovie" onclick="openRozkoukaneModal('movie')" style="flex:1;padding:9px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);font-weight:700;cursor:pointer;font-size:0.85rem;transition:0.2s;">⏸️ Filmy</button>
+        </div>
         <div class="modal-scroll-body" id="modalScrollBody"></div>
     </div>
 </div>
@@ -7696,6 +7700,7 @@ EXAMPLES:
         if(collM) collM.style.display = '';  // reset display:none z openCollFromModal
         const mc = $('modalContent'); if(mc) mc.style.zIndex = '';
         $('modalContent')?.classList.remove('watched-full');
+        const rst = $('rozkSourceTabsWrap'); if(rst) rst.style.display = 'none';
         const tvM = document.getElementById('tvModal'); if(tvM) { tvM.style.zIndex = ''; }
         const azBar = $('watchedAzBar'); if(azBar) { azBar.classList.remove('visible'); }
         const azTrig = document.getElementById('watchedAzTrigger'); if(azTrig) azTrig.style.display='none';
@@ -9736,14 +9741,42 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     window.fullResyncWatched = fullResyncWatched;
 
     // ── ROZKOUKANÉ SERIÁLY ────────────────────────────────────────────────────
+    function _updateRozkTabsUI(active) {
+        const wrap = $('rozkSourceTabsWrap');
+        if (wrap) wrap.style.display = 'flex';
+        const btnTv = $('rozkSrcBtnTv'), btnMovie = $('rozkSrcBtnMovie');
+        if (btnTv) {
+            const on = active === 'tv';
+            btnTv.style.background = on ? 'rgba(0,180,216,0.18)' : 'var(--bg-elevated)';
+            btnTv.style.borderColor = on ? '#00b4d8' : 'var(--border)';
+            btnTv.style.color = on ? '#fff' : 'var(--text-muted)';
+        }
+        if (btnMovie) {
+            const on = active === 'movie';
+            btnMovie.style.background = on ? 'rgba(255,152,0,0.18)' : 'var(--bg-elevated)';
+            btnMovie.style.borderColor = on ? 'var(--accent)' : 'var(--border)';
+            btnMovie.style.color = on ? '#fff' : 'var(--text-muted)';
+        }
+    }
+    window._updateRozkTabsUI = _updateRozkTabsUI;
+
+    function openRozkoukaneModal(source) {
+        window._rozkSource = source || window._rozkSource || 'tv';
+        if (window._rozkSource === 'movie') openMoviesProgressModal();
+        else openWatchingModal();
+    }
+    window.openRozkoukaneModal = openRozkoukaneModal;
+
     async function openWatchingModal() {
         closeHelperModals();
+        window._rozkSource = 'tv';
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if(nav && left && right) {
-            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">📺 Rozkoukané seriály ↑</span>`;
+            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">🎭 Rozkoukané · Seriály ↑</span>`;
             right.innerHTML = `<button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
             nav.style.display = 'flex';
         }
+        _updateRozkTabsUI('tv');
         $('modalScrollBody').innerHTML = '<div class="loading"><div class="spinner"></div>Načítám seriály z Traktu...</div>';
         $('modal').classList.add('open');
         $('modalContent').classList.remove('watched-full');
@@ -10039,12 +10072,14 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     // ── ROZKOUKANNÉ FILMY ─────────────────────────────────────────────────────
     async function openMoviesProgressModal() {
         closeHelperModals();
+        window._rozkSource = 'movie';
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if(nav && left && right) {
-            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">🎬 Rozkoukanné filmy ↑</span>`;
+            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">🎭 Rozkoukané · Filmy ↑</span>`;
             right.innerHTML = `<button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
             nav.style.display = 'flex';
         }
+        _updateRozkTabsUI('movie');
         $('modalScrollBody').innerHTML = '<div class="loading"><div class="spinner"></div>Načítám filmy z Traktu...</div>';
         $('modal').classList.add('open');
         $('modalContent').classList.add('watched-full');
@@ -11030,13 +11065,9 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             <span style="font-size:1.6rem;">✅</span>
             <div><div style="color:#1db954;font-weight:700;">Shlédnuté</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmy a seriály které jsi viděl/a</div></div>
         </button>
-        <button onclick="closeListsModal();openWatchingModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="closeListsModal();openRozkoukaneModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎭</span>
-            <div><div style="color:#00b4d8;font-weight:700;">Rozkoukané seriály</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Seriály které sleduješ</div></div>
-        </button>
-        <button onclick="closeListsModal();openMoviesProgressModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:1.6rem;">⏸️</span>
-            <div><div style="color:var(--accent);font-weight:700;">Rozkoukané filmy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmy které jsi nedokoukoval/a</div></div>
+            <div><div style="font-weight:700;"><span style="color:#00b4d8;">Rozkoukané</span></div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Seriály i filmy, které sleduješ</div></div>
         </button>
     </div>
 </div>
