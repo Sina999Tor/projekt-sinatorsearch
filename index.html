@@ -68,12 +68,20 @@
         html[data-theme="light"] body { background: var(--bg-dark); color: var(--text); }
         html[data-theme="light"] .card-image, html[data-theme="light"] .card-placeholder { background: var(--bg-elevated); }
         html[data-theme="light"] img { filter: none; }
-        html[data-theme="light"] .modal, html[data-theme="light"] .modal-overlay, html[data-theme="light"] .settings-modal,
-        html[data-theme="light"] .settings-modal-overlay, html[data-theme="light"] .search-overlay, html[data-theme="light"] .filters-overlay,
+        html[data-theme="light"] .modal, html[data-theme="light"] .settings-modal,
         html[data-theme="light"] .websites-modal, html[data-theme="light"] .music-modal, html[data-theme="light"] .ai-modal,
         html[data-theme="light"] .ivysilani-modal, html[data-theme="light"] .iprima-modal, html[data-theme="light"] .trakt-modal,
         html[data-theme="light"] .favs-modal, html[data-theme="light"] .sources-modal {
             background: var(--bg-card);
+        }
+        html[data-theme="light"] .modal-overlay, html[data-theme="light"] .settings-modal-overlay,
+        html[data-theme="light"] .search-overlay, html[data-theme="light"] .filters-overlay,
+        html[data-theme="light"] .websites-modal-overlay, html[data-theme="light"] .music-modal-overlay, html[data-theme="light"] .trakt-modal-overlay,
+        html[data-theme="light"] .favs-modal-overlay, html[data-theme="light"] .sources-modal-overlay, html[data-theme="light"] .ts-modal-overlay,
+        html[data-theme="light"] .ivysilani-modal-overlay, html[data-theme="light"] .ai-modal-overlay, html[data-theme="light"] .iprima-modal-overlay,
+        html[data-theme="light"] .tv-modal-overlay, html[data-theme="light"] .radio-modal-overlay, html[data-theme="light"] .coll-modal-overlay,
+        html[data-theme="light"] .kino-modal-overlay {
+            background: rgba(255,255,255,0.97);
         }
         html[data-theme="light"] .modal-title, html[data-theme="light"] h1, html[data-theme="light"] h2, html[data-theme="light"] h3 { color: var(--text); }
         html[data-theme="light"] ::-webkit-scrollbar-thumb { background: #c4c4cc; }
@@ -146,6 +154,25 @@
         html[data-theme="light"] #_dEditOverlay input { background: var(--bg-elevated) !important; border-color: var(--border) !important; color: var(--text) !important; }
         html[data-theme="light"] #_dEditOverlay label, html[data-theme="light"] #_dEditOverlay div[style*="color:#aaa"] { color: var(--text-muted) !important; }
         html[data-theme="light"] #_dEditOverlay button[onclick*="remove"] { color: var(--text) !important; border-color: var(--border) !important; }
+        /* ─── LIGHT THEME: generický fix pro modaly s inline tmavým pozadím (Seznamy, Zábava, Kino výběry, AI Zábava sub-modaly...) ─── */
+        html[data-theme="light"] div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"],
+        html[data-theme="light"] div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"] { background: rgba(255,255,255,0.97) !important; }
+        html[data-theme="light"] div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"] > div[style*="background:#141414"],
+        html[data-theme="light"] div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"] > div[style*="background:#141414"],
+        html[data-theme="light"] div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"] > div[style*="background:var(--bg-card)"],
+        html[data-theme="light"] div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"] > div[style*="background:var(--bg-card)"] { background: var(--bg-card) !important; }
+        html[data-theme="light"] div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"] h3,
+        html[data-theme="light"] div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"] h3 { color: var(--text) !important; }
+        html[data-theme="light"] div[id$="Modal"][style*="background:rgba(0,0,0,0.92)"] > div:first-child > button,
+        html[data-theme="light"] div[id$="Modal"][style*="background:rgba(0,0,0,0.97)"] > div:first-child > button { color: var(--text) !important; border-color: var(--border) !important; }
+        /* ─── LIGHT THEME: generický modal-nav (Shlédnuté, Rozkoukané, Oblíbené, Kolekce detail...) ─── */
+        html[data-theme="light"] .modal-nav { background: rgba(255,255,255,0.98) !important; }
+        html[data-theme="light"] .modal-nav-title { background: linear-gradient(135deg, #333, var(--gold)) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; }
+        html[data-theme="light"] .modal-close-btn, html[data-theme="light"] .modal-back-btn { background: rgba(0,0,0,0.06) !important; color: var(--text) !important; border-color: var(--border) !important; }
+        html[data-theme="light"] .tv-modal-header h3 { background: linear-gradient(135deg, #333, #00b4d8) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; }
+        html[data-theme="light"] .tv-modal-header .close-tv { color: var(--text) !important; }
+        html[data-theme="light"] .kino-modal-header h3 { background: linear-gradient(135deg, #333, var(--gold)) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; }
+        html[data-theme="light"] .kino-modal-header .close-kino { color: var(--text) !important; }
         /* ─── LOCK SCREEN ─────────────────────────────────────── */
         #lockScreen {
             position: fixed; inset: 0; z-index: 99999;
@@ -1632,7 +1659,7 @@
         <div class="modal-header-row">
             <h2 id="tsModalHeading">📋 <span style="color:#ed2224;">TRAKT</span><span style="opacity:.4;"> / </span><span style="opacity:.5;">SIMKL</span></h2>
             <div style="display:flex;gap:8px;align-items:center;">
-                <button onclick="closeTraktModal();openListsModal();" title="Zpět na Seznamy" style="background:none;border:1px solid var(--border);color:#fff;padding:0 12px;height:34px;border-radius:17px;cursor:pointer;font-size:0.85rem;">← Seznamy</button>
+                <button onclick="closeTraktModal();openListsModal();" title="Zpět na Seznamy" style="background:none;border:1px solid var(--border);color:var(--text);padding:0 12px;height:34px;border-radius:17px;cursor:pointer;font-size:0.85rem;">← Seznamy</button>
                 <button class="close-modal-btn" onclick="closeTraktModal()" title="Zavřít">✕</button>
             </div>
         </div>
@@ -11038,8 +11065,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         <div class="coll-modal-header">
             <h3 onclick="document.getElementById('collGrid').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">📦 Kolekce ↑</h3>
             <div style="display:flex;gap:8px;align-items:center;">
-                <button onclick="closeCollectionsModal();openListsModal();" title="Zpět na Seznamy" style="background:none;border:1px solid var(--border);color:#fff;padding:0 12px;height:30px;border-radius:15px;cursor:pointer;font-size:0.82rem;">← Seznamy</button>
-                <button onclick="closeCollectionsModal()" style="background:none;border:1px solid var(--border);color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;">✕</button>
+                <button onclick="closeCollectionsModal();openListsModal();" title="Zpět na Seznamy" style="background:none;border:1px solid var(--border);color:var(--text);padding:0 12px;height:30px;border-radius:15px;cursor:pointer;font-size:0.82rem;">← Seznamy</button>
+                <button onclick="closeCollectionsModal()" style="background:none;border:1px solid var(--border);color:var(--text);width:30px;height:30px;border-radius:50%;cursor:pointer;">✕</button>
             </div>
         </div>
         <div class="coll-tabs">
@@ -11066,7 +11093,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         <div class="radio-modal-header">
             <h3>📻 Online rádia</h3>
             <div style="display:flex;gap:8px;align-items:center;">
-<button onclick="closeRadioModal()" style="background:none;border:1px solid var(--border);color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;">✕</button>
+<button onclick="closeRadioModal()" style="background:none;border:1px solid var(--border);color:var(--text);width:30px;height:30px;border-radius:50%;cursor:pointer;">✕</button>
             </div>
         </div>
         <div class="radio-now-playing" id="radioNowPlaying">
