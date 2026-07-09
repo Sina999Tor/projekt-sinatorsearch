@@ -8150,6 +8150,7 @@ EXAMPLES:
                             <button class="action-btn-modal csfd" onclick="openCsfd('${seriesTitleJs}', '')">🎬 ČSFD</button>
                             <button class="action-btn-modal kinobox" onclick="openKinobox('${seriesTitleJs}', '')">🎫 Kinobox</button>
                             <button class="action-btn-modal imdb" onclick="openImdb('${seriesTitleJs}', '')">🎬 IMDb</button>
+                            <button class="action-btn-modal" onclick="openEdna('${seriesTitleJs}')">📺 Edna</button>
                             <button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${seriesTitleJs}')">📊 Trakt</button>
                         </div>
                         <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${tvId},type:'tv',title:'${seriesTitleJs}',year:'',poster:series?.poster_path||''})">📁 Složky</button>
@@ -8308,6 +8309,7 @@ ${collectionBtn}
 <button class="action-btn-modal imdb" onclick="openImdb('${safeTitle}', '${year}')">🎬 IMDb</button>
 <button class="action-btn-modal" onclick="openTvGuru('${safeTitle}')">📺 TVguru</button>
 <button class="action-btn-modal" style="background:rgba(0,85,165,0.15);border-color:#0055a5;color:#60b0ff;" onclick="openCT('${safeTitle}')">📡 ČT</button>
+<button class="action-btn-modal" onclick="openEdna('${safeTitle}')">📺 Edna</button>
 <button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${safeTitle}')">📊 Trakt hledat</button>
 </div>
 <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}',rating:${rating}})">📁 Složky</button>
@@ -8530,6 +8532,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     function openCsfd(t, y) { window.open(`https://www.csfd.cz/hledat/?q=${encodeURIComponent(t+' '+y)}`, '_blank'); }
     function openTvGuru(t) { window.open(`https://www.tvguru.cz/hledej/?q=${encodeURIComponent(t)}`, '_blank'); }
     function openCT(t) { window.open(`https://www.ceskatelevize.cz/hledani/?q=${encodeURIComponent(t)}`, '_blank'); }
+    function openEdna(t) { window.open(`https://www.edna.cz/vyhledavani/?q=${encodeURIComponent(t)}`, '_blank'); }
+    window.openEdna = openEdna;
     function openImdb(t, y) { window.open(`https://www.imdb.com/find?q=${encodeURIComponent(t+' '+y)}`, '_blank'); }
     function openTraktSearch(t) { window.open(`https://trakt.tv/search?query=${encodeURIComponent(t)}`, '_blank'); }
     function openYouTube(q) { window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(q+' trailer')}`, '_blank'); }
