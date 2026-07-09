@@ -11220,7 +11220,11 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         <button onclick="closeTvRadioModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
-                <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openTvModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+                <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openLiveOfficialModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🌐</span>
+            <div><div style="color:#22c55e;font-weight:700;">Živá TV — Oficiální weby</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Prima, Nova, ČT, JOJ, Seznam TV, Óčko, Slagr a další</div></div>
+        </button>
+        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openTvModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📺</span>
             <div><div style="color:#00b4d8;font-weight:700;">IPTV — živé vysílání</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">CZ, SK, DE, FR, IT, UK, US, India a stovky dalších kanálů</div></div>
         </button>
@@ -11235,10 +11239,6 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openIprimaModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🔴</span>
             <div><div style="color:#e30613;font-weight:700;">iPrima</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Archiv a živé vysílání Prima</div></div>
-        </button>
-        <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openLiveOfficialModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:1.6rem;">🌐</span>
-            <div><div style="color:#22c55e;font-weight:700;">Živá TV — Oficiální weby</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Prima, Nova, ČT, JOJ, Seznam TV, Óčko, Slagr a další</div></div>
         </button>
         <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, function(){ openKinoModal(''); })" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎦</span>
