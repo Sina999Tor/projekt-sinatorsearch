@@ -11266,7 +11266,9 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 
 <script>
     function openArchivTvModal() {
-        document.getElementById('archivTvModal').classList.add('open');
+        var m = document.getElementById('archivTvModal');
+        m.style.display = '';
+        m.classList.add('open');
     }
     function closeArchivTvModal() {
         document.getElementById('archivTvModal').classList.remove('open');
