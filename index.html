@@ -8145,6 +8145,7 @@ EXAMPLES:
                         <button class="action-btn-modal youtube" onclick="openYouTube('${seriesTitleJs} S${seasonNumber}E${episodeNumber}')">▶️ Trailer</button>
                         <button class="action-btn-modal search-sources" onclick="openSourcesModal('${seriesTitleJs} S${seasonNumber}E${episodeNumber}', '', 'tv', '${seriesTitleJs}', '${titleJs}', ${seasonNumber}, ${episodeNumber}, '${czSeriesNameJs}')">🔍 Vyhledat zdroje</button>
                         <button class="action-btn-modal" onclick="translateOverview()">🌐 Přeložit</button>
+                        <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${tvId},type:'tv',title:'${seriesTitleJs}',year:'',poster:series?.poster_path||''})">📁 Složky</button>
                         <button class="action-btn-modal" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">🎬 Katalogy ▾</button>
                         <div class="action-buttons" style="display:none;margin-top:4px;">
                             <button class="action-btn-modal csfd" onclick="openCsfd('${seriesTitleJs}', '')">🎬 ČSFD</button>
@@ -8153,7 +8154,6 @@ EXAMPLES:
                             <button class="action-btn-modal" onclick="openEdna('${seriesTitleJs}')">📺 Edna</button>
                             <button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${seriesTitleJs}')">📊 Trakt</button>
                         </div>
-                        <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${tvId},type:'tv',title:'${seriesTitleJs}',year:'',poster:series?.poster_path||''})">📁 Složky</button>
                     </div>
                 </div></div>`;
         } catch(e) { console.error(e); $('modalScrollBody').innerHTML = `<div class="empty">Chyba načtení epizody: ${e.message}</div>`; }
@@ -8215,11 +8215,12 @@ EXAMPLES:
                 ? `${BASE}/movie/${id}/release_dates?api_key=${tmdbApiKey}`
                 : `${BASE}/tv/${id}/content_ratings?api_key=${tmdbApiKey}`;
 
-            const [d, credits, certData, tvTranslations] = await Promise.all([
+            const [d, credits, certData, tvTranslations, aggCredits] = await Promise.all([
                 fetch(`${BASE}/${type}/${id}?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()),
                 fetch(`${BASE}/${type}/${id}/credits?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()),
                 fetch(certEndpoint).then(r=>r.json()).catch(()=>null),
-                (type === 'tv' ? fetch(`${BASE}/tv/${id}/translations?api_key=${tmdbApiKey}`).then(r=>r.json()).catch(()=>null) : Promise.resolve(null))
+                (type === 'tv' ? fetch(`${BASE}/tv/${id}/translations?api_key=${tmdbApiKey}`).then(r=>r.json()).catch(()=>null) : Promise.resolve(null)),
+                (type === 'tv' ? fetch(`${BASE}/tv/${id}/aggregate_credits?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>null) : Promise.resolve(null))
             ]);
 
             // Získání certifikace (věkové hodnocení)
@@ -8257,8 +8258,17 @@ EXAMPLES:
             const bg = d.backdrop_path?`<img class="modal-backdrop" src="${IMG}original${d.backdrop_path}">`:'';
             const genres = (d.genres||[]).map(g=>`<span class="modal-genre" style="cursor:pointer;" onclick="openGenreBrowse(${g.id},'${jsq(g.name)}','${type}')" title="Procházet žánr: ${g.name}">${g.name}</span>`).join('');
             const cast = (credits.cast||[]).slice(0,8).map(c=>`<div class="cast-item" onclick="openPersonDetail(${c.id})"><img src="${c.profile_path?IMG+'w185'+c.profile_path:'https://via.placeholder.com/50'}"><div class="name">${c.name}</div><div class="role">${c.character}</div></div>`).join('');
-            // Režiséři z crew
-            const directors = (credits.crew||[]).filter(c=>c.job==='Director');
+            // Režiséři z crew (u seriálů z aggregate_credits, protože běžné credits u TV režiséry většinou neobsahují)
+            let directors = (credits.crew||[]).filter(c=>c.job==='Director');
+            if (type === 'tv') {
+                const aggCrew = (aggCredits && aggCredits.crew) ? aggCredits.crew : [];
+                const aggDirectors = aggCrew.filter(c => (c.jobs||[]).some(j => j.job === 'Director'));
+                if (aggDirectors.length) {
+                    directors = aggDirectors;
+                } else if (!directors.length && (d.created_by||[]).length) {
+                    directors = d.created_by.map(c => ({ id: c.id, name: c.name, profile_path: c.profile_path, job: 'Creator' }));
+                }
+            }
             const safeTitle = jsq(title);
             const origTitle = jsq(d.original_title || d.original_name || title);
             const isLiked = state.favs.some(f => Number(f.id) === Number(id));
@@ -8302,6 +8312,11 @@ EXAMPLES:
 ${collectionBtn}
 <button class="action-btn-modal soundtrack" onclick="openSoundtrack('${safeTitle}')">🎵 Soundtrack</button>
 <button class="action-btn-modal" onclick="translateOverview()">🌐 Přeložit</button>
+<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}',rating:${rating}})">📁 Složky</button>
+<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="showSimilarInModal(${id},'${type}',this)">🎯 Podobné tituly</button>
+<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="window._dPrefill={tmdbId:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}'};openAddDoporuceni()">⭐ Doporučit</button>
+${cast ? `<button class="action-btn-modal" onclick="showCastModal(${id},'${type}')">👥 Herci</button>` : ''}
+${directors.length ? `<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="showDirectorsModal(${id},'${type}')">🎥 Režie</button>` : ''}
 <button class="action-btn-modal" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">🎬 Katalogy ▾</button>
 <div class="action-buttons" style="display:none;margin-top:4px;">
 <button class="action-btn-modal csfd" onclick="openCsfd('${safeTitle}', '${year}')">🎬 ČSFD</button>
@@ -8312,16 +8327,11 @@ ${collectionBtn}
 <button class="action-btn-modal" onclick="openEdna('${safeTitle}')">📺 Edna</button>
 <button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${safeTitle}')">📊 Trakt hledat</button>
 </div>
-<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}',rating:${rating}})">📁 Složky</button>
 <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">📋 Trakt ▾</button>
 <div class="action-buttons" style="display:none;margin-top:4px;">
 <button class="action-btn-modal" onclick="toggleTraktWatchlist(${id},'${type}',this)" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">🔖 Watchlist</button>
 <button class="action-btn-modal" onclick="openTraktListPicker(${id},'${type}')" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">📋 Do seznamu</button>
 </div>
-<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="showSimilarInModal(${id},'${type}',this)">🎯 Podobné tituly</button>
-<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="window._dPrefill={tmdbId:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}'};openAddDoporuceni()">⭐ Doporučit</button>
-${cast ? `<button class="action-btn-modal" onclick="showCastModal(${id},'${type}')">👥 Herci</button>` : ''}
-${directors.length ? `<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="showDirectorsModal(${id},'${type}')">🎥 Režie</button>` : ''}
 </div>`;
             $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p><div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div>${actionBtns}</div></div>`;
             
@@ -8340,9 +8350,20 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || tmdbApiKey;
         let dirs = [];
         try {
-            const r = await fetch(`${BASE}/${movieType}/${movieId}/credits?api_key=${tmdbKey}&language=cs-CZ`);
-            const data = await r.json();
-            dirs = (data.crew||[]).filter(c => c.job === 'Director');
+            if (movieType === 'tv') {
+                const r = await fetch(`${BASE}/tv/${movieId}/aggregate_credits?api_key=${tmdbKey}&language=cs-CZ`);
+                const data = await r.json();
+                dirs = (data.crew||[]).filter(c => (c.jobs||[]).some(j => j.job === 'Director'));
+                if (!dirs.length) {
+                    const r2 = await fetch(`${BASE}/tv/${movieId}?api_key=${tmdbKey}&language=cs-CZ`);
+                    const data2 = await r2.json();
+                    dirs = (data2.created_by||[]).map(c => ({ id: c.id, name: c.name, profile_path: c.profile_path, isCreator: true }));
+                }
+            } else {
+                const r = await fetch(`${BASE}/${movieType}/${movieId}/credits?api_key=${tmdbKey}&language=cs-CZ`);
+                const data = await r.json();
+                dirs = (data.crew||[]).filter(c => c.job === 'Director');
+            }
         } catch(e) {}
         if(!dirs.length) { alert('Režiséři nenalezeni.'); return; }
 
@@ -8355,7 +8376,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 ${img}
                 <div>
                     <div style="font-weight:700;font-size:1rem;">${d.name}</div>
-                    <div style="color:#c084fc;font-size:0.8rem;margin-top:3px;">🎥 Režisér</div>
+                    <div style="color:#c084fc;font-size:0.8rem;margin-top:3px;">${d.isCreator ? '🎥 Tvůrce' : '🎥 Režisér'}</div>
                 </div>
                 <div style="margin-left:auto;color:#8a2be2;font-size:1.2rem;">›</div>
             </div>`;
