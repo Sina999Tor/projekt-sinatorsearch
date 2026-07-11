@@ -11623,24 +11623,28 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 
 const TV_PLAYLIST_URL = '';
 
+const _tvCzMatch = ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
+    if(n.includes('sport') || n.includes('šport')) return false;
+    return g.includes('cz |') || ['čt','ct1','ct2','ct24','nova','prima','barrandov','seznam','óčko','cnn prima'].some(k => n.includes(k)); };
+const _tvSkMatch = ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
+    if(n.includes('sport') || n.includes('šport')) return false;
+    return g.includes('sk |') || ['markíza','markiza','joj','dajto','wau','dvojka','jednotka','doma','lux','tv8','rtvs','ta3'].some(k => n.includes(k)); };
 const TV_GROUPS = [
-    { id: 'cz',    label: '🇨🇿 CZ',     match: ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
-        return g.includes('cz |') || ['čt','ct1','ct2','ct24','nova','prima','barrandov','seznam','óčko','cnn prima'].some(k => n.includes(k)); } },
-    { id: 'sk',    label: '🇸🇰 SK',     match: ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
-        return g.includes('sk |') || ['markíza','markiza','joj','dajto','wau','dvojka','jednotka','doma','lux','tv8','rtvs','ta3'].some(k => n.includes(k)); } },
-    { id: 'film',  label: '🎬 Film',    match: ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
+    { id: 'cz',    label: '🇨🇿 CZ',     match: _tvCzMatch },
+    { id: 'sk',    label: '🇸🇰 SK',     match: _tvSkMatch },
+    { id: 'film',  label: '🎬 Film',    match: ch => { if(_tvCzMatch(ch) || _tvSkMatch(ch)) return false; const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
         return g.includes('film') || ['hbo','cinemax','filmbox','cinema','axn','amc','warner','canal','prima zoom','prima star','prima cool','prima max','nova cinema','nova krimi'].some(k => n.includes(k)); } },
-    { id: 'sport', label: '⚽ Sport',   match: ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
-        return g.includes('sport') || ['sport','eurosport','arena','digi sport','nova sport'].some(k => n.includes(k)); } },
-    { id: 'doc',   label: '🔬 Dok.',    match: ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
+    { id: 'sport', label: '⚽ Sport',   match: ch => { if(_tvCzMatch(ch) || _tvSkMatch(ch)) return false; const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
+        return g.includes('sport') || ['sport','šport','eurosport','arena','digi sport','nova sport'].some(k => n.includes(k)); } },
+    { id: 'doc',   label: '🔬 Dok.',    match: ch => { if(_tvCzMatch(ch) || _tvSkMatch(ch)) return false; const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
         return g.includes('dok') || ['discovery','national geographic','animal','spektrum','tlc','love nature','viasat history','viasat nature'].some(k => n.includes(k)); } },
-    { id: 'kids',  label: '🧸 Děti',    match: ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
+    { id: 'kids',  label: '🧸 Děti',    match: ch => { if(_tvCzMatch(ch) || _tvSkMatch(ch)) return false; const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
         return g.includes('dět') || g.includes('kid') || ['cartoon','disney','minimax','čt :d','ct :d','nickelodeon'].some(k => n.includes(k)); } },
-    { id: 'music', label: '🎵 Hudba',   match: ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
+    { id: 'music', label: '🎵 Hudba',   match: ch => { if(_tvCzMatch(ch) || _tvSkMatch(ch)) return false; const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
         return g.includes('hud') || g.includes('music') || ['óčko','ocko','kronehit','deluxe music','music box','musicbox','mtv'].some(k => n.includes(k)); } },
-    { id: 'de',    label: '🇩🇪 DE/AT',  match: ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
+    { id: 'de',    label: '🇩🇪 DE/AT',  match: ch => { if(_tvCzMatch(ch) || _tvSkMatch(ch)) return false; const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
         return g.includes('de |') || g.includes('at |') || ['orf','zdf','sat.1','pro7','vox','rtl','sixx','kabel','das erste','ard'].some(k => n.includes(k)); } },
-    { id: 'uk',    label: '🇬🇧 UK/IE',  match: ch => { const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
+    { id: 'uk',    label: '🇬🇧 UK/IE',  match: ch => { if(_tvCzMatch(ch) || _tvSkMatch(ch)) return false; const n = ch.name.toLowerCase(); const g = (ch.group||'').toLowerCase();
         return g.includes('uk |') || g.includes('ie |') || ['bbc','itv','channel 4','channel 5','e4','film4','rte'].some(k => n.includes(k)); } },
     { id: 'all',   label: '📋 Vše',     match: ch => true },
 ];
@@ -11660,7 +11664,7 @@ function openTvModal() {
     renderTvGroups();
     // Načti kanály (jen poprvé, pak už jsou v tvState.channels)
     if(!tvState.channels.length) {
-        loadTvPlaylist().then(renderTvChannelList);
+        loadTvPlaylist().then(() => { renderTvGroups(); renderTvChannelList(); });
     }
     renderTvChannelList();
 }
@@ -11908,404 +11912,406 @@ http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/79943
 http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/79945
 #EXTINF:-1 tvg-id="RTE.One.HD.ie" tvg-name="RTE One HD" tvg-logo="https://i.imgur.com/8uZSZdS.png", RTE ONE
 http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1014308
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98273.png", Barrandov Krimi
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98273
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1438011.png", CNN Prima News
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438011
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1438012.png", Crime + Investigation
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438012
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1127717.png", CS History
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127717
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1127716.png", CS Mystery
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127716
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98186.png", Docubox
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98186
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98221.png", Duck TV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98221
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1127732.png", Epic Drama
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127732
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1438014.png", FightBox
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438014
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1127730.png", Film Europe
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127730
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1127729.png", FilmBox Extra
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127729
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1438015.png", FilmBox Family
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438015
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1438016.png", FilmBox Premium
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438016
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/942813.png", FilmBox Stars
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/942813
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98194.png", Fishing & Hunting
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98194
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1438017.png", France 24 EN
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438017
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1788296.png", History CZ
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1788296
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1127715.png", JimJam
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127715
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1127714.png", JOJko
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127714
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98200.png", MTV Europe
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98200
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/942815.png", Mňam TV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/942815
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98203.png", Nick Jr CZ
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98203
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98204.png", Nickelodeon CZ
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98204
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98205.png", Nova 2
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98205
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1438025.png", Nova Lady
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438025
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1438026.png", Nova Sport 3
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438026
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1438027.png", Nova Sport 4
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438027
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1621810.png", Nova Sport 5
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1621810
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1621811.png", Nova Sport 6
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1621811
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1127710.png", Paramount Network
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127710
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98209.png", Prima Love
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98209
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98312.png", Prima Plus
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98312
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1127708.png", Rebel TV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127708
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1127707.png", Relax TV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127707
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98211.png", RiK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98211
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98212.png", Senzi
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98212
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1982228.png", Spektrum Home
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1982228
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1438033.png", Stingray Classica
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438033
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1066787.png", TA3
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1066787
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1438036.png", Travel Channel CZ
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438036
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98218.png", Viasat Explore
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98218
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98219.png", Viasat History
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98219
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98220.png", Viasat Nature
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98220
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1788297.png", Warnet TV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1788297
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/98278.png", ČT :D / Art
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98278
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411368.png", 13th Street
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411368
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411464.png", 3Sat
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411464
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1130275.png", ARD-alpha
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1130275
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411463.png", Arte
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411463
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411378.png", Boomerang DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411378
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411317.png", BR
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411317
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411532.png", Cartoon Network DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411532
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411367.png", Comedy Central DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411367
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411343.png", Discovery Channel DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411343
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411377.png", Disney Channel DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411377
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411344.png", DMAX
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411344
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/877864.png", Euronews DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/877864
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/889508.png", Eurosport 1 DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/889508
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/889507.png", Eurosport 2 DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/889507
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411711.png", Heimatkanal
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411711
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411337.png", History DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411337
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411316.png", HR
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411316
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411785.png", Kabel Eins Classics
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411785
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411374.png", KiKA
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411374
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411315.png", MDR Thüringen
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411315
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411606.png", MTV DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411606
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411327.png", N-TV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411327
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411342.png", Nat Geo DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411342
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411341.png", Nat Geo Wild DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411341
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411312.png", NDR Niedersachsen
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411312
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411375.png", Nick Jr DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411375
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411373.png", Nickelodeon DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411373
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411443.png", One
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411443
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411331.png", Phoenix
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411331
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1703596.png", QVC DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1703596
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411299.png", RBB
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411299
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411712.png", Romance TV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411712
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411625.png", RTL Crime
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411625
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411626.png", RTL Living
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411626
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411610.png", RTL Nitro
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411610
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411627.png", RTL Passion
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411627
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411448.png", RTL Zwei
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411448
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411466.png", Servus TV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411466
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411360.png", Sky Atlantic DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411360
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411359.png", Sky Cinema Action DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411359
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411358.png", Sky Cinema Family DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411358
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411357.png", Sky Cinema Highlight
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411357
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411355.png", Sky Cinema Premieren
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411355
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411356.png", Sky Cinema Special
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411356
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411353.png", Sky Cinema Thriller DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411353
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411352.png", Sky Krimi
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411352
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411365.png", Sky One
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411365
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411349.png", Sony AXN DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411349
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411339.png", Spiegel Geschichte
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411339
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/889509.png", Sport1 DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/889509
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411298.png", SR
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411298
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411371.png", Super RTL
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411371
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411297.png", SWR BW
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411297
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411350.png", Syfy DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411350
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411326.png", Tagesschau24
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411326
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411332.png", TLC DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411332
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411370.png", Toggo Plus
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411370
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411351.png", Universal TV DE
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411351
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411362.png", Warner TV Comedy
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411362
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411363.png", Warner TV Film
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411363
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411364.png", Warner TV Serie
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411364
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411296.png", WDR Köln
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411296
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411470.png", Welt
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411470
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411454.png", ZDF Info
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411454
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/411456.png", ZDFneo
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/411456
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1014272.png", 4Music
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1014272
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164005.png", 5 Select
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164005
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45320.png", 5 Star
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45320
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45319.png", 5 USA
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45319
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/79737.png", 5Action
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/79737
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/229460.png", Al Jazeera English
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/229460
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30584.png", Alibi
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30584
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30582.png", Animal Planet UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30582
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45318.png", Baby TV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45318
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30581.png", BBC 1 HD
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30581
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30580.png", BBC 2 HD
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30580
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45335.png", BBC 4 / CBeebies HD
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45335
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45331.png", BBC News
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45331
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45330.png", BBC Scotland HD
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45330
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30569.png", Blaze
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30569
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/49214.png", Bloomberg
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/49214
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30556.png", Cartoon Network UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30556
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164013.png", Cartoonito
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164013
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/228565.png", Challenge
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/228565
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/114747.png", CITV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/114747
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/163793.png", Clubland TV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/163793
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164037.png", CNBC
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164037
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30553.png", CNN
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30553
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30552.png", Comedy Central UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30552
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30551.png", Crime & Investigation UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30551
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30550.png", Dave
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30550
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45281.png", Discovery Science
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45281
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45279.png", Discovery Turbo
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45279
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30549.png", Discovery UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30549
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/396314.png", Disney Channel UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/396314
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164004.png", DMax UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164004
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164028.png", Drama
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164028
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/992267.png", DW News
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/992267
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1283923.png", EarthX TV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1283923
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30544.png", Eden
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30544
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/75866.png", Euronews UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/75866
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/149653.png", France 24 UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/149653
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/622483.png", GB News
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/622483
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30537.png", Gold
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30537
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1424875.png", Great! Action
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1424875
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1424877.png", Great! Movies
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1424877
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1424879.png", Great! Romance
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1424879
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1424873.png", Great! TV
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1424873
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30535.png", History 2
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30535
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30534.png", History UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30534
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45272.png", Horror Channel
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45272
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45270.png", Investigation Discovery
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45270
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45267.png", MTV Base
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45267
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45264.png", MTV Hits
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45264
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45326.png", MTV UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45326
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30526.png", Nat Geo UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30526
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30525.png", Nat Geo Wild UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30525
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1014233.png", Nick Jr UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1014233
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30524.png", Nickelodeon UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30524
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164022.png", Now 70s
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164022
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164012.png", Now 80s
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164012
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/163796.png", Now 90s
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/163796
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164007.png", PBS America
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164007
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45254.png", Pop
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45254
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45334.png", Quest
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45334
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1014320.png", Quest Red
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1014320
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164006.png", Really
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164006
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/163996.png", Sky Cinema Action UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/163996
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/873868.png", Sky Cinema Animation
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/873868
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/163994.png", Sky Cinema Comedy
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/163994
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/163997.png", Sky Cinema Drama
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/163997
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/163993.png", Sky Cinema Family UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/163993
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164000.png", Sky Cinema Greats
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164000
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/163992.png", Sky Cinema Hits
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/163992
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/30511.png", Sky Cinema Oscars
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/30511
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/163991.png", Sky Cinema Premiere
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/163991
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/163998.png", Sky Cinema Sci-Fi
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/163998
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/163999.png", Sky Cinema Thriller UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/163999
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164073.png", Sky Crime
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164073
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164072.png", Sky Documentaries
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164072
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/164071.png", Sky Nature
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/164071
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1081655.png", Sky News
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1081655
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/163995.png", Sky Witness
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/163995
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/114740.png", Sony Channel
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/114740
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/79703.png", Sony Movies Action
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/79703
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1014228.png", Talking Pictures
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1014228
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1014232.png", TG4
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1014232
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/79718.png", Travel Channel UK
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/79718
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45289.png", True Crime
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45289
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/45234.png", VH1
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/45234
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/83056.png", W
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/83056
-#EXTINF:-1 tvg-logo="http://picons.cmshulk.com/picons/1393321.png", Yesterday
-http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1393321
 #EXTINF:-1 tvg-id="Dorcel.TV.cz" tvg-name="Dorcel TV" tvg-logo="https://i.imgur.com/RkzyjEd.png", Dorcel TV
 http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/773996
 #EXTINF:-1 tvg-id="Playboy.TV.cz" tvg-name="Playboy TV" tvg-logo="https://i.imgur.com/5di4Nis.png", Playboy TV
 http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/774034
+#EXTINF:-1 tvg-id="Czech.Streets" tvg-name="Czech Streets" tvg-logo="http://51.158.145.100/picons/logos/EUROPE/XXX.png" group-title="XXX", Czech Streets
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/309868
+#EXTINF:-1 tvg-id="BarrandovKrimi.cz" tvg-name="CZ| BARRANDOV KRIMI HD" tvg-logo="http://picons.cmshulk.com/picons/98273.png" group-title="CZ| GENERAL",CZ| BARRANDOV KRIMI HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98273
+#EXTINF:-1 tvg-id="BarrandovKrimi.cz" tvg-name="CZ| BARRANDOV KRIMI HEVC" tvg-logo="http://picons.cmshulk.com/picons/98225.png" group-title="CZ| GENERAL",CZ| BARRANDOV KRIMI HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98225
+#EXTINF:-1 tvg-id="CT1.cz" tvg-name="CZ| CT 1 HD" tvg-logo="http://picons.cmshulk.com/picons/98275.png" group-title="CZ| GENERAL",CZ| CT 1 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98275
+#EXTINF:-1 tvg-id="CT1.cz" tvg-name="CZ| CT 1 HEVC" tvg-logo="http://picons.cmshulk.com/picons/98227.png" group-title="CZ| GENERAL",CZ| CT 1 HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98227
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CT 1 JZC FHD" tvg-logo="http://picons.cmshulk.com/picons/1127735.png" group-title="CZ| GENERAL",CZ| CT 1 JZC FHD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127735
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CT 1 JZC HD" tvg-logo="http://picons.cmshulk.com/picons/1127736.png" group-title="CZ| GENERAL",CZ| CT 1 JZC HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127736
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CT 1 SVC FHD" tvg-logo="http://picons.cmshulk.com/picons/1127733.png" group-title="CZ| GENERAL",CZ| CT 1 SVC FHD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127733
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CT 1 SVC HD" tvg-logo="http://picons.cmshulk.com/picons/1127734.png" group-title="CZ| GENERAL",CZ| CT 1 SVC HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127734
+#EXTINF:-1 tvg-id="CT2.cz" tvg-name="CZ| CT 2 HD" tvg-logo="http://picons.cmshulk.com/picons/98276.png" group-title="CZ| GENERAL",CZ| CT 2 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98276
+#EXTINF:-1 tvg-id="CT2.cz" tvg-name="CZ| CT 2 HEVC" tvg-logo="http://picons.cmshulk.com/picons/98228.png" group-title="CZ| GENERAL",CZ| CT 2 HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98228
+#EXTINF:-1 tvg-id="CT24.cz" tvg-name="CZ| CT 24 HD" tvg-logo="http://picons.cmshulk.com/picons/98277.png" group-title="CZ| GENERAL",CZ| CT 24 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98277
+#EXTINF:-1 tvg-id="CT24.cz" tvg-name="CZ| CT 24 HEVC" tvg-logo="http://picons.cmshulk.com/picons/98229.png" group-title="CZ| GENERAL",CZ| CT 24 HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98229
+#EXTINF:-1 tvg-id="CTart.cz" tvg-name="CZ| CT :D/ART HD" tvg-logo="http://picons.cmshulk.com/picons/98278.png" group-title="CZ| GENERAL",CZ| CT :D/ART HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98278
+#EXTINF:-1 tvg-id="CTart.cz" tvg-name="CZ| CT :D/ART HEVC" tvg-logo="http://picons.cmshulk.com/picons/98230.png" group-title="CZ| GENERAL",CZ| CT :D/ART HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98230
+#EXTINF:-1 tvg-id="Dajto.sk" tvg-name="CZ| DAJTO HD" tvg-logo="http://picons.cmshulk.com/picons/98280.png" group-title="CZ| GENERAL",CZ| DAJTO HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98280
+#EXTINF:-1 tvg-id="Dajto.sk" tvg-name="CZ| DAJTO HEVC" tvg-logo="http://picons.cmshulk.com/picons/98232.png" group-title="CZ| GENERAL",CZ| DAJTO HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98232
+#EXTINF:-1 tvg-id="" tvg-name="CZ| FRANCE 24 EN" tvg-logo="http://picons.cmshulk.com/picons/1438017.png" group-title="CZ| GENERAL",CZ| FRANCE 24 EN
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438017
+#EXTINF:-1 tvg-id="STV1.sk" tvg-name="CZ| JEDNOTKA HD" tvg-logo="http://picons.cmshulk.com/picons/98314.png" group-title="CZ| GENERAL",CZ| JEDNOTKA HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98314
+#EXTINF:-1 tvg-id="STV1.sk" tvg-name="CZ| JEDNOTKA HEVC" tvg-logo="http://picons.cmshulk.com/picons/98266.png" group-title="CZ| GENERAL",CZ| JEDNOTKA HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98266
+#EXTINF:-1 tvg-id="JOJFamily.cz" tvg-name="CZ| JOJ FAMILY HD" tvg-logo="http://103.176.90.118/picons/logos/logos/JOJ-FAMILY.png" group-title="CZ| GENERAL",CZ| JOJ FAMILY HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98289
+#EXTINF:-1 tvg-id="JOJPlus.sk" tvg-name="CZ| JOJ PLUS HD" tvg-logo="http://picons.cmshulk.com/picons/98290.png" group-title="CZ| GENERAL",CZ| JOJ PLUS HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98290
+#EXTINF:-1 tvg-id="" tvg-name="CZ| JOJKO" tvg-logo="http://picons.cmshulk.com/picons/1127714.png" group-title="CZ| GENERAL",CZ| JOJKO
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127714
+#EXTINF:-1 tvg-id="KinoBarrandov.cz" tvg-name="CZ| KINO BARRANDOV HD" tvg-logo="http://picons.cmshulk.com/picons/98291.png" group-title="CZ| GENERAL",CZ| KINO BARRANDOV HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98291
+#EXTINF:-1 tvg-id="KinoBarrandov.cz" tvg-name="CZ| KINO BARRANDOV HEVC" tvg-logo="http://picons.cmshulk.com/picons/98243.png" group-title="CZ| GENERAL",CZ| KINO BARRANDOV HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98243
+#EXTINF:-1 tvg-id="Markiza.sk" tvg-name="CZ| MARKIZA HD" tvg-logo="http://picons.cmshulk.com/picons/98293.png" group-title="CZ| GENERAL",CZ| MARKIZA HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98293
+#EXTINF:-1 tvg-id="Markiza.sk" tvg-name="CZ| MARKIZA HEVC" tvg-logo="http://picons.cmshulk.com/picons/98245.png" group-title="CZ| GENERAL",CZ| MARKIZA HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98245
+#EXTINF:-1 tvg-id="MarkizaInternational.sk" tvg-name="CZ| MARKIZA INTERNATIONAL" tvg-logo="http://picons.cmshulk.com/picons/98201.png" group-title="CZ| GENERAL",CZ| MARKIZA INTERNATIONAL
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98201
+#EXTINF:-1 tvg-id="" tvg-name="CZ| MNAM TV" tvg-logo="http://103.176.90.118/picons/logos/logos/mnamtv.png" group-title="CZ| GENERAL",CZ| MNAM TV
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/942815
+#EXTINF:-1 tvg-id="Rebel.cz" tvg-name="CZ| REBEL TV" tvg-logo="http://picons.cmshulk.com/picons/1127708.png" group-title="CZ| GENERAL",CZ| REBEL TV
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127708
+#EXTINF:-1 tvg-id="Relax.cz" tvg-name="CZ| RELAX TV" tvg-logo="http://picons.cmshulk.com/picons/1127707.png" group-title="CZ| GENERAL",CZ| RELAX TV
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127707
+#EXTINF:-1 tvg-id="RiK.sk" tvg-name="CZ| RIK" tvg-logo="http://picons.cmshulk.com/picons/98211.png" group-title="CZ| GENERAL",CZ| RIK
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98211
+#EXTINF:-1 tvg-id="" tvg-name="CZ| RTVS 24 FHD" tvg-logo="http://picons.cmshulk.com/picons/1127723.png" group-title="CZ| GENERAL",CZ| RTVS 24 FHD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127723
+#EXTINF:-1 tvg-id="" tvg-name="CZ| RTVS 24 HD" tvg-logo="http://picons.cmshulk.com/picons/1127724.png" group-title="CZ| GENERAL",CZ| RTVS 24 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127724
+#EXTINF:-1 tvg-id="Senzi.sk" tvg-name="CZ| SENZI" tvg-logo="http://picons.cmshulk.com/picons/98212.png" group-title="CZ| GENERAL",CZ| SENZI
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98212
+#EXTINF:-1 tvg-id="" tvg-name="CZ| DOMA HD" tvg-logo="" group-title="CZ| GENERAL",CZ| DOMA HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438031
+#EXTINF:-1 tvg-id="Spektrum.cz" tvg-name="CZ| SPEKTRUM HD" tvg-logo="http://picons.cmshulk.com/picons/98316.png" group-title="CZ| GENERAL",CZ| SPEKTRUM HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98316
+#EXTINF:-1 tvg-id="Spektrum.cz" tvg-name="CZ| SPEKTRUM HEVC" tvg-logo="http://picons.cmshulk.com/picons/98268.png" group-title="CZ| GENERAL",CZ| SPEKTRUM HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98268
+#EXTINF:-1 tvg-id="" tvg-name="CZ| TA 3" tvg-logo="http://picons.cmshulk.com/picons/1066787.png" group-title="CZ| GENERAL",CZ| TA 3
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1066787
+#EXTINF:-1 tvg-id="Barrandov.cz" tvg-name="CZ| TV BARRANDOV HD" tvg-logo="http://picons.cmshulk.com/picons/98301.png" group-title="CZ| GENERAL",CZ| TV BARRANDOV HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98301
+#EXTINF:-1 tvg-id="Barrandov.cz" tvg-name="CZ| TV BARRANDOV HEVC" tvg-logo="http://picons.cmshulk.com/picons/98253.png" group-title="CZ| GENERAL",CZ| TV BARRANDOV HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98253
+#EXTINF:-1 tvg-id="JOJ.sk" tvg-name="CZ| TV JOJ" tvg-logo="http://picons.cmshulk.com/picons/1121044.png" group-title="CZ| GENERAL",CZ| TV JOJ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1121044
+#EXTINF:-1 tvg-id="" tvg-name="CZ| TV JOJ FHD" tvg-logo="http://picons.cmshulk.com/picons/1127721.png" group-title="CZ| GENERAL",CZ| TV JOJ FHD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127721
+#EXTINF:-1 tvg-id="cz.JOJ+" tvg-name="CZ| TV JOJ PLUS 1 HD" tvg-logo="http://picons.cmshulk.com/picons/98302.png" group-title="CZ| GENERAL",CZ| TV JOJ PLUS 1 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98302
+#EXTINF:-1 tvg-id="JOJPlus.sk" tvg-name="CZ| TV JOJ PLUS 1 HEVC" tvg-logo="http://picons.cmshulk.com/picons/98254.png" group-title="CZ| GENERAL",CZ| TV JOJ PLUS 1 HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98254
+#EXTINF:-1 tvg-id="Noe.cz" tvg-name="CZ| TV NOE HD" tvg-logo="http://picons.cmshulk.com/picons/98303.png" group-title="CZ| GENERAL",CZ| TV NOE HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98303
+#EXTINF:-1 tvg-id="Noe.cz" tvg-name="CZ| TV NOE HEVC" tvg-logo="http://picons.cmshulk.com/picons/98255.png" group-title="CZ| GENERAL",CZ| TV NOE HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98255
+#EXTINF:-1 tvg-id="Paprika.cz" tvg-name="CZ| TV PAPRIKA" tvg-logo="http://picons.cmshulk.com/picons/98216.png" group-title="CZ| GENERAL",CZ| TV PAPRIKA
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98216
+#EXTINF:-1 tvg-id="TV8.sk" tvg-name="CZ| TV8 HD" tvg-logo="http://picons.cmshulk.com/picons/98304.png" group-title="CZ| GENERAL",CZ| TV8 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98304
+#EXTINF:-1 tvg-id="TV8.sk" tvg-name="CZ| TV8 HEVC" tvg-logo="http://picons.cmshulk.com/picons/98256.png" group-title="CZ| GENERAL",CZ| TV8 HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98256
+#EXTINF:-1 tvg-id="Wau.sk" tvg-name="CZ| WAU HD" tvg-logo="http://picons.cmshulk.com/picons/98305.png" group-title="CZ| GENERAL",CZ| WAU HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98305
+#EXTINF:-1 tvg-id="Wau.sk" tvg-name="CZ| WAU HEVC" tvg-logo="http://picons.cmshulk.com/picons/98257.png" group-title="CZ| GENERAL",CZ| WAU HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98257
+#EXTINF:-1 tvg-id="CSHistory.cz" tvg-name="CZ| HISTORY HD" tvg-logo="http://picons.cmshulk.com/picons/1788296.png" group-title="CZ| GENERAL",CZ| HISTORY HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1788296
+#EXTINF:-1 tvg-id="AnimalPlanet.cz" tvg-name="CZ| ANIMAL PLANET HD" tvg-logo="http://picons.cmshulk.com/picons/1788295.png" group-title="CZ| GENERAL",CZ| ANIMAL PLANET HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1788295
+#EXTINF:-1 tvg-id="TravelChannel.cz" tvg-name="CZ| WARNET TV" tvg-logo="" group-title="CZ| GENERAL",CZ| WARNET TV
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1788297
+#EXTINF:-1 tvg-id="Nova2.cz" tvg-name="CZ| NOVA 2" tvg-logo="http://picons.cmshulk.com/picons/98205.png" group-title="CZ| NOVA",CZ| NOVA 2
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98205
+#EXTINF:-1 tvg-id="NovaAction.cz" tvg-name="CZ| NOVA ACTION HD" tvg-logo="http://picons.cmshulk.com/picons/98298.png" group-title="CZ| NOVA",CZ| NOVA ACTION HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98298
+#EXTINF:-1 tvg-id="NovaAction.cz" tvg-name="CZ| NOVA ACTION HEVC" tvg-logo="http://picons.cmshulk.com/picons/98250.png" group-title="CZ| NOVA",CZ| NOVA ACTION HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98250
+#EXTINF:-1 tvg-id="NovaCinema.cz" tvg-name="CZ| NOVA CINEMA HD" tvg-logo="http://picons.cmshulk.com/picons/98299.png" group-title="CZ| NOVA",CZ| NOVA CINEMA HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98299
+#EXTINF:-1 tvg-id="NovaCinema.cz" tvg-name="CZ| NOVA CINEMA HEVC" tvg-logo="http://picons.cmshulk.com/picons/98251.png" group-title="CZ| NOVA",CZ| NOVA CINEMA HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98251
+#EXTINF:-1 tvg-id="NovaFun.cz" tvg-name="CZ| NOVA FUN FHD" tvg-logo="http://picons.cmshulk.com/picons/1127726.png" group-title="CZ| NOVA",CZ| NOVA FUN FHD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127726
+#EXTINF:-1 tvg-id="NovaFun.cz" tvg-name="CZ| NOVA FUN HD" tvg-logo="http://picons.cmshulk.com/picons/1127727.png" group-title="CZ| NOVA",CZ| NOVA FUN HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127727
+#EXTINF:-1 tvg-id="NovaGold.cz" tvg-name="CZ| NOVA GOLD" tvg-logo="http://picons.cmshulk.com/picons/98206.png" group-title="CZ| NOVA",CZ| NOVA GOLD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98206
+#EXTINF:-1 tvg-id="NovaTV.cz" tvg-name="CZ| NOVA HD" tvg-logo="http://picons.cmshulk.com/picons/98271.png" group-title="CZ| NOVA",CZ| NOVA HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98271
+#EXTINF:-1 tvg-id="NovaTV.cz" tvg-name="CZ| NOVA HEVC" tvg-logo="http://picons.cmshulk.com/picons/98223.png" group-title="CZ| NOVA",CZ| NOVA HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98223
+#EXTINF:-1 tvg-id="" tvg-name="CZ| NOVA LADY" tvg-logo="http://picons.cmshulk.com/picons/1438025.png" group-title="CZ| NOVA",CZ| NOVA LADY
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438025
+#EXTINF:-1 tvg-id="CZ| NOVA SPORT 1 HD" tvg-name="CZ| NOVA SPORT 1 HD" tvg-logo="http://picons.cmshulk.com/picons/98306.png" group-title="CZ| NOVA",CZ| NOVA SPORT 1 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98306
+#EXTINF:-1 tvg-id="cz.NOVA Sport 1" tvg-name="CZ| NOVA SPORT 1 HEVC" tvg-logo="http://picons.cmshulk.com/picons/98258.png" group-title="CZ| NOVA",CZ| NOVA SPORT 1 HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98258
+#EXTINF:-1 tvg-id="cz.NOVA Sport 2" tvg-name="CZ| NOVA SPORT 2 HD" tvg-logo="http://picons.cmshulk.com/picons/98307.png" group-title="CZ| NOVA",CZ| NOVA SPORT 2 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98307
+#EXTINF:-1 tvg-id="cz.NOVA Sport 2" tvg-name="CZ| NOVA SPORT 2 HEVC" tvg-logo="http://picons.cmshulk.com/picons/98259.png" group-title="CZ| NOVA",CZ| NOVA SPORT 2 HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98259
+#EXTINF:-1 tvg-id="" tvg-name="CZ| NOVA SPORT 3 HD" tvg-logo="http://picons.cmshulk.com/picons/1438026.png" group-title="CZ| NOVA",CZ| NOVA SPORT 3 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438026
+#EXTINF:-1 tvg-id="" tvg-name="CZ| NOVA SPORT 4 HD" tvg-logo="http://picons.cmshulk.com/picons/1438027.png" group-title="CZ| NOVA",CZ| NOVA SPORT 4 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438027
+#EXTINF:-1 tvg-id="" tvg-name="CZ| NOVA SPORT 5" tvg-logo="http://picons.cmshulk.com/picons/1621810.png" group-title="CZ| NOVA",CZ| NOVA SPORT 5
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1621810
+#EXTINF:-1 tvg-id="" tvg-name="CZ| NOVA SPORT 6" tvg-logo="http://picons.cmshulk.com/picons/1621811.png" group-title="CZ| NOVA",CZ| NOVA SPORT 6
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1621811
+#EXTINF:-1 tvg-id="PrimaCool.cz" tvg-name="CZ| PRIMA COOL HD" tvg-logo="http://picons.cmshulk.com/picons/98309.png" group-title="CZ| PRIMA",CZ| PRIMA COOL HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98309
+#EXTINF:-1 tvg-id="PrimaCool.cz" tvg-name="CZ| PRIMA COOL HEVC" tvg-logo="http://picons.cmshulk.com/picons/98261.png" group-title="CZ| PRIMA",CZ| PRIMA COOL HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98261
+#EXTINF:-1 tvg-id="Prima.cz" tvg-name="CZ| PRIMA HD" tvg-logo="http://picons.cmshulk.com/picons/98310.png" group-title="CZ| PRIMA",CZ| PRIMA HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98310
+#EXTINF:-1 tvg-id="Prima.cz" tvg-name="CZ| PRIMA HEVC" tvg-logo="http://picons.cmshulk.com/picons/98262.png" group-title="CZ| PRIMA",CZ| PRIMA HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98262
+#EXTINF:-1 tvg-id="PrimaLove.cz" tvg-name="CZ| PRIMA LOVE FHD" tvg-logo="http://picons.cmshulk.com/picons/1127725.png" group-title="CZ| PRIMA",CZ| PRIMA LOVE FHD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127725
+#EXTINF:-1 tvg-id="PrimaLove.cz" tvg-name="CZ| PRIMA LOVE HD" tvg-logo="http://picons.cmshulk.com/picons/98209.png" group-title="CZ| PRIMA",CZ| PRIMA LOVE HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98209
+#EXTINF:-1 tvg-id="PrimaMax.cz" tvg-name="CZ| PRIMA MAX HD" tvg-logo="http://picons.cmshulk.com/picons/98311.png" group-title="CZ| PRIMA",CZ| PRIMA MAX HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98311
+#EXTINF:-1 tvg-id="PrimaMax.cz" tvg-name="CZ| PRIMA MAX HEVC" tvg-logo="http://picons.cmshulk.com/picons/98263.png" group-title="CZ| PRIMA",CZ| PRIMA MAX HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98263
+#EXTINF:-1 tvg-id="" tvg-name="CZ| PRIMA PLUS 1 HD" tvg-logo="http://picons.cmshulk.com/picons/98308.png" group-title="CZ| PRIMA",CZ| PRIMA PLUS 1 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98308
+#EXTINF:-1 tvg-id="" tvg-name="CZ| PRIMA PLUS 1 HEVC" tvg-logo="http://picons.cmshulk.com/picons/98260.png" group-title="CZ| PRIMA",CZ| PRIMA PLUS 1 HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98260
+#EXTINF:-1 tvg-id="" tvg-name="CZ| PRIMA PLUS HD" tvg-logo="http://picons.cmshulk.com/picons/98312.png" group-title="CZ| PRIMA",CZ| PRIMA PLUS HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98312
+#EXTINF:-1 tvg-id="" tvg-name="CZ| PRIMA PLUS HEVC" tvg-logo="http://picons.cmshulk.com/picons/98264.png" group-title="CZ| PRIMA",CZ| PRIMA PLUS HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98264
+#EXTINF:-1 tvg-id="PrimaZoom.cz" tvg-name="CZ| PRIMA ZOOM HD" tvg-logo="http://picons.cmshulk.com/picons/98313.png" group-title="CZ| PRIMA",CZ| PRIMA ZOOM HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98313
+#EXTINF:-1 tvg-id="PrimaZoom.cz" tvg-name="CZ| PRIMA ZOOM HEVC" tvg-logo="http://picons.cmshulk.com/picons/98265.png" group-title="CZ| PRIMA",CZ| PRIMA ZOOM HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98265
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CNN PRIMA NEWS HD" tvg-logo="http://picons.cmshulk.com/picons/1438011.png" group-title="CZ| PRIMA",CZ| CNN PRIMA NEWS HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438011
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CNN PRIMA NEWS ᴴᴰ" tvg-logo="http://picons.cmshulk.com/picons/1725163.png" group-title="CZ| PRIMA ᴴᴰ",CZ| CNN PRIMA NEWS ᴴᴰ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1725163
+#EXTINF:-1 tvg-id="PrimaCool.cz" tvg-name="CZ| PRIMA COOL ᴴᴰ" tvg-logo="http://picons.cmshulk.com/picons/1725162.png" group-title="CZ| PRIMA ᴴᴰ",CZ| PRIMA COOL ᴴᴰ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1725162
+#EXTINF:-1 tvg-id="PrimaKrimi.cz" tvg-name="CZ| PRIMA KRIMI ᴴᴰ" tvg-logo="http://picons.cmshulk.com/picons/1725161.png" group-title="CZ| PRIMA ᴴᴰ",CZ| PRIMA KRIMI ᴴᴰ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1725161
+#EXTINF:-1 tvg-id="PrimaLOVE.cz" tvg-name="CZ| PRIMA LOVE ᴴᴰ" tvg-logo="http://picons.cmshulk.com/picons/1725160.png" group-title="CZ| PRIMA ᴴᴰ",CZ| PRIMA LOVE ᴴᴰ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1725160
+#EXTINF:-1 tvg-id="PrimaMAX.cz" tvg-name="CZ| PRIMA MAX ᴴᴰ" tvg-logo="http://picons.cmshulk.com/picons/1725159.png" group-title="CZ| PRIMA ᴴᴰ",CZ| PRIMA MAX ᴴᴰ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1725159
+#EXTINF:-1 tvg-id="PrimaShow.cz" tvg-name="CZ| PRIMA SHOW ᴴᴰ" tvg-logo="http://picons.cmshulk.com/picons/1725158.png" group-title="CZ| PRIMA ᴴᴰ",CZ| PRIMA SHOW ᴴᴰ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1725158
+#EXTINF:-1 tvg-id="PrimaStar.cz" tvg-name="CZ| PRIMA STAR ᴴᴰ" tvg-logo="http://picons.cmshulk.com/picons/1725157.png" group-title="CZ| PRIMA ᴴᴰ",CZ| PRIMA STAR ᴴᴰ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1725157
+#EXTINF:-1 tvg-id="PrimaZOOM.cz" tvg-name="CZ| PRIMA ZOOM ᴴᴰ" tvg-logo="http://picons.cmshulk.com/picons/1725156.png" group-title="CZ| PRIMA ᴴᴰ",CZ| PRIMA ZOOM ᴴᴰ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1725156
+#EXTINF:-1 tvg-id="Prima.cz" tvg-name="CZ| PRIMA ᴴᴰ" tvg-logo="http://picons.cmshulk.com/picons/1725155.png" group-title="CZ| PRIMA ᴴᴰ",CZ| PRIMA ᴴᴰ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1725155
+#EXTINF:-1 tvg-id="AMC.cz" tvg-name="CZ| AMC" tvg-logo="http://picons.cmshulk.com/picons/amcmehd.png" group-title="CZ| ZÁBAVA",CZ| AMC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127720
+#EXTINF:-1 tvg-id="AXN.cz" tvg-name="CZ| AXN" tvg-logo="http://picons.cmshulk.com/picons/98181.png" group-title="CZ| ZÁBAVA",CZ| AXN
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98181
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CANAL+ ACTION" tvg-logo="http://picons.cmshulk.com/picons/1438001.png" group-title="CZ| ZÁBAVA",CZ| CANAL+ ACTION
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438001
+#EXTINF:-1 tvg-id="Cinemax2.cz" tvg-name="CZ| CINEMAX 2" tvg-logo="http://picons.cmshulk.com/picons/509076.png" group-title="CZ| ZÁBAVA",CZ| CINEMAX 2
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/509076
+#EXTINF:-1 tvg-id="CSFilm.cz" tvg-name="CZ| CS FILM+" tvg-logo="http://picons.cmshulk.com/picons/1127718.png" group-title="CZ| ZÁBAVA",CZ| CS FILM+
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127718
+#EXTINF:-1 tvg-id="EpicDrama.cz" tvg-name="CZ| EPIC DRAMA FHD" tvg-logo="http://103.176.90.118/picons/logos/EPIC-DRAMA.png" group-title="CZ| ZÁBAVA",CZ| EPIC DRAMA FHD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127731
+#EXTINF:-1 tvg-id="EpicDrama.cz" tvg-name="CZ| EPIC DRAMA HD" tvg-logo="http://103.176.90.118/picons/logos/EPIC-DRAMA.png" group-title="CZ| ZÁBAVA",CZ| EPIC DRAMA HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127732
+#EXTINF:-1 tvg-id="" tvg-name="CZ| FILM EUROPE+ FHD" tvg-logo="http://picons.cmshulk.com/picons/942812.png" group-title="CZ| ZÁBAVA",CZ| FILM EUROPE+ FHD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/942812
+#EXTINF:-1 tvg-id="FilmEurope.cz" tvg-name="CZ| FILM EUROPE HD" tvg-logo="http://picons.cmshulk.com/picons/1127730.png" group-title="CZ| ZÁBAVA",CZ| FILM EUROPE HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127730
+#EXTINF:-1 tvg-id="FilmboxExtra.cz" tvg-name="CZ| FILMBOX EXTRA FHD" tvg-logo="http://picons.cmshulk.com/picons/1127728.png" group-title="CZ| ZÁBAVA",CZ| FILMBOX EXTRA FHD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127728
+#EXTINF:-1 tvg-id="FilmboxExtra.cz" tvg-name="CZ| FILMBOX EXTRA HD" tvg-logo="http://picons.cmshulk.com/picons/1127729.png" group-title="CZ| ZÁBAVA",CZ| FILMBOX EXTRA HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127729
+#EXTINF:-1 tvg-id="" tvg-name="CZ| FILMBOX FAMILY" tvg-logo="http://103.176.90.118/picons/logos/logos/FILMBOX-FAMILY.png" group-title="CZ| ZÁBAVA",CZ| FILMBOX FAMILY
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438015
+#EXTINF:-1 tvg-id="" tvg-name="CZ| FILMBOX PREMIUM HD" tvg-logo="http://picons.cmshulk.com/picons/1438016.png" group-title="CZ| ZÁBAVA",CZ| FILMBOX PREMIUM HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438016
+#EXTINF:-1 tvg-id="" tvg-name="CZ| FILMBOX STARS" tvg-logo="http://picons.cmshulk.com/picons/942813.png" group-title="CZ| ZÁBAVA",CZ| FILMBOX STARS
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/942813
+#EXTINF:-1 tvg-id="HBO.cz" tvg-name="CZ| HBO HD" tvg-logo="http://picons.cmshulk.com/picons/98286.png" group-title="CZ| ZÁBAVA",CZ| HBO HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98286
+#EXTINF:-1 tvg-id="HBO.cz" tvg-name="CZ| HBO HEVC" tvg-logo="http://picons.cmshulk.com/picons/98238.png" group-title="CZ| ZÁBAVA",CZ| HBO HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98238
+#EXTINF:-1 tvg-id="HBO2.cz" tvg-name="CZ| HBO2" tvg-logo="http://picons.cmshulk.com/picons/98196.png" group-title="CZ| ZÁBAVA",CZ| HBO2
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98196
+#EXTINF:-1 tvg-id="HBO3.cz" tvg-name="CZ| HBO3" tvg-logo="http://picons.cmshulk.com/picons/98197.png" group-title="CZ| ZÁBAVA",CZ| HBO3
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98197
+#EXTINF:-1 tvg-id="JOJCinema.cz" tvg-name="CZ| JOJ CINEMA HD" tvg-logo="http://picons.cmshulk.com/picons/98288.png" group-title="CZ| ZÁBAVA",CZ| JOJ CINEMA HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98288
+#EXTINF:-1 tvg-id="JOJCinema.cz" tvg-name="CZ| JOJ CINEMA HEVC" tvg-logo="http://picons.cmshulk.com/picons/98240.png" group-title="CZ| ZÁBAVA",CZ| JOJ CINEMA HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98240
+#EXTINF:-1 tvg-id="JOJFamily.cz" tvg-name="CZ| JOJ FAMILY HEVC" tvg-logo="http://103.176.90.118/picons/logos/jojfamily.png" group-title="CZ| ZÁBAVA",CZ| JOJ FAMILY HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98241
+#EXTINF:-1 tvg-id="JOJPlus.sk" tvg-name="CZ| JOJ PLUS HEVC" tvg-logo="http://picons.cmshulk.com/picons/98242.png" group-title="CZ| ZÁBAVA",CZ| JOJ PLUS HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98242
+#EXTINF:-1 tvg-id="" tvg-name="CZ| PARAMOUNT NETWORK" tvg-logo="http://103.176.90.118/picons/logos/Paramount-Channel-Poland.png" group-title="CZ| ZÁBAVA",CZ| PARAMOUNT NETWORK
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127710
+#EXTINF:-1 tvg-id="" tvg-name="CZ| ARENA SPORT 1 HD" tvg-logo="http://picons.cmshulk.com/picons/1437999.png" group-title="CZ| SPORTS",CZ| ARENA SPORT 1 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1437999
+#EXTINF:-1 tvg-id="" tvg-name="CZ| ARENA SPORT 2 HD" tvg-logo="http://picons.cmshulk.com/picons/1438000.png" group-title="CZ| SPORTS",CZ| ARENA SPORT 2 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438000
+#EXTINF:-1 tvg-id="" tvg-name="CZ| AUTOMOTORSPORT HD" tvg-logo="http://picons.cmshulk.com/picons/98272.png" group-title="CZ| SPORTS",CZ| AUTOMOTORSPORT HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98272
+#EXTINF:-1 tvg-id="" tvg-name="CZ| AUTOMOTORSPORT HEVC" tvg-logo="http://picons.cmshulk.com/picons/98224.png" group-title="CZ| SPORTS",CZ| AUTOMOTORSPORT HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98224
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CANAL+ SPORT" tvg-logo="http://picons.cmshulk.com/picons/1438002.png" group-title="CZ| SPORTS",CZ| CANAL+ SPORT
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438002
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CANAL+ SPORT 2" tvg-logo="http://picons.cmshulk.com/picons/1438003.png" group-title="CZ| SPORTS",CZ| CANAL+ SPORT 2
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438003
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CANAL+ SPORT 4" tvg-logo="http://picons.cmshulk.com/picons/1438005.png" group-title="CZ| SPORTS",CZ| CANAL+ SPORT 4
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438005
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CANAL+ SPORT 5" tvg-logo="http://picons.cmshulk.com/picons/1438006.png" group-title="CZ| SPORTS",CZ| CANAL+ SPORT 5
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438006
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CANAL+ SPORT 6" tvg-logo="http://103.176.90.118/picons/logos/logos/CANAL-SPORT-6.png" group-title="CZ| SPORTS",CZ| CANAL+ SPORT 6
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438007
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CANAL+ SPORT 7" tvg-logo="http://103.176.90.118/picons/logos/logos/CANAL-SPORT-7.png" group-title="CZ| SPORTS",CZ| CANAL+ SPORT 7
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438008
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CANAL+ SPORT 8" tvg-logo="http://103.176.90.118/picons/logos/logos/CANAL-SPORT-8.png" group-title="CZ| SPORTS",CZ| CANAL+ SPORT 8
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438009
+#EXTINF:-1 tvg-id="CT4Sport.cz" tvg-name="CZ| CT SPORT HD" tvg-logo="http://picons.cmshulk.com/picons/98279.png" group-title="CZ| SPORTS",CZ| CT SPORT HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98279
+#EXTINF:-1 tvg-id="CT4Sport.cz" tvg-name="CZ| CT SPORT HEVC" tvg-logo="http://picons.cmshulk.com/picons/98231.png" group-title="CZ| SPORTS",CZ| CT SPORT HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98231
+#EXTINF:-1 tvg-id="" tvg-name="CZ| ONEPLAY SPORT 1" tvg-logo="http://51.158.145.100/picons/logos/logos/1982236.png" group-title="CZ| SPORTS",CZ| ONEPLAY SPORT 1
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1982236
+#EXTINF:-1 tvg-id="" tvg-name="CZ| ONEPLAY SPORT 2" tvg-logo="http://51.158.145.100/picons/logos/logos/1982238.png" group-title="CZ| SPORTS",CZ| ONEPLAY SPORT 2
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1982238
+#EXTINF:-1 tvg-id="" tvg-name="CZ| ONEPLAY SPORT 3" tvg-logo="http://51.158.145.100/picons/logos/logos/1982239.png" group-title="CZ| SPORTS",CZ| ONEPLAY SPORT 3
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1982239
+#EXTINF:-1 tvg-id="" tvg-name="CZ| ONEPLAY SPORT 4" tvg-logo="http://51.158.145.100/picons/logos/logos/1982240.png" group-title="CZ| SPORTS",CZ| ONEPLAY SPORT 4
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1982240
+#EXTINF:-1 tvg-id="" tvg-name="CZ| PREMIER SPORT 1" tvg-logo="http://picons.cmshulk.com/picons/1758165.png" group-title="CZ| SPORTS",CZ| PREMIER SPORT 1
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1758165
+#EXTINF:-1 tvg-id="" tvg-name="CZ| PREMIER SPORT 2" tvg-logo="http://picons.cmshulk.com/picons/1758164.png" group-title="CZ| SPORTS",CZ| PREMIER SPORT 2
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1758164
+#EXTINF:-1 tvg-id="" tvg-name="CZ| PREMIER SPORT 3" tvg-logo="http://picons.cmshulk.com/picons/1758163.png" group-title="CZ| SPORTS",CZ| PREMIER SPORT 3
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1758163
+#EXTINF:-1 tvg-id="Eurosport2.cz" tvg-name="CZ| EUROSPORT 2 HD" tvg-logo="http://picons.cmshulk.com/picons/509078.png" group-title="CZ| SPORTS",CZ| EUROSPORT 2 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/509078
+#EXTINF:-1 tvg-id="Eurosport1.cz" tvg-name="CZ| EUROSPORT HD" tvg-logo="http://picons.cmshulk.com/picons/509077.png" group-title="CZ| SPORTS",CZ| EUROSPORT HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/509077
+#EXTINF:-1 tvg-id="" tvg-name="CZ| FIGHTBOX" tvg-logo="http://picons.cmshulk.com/picons/1438014.png" group-title="CZ| SPORTS",CZ| FIGHTBOX
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438014
+#EXTINF:-1 tvg-id="" tvg-name="CZ| SPORT 1 FHD" tvg-logo="http://picons.cmshulk.com/picons/1127722.png" group-title="CZ| SPORTS",CZ| SPORT 1 FHD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127722
+#EXTINF:-1 tvg-id="Sport1.cz" tvg-name="CZ| SPORT 1 HD" tvg-logo="http://picons.cmshulk.com/picons/98317.png" group-title="CZ| SPORTS",CZ| SPORT 1 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98317
+#EXTINF:-1 tvg-id="Sport2.cz" tvg-name="CZ| SPORT 2 HD" tvg-logo="http://picons.cmshulk.com/picons/98318.png" group-title="CZ| SPORTS",CZ| SPORT 2 HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98318
+#EXTINF:-1 tvg-id="Sport2.cz" tvg-name="CZ| SPORT 2 HEVC" tvg-logo="http://picons.cmshulk.com/picons/98270.png" group-title="CZ| SPORTS",CZ| SPORT 2 HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98270
+#EXTINF:-1 tvg-id="Sport5.cz" tvg-name="CZ| SPORT 5" tvg-logo="http://picons.cmshulk.com/picons/98214.png" group-title="CZ| SPORTS",CZ| SPORT 5
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98214
+#EXTINF:-1 tvg-id="" tvg-name="SKY| ARENA SPORT 1 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/ARENASPORT1.png" group-title="CZ| SPORTS",SKY| ARENA SPORT 1 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011095
+#EXTINF:-1 tvg-id="" tvg-name="SKY| ARENA SPORT 2 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/ARENASPORT2.png" group-title="CZ| SPORTS",SKY| ARENA SPORT 2 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011094
+#EXTINF:-1 tvg-id="" tvg-name="SKY| CANAL+ SPORT ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/CANALPLUSSPORT.png" group-title="CZ| SPORTS",SKY| CANAL+ SPORT ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011088
+#EXTINF:-1 tvg-id="" tvg-name="SKY| CANAL+ SPORT 2 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/CANALPLUSSPORT2.png" group-title="CZ| SPORTS",SKY| CANAL+ SPORT 2 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011087
+#EXTINF:-1 tvg-id="" tvg-name="SKY| CANAL+ SPORT 3 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/CANALPLUSSPORT3.png" group-title="CZ| SPORTS",SKY| CANAL+ SPORT 3 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011086
+#EXTINF:-1 tvg-id="" tvg-name="SKY| CANAL+ SPORT 4 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/CANALPLUSSPORT4.png" group-title="CZ| SPORTS",SKY| CANAL+ SPORT 4 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011085
+#EXTINF:-1 tvg-id="" tvg-name="SKY| CANAL+ SPORT 5 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/CANALPLUSSPORT5.png" group-title="CZ| SPORTS",SKY| CANAL+ SPORT 5 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011084
+#EXTINF:-1 tvg-id="" tvg-name="SKY| CANAL+ SPORT 6 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/CANALPLUSSPORT.png" group-title="CZ| SPORTS",SKY| CANAL+ SPORT 6 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011083
+#EXTINF:-1 tvg-id="" tvg-name="SKY| CANAL+ SPORT 7 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/CANALPLUSSPORT.png" group-title="CZ| SPORTS",SKY| CANAL+ SPORT 7 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011082
+#EXTINF:-1 tvg-id="" tvg-name="SKY| CANAL+ SPORT 8 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/CANALPLUSSPORT.png" group-title="CZ| SPORTS",SKY| CANAL+ SPORT 8 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011081
+#EXTINF:-1 tvg-id="" tvg-name="SKY| CT SPORT ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/CTSPORT.png" group-title="CZ| SPORTS",SKY| CT SPORT ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011071
+#EXTINF:-1 tvg-id="" tvg-name="SKY| NOVA SPORT 1 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/NOVASPORT1.png" group-title="CZ| SPORTS",SKY| NOVA SPORT 1 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011021
+#EXTINF:-1 tvg-id="" tvg-name="SKY| NOVA SPORT 2 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/NOVASPORT2.png" group-title="CZ| SPORTS",SKY| NOVA SPORT 2 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011020
+#EXTINF:-1 tvg-id="" tvg-name="SKY| NOVA SPORT 3 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/NOVASPORT3.png" group-title="CZ| SPORTS",SKY| NOVA SPORT 3 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011019
+#EXTINF:-1 tvg-id="" tvg-name="SKY| NOVA SPORT 4 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/NOVASPORT4.png" group-title="CZ| SPORTS",SKY| NOVA SPORT 4 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011018
+#EXTINF:-1 tvg-id="" tvg-name="SKY| NOVA SPORT 5 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/NOVASPORT5.png" group-title="CZ| SPORTS",SKY| NOVA SPORT 5 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011017
+#EXTINF:-1 tvg-id="" tvg-name="SKY| NOVA SPORT 6 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/NOVASPORT6.png" group-title="CZ| SPORTS",SKY| NOVA SPORT 6 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2011016
+#EXTINF:-1 tvg-id="" tvg-name="SKY| SPORT 1 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/SPORT1.png" group-title="CZ| SPORTS",SKY| SPORT 1 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2010992
+#EXTINF:-1 tvg-id="" tvg-name="SKY| SPORT 2 ᴿᴬᵂ" tvg-logo="http://51.158.145.100/picons/logos/TCHEQUIE/SPORT2.png" group-title="CZ| SPORTS",SKY| SPORT 2 ᴿᴬᵂ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/2010991
+#EXTINF:-1 tvg-id="cz.Nova MTV" tvg-name="CZ| MTV EUROPE" tvg-logo="http://picons.cmshulk.com/picons/98200.png" group-title="CZ| HUDBA",CZ| MTV EUROPE
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98200
+#EXTINF:-1 tvg-id="" tvg-name="CZ| OCKO BLACK HD" tvg-logo="http://picons.cmshulk.com/picons/1438028.png" group-title="CZ| HUDBA",CZ| OCKO BLACK HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438028
+#EXTINF:-1 tvg-id="" tvg-name="CZ| OCKO EXPRES HD" tvg-logo="http://picons.cmshulk.com/picons/1438029.png" group-title="CZ| HUDBA",CZ| OCKO EXPRES HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438029
+#EXTINF:-1 tvg-id="OckoStar.cz" tvg-name="CZ| OCKO STAR TV" tvg-logo="http://picons.cmshulk.com/picons/1127712.png" group-title="CZ| HUDBA",CZ| OCKO STAR TV
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127712
+#EXTINF:-1 tvg-id="Ocko.cz" tvg-name="CZ| OCKO TV" tvg-logo="http://picons.cmshulk.com/picons/1127711.png" group-title="CZ| HUDBA",CZ| OCKO TV
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127711
+#EXTINF:-1 tvg-id="RetroMusic.cz" tvg-name="CZ| RETRO MUSIC TV" tvg-logo="http://103.176.90.118/picons/logos/RETRO-MUSIC-TV.png" group-title="CZ| HUDBA",CZ| RETRO MUSIC TV
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127706
+#EXTINF:-1 tvg-id="" tvg-name="CZ| STINGRAY CLASSICA HD" tvg-logo="http://picons.cmshulk.com/picons/stingraycmusic.png" group-title="CZ| HUDBA",CZ| STINGRAY CLASSICA HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438033
+#EXTINF:-1 tvg-id="" tvg-name="CZ| STINGRAY CMUSIC" tvg-logo="http://picons.cmshulk.com/picons/stingraycmusic.png" group-title="CZ| HUDBA",CZ| STINGRAY CMUSIC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438034
+#EXTINF:-1 tvg-id="" tvg-name="CZ| STINGRAY ICONCERTS HD" tvg-logo="http://picons.cmshulk.com/picons/stingraycmusic.png" group-title="CZ| HUDBA",CZ| STINGRAY ICONCERTS HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438035
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CARTOON NETWORK" tvg-logo="http://picons.cmshulk.com/picons/1438010.png" group-title="CZ| DĚTI",CZ| CARTOON NETWORK
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438010
+#EXTINF:-1 tvg-id="DisneyChannel.cz" tvg-name="CZ| DISNEY" tvg-logo="http://picons.cmshulk.com/picons/98188.png" group-title="CZ| DĚTI",CZ| DISNEY
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98188
+#EXTINF:-1 tvg-id="DuckTV.sk" tvg-name="CZ| DUCK TV" tvg-logo="http://picons.cmshulk.com/picons/98221.png" group-title="CZ| DĚTI",CZ| DUCK TV
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98221
+#EXTINF:-1 tvg-id="JimJam.cz" tvg-name="CZ| JIMJAM CZ" tvg-logo="https://logo.protv.cc/piconsnew/jimjam.png" group-title="CZ| DĚTI",CZ| JIMJAM CZ
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127715
+#EXTINF:-1 tvg-id="NickJr.cz" tvg-name="CZ| NICK JR" tvg-logo="http://picons.cmshulk.com/picons/98203.png" group-title="CZ| DĚTI",CZ| NICK JR
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98203
+#EXTINF:-1 tvg-id="Nickelodeon.cz" tvg-name="CZ| NICKELODEON" tvg-logo="http://picons.cmshulk.com/picons/98204.png" group-title="CZ| DĚTI",CZ| NICKELODEON
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98204
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CRIME+INVESTIGATION" tvg-logo="http://picons.cmshulk.com/picons/1438012.png" group-title="CZ| KULTURNÍ",CZ| CRIME+INVESTIGATION
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438012
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CS HISTORY" tvg-logo="http://picons.cmshulk.com/picons/1127717.png" group-title="CZ| KULTURNÍ",CZ| CS HISTORY
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127717
+#EXTINF:-1 tvg-id="" tvg-name="CZ| CS MYSTERY" tvg-logo="http://picons.cmshulk.com/picons/1127716.png" group-title="CZ| KULTURNÍ",CZ| CS MYSTERY
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1127716
+#EXTINF:-1 tvg-id="" tvg-name="CZ| DOCUBOX" tvg-logo="http://picons.cmshulk.com/picons/98186.png" group-title="CZ| KULTURNÍ",CZ| DOCUBOX
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98186
+#EXTINF:-1 tvg-id="" tvg-name="CZ| SPEKTRUM HOME HD" tvg-logo="http://51.158.145.100/picons/logos/logos/1982228.png" group-title="CZ| KULTURNÍ",CZ| SPEKTRUM HOME HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1982228
+#EXTINF:-1 tvg-id="FishingHunting.cz" tvg-name="CZ| FISHING AND HUNTING" tvg-logo="http://picons.cmshulk.com/picons/98194.png" group-title="CZ| KULTURNÍ",CZ| FISHING AND HUNTING
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98194
+#EXTINF:-1 tvg-id="" tvg-name="CZ| LOVE NATURE HD" tvg-logo="http://picons.cmshulk.com/picons/1438019.png" group-title="CZ| KULTURNÍ",CZ| LOVE NATURE HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438019
+#EXTINF:-1 tvg-id="NatGeo.cz" tvg-name="CZ| NAT GEO HD" tvg-logo="http://picons.cmshulk.com/picons/98294.png" group-title="CZ| KULTURNÍ",CZ| NAT GEO HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98294
+#EXTINF:-1 tvg-id="NatGeo.cz" tvg-name="CZ| NAT GEO HEVC" tvg-logo="http://picons.cmshulk.com/picons/98246.png" group-title="CZ| KULTURNÍ",CZ| NAT GEO HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98246
+#EXTINF:-1 tvg-id="NatGeoWild.cz" tvg-name="CZ| NATIONAL GEOGRAPHIC WILD HD" tvg-logo="http://103.176.90.118/picons/logos/natgeowildhdcz.png" group-title="CZ| KULTURNÍ",CZ| NATIONAL GEOGRAPHIC WILD HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98295
+#EXTINF:-1 tvg-id="NatGeoWild.cz" tvg-name="CZ| NATIONAL GEOGRAPHIC WILD HEVC" tvg-logo="http://103.176.90.118/picons/logos/nationalgeographicwild.png" group-title="CZ| KULTURNÍ",CZ| NATIONAL GEOGRAPHIC WILD HEVC
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98247
+#EXTINF:-1 tvg-id="" tvg-name="CZ| TRAVEL CHANNEL HD" tvg-logo="http://51.158.145.100/picons/logos/logos/1438036.png" group-title="CZ| KULTURNÍ",CZ| TRAVEL CHANNEL HD
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/1438036
+#EXTINF:-1 tvg-id="ViasatExplore.cz" tvg-name="CZ| VIASAT EXPLORE" tvg-logo="http://picons.cmshulk.com/picons/98218.png" group-title="CZ| KULTURNÍ",CZ| VIASAT EXPLORE
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98218
+#EXTINF:-1 tvg-id="ViasatHistory.cz" tvg-name="CZ| VIASAT HISTORY" tvg-logo="http://picons.cmshulk.com/picons/98219.png" group-title="CZ| KULTURNÍ",CZ| VIASAT HISTORY
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98219
+#EXTINF:-1 tvg-id="ViasatNature.cz" tvg-name="CZ| VIASAT NATURE" tvg-logo="http://picons.cmshulk.com/picons/98220.png" group-title="CZ| KULTURNÍ",CZ| VIASAT NATURE
+http://line.iptventes.site:80/8fb2887140/9b35e5e741b1/98220
 `;
 
 async function loadTvPlaylist() {
@@ -18478,9 +18484,11 @@ let altState = window.altState = { activeCode: null, channels: [], filtered: [],
 function renderAltPlaylistTabs() {
     const tabs = document.getElementById('tvAltPlaylistTabs');
     if(!tabs) return;
-    tabs.innerHTML = Object.keys(ALT_PLAYLISTS).map(code =>
-        `<button class="tv-group-tab ${code === altState.activeCode ? 'active' : ''}" onclick="selectAltPlaylist('${code}')">${ALT_PLAYLISTS[code].label}</button>`
-    ).join('');
+    tabs.innerHTML = Object.keys(ALT_PLAYLISTS).map(code => {
+        const pl = ALT_PLAYLISTS[code];
+        if(pl._count === undefined) pl._count = (pl.m3u.match(/#EXTINF/g) || []).length;
+        return `<button class="tv-group-tab ${code === altState.activeCode ? 'active' : ''}" onclick="selectAltPlaylist('${code}')">${pl.label} (${pl._count})</button>`;
+    }).join('');
 }
 
 function selectAltPlaylist(code) {
@@ -18619,9 +18627,11 @@ function switchTvTab(tab) {
 
 function renderTvGroups() {
     const tabs = document.getElementById('tvGroupTabs');
-    tabs.innerHTML = TV_GROUPS.map(g =>
-        `<button class="tv-group-tab ${g.id === tvState.activeGroup ? 'active' : ''}" onclick="switchTvGroup('${g.id}')">${g.label}</button>`
-    ).join('');
+    const adultAllowed = localStorage.getItem('sinator_adult_content') === 'true';
+    tabs.innerHTML = TV_GROUPS.map(g => {
+        const count = tvState.channels.filter(ch => g.match(ch) && (adultAllowed || !isAdultChannel(ch))).length;
+        return `<button class="tv-group-tab ${g.id === tvState.activeGroup ? 'active' : ''}" onclick="switchTvGroup('${g.id}')">${g.label} (${count})</button>`;
+    }).join('');
 }
 
 function switchTvGroup(id) {
@@ -18680,6 +18690,8 @@ function renderTvChannelList() {
     }
 
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály v této skupině.') + '</div>'; return; }
+
+    filtered = filtered.slice().sort((a, b) => a.name.localeCompare(b.name, 'cs', { sensitivity: 'base', numeric: true }));
 
     listEl.innerHTML = filtered.map((ch) => {
         const isActive = tvState.currentChannel && tvState.currentChannel.url === ch.url;
@@ -18765,6 +18777,31 @@ function showTvError(name, url) {
         </div>`;
 }
 
+function findTvChannelByEpgName(chName) {
+    if(!chName || !tvState.channels || !tvState.channels.length) return null;
+    const norm = s => (s||'').toLowerCase()
+        .replace(/^.*\|\s*/,'')              // odstranit prefix "CZ| " apod.
+        .replace(/\s*\b(hd|fhd|4k|hevc)\b/gi,'')
+        .replace(/[^a-z0-9čćšžýáíéúůňďťěř]+/gi,'')
+        .trim();
+    const target = norm(chName);
+    if(!target) return null;
+    let exact = null, partial = null;
+    for(const ch of tvState.channels) {
+        const n = norm(ch.name);
+        if(n === target) { exact = ch; break; }
+        if(!partial && (n.includes(target) || target.includes(n)) && target.length > 2) partial = ch;
+    }
+    return exact || partial;
+}
+
+function playEpgChannelLive(chName) {
+    const ch = findTvChannelByEpgName(chName);
+    if(!ch) { alert('Kanál "' + chName + '" se nepodařilo dohledat v seznamu.'); return; }
+    document.getElementById('epgDetailModal').style.display='none';
+    openInVlcUrl(ch.url);
+}
+
 function openEpgDetail(ep) {
     // ep = { title, desc, channel?, timeLabel?, start?, end? }
     const title = ep.title || '';
@@ -18783,8 +18820,8 @@ function openEpgDetail(ep) {
                 </div>
             </div>
             ${desc ? `<div style="font-size:0.85rem;color:var(--text-muted);line-height:1.6;margin-bottom:20px;padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;border-left:3px solid #00b4d8;">${desc}</div>` : ''}
-            ${ep.isNow && ep.url ? `<div style="margin-bottom:16px;">
-                <button onclick="document.getElementById('epgDetailModal').style.display='none'; window.location.href='intent:${ep.url}#Intent;package=org.videolan.vlc;action=android.intent.action.VIEW;end';" style="width:100%;padding:11px 16px;background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶ Přehrát živě ve VLC</button>
+            ${ep.isNow ? `<div style="margin-bottom:16px;">
+                <button onclick="playEpgChannelLive('${channel.replace(/'/g,"\\'")}')" style="width:100%;padding:11px 16px;background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶ Přehrát živě ve VLC</button>
             </div>` : ''}
             <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Hledat / otevřít</div>
             <div style="display:flex;flex-wrap:wrap;gap:8px;">
@@ -19061,9 +19098,10 @@ async function loadEpgData() {
         : String(t);
 
     const normKey = s => s.toLowerCase()
+        .replace(/^\s*[a-z]{2,4}\s*\|\s*/, '')
         .replace(/[čc]/g,'c').replace(/[šs]/g,'s').replace(/[žz]/g,'z')
         .replace(/[áa]/g,'a').replace(/[éíě]/g,'e').replace(/[óo]/g,'o').replace(/[úůu]/g,'u')
-        .replace(/\s*(hd|fhd|4k)\s*$/i,'').replace(/[.\s]/g,'').trim();
+        .replace(/\s*(hd|fhd|4k|hevc)\s*$/i,'').replace(/[.\s]/g,'').trim();
 
     const epg = tvState.epgData || {};
     const windowStart = new Date(now.getTime() - 2*60*60*1000);
@@ -19384,8 +19422,9 @@ function parseXmltvEpg(xml) {
     // normalize: strip diacritics, suffixes (.cz/.sk/.cz2/.sk2), trailing HD/FHD/4K/CZ/SK, spaces, dots
     const normalize = s => s.toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/^\s*[a-z]{2,4}\s*\|\s*/, '')    // strip zdrojový prefix "cz| " / "sk| " / "sky| " apod.
         .replace(/\.(cz|sk)\d*$/g, '')           // strip .cz .sk .cz2 .sk2
-        .replace(/\s*(hd|fhd|4k)\s*$/g, '')      // strip trailing HD/FHD/4K
+        .replace(/\s*(hd|fhd|4k|hevc|ᴴᴰ|ᴿᴬᵂ)\s*$/g, '')      // strip trailing HD/FHD/4K/HEVC
         .replace(/(cz|sk)\d*$/g, '')              // strip trailing cz/sk/cz2
         .replace(/[^a-z0-9]/g, '');              // keep only alphanumeric
 
