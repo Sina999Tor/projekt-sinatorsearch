@@ -1972,6 +1972,34 @@
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Zapnout = barevné emoji ikony, Vypnout = šedé (výchozí)</div>
             </div>
             <div class="settings-divider"></div>
+            <div class="settings-section">
+                <span class="settings-label">📺 Kde se to dá sledovat</span>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+                    <span style="font-size:0.85rem;color:var(--text-muted);">Zobrazit streamovací služby v detailu</span>
+                    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+                        <input type="checkbox" id="watchProvidersToggle" onchange="applyWatchProvidersMode(this.checked)" style="opacity:0;width:0;height:0;position:absolute;">
+                        <span id="watchProvidersSlider" style="position:absolute;inset:0;background:#333;border-radius:24px;transition:0.3s;border:1px solid var(--border);">
+                            <span style="position:absolute;left:3px;top:3px;width:16px;height:16px;background:#888;border-radius:50%;transition:0.3s;" id="watchProvidersThumb"></span>
+                        </span>
+                    </label>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Zobrazí v detailu filmu/seriálu, na kterých službách (Netflix, HBO Max…) je dostupný (zdroj: JustWatch)</div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section">
+                <span class="settings-label">🧩 Podrobnosti v detailu</span>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+                    <span style="font-size:0.85rem;color:var(--text-muted);">Zobrazit rozšířená tlačítka</span>
+                    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+                        <input type="checkbox" id="detailExtrasToggle" onchange="applyDetailExtrasMode(this.checked)" style="opacity:0;width:0;height:0;position:absolute;">
+                        <span id="detailExtrasSlider" style="position:absolute;inset:0;background:#333;border-radius:24px;transition:0.3s;border:1px solid var(--border);">
+                            <span style="position:absolute;left:3px;top:3px;width:16px;height:16px;background:#888;border-radius:50%;transition:0.3s;" id="detailExtrasThumb"></span>
+                        </span>
+                    </label>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Vypnuto = v detailu zůstanou jen ▶️ Přehrát, 🔍 Vyhledat zdroje a ▶️ Trailer. Zapnuto = i Galerie, Kolekce, Soundtrack, Složky, Herci, Katalogy a další.</div>
+            </div>
+            <div class="settings-divider"></div>
             <button class="settings-full-btn" onclick="toggleFullscreen()" id="settingsFullscreenBtn">🔒 Fullscreen (zapnuto)</button>
             <button class="settings-full-btn" id="pwaInstallBtn" onclick="installPWA()" style="display:none;">📲 Instalovat aplikaci</button>
             <div id="pwaInstallInfo" style="font-size:0.7rem; color:var(--text-muted); text-align:center; margin-top:4px; display:none;">Dostupné v Chrome/Edge na Androidu přes HTTPS</div>
@@ -3022,6 +3050,36 @@
         const tog = $('coloredIconsToggle');
         if(tog) tog.checked = colored;
         _syncIconSlider(colored);
+        const wpEnabled = _store.getItem('sinator_watch_providers') !== '0';
+        const wpTog = $('watchProvidersToggle');
+        if(wpTog) wpTog.checked = wpEnabled;
+        _syncWatchProvidersSlider(wpEnabled);
+        const deEnabled = _store.getItem('sinator_detail_extras') !== '0';
+        const deTog = $('detailExtrasToggle');
+        if(deTog) deTog.checked = deEnabled;
+        _syncDetailExtrasSlider(deEnabled);
+    }
+
+    window.applyWatchProvidersMode = function(enabled) {
+        _store.setItem('sinator_watch_providers', enabled ? '1' : '0');
+        _syncWatchProvidersSlider(enabled);
+    };
+    function _syncWatchProvidersSlider(enabled) {
+        const slider = $('watchProvidersSlider');
+        const thumb = $('watchProvidersThumb');
+        if(slider) slider.style.background = enabled ? '#4a4a4a' : '#333';
+        if(thumb) { thumb.style.transform = enabled ? 'translateX(20px)' : 'translateX(0)'; thumb.style.background = enabled ? '#fff' : '#888'; }
+    }
+
+    window.applyDetailExtrasMode = function(enabled) {
+        _store.setItem('sinator_detail_extras', enabled ? '1' : '0');
+        _syncDetailExtrasSlider(enabled);
+    };
+    function _syncDetailExtrasSlider(enabled) {
+        const slider = $('detailExtrasSlider');
+        const thumb = $('detailExtrasThumb');
+        if(slider) slider.style.background = enabled ? '#4a4a4a' : '#333';
+        if(thumb) { thumb.style.transform = enabled ? 'translateX(20px)' : 'translateX(0)'; thumb.style.background = enabled ? '#fff' : '#888'; }
     }
 
     window.applyIconColorMode = function(colored) {
@@ -8215,12 +8273,13 @@ EXAMPLES:
                 ? `${BASE}/movie/${id}/release_dates?api_key=${tmdbApiKey}`
                 : `${BASE}/tv/${id}/content_ratings?api_key=${tmdbApiKey}`;
 
-            const [d, credits, certData, tvTranslations, aggCredits] = await Promise.all([
+            const [d, credits, certData, tvTranslations, aggCredits, watchProviders] = await Promise.all([
                 fetch(`${BASE}/${type}/${id}?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()),
                 fetch(`${BASE}/${type}/${id}/credits?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()),
                 fetch(certEndpoint).then(r=>r.json()).catch(()=>null),
                 (type === 'tv' ? fetch(`${BASE}/tv/${id}/translations?api_key=${tmdbApiKey}`).then(r=>r.json()).catch(()=>null) : Promise.resolve(null)),
-                (type === 'tv' ? fetch(`${BASE}/tv/${id}/aggregate_credits?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>null) : Promise.resolve(null))
+                (type === 'tv' ? fetch(`${BASE}/tv/${id}/aggregate_credits?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>null) : Promise.resolve(null)),
+                fetch(`${BASE}/${type}/${id}/watch/providers?api_key=${tmdbApiKey}`).then(r=>r.json()).catch(()=>null)
             ]);
 
             // Získání certifikace (věkové hodnocení)
@@ -8301,6 +8360,38 @@ EXAMPLES:
                 }
             }
 
+            // Dostupnost u streamovacích služeb (Netflix, HBO Max, Disney+ atd.)
+            let providersHtml = '';
+            if (window._store.getItem('sinator_watch_providers') !== '0' && watchProviders && watchProviders.results) {
+                const region = watchProviders.results.CZ || watchProviders.results.US;
+                if (region) {
+                    const link = region.link || '';
+                    const groups = [
+                        { key: 'flatrate', label: '📺 Streamování' },
+                        { key: 'rent', label: '💸 Půjčení' },
+                        { key: 'buy', label: '🛒 Koupě' }
+                    ];
+                    const sections = groups.map(g => {
+                        const list = region[g.key];
+                        if (!list || !list.length) return '';
+                        const seen = new Set();
+                        const logos = list.filter(p => { if(seen.has(p.provider_name)) return false; seen.add(p.provider_name); return true; })
+                            .map(p => `<div class="provider-item" title="${p.provider_name}" style="display:flex;flex-direction:column;align-items:center;gap:4px;width:56px;">
+                                <img src="${IMG}w92${p.logo_path}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;">
+                                <span style="font-size:0.62rem;color:var(--text-muted);text-align:center;line-height:1.1;">${p.provider_name}</span>
+                            </div>`).join('');
+                        return `<div style="margin-bottom:10px;"><div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);margin-bottom:6px;">${g.label}</div><div style="display:flex;flex-wrap:wrap;gap:10px;">${logos}</div></div>`;
+                    }).join('');
+                    if (sections) {
+                        providersHtml = `<div class="modal-providers" style="margin:14px 0;padding:12px;background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border);">
+                            <div style="font-size:0.85rem;font-weight:700;margin-bottom:10px;">Kde se to dá sledovat</div>
+                            ${sections}
+                            ${link ? `<a href="${link}" target="_blank" style="display:inline-block;margin-top:6px;font-size:0.72rem;color:var(--accent);text-decoration:none;">Zdroj: JustWatch ↗</a>` : ''}
+                        </div>`;
+                    }
+                }
+            }
+
             // Stav seriálu (Pokračuje / Ukončeno / Zrušeno / V přípravě) + datum příštího dílu
             let seriesStatusChip = '';
             if (type === 'tv' && d.status) {
@@ -8327,10 +8418,12 @@ EXAMPLES:
             const collectionBtn = d.belongs_to_collection ? `<button class="action-btn-modal collection" onclick="showCollection(${d.belongs_to_collection.id}, '${jsq(d.belongs_to_collection.name)}')">📦 Kolekce</button>` : '';
             
             const posterPath = d.poster_path || '';
-            const actionBtns = `<div class="action-buttons">
+            const showDetailExtras = window._store.getItem('sinator_detail_extras') !== '0';
+            const coreBtns = `<div class="action-buttons">
 <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeTitle}'))">▶️ Přehrát</button>
 <button class="action-btn-modal search-sources" onclick="openSourcesModal('${safeTitle}', '${year}', '${type}', '${origTitle}', '', '', '', '${jsq(czTvName||'')}')">🔍 Vyhledat zdroje</button>
-<button class="action-btn-modal youtube" onclick="openYouTube('${safeTitle}')">▶️ Trailer</button>
+<button class="action-btn-modal youtube" onclick="openYouTube('${safeTitle}')">▶️ Trailer</button>`;
+            const extraBtns = !showDetailExtras ? '' : `
 <button class="action-btn-modal" onclick="showMediaGallery(${id}, '${type}', '${safeTitle}')">🖼️ Galerie</button>
 ${collectionBtn}
 <button class="action-btn-modal soundtrack" onclick="openSoundtrack('${safeTitle}')">🎵 Soundtrack</button>
@@ -8354,9 +8447,9 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 <div class="action-buttons" style="display:none;margin-top:4px;">
 <button class="action-btn-modal" onclick="toggleTraktWatchlist(${id},'${type}',this)" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">🔖 Watchlist</button>
 <button class="action-btn-modal" onclick="openTraktListPicker(${id},'${type}')" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">📋 Do seznamu</button>
-</div>
 </div>`;
-            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p><div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div>${actionBtns}</div></div>`;
+            const actionBtns = coreBtns + extraBtns + `</div>`;
+            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div>${actionBtns}</div></div>`;
             
             if(type === 'tv') {
                 $('modalScrollBody').innerHTML += `<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);"><h3 style="margin-bottom:16px;font-size:1.2rem;">📺 Sezóny a epizody</h3><div id="seasons-container"></div></div>`;
