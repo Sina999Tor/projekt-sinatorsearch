@@ -8278,6 +8278,29 @@ EXAMPLES:
             const releaseDate = d.release_date || d.first_air_date || '';
             const releaseDateChip = releaseDate ? `<div class="modal-chip">📅 Premiéra: <strong>${releaseDate}</strong></div>` : '';
 
+            // Typ uvedení (Kino / VOD / Digitálně / Fyzické médium / TV) z TMDB release_dates
+            let releaseTypeChip = '';
+            if (type === 'movie' && certData && certData.results) {
+                const releaseTypeLabels = {
+                    1: { label: '🎪 Premiéra na festivalu', color: '#7db8f7' },
+                    2: { label: '🎬 Kino (limitovaně)', color: '#f5a623' },
+                    3: { label: '🎬 Kino', color: '#e50914' },
+                    4: { label: '💻 Digitálně / VOD', color: '#1db954' },
+                    5: { label: '📀 Fyzické médium', color: '#7db8f7' },
+                    6: { label: '📺 TV', color: '#7db8f7' }
+                };
+                const region = (certData.results||[]).find(r => r.iso_3166_1 === 'CZ') || (certData.results||[]).find(r => r.iso_3166_1 === 'US');
+                const dates = region?.release_dates || [];
+                if (dates.length) {
+                    const today = new Date().toISOString().slice(0,10);
+                    // Nejnovější typ uvedení, který už nastal (nebo nastává dnes); jinak nejbližší nadcházející
+                    const past = dates.filter(rd => (rd.release_date||'').slice(0,10) <= today).sort((a,b) => (b.release_date||'').localeCompare(a.release_date||''));
+                    const entry = past[0] || dates.slice().sort((a,b) => (a.release_date||'').localeCompare(b.release_date||''))[0];
+                    const info = entry ? releaseTypeLabels[entry.type] : null;
+                    if (info) releaseTypeChip = `<div class="modal-chip" style="border-color:${info.color};color:${info.color};font-weight:600;">${info.label}</div>`;
+                }
+            }
+
             // Stav seriálu (Pokračuje / Ukončeno / Zrušeno / V přípravě) + datum příštího dílu
             let seriesStatusChip = '';
             if (type === 'tv' && d.status) {
@@ -8333,7 +8356,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 <button class="action-btn-modal" onclick="openTraktListPicker(${id},'${type}')" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">📋 Do seznamu</button>
 </div>
 </div>`;
-            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p><div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div>${actionBtns}</div></div>`;
+            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p><div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div>${actionBtns}</div></div>`;
             
             if(type === 'tv') {
                 $('modalScrollBody').innerHTML += `<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);"><h3 style="margin-bottom:16px;font-size:1.2rem;">📺 Sezóny a epizody</h3><div id="seasons-container"></div></div>`;
