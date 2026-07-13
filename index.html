@@ -8428,7 +8428,7 @@ EXAMPLES:
 ${collectionBtn}
 <button class="action-btn-modal soundtrack" onclick="openSoundtrack('${safeTitle}')">🎵 Soundtrack</button>
 <button class="action-btn-modal" onclick="translateOverview()">🌐 Přeložit</button>
-<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}',rating:${rating}})">📁 Složky</button>
+<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${id},type:'${type}',title:'${safeTitle}',year:${year||0},poster:'${d.poster_path||''}',rating:${d.vote_average||0}})">📁 Složky</button>
 <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="showSimilarInModal(${id},'${type}',this)">🎯 Podobné tituly</button>
 <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="window._dPrefill={tmdbId:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}'};openAddDoporuceni()">⭐ Doporučit</button>
 ${cast ? `<button class="action-btn-modal" onclick="showCastModal(${id},'${type}')">👥 Herci</button>` : ''}
