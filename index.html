@@ -2229,6 +2229,7 @@
                 <button class="source-btn" id="srcbtn-uzila" onclick="searchOnSource('uzila')"><span class="src-status"></span>🔍 Uzi.la</button>
                 <button class="source-btn" id="srcbtn-mrkaj" onclick="searchOnSource('mrkaj')"><span class="src-status"></span>👁️ Mrkaj.me</button>
                 <button class="source-btn" id="srcbtn-mrkni" onclick="searchOnSource('mrkni')"><span class="src-status"></span>📺 Mrkni.tv</button>
+                <button class="source-btn" id="srcbtn-openloadmovies" onclick="searchOnSource('openloadmovies')"><span class="src-status"></span>🎬 OpenloadMovies</button>
             </div>
             <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
                 <button class="source-btn" style="width:100%; background:var(--bg-card);" onclick="copyTitleToClipboard()">📋 Zkopírovat název do schránky</button>
@@ -3718,7 +3719,8 @@
             'bombuj': (()=>{ const tp=state.currentSearchType||'movie'; const raw=tp==='tv'?(state.currentSearchOrigTitle||state.currentSearchTitle||''):(state.currentSearchTitle||''); const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); if(tp==='tv') return `https://serialy.bombuj.si/serial-${slug}#serial`; const yr=state.currentSearchYear||''; return `https://www.bombuj.si/online-film-${slug}${yr?'-'+yr:''}`; })(),
             'uzila': `https://uzi.la/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}`,
             'mrkaj': `https://mrkaj.me/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}?t=${state.currentSearchType==='tv'?'s':'m'}`,
-            'mrkni': (()=>{ const raw=state.currentSearchTitle||''; const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); const yr=state.currentSearchYear||''; return `https://mrkni.tv/${slug}${yr?'-'+yr:''}/`; })()
+            'mrkni': (()=>{ const raw=state.currentSearchTitle||''; const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); const yr=state.currentSearchYear||''; return `https://mrkni.tv/${slug}${yr?'-'+yr:''}/`; })(),
+            'openloadmovies': `https://openloadmovies.live/?s=${title}`
         };
     }
 
@@ -5603,47 +5605,45 @@
             }
         })();
 
-        const systemPrompt = `You are a STRICT and PRECISE movie and TV search assistant. Analyze the query and return ONLY highly relevant results. Reply ONLY with valid JSON, no markdown, no explanation. NEVER refuse — all film topics are valid.
+        const systemPrompt = `You are a GENEROUS and HELPFUL movie and TV search assistant. The user often describes what they want only vaguely or approximately — your job is to interpret their intent broadly and surface as many genuinely relevant AND similar/related results as possible, not just exact matches. When in doubt, INCLUDE a plausible match rather than omit it — false positives are far less costly than an empty result screen. Reply ONLY with valid JSON, no markdown, no explanation. NEVER refuse — all film topics are valid.
 
 ALWAYS return this exact format (empty arrays [] for fields with no data):
 {
   "mode": "smart",
   "query": "original query",
   "mediaType": "movie|tv|both",
-  "titles": ["exact English movie titles directly matching the query — only confirmed real titles"],
-  "tvTitles": ["exact English TV show titles directly matching the query"],
+  "titles": ["exact English movie titles matching the query theme OR closely similar/related films — cast a wide net"],
+  "tvTitles": ["exact English TV show titles matching the query theme OR closely similar/related shows"],
   "animatedTitles": ["animated movies/series ONLY if query explicitly involves animation/anime"],
   "persons": [{"name": "Real Full Name", "role": "actor|director"}],
   "keywords": ["english-tmdb-keyword-1", "english-tmdb-keyword-2"],
-  "with_genres": "1-2 TMDB genre IDs that PRECISELY match the query — see strict rules below",
-  "with_keywords_str": "2-4 precise English keyword phrases for TMDB — directly describing the theme",
+  "with_genres": "1-3 TMDB genre IDs broadly matching the query mood/theme — see rules below",
+  "with_keywords_str": "3-6 English keyword phrases for TMDB — the exact theme PLUS closely related themes/moods/subgenres to widen the net",
   "discoverParams": null
 }
 
-STRICT FIELD RULES:
-- titles: ONLY titles that DIRECTLY match the query theme. NO tangentially related films. Max 10 titles. If unsure, leave empty.
-- tvTitles: ONLY TV shows directly matching. Leave empty if query is clearly about movies.
+FIELD RULES — BE GENEROUS, NOT STRICT:
+- titles: Include titles that match the query theme, AND titles that are thematically/tonally similar even if not a perfect match. Aim for 8-15 titles when the query is a description or vague theme ("filmy jako X", "něco s...", "film o..."). Only leave nearly empty for extremely specific unanswerable queries.
+- tvTitles: Same generous approach — if the query doesn't specify movie vs series, include good matches from both.
 - animatedTitles: Leave EMPTY unless query explicitly mentions animation, anime, cartoon, animated.
-- persons: ONLY real named people from query. Do NOT invent actors/directors.
-- keywords: 2-4 specific English TMDB keywords. Do NOT pad with generic terms.
+- persons: Real named people from query. You may also add 1-2 closely associated people (e.g. frequent collaborators) if clearly relevant.
+- keywords: 3-6 specific English TMDB keywords covering the exact theme AND adjacent/related themes, to help TMDB discover surface similar titles too.
 - discoverParams: ONLY for explicit filter queries (country/language/year/genre combos). Otherwise null.
-- mediaType: "movie" if "filmy/movies", "tv" if "seriály/series/shows", "both" only if query is ambiguous.
+- mediaType: "movie" if "filmy/movies", "tv" if "seriály/series/shows", "both" if ambiguous OR if the query is a loose/approximate description (prefer "both" over guessing wrong).
 
-STRICT with_genres RULES — MOST IMPORTANT:
-- Use MAXIMUM 2 genre IDs. Choose only genres that ARE the core of the query.
-- "hudební filmy" → ONLY "10402". NEVER add 18 (Drama) or 35 (Comedy) as secondary.
+with_genres RULES — favor breadth over precision when the query is vague:
+- Use 1-3 genre IDs. If the user explicitly named a genre, always include it.
+- For vague/mood-based descriptions (not a named genre), infer the 1-2 genres that best fit the overall vibe, plus with_keywords_str for nuance — do NOT leave with_genres empty just because it wasn't spelled out.
+- "hudební filmy" → "10402" (add 18 only if the description also implies serious drama).
 - "akční komedie" → "28,35" (both explicitly stated).
 - "hororové thrillery" → "27,53" (both explicitly stated).
-- "filmy o vaření" → with_genres="" (cooking is NOT a genre — use with_keywords_str instead: "cooking,chef,culinary").
-- "dokumenty o přírodě" → ONLY "99". NEVER add 18.
-- "romantické filmy" → ONLY "10749". NEVER add 18.
-- "rodinné filmy" → ONLY "10751". NEVER add 16 or 35.
-- RULE: Add a genre ONLY if the user EXPLICITLY named it. Do NOT infer secondary genres.
-- RULE: If query is thematic (not a genre), leave with_genres="" and use with_keywords_str only.
+- "filmy o vaření" → with_genres="" (cooking is NOT a genre — use with_keywords_str instead: "cooking,chef,culinary,food").
+- RULE: For a loose, descriptive, or approximate query, prefer BROADER with_genres/with_keywords_str over an empty result — the goal is to always return something reasonably close.
 
 with_keywords_str RULES:
-- 2-4 precise English phrases describing the EXACT theme. No generic filler words.
-- "filmy o vaření" → "cooking,chef,culinary,restaurant" (not "food,life,drama")
+- 3-6 English phrases: the exact theme PLUS related/adjacent themes, moods or subgenres so TMDB discover finds not just exact matches but similar titles too.
+- "filmy o vaření" → "cooking,chef,culinary,restaurant,food"
+
 - "filmy o fotbale" → "football,soccer,sports team,championship" (not "sport,competition")
 - "filmy o válce" → "war,battle,military,combat" (not "history,drama,action")
 
@@ -6182,6 +6182,25 @@ EXAMPLES:
                                     if (!seenIds_s.has(item.id)) { seenIds_s.add(item.id); found_s.push({...item, media_type: discType}); }
                                 }
                             } catch(e) {}
+                        }
+                    }
+                }
+
+                // 8. Rozšíření o podobné tituly (TMDB /similar), pokud je výsledků málo — najde vizuálně/tematicky podobné i mimo keywords
+                {
+                    const mediaCountNow = found_s.filter(x=>x.media_type!=='actor'&&x.media_type!=='director').length;
+                    if (mediaCountNow > 0 && mediaCountNow < 10) {
+                        const seedItems = found_s.filter(x=>x.media_type==='movie'||x.media_type==='tv')
+                            .sort((a,b)=>(b.popularity||0)-(a.popularity||0)).slice(0,3);
+                        const simFetches = seedItems.map(seed =>
+                            fetch(`${BASE}/${seed.media_type}/${seed.id}/similar?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`)
+                                .then(r=>r.json()).catch(()=>({results:[]}))
+                        );
+                        const simResults = await Promise.all(simFetches);
+                        for (let i=0; i<seedItems.length; i++) {
+                            for (const item of (simResults[i].results || [])) {
+                                if (!seenIds_s.has(item.id)) { seenIds_s.add(item.id); found_s.push({...item, media_type: seedItems[i].media_type}); }
+                            }
                         }
                     }
                 }
