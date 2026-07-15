@@ -1538,7 +1538,8 @@
 <div class="websites-modal-overlay" id="websitesModal" onclick="if(event.target===this)closeWebsitesModal()">
     <div class="websites-modal">
         <div class="websites-modal-header">
-            <h2>Filmové magazíny a stránky o filmech</h2>
+            <button onclick="closeWebsitesModal();openZabavaModal()" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;flex-shrink:0;margin-right:10px;">← Zpět</button>
+            <h2 style="flex:1;">Filmové magazíny a stránky o filmech</h2>
             <button class="close-websites" onclick="closeWebsitesModal()" title="Zavřít">✕</button>
         </div>
         <div class="websites-modal-body">
@@ -4091,6 +4092,36 @@
         if(m) m.style.display = 'none';
         $('btnZabavaToggle')?.classList.remove('active');
     }
+    function openZabavaKinoModal() {
+        const m = $('zabavaKinoModal');
+        if(m) m.style.display = 'flex';
+    }
+    window.openZabavaKinoModal = openZabavaKinoModal;
+    function closeZabavaKinoModal() {
+        const m = $('zabavaKinoModal');
+        if(m) m.style.display = 'none';
+    }
+    window.closeZabavaKinoModal = closeZabavaKinoModal;
+    function openZabavaAiModal() {
+        const m = $('zabavaAiModal');
+        if(m) m.style.display = 'flex';
+    }
+    window.openZabavaAiModal = openZabavaAiModal;
+    function closeZabavaAiModal() {
+        const m = $('zabavaAiModal');
+        if(m) m.style.display = 'none';
+    }
+    window.closeZabavaAiModal = closeZabavaAiModal;
+    function openZabavaPrehledyModal() {
+        const m = $('zabavaPrehledyModal');
+        if(m) m.style.display = 'flex';
+    }
+    window.openZabavaPrehledyModal = openZabavaPrehledyModal;
+    function closeZabavaPrehledyModal() {
+        const m = $('zabavaPrehledyModal');
+        if(m) m.style.display = 'none';
+    }
+    window.closeZabavaPrehledyModal = closeZabavaPrehledyModal;
     window._returnToZabava = function() {
         const m = $('zabavaModal');
         if(m) m.style.display = 'flex';
@@ -11575,53 +11606,98 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         <button onclick="closeZabavaModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
+        <button onclick="pushModalAndOpen('zabavaModal', openZabavaModal, openZabavaKinoModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎬</span>
+            <div><div style="font-weight:700;color:#38bdf8;">Kino</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co se chystá a co už bylo v kině</div></div>
+        </button>
+        <button onclick="pushModalAndOpen('zabavaModal', openZabavaModal, openZabavaAiModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🤖</span>
+            <div><div style="font-weight:700;background:linear-gradient(135deg,#a78bfa,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">AI nástroje</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Doporučení, kvízy, nálada, porovnání</div></div>
+        </button>
+        <button onclick="pushModalAndOpen('zabavaModal', openZabavaModal, openZabavaPrehledyModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🏆</span>
+            <div><div style="font-weight:700;color:#22c55e;">Přehledy a statistiky</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Žebříčky, tvá knihovna, dnešní výročí</div></div>
+        </button>
         <button onclick="closeZabavaModal();openWebsitesModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🌐</span>
-            <div><div style="color:#00b4d8;font-weight:700;">Filmové magazíny</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Weby, recenze, tipy na filmy</div></div>
+            <div><div style="color:#00b4d8;font-weight:700;">Weby</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmové magazíny, recenze, tipy</div></div>
         </button>
-        <button onclick="pushModalAndOpen('zabavaModal', openZabavaModal, openAiModal)" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:1.6rem;">🤖</span>
-            <div><div style="font-weight:700;background:linear-gradient(135deg,#a78bfa,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">AI Zábava</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Doporučení, kvízy a hry s AI</div></div>
-        </button>
-        <button onclick="closeZabavaModal();openNahodnyTipModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:1.6rem;">🎲</span>
-            <div><div style="font-weight:700;color:#ff6b6b;">Co dnes sledovat?</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Náhodný tip na film nebo seriál</div></div>
-        </button>
-        <button onclick="closeZabavaModal();openKvizModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:1.6rem;">🧠</span>
-            <div><div style="font-weight:700;color:#fbbf24;">Filmový kvíz</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">5 otázek o filmech a seriálech s AI</div></div>
-        </button>
-        <button onclick="closeZabavaModal();openZebricky()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:1.6rem;">🏆</span>
-            <div><div style="font-weight:700;color:#22c55e;">Filmové žebříčky</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Nejlepší filmy všech dob, dekád a žánrů</div></div>
-        </button>
-        <button onclick="closeZabavaModal();openUpcomingModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+    </div>
+</div>
+
+<!-- 🎬 ZÁBAVA: KINO SUBMENU -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4200;flex-direction:column;overflow:hidden;" id="zabavaKinoModal" onclick="if(event.target===this)closeZabavaKinoModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <button onclick="closeZabavaKinoModal();openZabavaModal()" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;">← Zpět</button>
+        <h3 style="flex:1;font-family:'Playfair Display',serif;font-size:1.05rem;color:#fff;">🎬 Kino</h3>
+        <button onclick="closeZabavaKinoModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
+        <button onclick="closeZabavaKinoModal();openUpcomingModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📅</span>
             <div><div style="font-weight:700;color:#38bdf8;">Co se chystá</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Brzy v kinech a nové seriály</div></div>
         </button>
-        <button onclick="closeZabavaModal();openPorovnaniModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="closeZabavaKinoModal();openUzByloVKineModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎟️</span>
+            <div><div style="font-weight:700;color:#c084fc;">Již bylo v kině</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmy z kin za posledních 6 měsíců</div></div>
+        </button>
+    </div>
+</div>
+
+<!-- 🤖 ZÁBAVA: AI NÁSTROJE SUBMENU -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4200;flex-direction:column;overflow:hidden;" id="zabavaAiModal" onclick="if(event.target===this)closeZabavaAiModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <button onclick="closeZabavaAiModal();openZabavaModal()" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;">← Zpět</button>
+        <h3 style="flex:1;font-family:'Playfair Display',serif;font-size:1.05rem;color:#fff;">🤖 AI nástroje</h3>
+        <button onclick="closeZabavaAiModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
+        <button onclick="closeZabavaAiModal();pushModalAndOpen('zabavaModal', openZabavaModal, openAiModal)" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🤖</span>
+            <div><div style="font-weight:700;background:linear-gradient(135deg,#a78bfa,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">AI Zábava</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Doporučení, kvízy a hry s AI</div></div>
+        </button>
+        <button onclick="closeZabavaAiModal();openNahodnyTipModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎲</span>
+            <div><div style="font-weight:700;color:#ff6b6b;">Co dnes sledovat?</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Náhodný tip na film nebo seriál</div></div>
+        </button>
+        <button onclick="closeZabavaAiModal();openKvizModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🧠</span>
+            <div><div style="font-weight:700;color:#fbbf24;">Filmový kvíz</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">5 otázek o filmech a seriálech s AI</div></div>
+        </button>
+        <button onclick="closeZabavaAiModal();openPorovnaniModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎭</span>
             <div><div style="font-weight:700;color:#fb7185;">Porovnání filmů</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">AI porovná dva filmy nebo seriály</div></div>
         </button>
-        <button onclick="closeZabavaModal();openMoodModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="closeZabavaAiModal();openMoodModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎬</span>
             <div><div style="font-weight:700;color:#a855f7;">Filmová nálada</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Vyber náladu — dostaneš 3 tipy</div></div>
         </button>
-        <button onclick="closeZabavaModal();openMyStatsModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:1.6rem;">📊</span>
-            <div><div style="font-weight:700;color:#fb923c;">Moje statistiky</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Přehled tvé knihovny oblíbených</div></div>
-        </button>
-        <button onclick="closeZabavaModal();openTentodenModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:1.6rem;">🗓️</span>
-            <div><div style="font-weight:700;color:#63cab7;">Tento den v historii</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co vyšlo přesně dnes před lety</div></div>
-        </button>
-        <button onclick="closeZabavaModal();openKoukatSModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="closeZabavaAiModal();openKoukatSModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">👥</span>
             <div><div style="font-weight:700;color:#facc15;">Koukat s...</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">AI tipy podle toho, s kým díváš</div></div>
         </button>
-        <button onclick="closeZabavaModal();openUzByloVKineModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:1.6rem;">🎟️</span>
-            <div><div style="font-weight:700;color:#c084fc;">Již bylo v kině</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmy z kin za posledních 6 měsíců</div></div>
+    </div>
+</div>
+
+<!-- 🏆 ZÁBAVA: PŘEHLEDY A STATISTIKY SUBMENU -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4200;flex-direction:column;overflow:hidden;" id="zabavaPrehledyModal" onclick="if(event.target===this)closeZabavaPrehledyModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <button onclick="closeZabavaPrehledyModal();openZabavaModal()" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;">← Zpět</button>
+        <h3 style="flex:1;font-family:'Playfair Display',serif;font-size:1.05rem;color:#fff;">🏆 Přehledy a statistiky</h3>
+        <button onclick="closeZabavaPrehledyModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
+        <button onclick="closeZabavaPrehledyModal();openZebricky()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🏆</span>
+            <div><div style="font-weight:700;color:#22c55e;">Filmové žebříčky</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Nejlepší filmy všech dob, dekád a žánrů</div></div>
+        </button>
+        <button onclick="closeZabavaPrehledyModal();openMyStatsModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📊</span>
+            <div><div style="font-weight:700;color:#fb923c;">Moje statistiky</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Přehled tvé knihovny oblíbených</div></div>
+        </button>
+        <button onclick="closeZabavaPrehledyModal();openTentodenModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🗓️</span>
+            <div><div style="font-weight:700;color:#63cab7;">Tento den v historii</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co vyšlo přesně dnes před lety</div></div>
         </button>
     </div>
 </div>
@@ -25111,6 +25187,9 @@ document.addEventListener('DOMContentLoaded', function() {
         'archivTvModal':  function() { if(typeof closeArchivTvModal==='function') closeArchivTvModal(); },
         'aiModal':        function() { if(typeof closeAiModal==='function') closeAiModal(); },
         'zabavaModal':    function() { if(typeof closeZabavaModal==='function') closeZabavaModal(); },
+        'zabavaKinoModal':    function() { if(typeof closeZabavaKinoModal==='function') closeZabavaKinoModal(); },
+        'zabavaAiModal':      function() { if(typeof closeZabavaAiModal==='function') closeZabavaAiModal(); },
+        'zabavaPrehledyModal':function() { if(typeof closeZabavaPrehledyModal==='function') closeZabavaPrehledyModal(); },
         'listsModal':     function() { if(typeof closeListsModal==='function') closeListsModal(); },
         'tvRadioModal':   function() { if(typeof closeTvRadioModal==='function') closeTvRadioModal(); },
         'slozkyModal':    function() { if(typeof closeSlozkyModal==='function') closeSlozkyModal(); },
