@@ -26796,12 +26796,11 @@ async function loadGenreStats() {
   const counts = {};
   items.forEach(it => {
     const gids = cache[`${it.type}_${it.id}`] || [];
-    gids.forEach(gid => {
-      if (!gid) return;
-      const name = (_STATS_GENRE_MAP[it.type]||{})[gid];
-      if (!name) return;
-      counts[name] = (counts[name]||0)+1;
-    });
+    const primaryGid = gids.find(g => !!g);
+    if (!primaryGid) return;
+    const name = (_STATS_GENRE_MAP[it.type]||{})[primaryGid];
+    if (!name) return;
+    counts[name] = (counts[name]||0)+1;
   });
   const top = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
   if (!top.length) { box.innerHTML = '<div style="color:#666;font-size:0.8rem;text-align:center;padding:6px;">Žádná žánrová data k zobrazení.</div>'; return; }
