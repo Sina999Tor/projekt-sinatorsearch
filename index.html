@@ -905,6 +905,16 @@
         .rating-item.tmdb { border-color: var(--border); }
         .rating-value { font-weight: 700; font-size: 1rem; color: var(--gold); }
         .rating-source { font-size: 0.75rem; color: var(--text-muted); }
+        .trakt-user-rating { margin: -8px 0 20px 0; padding: 12px 14px; background: var(--bg-elevated); border-radius: 12px; border: 1px solid var(--border); }
+        .trakt-user-rating-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        .trakt-stars { display: flex; gap: 3px; flex-wrap: wrap; }
+        .trakt-star { font-size: 1.55rem; line-height: 1; cursor: pointer; color: #4a4a4a; transition: color 0.15s, transform 0.1s; user-select: none; -webkit-tap-highlight-color: transparent; }
+        .trakt-star.filled { color: #ffcc33; }
+        .trakt-star.hovered { color: #ffe08a; }
+        .trakt-star:active { transform: scale(1.2); }
+        .trakt-rating-remove { background: none; border: 1px solid var(--border); color: var(--text-muted); font-size: 0.7rem; padding: 3px 8px; border-radius: 12px; cursor: pointer; }
+        .trakt-rating-remove:hover { border-color: #e50914; color: #e50914; }
+        .trakt-rating-saving { font-size: 0.7rem; color: var(--text-muted); }
         .cast-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
         .cast-item { text-align: center; padding: 8px; background: var(--bg-elevated); border-radius: 8px; cursor: pointer; transition: 0.2s; }
         .cast-item:hover { background: var(--bg-card); transform: translateY(-2px); }
@@ -7716,9 +7726,22 @@ EXAMPLES:
         await ensureTraktToken();
         if(!state.trakt.accessToken) { $('traktResultsContainer').innerHTML = '<div class="empty">⚙️ Nejprve se připojte k Traktu v nastavení.</div>'; return; }
         try {
-            const res = await fetch(`${TRAKT_BASE}/users/${state.trakt.username||'me'}/lists`, { headers: getTraktHeaders() });
-            const lists = await res.json();
-            state.traktLists = Array.isArray(lists) ? lists : [];
+            const [listsRes, movieRatingsRes, showRatingsRes] = await Promise.all([
+                fetch(`${TRAKT_BASE}/users/${state.trakt.username||'me'}/lists`, { headers: getTraktHeaders() }),
+                fetch(`${TRAKT_BASE}/sync/ratings/movies`, { headers: getTraktHeaders() }),
+                fetch(`${TRAKT_BASE}/sync/ratings/shows`, { headers: getTraktHeaders() })
+            ]);
+            const lists = await listsRes.json();
+            const movieRatings = movieRatingsRes.ok ? await movieRatingsRes.json() : [];
+            const showRatings = showRatingsRes.ok ? await showRatingsRes.json() : [];
+            window._traktMovieRatingsCache = Array.isArray(movieRatings) ? movieRatings : [];
+            window._traktShowRatingsCache = Array.isArray(showRatings) ? showRatings : [];
+            // Pseudo-seznamy "Moje hodnocení" (z Trakt /sync/ratings) — vždy na začátku
+            const ratingPseudoLists = [
+                { name: '⭐ HODNOCENÉ FILMY', item_count: window._traktMovieRatingsCache.length, isRatings: true, ratingType: 'movies', ids: { trakt: '__ratings_movies__' } },
+                { name: '⭐ HODNOCENÉ SERIÁLY', item_count: window._traktShowRatingsCache.length, isRatings: true, ratingType: 'shows', ids: { trakt: '__ratings_shows__' } }
+            ];
+            state.traktLists = [...ratingPseudoLists, ...(Array.isArray(lists) ? lists : [])];
             if(state.traktLists.length === 0) { $('traktResultsContainer').innerHTML='<div class="empty">Žádné Trakt seznamy.</div>'; }
             else { renderTraktLists(state.traktLists); }
         } catch(e) { $('traktResultsContainer').innerHTML='<div class="empty">⚠️ Chyba načtení seznamů.</div>'; }
@@ -7768,6 +7791,45 @@ EXAMPLES:
         }
         if (tabsWrap) tabsWrap.style.display = 'block';
         window.traktOpenIdx(startIdx);
+    }
+
+    async function loadTraktRatingsItems(ratingType, listName) {
+        $('traktResultsContainer').innerHTML = `<div class="loading"><div class="spinner"></div>Načítám...</div>`;
+        await ensureTraktToken();
+        try {
+            const cacheKey = ratingType === 'movies' ? '_traktMovieRatingsCache' : '_traktShowRatingsCache';
+            let items = window[cacheKey];
+            if (!Array.isArray(items)) {
+                const res = await fetch(`${TRAKT_BASE}/sync/ratings/${ratingType}`, { headers: getTraktHeaders() });
+                if (!res.ok) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba API: HTTP ${res.status}</div>`; return; }
+                items = await res.json();
+                window[cacheKey] = Array.isArray(items) ? items : [];
+            }
+            if (!items.length) { $('traktResultsContainer').innerHTML = `<div class="empty">Zatím žádné hodnocení na Traktu.</div>`; return; }
+            const sorted = [...items].sort((a,b) => (b.rating - a.rating) || (new Date(b.rated_at||0) - new Date(a.rated_at||0)));
+            await renderTraktRatingsItems(sorted, listName, ratingType);
+        } catch(e) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba: ${e.message}</div>`; }
+    }
+
+    async function renderTraktRatingsItems(items, listName, ratingType) {
+        const gen = (window._traktGen = (window._traktGen||0) + 1);
+        const itemKey = ratingType === 'movies' ? 'movie' : 'show';
+        const mediaType = ratingType === 'movies' ? 'movie' : 'tv';
+        const mapped = items.map(it => {
+            const m = it[itemKey];
+            if(!m || !m.ids?.tmdb) return null;
+            return { id: m.ids.tmdb, type: mediaType, title: m.title||'?', year: m.year || '', poster_path: null, vote_average: 0, userRating: it.rating };
+        }).filter(Boolean);
+        if(!mapped.length) { $('traktResultsContainer').innerHTML=`<div class="empty">Zatím žádné hodnocení na Traktu.</div>`; return; }
+        if(window._traktGen !== gen) return;
+        renderTraktGrid(mapped, listName, true);
+        const batchSize = 10;
+        for(let i=0; i<mapped.length; i+=batchSize) {
+            if(window._traktGen !== gen) return;
+            await Promise.all(mapped.slice(i, i+batchSize).map(async item => { try { const ctrl=new AbortController(); const tmr=setTimeout(()=>ctrl.abort(),8000); const d = await (await fetch(`${BASE}/${item.type}/${item.id}?api_key=${tmdbApiKey}&language=cs-CZ`,{signal:ctrl.signal})).json(); clearTimeout(tmr); item.poster_path = d.poster_path||null; item.vote_average = d.vote_average||0; const csT=d.title||d.name||''; if(csT)item.title=csT; } catch {} }));
+            if(window._traktGen !== gen) return;
+            renderTraktGrid(mapped, listName, false);
+        }
     }
 
     async function loadTraktListItems(listObj) {
@@ -7832,7 +7894,8 @@ EXAMPLES:
             const liked = state.favs.some(f=>Number(f.id)===Number(it.id));
             const watched = isWatched(it.id, it.type);
             const overlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
-            return `<div class="card${watched?' is-watched':''}" onclick="window.openDetailFromTrakt(${it.id}, '${it.type}')">${img}${overlay}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="window.toggleFav(${it.id},'${jsq(it.title)}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span><span class="card-rating">★ ${it.vote_average?it.vote_average.toFixed(1):'—'}</span></div></div></div>`;
+            const userRatingBadge = it.userRating ? `<span class="card-rating" style="color:#ffcc33;">👤 ${it.userRating}/10</span>` : '';
+            return `<div class="card${watched?' is-watched':''}" onclick="window.openDetailFromTrakt(${it.id}, '${it.type}')">${img}${overlay}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="window.toggleFav(${it.id},'${jsq(it.title)}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span><span class="card-rating">★ ${it.vote_average?it.vote_average.toFixed(1):'—'}</span>${userRatingBadge}</div></div></div>`;
         }).join('')}</div>`;
         $('traktResultsContainer').innerHTML = count + grid;
     }
@@ -8499,7 +8562,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 <button class="action-btn-modal" onclick="openTraktListPicker(${id},'${type}')" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">📋 Do seznamu</button>
 </div>`;
             const actionBtns = coreBtns + extraBtns + `</div>`;
-            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div>${actionBtns}</div></div>`;
+            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div>${actionBtns}</div></div>`;
             
             if(type === 'tv') {
                 $('modalScrollBody').innerHTML += `<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);"><h3 style="margin-bottom:16px;font-size:1.2rem;">📺 Sezóny a epizody</h3><div id="seasons-container"></div></div>`;
@@ -8507,6 +8570,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             }
             // Načíst ČSFD hodnocení z Kinobox API
             loadCsfdRating(id, type, safeTitle, year);
+            // Vlastní hodnocení na Trakt (jen pokud je uživatel přihlášen)
+            initTraktUserRating(id, type);
             $('modalScrollBody').innerHTML += `</div>`;
         } catch(e) { console.error(e); $('modalScrollBody').innerHTML=`<div class="empty">Chyba detailu: ${e.message}</div>`; }
     }
@@ -8640,6 +8705,91 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         } catch { /* ponechat default */ }
     }
 
+
+    // ── VLASTNÍ HODNOCENÍ NA TRAKT (10 hvězdiček) ───────────────────────────────
+    function traktStarsRowHtml(id, current) {
+        let out = '';
+        for (let i = 1; i <= 10; i++) {
+            out += `<span class="trakt-star${current && i <= current ? ' filled' : ''}" data-star="${i}" onclick="setTraktUserRating(${id},this,${i})" onmouseover="hoverTraktStars(this,${i})" onmouseout="unhoverTraktStars(this)">★</span>`;
+        }
+        return out;
+    }
+
+    function traktRatingLabelHtml(id, type, current) {
+        const removeBtn = current ? `<button class="trakt-rating-remove" onclick="removeTraktUserRating(${id},'${type}')">✕ Odebrat</button>` : '';
+        return `<span>⭐ Vaše hodnocení na Trakt${current ? ` <b style="color:#ffcc33;">${current}/10</b>` : ''}</span>${removeBtn}`;
+    }
+
+    async function initTraktUserRating(id, type) {
+        const box = document.getElementById(`traktUserRatingSlot_${id}`);
+        if (!box) return;
+        if (!state.trakt || !state.trakt.accessToken) { box.innerHTML = ''; return; }
+        box.dataset.type = type;
+        box.innerHTML = `<div class="trakt-user-rating"><div class="trakt-user-rating-label">${traktRatingLabelHtml(id, type, 0)}</div><div class="trakt-stars">${traktStarsRowHtml(id, 0)}</div></div>`;
+        try {
+            await ensureTraktToken();
+            if (!state.trakt.accessToken) { box.innerHTML = ''; return; }
+            const traktType = type === 'tv' ? 'shows' : 'movies';
+            const itemKey = type === 'tv' ? 'show' : 'movie';
+            const res = await fetch(`${TRAKT_BASE}/sync/ratings/${traktType}`, { headers: getTraktHeaders() });
+            if (!res.ok) return;
+            const data = await res.json();
+            const found = (Array.isArray(data) ? data : []).find(r => r[itemKey]?.ids?.tmdb === id);
+            updateTraktUserRatingUI(id, type, found ? found.rating : 0);
+        } catch (e) { console.warn('Trakt user rating load error:', e); }
+    }
+
+    function updateTraktUserRatingUI(id, type, current) {
+        const box = document.getElementById(`traktUserRatingSlot_${id}`);
+        if (!box || !box.firstElementChild) return;
+        const label = box.querySelector('.trakt-user-rating-label');
+        const starsRow = box.querySelector('.trakt-stars');
+        if (label) label.innerHTML = traktRatingLabelHtml(id, type, current);
+        if (starsRow) starsRow.innerHTML = traktStarsRowHtml(id, current);
+    }
+
+    function hoverTraktStars(starEl, value) {
+        const row = starEl.parentElement;
+        if (!row) return;
+        row.querySelectorAll('.trakt-star').forEach(s => s.classList.toggle('hovered', parseInt(s.dataset.star) <= value));
+    }
+
+    function unhoverTraktStars(starEl) {
+        const row = starEl.parentElement;
+        if (!row) return;
+        row.querySelectorAll('.trakt-star').forEach(s => s.classList.remove('hovered'));
+    }
+
+    async function setTraktUserRating(id, starEl, value) {
+        const box = starEl.closest('.trakt-user-rating')?.parentElement;
+        const type = box?.dataset.type;
+        if (!type) return;
+        await ensureTraktToken();
+        if (!state.trakt || !state.trakt.accessToken) { alert('⚠️ Nejprve se připojte k Trakt v nastavení.'); return; }
+        updateTraktUserRatingUI(id, type, value);
+        try {
+            const key = type === 'tv' ? 'shows' : 'movies';
+            const body = { [key]: [{ ids: { tmdb: id }, rating: value }] };
+            const res = await fetch(`${TRAKT_BASE}/sync/ratings`, { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            window._traktMovieRatingsCache = null; window._traktShowRatingsCache = null;
+        } catch (e) {
+            console.warn('Trakt rating submit error:', e);
+            alert('⚠️ Hodnocení se nepodařilo odeslat na Trakt.');
+        }
+    }
+
+    async function removeTraktUserRating(id, type) {
+        await ensureTraktToken();
+        if (!state.trakt || !state.trakt.accessToken) return;
+        updateTraktUserRatingUI(id, type, 0);
+        try {
+            const key = type === 'tv' ? 'shows' : 'movies';
+            const body = { [key]: [{ ids: { tmdb: id } }] };
+            await fetch(`${TRAKT_BASE}/sync/ratings/remove`, { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
+            window._traktMovieRatingsCache = null; window._traktShowRatingsCache = null;
+        } catch (e) { console.warn('Trakt rating remove error:', e); }
+    }
 
     function getCertLabel(cert) {
         const map = {
@@ -11186,7 +11336,12 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
     };
     window.simklBack = () => _loadSimklLists();
     window.simklOpenIdx = (i) => { window._simklActiveIdx = i; loadSimklListItems(window._simklListsCache[i]); };
-    window.traktOpenIdx = (i) => { window._traktActiveIdx = i; const l = window._traktListsCache[i]; loadTraktListItems({id: l.ids.trakt, name: l.name, item_count: l.item_count}); };
+    window.traktOpenIdx = (i) => {
+        window._traktActiveIdx = i;
+        const l = window._traktListsCache[i];
+        if (l.isRatings) { loadTraktRatingsItems(l.ratingType, l.name); return; }
+        loadTraktListItems({id: l.ids.trakt, name: l.name, item_count: l.item_count});
+    };
 
 </script>
 <!-- KINO MODAL -->
@@ -26690,49 +26845,19 @@ function renderMyStats() {
       ${clickable?`<span style="color:${color};font-size:1rem;opacity:0.7;">›</span>`:''}
     </div>`;
   };
-  // Odhadovaný čas shlédnutého (film ~105 min, seriál ~40 min/položka)
-  const totalMins = watchedMovies.length*105 + watchedTv.length*40;
-  const totalH = Math.floor(totalMins/60), totalM = totalMins%60;
-  const movieMins = watchedMovies.length*105; const movieH = Math.floor(movieMins/60), movieM = movieMins%60;
-  const tvMins = watchedTv.length*40; const tvH = Math.floor(tvMins/60), tvM = tvMins%60;
-
-  const openWatchedMovies = `closeMyStatsModal();setTimeout(()=>{window._openWatchedModal&&window._openWatchedModal();setTimeout(()=>{if(typeof renderWatchedTab==='function')renderWatchedTab('movie');},80);},80)`;
-  const openWatchedTv = `closeMyStatsModal();setTimeout(()=>{window._openWatchedModal&&window._openWatchedModal();setTimeout(()=>{if(typeof renderWatchedTab==='function')renderWatchedTab('tv');},80);},80)`;
-  const openFavsMovies = `closeMyStatsModal();setTimeout(()=>{if(typeof setFavsTab==='function')setFavsTab('movie');window._openFavsModal&&window._openFavsModal();},80)`;
-  const openFavsTv = `closeMyStatsModal();setTimeout(()=>{if(typeof setFavsTab==='function')setFavsTab('tv');window._openFavsModal&&window._openFavsModal();},80)`;
-  const openFavsActors = `closeMyStatsModal();setTimeout(()=>{if(typeof setFavsTab==='function')setFavsTab('actor');window._openFavsModal&&window._openFavsModal();},80)`;
-  const openRozkTv = `closeMyStatsModal();setTimeout(()=>window.openRozkoukaneModal&&window.openRozkoukaneModal('tv'),80)`;
-  const openRozkMovie = `closeMyStatsModal();setTimeout(()=>window.openRozkoukaneModal&&window.openRozkoukaneModal('movie'),80)`;
-
+  const openFavs = `closeMyStatsModal();setTimeout(()=>window._openFavsModal&&window._openFavsModal(),80)`;
+  const openWatched = `closeMyStatsModal();setTimeout(()=>window._openWatchedModal&&window._openWatchedModal(),80)`;
   body.innerHTML = `<div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-      ${statCard('❤️','Oblíbené filmy',movies.length,'#fb7185',openFavsMovies)}
-      ${statCard('📺','Oblíbené seriály',tvShows.length,'#38bdf8',openFavsTv)}
-      ${statCard('✅','Shlédnuto filmů',watchedMovies.length,'#4ade80',openWatchedMovies)}
-      ${statCard('✅','Shlédnuto seriálů',watchedTv.length,'#4ade80',openWatchedTv)}
-      ${statCard('🎭','Oblíbení herci',actorFavs.length,'#a855f7',openFavsActors)}
+      ${statCard('❤️','Oblíbené filmy',movies.length,'#fb7185',openFavs)}
+      ${statCard('📺','Oblíbené seriály',tvShows.length,'#38bdf8',openFavs)}
+      ${statCard('✅','Shlédnuto filmů',watchedMovies.length,'#4ade80',openWatched)}
+      ${statCard('✅','Shlédnuto seriálů',watchedTv.length,'#4ade80',openWatched)}
+      ${statCard('🎭','Oblíbení herci',actorFavs.length,'#a855f7',null)}
       ${statCard('★','Průměrné hodnocení','★ '+avgRating,'#fbbf24',null)}
-      ${statCard('▶️','Rozkoukané seriály','Zobrazit','#00b4d8',openRozkTv)}
-      ${statCard('⏸️','Rozkoukané filmy','Zobrazit','#00b4d8',openRozkMovie)}
     </div>
     ${favs.length===0?`<div style="text-align:center;padding:20px;color:#555;font-size:0.85rem;">Zatím žádné oblíbené. Přidej filmy nebo seriály srdíčkem ❤️</div>`:''}
-    <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:8px;">
-      <div style="font-weight:700;color:#4ade80;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">⏱ Odhadnutý čas shlédnutého</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:90px;padding:10px;background:#0f0f0f;border-radius:8px;text-align:center;"><div style="font-size:1rem;font-weight:700;color:#fff;">${totalH}h ${totalM}m</div><div style="font-size:0.7rem;color:#888;margin-top:2px;">Celkem</div></div>
-        <div style="flex:1;min-width:90px;padding:10px;background:#0f0f0f;border-radius:8px;text-align:center;border-left:3px solid #fb7185;"><div style="font-size:1rem;font-weight:700;color:#fff;">${movieH}h ${movieM}m</div><div style="font-size:0.7rem;color:#888;margin-top:2px;">🎬 Filmy</div></div>
-        <div style="flex:1;min-width:90px;padding:10px;background:#0f0f0f;border-radius:8px;text-align:center;border-left:3px solid #38bdf8;"><div style="font-size:1rem;font-weight:700;color:#fff;">${tvH}h ${tvM}m</div><div style="font-size:0.7rem;color:#888;margin-top:2px;">📺 Seriály</div></div>
-      </div>
-      <div style="font-size:0.68rem;color:#666;margin-top:8px;">* Odhad: film ~105 min, seriál ~40 min/položka</div>
-    </div>
-    <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:8px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font-weight:700;color:#4ade80;font-size:0.82rem;text-transform:uppercase;letter-spacing:0.5px;">🎭 Shlédnuto dle žánru</div>
-        <button onclick="loadGenreStats()" style="background:none;border:1px solid #4ade80;color:#4ade80;font-size:0.7rem;padding:4px 10px;border-radius:14px;cursor:pointer;">🔄 Načíst</button>
-      </div>
-      <div id="genreStatsBox" style="color:#666;font-size:0.8rem;text-align:center;padding:10px;">Klikni na "Načíst" pro zobrazení statistiky žánrů (může chvíli trvat, výsledek se uloží pro příště).</div>
-    </div>
-    ${topYears.length?`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;">
+    ${topYears.length?`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:8px;">
       <div style="font-weight:700;color:#fb923c;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">📅 TOP roky v oblíbených</div>
       ${topYears.map(([y,c])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
         <span style="color:#fff;font-size:0.85rem;min-width:40px;font-weight:600;">${y}</span>
@@ -26742,78 +26867,14 @@ function renderMyStats() {
         <span style="color:#888;font-size:0.75rem;min-width:20px;text-align:right;">${c}</span>
       </div>`).join('')}
     </div>`:''}
+    ${actorFavs.length?`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;">
+      <div style="font-weight:700;color:#a855f7;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">🎭 Oblíbení herci</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${actorFavs.slice(0,12).map(a=>`<span style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);color:#c084fc;padding:4px 10px;border-radius:16px;font-size:0.75rem;font-weight:600;">${a.name}</span>`).join('')}
+      </div>
+    </div>`:''}
   </div>`;
 }
-
-// Statické mapy TMDB žánrů (id -> CZ název) pro filmy a seriály — pro žánrovou statistiku shlédnutého
-const _STATS_GENRE_MAP = {
-  movie: {28:'Akční',12:'Dobrodružný',16:'Animovaný',35:'Komedie',80:'Krimi',99:'Dokumentární',18:'Drama',10751:'Rodinný',14:'Fantasy',36:'Historický',27:'Horor',10402:'Hudební',9648:'Mysteriózní',10749:'Romantický',878:'Sci-Fi',10770:'TV film',53:'Thriller',10752:'Válečný',37:'Western'},
-  tv: {10759:'Akční & Dobrodružný',16:'Animovaný',35:'Komedie',80:'Krimi',99:'Dokumentární',18:'Drama',10751:'Rodinný',10762:'Dětský',9648:'Mysteriózní',10763:'Zpravodajství',10764:'Reality',10765:'Sci-Fi & Fantasy',10766:'Telenovela',10767:'Talk show',10768:'Válečný & Politický',37:'Western'}
-};
-
-async function _statsFetchGenreIds(id, type, tmdbKey) {
-  try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${tmdbKey}&language=cs-CZ`;
-    const d = await fetch(url).then(r=>r.json());
-    if (Array.isArray(d.genres) && d.genres.length) return d.genres.map(g=>g.id);
-    if (Array.isArray(d.genre_ids)) return d.genre_ids;
-    return [];
-  } catch(e) { return []; }
-}
-
-async function loadGenreStats() {
-  const box = document.getElementById('genreStatsBox');
-  if (!box) return;
-  const _s = window._store || localStorage;
-  const tmdbKey = _s.getItem('sinator_tmdb_api_key') || '';
-  if (!tmdbKey) { box.innerHTML = '<div style="color:#e50914;font-size:0.8rem;text-align:center;padding:6px;">Chybí TMDB API klíč v nastavení.</div>'; return; }
-
-  const watched = (()=>{ try { const w=JSON.parse(_s.getItem('sinator_watched')||'{}'); return (w&&typeof w==='object'&&!Array.isArray(w))?w:{}; } catch(e){return{};} })();
-  const items = Object.values(watched).filter(w=>w && (w.type==='movie'||w.type==='tv') && w.id);
-  if (!items.length) { box.innerHTML = '<div style="color:#666;font-size:0.8rem;text-align:center;padding:6px;">Zatím nic shlédnuto.</div>'; return; }
-
-  let cache = {};
-  try { cache = JSON.parse(_s.getItem('sinator_genre_cache')||'{}'); } catch(e){ cache = {}; }
-
-  const missing = items.filter(it => !cache[`${it.type}_${it.id}`]);
-  let done = 0;
-  if (missing.length) {
-    box.innerHTML = `<div style="text-align:center;padding:10px;color:#888;font-size:0.8rem;"><div style="font-size:1.3rem;margin-bottom:6px;">⏳</div>Načítám žánry… <span id="genreStatsProgress">0/${missing.length}</span></div>`;
-    const progEl = document.getElementById('genreStatsProgress');
-    const batchSize = 8;
-    for (let i=0; i<missing.length; i+=batchSize) {
-      const batch = missing.slice(i, i+batchSize);
-      await Promise.all(batch.map(async it => {
-        const gids = await _statsFetchGenreIds(it.id, it.type, tmdbKey);
-        cache[`${it.type}_${it.id}`] = gids.length ? gids : [0];
-        done++;
-        if (progEl) progEl.textContent = `${done}/${missing.length}`;
-      }));
-      try { _s.setItem('sinator_genre_cache', JSON.stringify(cache)); } catch(e){}
-    }
-  }
-
-  const counts = {};
-  items.forEach(it => {
-    const gids = cache[`${it.type}_${it.id}`] || [];
-    const primaryGid = gids.find(g => !!g);
-    if (!primaryGid) return;
-    const name = (_STATS_GENRE_MAP[it.type]||{})[primaryGid];
-    if (!name) return;
-    counts[name] = (counts[name]||0)+1;
-  });
-  const top = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  if (!top.length) { box.innerHTML = '<div style="color:#666;font-size:0.8rem;text-align:center;padding:6px;">Žádná žánrová data k zobrazení.</div>'; return; }
-  const max = Math.max(...top.map(x=>x[1]));
-  box.innerHTML = top.map(([g,c])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-    <span style="color:#fff;font-size:0.78rem;min-width:118px;max-width:118px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${g}</span>
-    <div style="flex:1;background:#2a2a2a;border-radius:4px;height:6px;overflow:hidden;">
-      <div style="height:100%;background:linear-gradient(90deg,#4ade80,#22c55e);border-radius:4px;width:${Math.round((c/max)*100)}%;"></div>
-    </div>
-    <span style="color:#888;font-size:0.75rem;min-width:64px;text-align:right;white-space:nowrap;">${c} filmů</span>
-  </div>`).join('');
-}
-window.loadGenreStats = loadGenreStats;
 
 // =====================================================
 // 🤖 SDÍLENÁ AI HELPER FUNKCE
