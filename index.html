@@ -26696,18 +26696,20 @@ function renderMyStats() {
   const movieMins = watchedMovies.length*105; const movieH = Math.floor(movieMins/60), movieM = movieMins%60;
   const tvMins = watchedTv.length*40; const tvH = Math.floor(tvMins/60), tvM = tvMins%60;
 
-  const openFavs = `closeMyStatsModal();setTimeout(()=>window._openFavsModal&&window._openFavsModal(),80)`;
-  const openWatched = `closeMyStatsModal();setTimeout(()=>window._openWatchedModal&&window._openWatchedModal(),80)`;
+  const openWatchedMovies = `closeMyStatsModal();setTimeout(()=>{window._openWatchedModal&&window._openWatchedModal();setTimeout(()=>{if(typeof renderWatchedTab==='function')renderWatchedTab('movie');},80);},80)`;
+  const openWatchedTv = `closeMyStatsModal();setTimeout(()=>{window._openWatchedModal&&window._openWatchedModal();setTimeout(()=>{if(typeof renderWatchedTab==='function')renderWatchedTab('tv');},80);},80)`;
+  const openFavsMovies = `closeMyStatsModal();setTimeout(()=>{if(typeof setFavsTab==='function')setFavsTab('movie');window._openFavsModal&&window._openFavsModal();},80)`;
+  const openFavsTv = `closeMyStatsModal();setTimeout(()=>{if(typeof setFavsTab==='function')setFavsTab('tv');window._openFavsModal&&window._openFavsModal();},80)`;
   const openFavsActors = `closeMyStatsModal();setTimeout(()=>{if(typeof setFavsTab==='function')setFavsTab('actor');window._openFavsModal&&window._openFavsModal();},80)`;
   const openRozkTv = `closeMyStatsModal();setTimeout(()=>window.openRozkoukaneModal&&window.openRozkoukaneModal('tv'),80)`;
   const openRozkMovie = `closeMyStatsModal();setTimeout(()=>window.openRozkoukaneModal&&window.openRozkoukaneModal('movie'),80)`;
 
   body.innerHTML = `<div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-      ${statCard('❤️','Oblíbené filmy',movies.length,'#fb7185',openFavs)}
-      ${statCard('📺','Oblíbené seriály',tvShows.length,'#38bdf8',openFavs)}
-      ${statCard('✅','Shlédnuto filmů',watchedMovies.length,'#4ade80',openWatched)}
-      ${statCard('✅','Shlédnuto seriálů',watchedTv.length,'#4ade80',openWatched)}
+      ${statCard('❤️','Oblíbené filmy',movies.length,'#fb7185',openFavsMovies)}
+      ${statCard('📺','Oblíbené seriály',tvShows.length,'#38bdf8',openFavsTv)}
+      ${statCard('✅','Shlédnuto filmů',watchedMovies.length,'#4ade80',openWatchedMovies)}
+      ${statCard('✅','Shlédnuto seriálů',watchedTv.length,'#4ade80',openWatchedTv)}
       ${statCard('🎭','Oblíbení herci',actorFavs.length,'#a855f7',openFavsActors)}
       ${statCard('★','Průměrné hodnocení','★ '+avgRating,'#fbbf24',null)}
       ${statCard('▶️','Rozkoukané seriály','Zobrazit','#00b4d8',openRozkTv)}
