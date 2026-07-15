@@ -26690,19 +26690,47 @@ function renderMyStats() {
       ${clickable?`<span style="color:${color};font-size:1rem;opacity:0.7;">›</span>`:''}
     </div>`;
   };
+  // Odhadovaný čas shlédnutého (film ~105 min, seriál ~40 min/položka)
+  const totalMins = watchedMovies.length*105 + watchedTv.length*40;
+  const totalH = Math.floor(totalMins/60), totalM = totalMins%60;
+  const movieMins = watchedMovies.length*105; const movieH = Math.floor(movieMins/60), movieM = movieMins%60;
+  const tvMins = watchedTv.length*40; const tvH = Math.floor(tvMins/60), tvM = tvMins%60;
+
   const openFavs = `closeMyStatsModal();setTimeout(()=>window._openFavsModal&&window._openFavsModal(),80)`;
   const openWatched = `closeMyStatsModal();setTimeout(()=>window._openWatchedModal&&window._openWatchedModal(),80)`;
+  const openFavsActors = `closeMyStatsModal();setTimeout(()=>{if(typeof setFavsTab==='function')setFavsTab('actor');window._openFavsModal&&window._openFavsModal();},80)`;
+  const openRozkTv = `closeMyStatsModal();setTimeout(()=>window.openRozkoukaneModal&&window.openRozkoukaneModal('tv'),80)`;
+  const openRozkMovie = `closeMyStatsModal();setTimeout(()=>window.openRozkoukaneModal&&window.openRozkoukaneModal('movie'),80)`;
+
   body.innerHTML = `<div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
       ${statCard('❤️','Oblíbené filmy',movies.length,'#fb7185',openFavs)}
       ${statCard('📺','Oblíbené seriály',tvShows.length,'#38bdf8',openFavs)}
       ${statCard('✅','Shlédnuto filmů',watchedMovies.length,'#4ade80',openWatched)}
       ${statCard('✅','Shlédnuto seriálů',watchedTv.length,'#4ade80',openWatched)}
-      ${statCard('🎭','Oblíbení herci',actorFavs.length,'#a855f7',null)}
+      ${statCard('🎭','Oblíbení herci',actorFavs.length,'#a855f7',openFavsActors)}
       ${statCard('★','Průměrné hodnocení','★ '+avgRating,'#fbbf24',null)}
+      ${statCard('▶️','Rozkoukané seriály','Zobrazit','#00b4d8',openRozkTv)}
+      ${statCard('⏸️','Rozkoukané filmy','Zobrazit','#00b4d8',openRozkMovie)}
     </div>
     ${favs.length===0?`<div style="text-align:center;padding:20px;color:#555;font-size:0.85rem;">Zatím žádné oblíbené. Přidej filmy nebo seriály srdíčkem ❤️</div>`:''}
-    ${topYears.length?`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:8px;">
+    <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:8px;">
+      <div style="font-weight:700;color:#4ade80;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">⏱ Odhadnutý čas shlédnutého</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:90px;padding:10px;background:#0f0f0f;border-radius:8px;text-align:center;"><div style="font-size:1rem;font-weight:700;color:#fff;">${totalH}h ${totalM}m</div><div style="font-size:0.7rem;color:#888;margin-top:2px;">Celkem</div></div>
+        <div style="flex:1;min-width:90px;padding:10px;background:#0f0f0f;border-radius:8px;text-align:center;border-left:3px solid #fb7185;"><div style="font-size:1rem;font-weight:700;color:#fff;">${movieH}h ${movieM}m</div><div style="font-size:0.7rem;color:#888;margin-top:2px;">🎬 Filmy</div></div>
+        <div style="flex:1;min-width:90px;padding:10px;background:#0f0f0f;border-radius:8px;text-align:center;border-left:3px solid #38bdf8;"><div style="font-size:1rem;font-weight:700;color:#fff;">${tvH}h ${tvM}m</div><div style="font-size:0.7rem;color:#888;margin-top:2px;">📺 Seriály</div></div>
+      </div>
+      <div style="font-size:0.68rem;color:#666;margin-top:8px;">* Odhad: film ~105 min, seriál ~40 min/položka</div>
+    </div>
+    <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-weight:700;color:#4ade80;font-size:0.82rem;text-transform:uppercase;letter-spacing:0.5px;">🎭 Shlédnuto dle žánru</div>
+        <button onclick="loadGenreStats()" style="background:none;border:1px solid #4ade80;color:#4ade80;font-size:0.7rem;padding:4px 10px;border-radius:14px;cursor:pointer;">🔄 Načíst</button>
+      </div>
+      <div id="genreStatsBox" style="color:#666;font-size:0.8rem;text-align:center;padding:10px;">Klikni na "Načíst" pro zobrazení statistiky žánrů (může chvíli trvat, výsledek se uloží pro příště).</div>
+    </div>
+    ${topYears.length?`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;">
       <div style="font-weight:700;color:#fb923c;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">📅 TOP roky v oblíbených</div>
       ${topYears.map(([y,c])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
         <span style="color:#fff;font-size:0.85rem;min-width:40px;font-weight:600;">${y}</span>
@@ -26712,14 +26740,79 @@ function renderMyStats() {
         <span style="color:#888;font-size:0.75rem;min-width:20px;text-align:right;">${c}</span>
       </div>`).join('')}
     </div>`:''}
-    ${actorFavs.length?`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;">
-      <div style="font-weight:700;color:#a855f7;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">🎭 Oblíbení herci</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;">
-        ${actorFavs.slice(0,12).map(a=>`<span style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);color:#c084fc;padding:4px 10px;border-radius:16px;font-size:0.75rem;font-weight:600;">${a.name}</span>`).join('')}
-      </div>
-    </div>`:''}
   </div>`;
 }
+
+// Statické mapy TMDB žánrů (id -> CZ název) pro filmy a seriály — pro žánrovou statistiku shlédnutého
+const _STATS_GENRE_MAP = {
+  movie: {28:'Akční',12:'Dobrodružný',16:'Animovaný',35:'Komedie',80:'Krimi',99:'Dokumentární',18:'Drama',10751:'Rodinný',14:'Fantasy',36:'Historický',27:'Horor',10402:'Hudební',9648:'Mysteriózní',10749:'Romantický',878:'Sci-Fi',10770:'TV film',53:'Thriller',10752:'Válečný',37:'Western'},
+  tv: {10759:'Akční & Dobrodružný',16:'Animovaný',35:'Komedie',80:'Krimi',99:'Dokumentární',18:'Drama',10751:'Rodinný',10762:'Dětský',9648:'Mysteriózní',10763:'Zpravodajství',10764:'Reality',10765:'Sci-Fi & Fantasy',10766:'Telenovela',10767:'Talk show',10768:'Válečný & Politický',37:'Western'}
+};
+
+async function _statsFetchGenreIds(id, type, tmdbKey) {
+  try {
+    const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${tmdbKey}&language=cs-CZ`;
+    const d = await fetch(url).then(r=>r.json());
+    if (Array.isArray(d.genres) && d.genres.length) return d.genres.map(g=>g.id);
+    if (Array.isArray(d.genre_ids)) return d.genre_ids;
+    return [];
+  } catch(e) { return []; }
+}
+
+async function loadGenreStats() {
+  const box = document.getElementById('genreStatsBox');
+  if (!box) return;
+  const _s = window._store || localStorage;
+  const tmdbKey = _s.getItem('sinator_tmdb_api_key') || '';
+  if (!tmdbKey) { box.innerHTML = '<div style="color:#e50914;font-size:0.8rem;text-align:center;padding:6px;">Chybí TMDB API klíč v nastavení.</div>'; return; }
+
+  const watched = (()=>{ try { const w=JSON.parse(_s.getItem('sinator_watched')||'{}'); return (w&&typeof w==='object'&&!Array.isArray(w))?w:{}; } catch(e){return{};} })();
+  const items = Object.values(watched).filter(w=>w && (w.type==='movie'||w.type==='tv') && w.id);
+  if (!items.length) { box.innerHTML = '<div style="color:#666;font-size:0.8rem;text-align:center;padding:6px;">Zatím nic shlédnuto.</div>'; return; }
+
+  let cache = {};
+  try { cache = JSON.parse(_s.getItem('sinator_genre_cache')||'{}'); } catch(e){ cache = {}; }
+
+  const missing = items.filter(it => !cache[`${it.type}_${it.id}`]);
+  let done = 0;
+  if (missing.length) {
+    box.innerHTML = `<div style="text-align:center;padding:10px;color:#888;font-size:0.8rem;"><div style="font-size:1.3rem;margin-bottom:6px;">⏳</div>Načítám žánry… <span id="genreStatsProgress">0/${missing.length}</span></div>`;
+    const progEl = document.getElementById('genreStatsProgress');
+    const batchSize = 8;
+    for (let i=0; i<missing.length; i+=batchSize) {
+      const batch = missing.slice(i, i+batchSize);
+      await Promise.all(batch.map(async it => {
+        const gids = await _statsFetchGenreIds(it.id, it.type, tmdbKey);
+        cache[`${it.type}_${it.id}`] = gids.length ? gids : [0];
+        done++;
+        if (progEl) progEl.textContent = `${done}/${missing.length}`;
+      }));
+      try { _s.setItem('sinator_genre_cache', JSON.stringify(cache)); } catch(e){}
+    }
+  }
+
+  const counts = {};
+  items.forEach(it => {
+    const gids = cache[`${it.type}_${it.id}`] || [];
+    gids.forEach(gid => {
+      if (!gid) return;
+      const name = (_STATS_GENRE_MAP[it.type]||{})[gid];
+      if (!name) return;
+      counts[name] = (counts[name]||0)+1;
+    });
+  });
+  const top = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  if (!top.length) { box.innerHTML = '<div style="color:#666;font-size:0.8rem;text-align:center;padding:6px;">Žádná žánrová data k zobrazení.</div>'; return; }
+  const max = Math.max(...top.map(x=>x[1]));
+  box.innerHTML = top.map(([g,c])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+    <span style="color:#fff;font-size:0.78rem;min-width:118px;max-width:118px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${g}</span>
+    <div style="flex:1;background:#2a2a2a;border-radius:4px;height:6px;overflow:hidden;">
+      <div style="height:100%;background:linear-gradient(90deg,#4ade80,#22c55e);border-radius:4px;width:${Math.round((c/max)*100)}%;"></div>
+    </div>
+    <span style="color:#888;font-size:0.75rem;min-width:24px;text-align:right;">${c}</span>
+  </div>`).join('');
+}
+window.loadGenreStats = loadGenreStats;
 
 // =====================================================
 // 🤖 SDÍLENÁ AI HELPER FUNKCE
