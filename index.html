@@ -7726,22 +7726,31 @@ EXAMPLES:
         await ensureTraktToken();
         if(!state.trakt.accessToken) { $('traktResultsContainer').innerHTML = '<div class="empty">⚙️ Nejprve se připojte k Traktu v nastavení.</div>'; return; }
         try {
-            const [listsRes, movieRatingsRes, showRatingsRes] = await Promise.all([
+            const [listsRes, movieRatingsRes, showRatingsRes, movieHistRes, epHistRes] = await Promise.all([
                 fetch(`${TRAKT_BASE}/users/${state.trakt.username||'me'}/lists`, { headers: getTraktHeaders() }),
                 fetch(`${TRAKT_BASE}/sync/ratings/movies`, { headers: getTraktHeaders() }),
-                fetch(`${TRAKT_BASE}/sync/ratings/shows`, { headers: getTraktHeaders() })
+                fetch(`${TRAKT_BASE}/sync/ratings/shows`, { headers: getTraktHeaders() }),
+                fetch(`${TRAKT_BASE}/sync/history/movies?limit=1`, { headers: getTraktHeaders() }),
+                fetch(`${TRAKT_BASE}/sync/history/episodes?limit=1`, { headers: getTraktHeaders() })
             ]);
             const lists = await listsRes.json();
             const movieRatings = movieRatingsRes.ok ? await movieRatingsRes.json() : [];
             const showRatings = showRatingsRes.ok ? await showRatingsRes.json() : [];
             window._traktMovieRatingsCache = Array.isArray(movieRatings) ? movieRatings : [];
             window._traktShowRatingsCache = Array.isArray(showRatings) ? showRatings : [];
+            const movieHistCount = movieHistRes.ok ? parseInt(movieHistRes.headers.get('X-Pagination-Item-Count')||'0', 10) : 0;
+            const epHistCount = epHistRes.ok ? parseInt(epHistRes.headers.get('X-Pagination-Item-Count')||'0', 10) : 0;
             // Pseudo-seznamy "Moje hodnocení" (z Trakt /sync/ratings) — vždy na začátku
             const ratingPseudoLists = [
-                { name: '⭐ HODNOCENÉ FILMY', item_count: window._traktMovieRatingsCache.length, isRatings: true, ratingType: 'movies', ids: { trakt: '__ratings_movies__' } },
-                { name: '⭐ HODNOCENÉ SERIÁLY', item_count: window._traktShowRatingsCache.length, isRatings: true, ratingType: 'shows', ids: { trakt: '__ratings_shows__' } }
+                { name: 'HODNOCENÉ FILMY', item_count: window._traktMovieRatingsCache.length, isRatings: true, ratingType: 'movies', ids: { trakt: '__ratings_movies__' } },
+                { name: 'HODNOCENÉ SERIÁLY', item_count: window._traktShowRatingsCache.length, isRatings: true, ratingType: 'shows', ids: { trakt: '__ratings_shows__' } }
             ];
-            state.traktLists = [...ratingPseudoLists, ...(Array.isArray(lists) ? lists : [])];
+            // Pseudo-seznamy "Historie" (z Trakt /sync/history) — datum a čas zhlédnutí
+            const historyPseudoLists = [
+                { name: 'HISTORIE FILMŮ', item_count: movieHistCount, isHistory: true, historyType: 'movies', ids: { trakt: '__history_movies__' } },
+                { name: 'HISTORIE EPIZOD', item_count: epHistCount, isHistory: true, historyType: 'episodes', ids: { trakt: '__history_episodes__' } }
+            ];
+            state.traktLists = [...ratingPseudoLists, ...historyPseudoLists, ...(Array.isArray(lists) ? lists : [])];
             if(state.traktLists.length === 0) { $('traktResultsContainer').innerHTML='<div class="empty">Žádné Trakt seznamy.</div>'; }
             else { renderTraktLists(state.traktLists); }
         } catch(e) { $('traktResultsContainer').innerHTML='<div class="empty">⚠️ Chyba načtení seznamů.</div>'; }
@@ -7785,9 +7794,10 @@ EXAMPLES:
         const tabsWrap = $('traktListTabsWrap');
         const tabsEl = $('traktListTabs');
         if (tabsEl) {
-            tabsEl.innerHTML = lists.map((l,i) =>
-                `<button id="traktTab-${i}" onclick="window.traktOpenIdx(${i})" style="flex-shrink:0;padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);cursor:pointer;font-size:0.82rem;font-weight:500;white-space:nowrap;transition:0.2s;">📋 ${l.name} <span style="opacity:0.6;font-size:0.72rem;">(${l.item_count||0})</span></button>`
-            ).join('');
+            tabsEl.innerHTML = lists.map((l,i) => {
+                const icon = l.isRatings ? '⭐' : (l.isHistory ? '🕓' : '📋');
+                return `<button id="traktTab-${i}" onclick="window.traktOpenIdx(${i})" style="flex-shrink:0;padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);cursor:pointer;font-size:0.82rem;font-weight:500;white-space:nowrap;transition:0.2s;">${icon} ${l.name} <span style="opacity:0.6;font-size:0.72rem;">(${l.item_count||0})</span></button>`;
+            }).join('');
         }
         if (tabsWrap) tabsWrap.style.display = 'block';
         window.traktOpenIdx(startIdx);
@@ -7830,6 +7840,133 @@ EXAMPLES:
             if(window._traktGen !== gen) return;
             renderTraktGrid(mapped, listName, false);
         }
+    }
+
+    // ── HISTORIE (kdy bylo co zhlédnuto — datum a čas, z Trakt /sync/history) ──
+    async function loadTraktHistoryItems(historyType, listName) {
+        window._traktHistoryType = historyType;
+        window._traktHistoryListName = listName;
+        window._traktHistoryPage = 1;
+        window._traktHistoryAll = [];
+        window._traktHistoryTotal = 0;
+        window._traktHistoryHasMore = false;
+        const gen = (window._traktHistGen = (window._traktHistGen||0) + 1);
+        $('traktResultsContainer').innerHTML = `<div class="loading"><div class="spinner"></div>Načítám...</div>`;
+        await ensureTraktToken();
+        await fetchTraktHistoryPage(gen);
+    }
+
+    async function fetchTraktHistoryPage(gen) {
+        if (gen !== window._traktHistGen) return;
+        const historyType = window._traktHistoryType;
+        const page = window._traktHistoryPage;
+        try {
+            const res = await fetch(`${TRAKT_BASE}/sync/history/${historyType}?limit=50&page=${page}&extended=full`, { headers: getTraktHeaders() });
+            if (gen !== window._traktHistGen) return;
+            if (!res.ok) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba API: HTTP ${res.status}</div>`; return; }
+            const items = await res.json();
+            const pageCount = parseInt(res.headers.get('X-Pagination-Page-Count') || '1', 10);
+            const itemCount = parseInt(res.headers.get('X-Pagination-Item-Count') || '0', 10);
+            if (itemCount) window._traktHistoryTotal = itemCount;
+            const arr = Array.isArray(items) ? items : [];
+            window._traktHistoryAll = window._traktHistoryAll.concat(arr);
+            window._traktHistoryHasMore = page < pageCount;
+            renderTraktHistoryList();
+            enrichTraktHistoryPosters(arr, historyType, gen);
+        } catch(e) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba: ${e.message}</div>`; }
+    }
+
+    window.loadMoreTraktHistory = () => {
+        const gen = window._traktHistGen;
+        window._traktHistoryPage++;
+        fetchTraktHistoryPage(gen);
+    };
+
+    async function enrichTraktHistoryPosters(items, historyType, gen) {
+        window._traktPosterCache = window._traktPosterCache || {};
+        const mediaType = historyType === 'movies' ? 'movie' : 'tv';
+        const seen = new Set();
+        const toFetch = [];
+        items.forEach(it => {
+            const tmdbId = historyType === 'movies' ? it.movie?.ids?.tmdb : it.show?.ids?.tmdb;
+            if (!tmdbId) return;
+            const key = `${mediaType}_${tmdbId}`;
+            if (seen.has(key) || window._traktPosterCache[key] !== undefined) return;
+            seen.add(key); toFetch.push({ tmdbId, key });
+        });
+        if (!toFetch.length) return;
+        const batchSize = 10;
+        for (let i=0; i<toFetch.length; i+=batchSize) {
+            if (gen !== window._traktHistGen) return;
+            await Promise.all(toFetch.slice(i, i+batchSize).map(async t => {
+                try {
+                    const ctrl = new AbortController(); const tmr = setTimeout(()=>ctrl.abort(),8000);
+                    const d = await (await fetch(`${BASE}/${mediaType}/${t.tmdbId}?api_key=${tmdbApiKey}&language=cs-CZ`,{signal:ctrl.signal})).json();
+                    clearTimeout(tmr);
+                    window._traktPosterCache[t.key] = d.poster_path || null;
+                } catch { window._traktPosterCache[t.key] = null; }
+            }));
+            if (gen !== window._traktHistGen) return;
+            renderTraktHistoryList();
+        }
+    }
+
+    const _traktMonthNames = ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince'];
+
+    function traktHistoryRowHtml(it, historyType) {
+        const mediaType = historyType === 'movies' ? 'movie' : 'tv';
+        const tmdbId = historyType === 'movies' ? it.movie?.ids?.tmdb : it.show?.ids?.tmdb;
+        const posterPath = tmdbId ? window._traktPosterCache?.[`${mediaType}_${tmdbId}`] : null;
+        const posterImg = posterPath
+            ? `<img src="${IMG}w200${posterPath}" loading="lazy" style="width:56px;height:84px;object-fit:cover;border-radius:6px;flex-shrink:0;">`
+            : `<div style="width:56px;height:84px;border-radius:6px;background:var(--bg-elevated);display:grid;place-items:center;flex-shrink:0;font-size:1.3rem;">${historyType==='movies'?'🎬':'📺'}</div>`;
+        const d = new Date(it.watched_at);
+        const dateStr = isNaN(d) ? '' : `${d.getDate()}. ${d.getMonth()+1}. ${d.getFullYear()}`;
+        const timeStr = isNaN(d) ? '' : `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        let titleLine, subLine = '';
+        if (historyType === 'movies') {
+            titleLine = it.movie?.title || '?';
+        } else {
+            titleLine = it.show?.title || '?';
+            const ep = it.episode;
+            if (ep) subLine = `Epizoda ${ep.number}${ep.title ? ' – '+ep.title : ''} <span style="opacity:0.6;">(Sezóna ${String(ep.season).padStart(2,'0')} – Epizoda ${String(ep.number).padStart(2,'0')})</span>`;
+        }
+        const clickAttr = tmdbId ? `window.openDetailFromTrakt(${tmdbId}, '${mediaType}')` : '';
+        return `<div onclick="${clickAttr}" style="display:flex;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:${tmdbId?'pointer':'default'};align-items:flex-start;">
+            ${posterImg}
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;font-size:0.92rem;">${titleLine}</div>
+                ${subLine ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">${subLine}</div>` : ''}
+                <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;">${dateStr}${timeStr ? ' – '+timeStr : ''}</div>
+            </div>
+        </div>`;
+    }
+
+    function renderTraktHistoryList() {
+        const historyType = window._traktHistoryType;
+        const items = window._traktHistoryAll || [];
+        if (!items.length) { $('traktResultsContainer').innerHTML = `<div class="empty">Zatím žádná historie na Traktu.</div>`; return; }
+        // Seskupení podle měsíce (položky přichází z Traktu už seřazené od nejnovějších)
+        const groups = [];
+        let curKey = null, curGroup = null;
+        items.forEach(it => {
+            const d = new Date(it.watched_at);
+            const key = isNaN(d) ? 'neznámo' : `${d.getFullYear()}-${d.getMonth()}`;
+            if (key !== curKey) { curKey = key; curGroup = { label: isNaN(d) ? 'Neznámé datum' : `${_traktMonthNames[d.getMonth()]}, ${d.getFullYear()}`, items: [] }; groups.push(curGroup); }
+            curGroup.items.push(it);
+        });
+        const totalLabel = historyType === 'movies'
+            ? `Celkem: ${window._traktHistoryTotal || items.length} filmů`
+            : `Epizod celkem: ${window._traktHistoryTotal || items.length}`;
+        let html = `<div style="padding:14px 16px 4px;font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:var(--gold);">${totalLabel}</div>`;
+        groups.forEach(g => {
+            html += `<div style="display:flex;justify-content:space-between;padding:8px 16px;color:var(--text-muted);font-size:0.82rem;background:var(--bg-elevated);"><span>${g.label}</span><span>${g.items.length} ${historyType==='movies'?'filmů':'epizod'}</span></div>`;
+            html += g.items.map(it => traktHistoryRowHtml(it, historyType)).join('');
+        });
+        if (window._traktHistoryHasMore) {
+            html += `<div style="padding:16px;text-align:center;"><button onclick="window.loadMoreTraktHistory()" style="background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:10px 22px;border-radius:20px;cursor:pointer;font-size:0.85rem;">Načíst další</button></div>`;
+        }
+        $('traktResultsContainer').innerHTML = html;
     }
 
     async function loadTraktListItems(listObj) {
@@ -11340,6 +11477,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         window._traktActiveIdx = i;
         const l = window._traktListsCache[i];
         if (l.isRatings) { loadTraktRatingsItems(l.ratingType, l.name); return; }
+        if (l.isHistory) { loadTraktHistoryItems(l.historyType, l.name); return; }
         loadTraktListItems({id: l.ids.trakt, name: l.name, item_count: l.item_count});
     };
 
