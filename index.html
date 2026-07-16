@@ -8746,7 +8746,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 <button class="action-btn-modal" onclick="openTraktListPicker(${id},'${type}')" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">📋 Do seznamu</button>
 </div>`;
             const actionBtns = coreBtns + extraBtns + `</div>`;
-            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div>${actionBtns}</div></div>`;
+            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
             
             if(type === 'tv') {
                 $('modalScrollBody').innerHTML += `<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);"><h3 style="margin-bottom:16px;font-size:1.2rem;">📺 Sezóny a epizody</h3><div id="seasons-container"></div></div>`;
@@ -8756,6 +8756,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             loadCsfdRating(id, type, safeTitle, year);
             // Vlastní hodnocení na Trakt (jen pokud je uživatel přihlášen)
             initTraktUserRating(id, type);
+            // Historie sledování na Trakt (datum a čas zhlédnutí)
+            initTraktWatchHistory(id, type);
             $('modalScrollBody').innerHTML += `</div>`;
         } catch(e) { console.error(e); $('modalScrollBody').innerHTML=`<div class="empty">Chyba detailu: ${e.message}</div>`; }
     }
@@ -8973,6 +8975,51 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             await fetch(`${TRAKT_BASE}/sync/ratings/remove`, { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
             window._traktMovieRatingsCache = null; window._traktShowRatingsCache = null;
         } catch (e) { console.warn('Trakt rating remove error:', e); }
+    }
+
+    // ── HISTORIE SLEDOVÁNÍ NA TRAKT (datum a čas zhlédnutí) ─────────────────────
+    async function initTraktWatchHistory(id, type) {
+        const box = document.getElementById(`traktWatchHistorySlot_${id}`);
+        if (!box) return;
+        if (!state.trakt || !state.trakt.accessToken) { box.innerHTML = ''; return; }
+        try {
+            await ensureTraktToken();
+            if (!state.trakt.accessToken) { box.innerHTML = ''; return; }
+            const traktType = type === 'tv' ? 'show' : 'movie';
+            const traktPlural = type === 'tv' ? 'shows' : 'movies';
+            const searchRes = await fetch(`${TRAKT_BASE}/search/tmdb/${id}?type=${traktType}`, { headers: getTraktHeaders() });
+            if (!searchRes.ok) { box.innerHTML = ''; return; }
+            const searchData = await searchRes.json();
+            const item = searchData?.[0]?.[traktType];
+            const traktId = item?.ids?.trakt;
+            if (!traktId) { box.innerHTML = ''; return; }
+            const histRes = await fetch(`${TRAKT_BASE}/sync/history/${traktPlural}/${traktId}?limit=100`, { headers: getTraktHeaders() });
+            if (!histRes.ok) { box.innerHTML = ''; return; }
+            const hist = await histRes.json();
+            renderTraktWatchHistory(id, Array.isArray(hist) ? hist : [], type);
+        } catch (e) { console.warn('Trakt watch history load error:', e); box.innerHTML = ''; }
+    }
+
+    function renderTraktWatchHistory(id, items, type) {
+        const box = document.getElementById(`traktWatchHistorySlot_${id}`);
+        if (!box) return;
+        if (!items.length) { box.innerHTML = ''; return; }
+        const rows = items.map(it => {
+            const d = new Date(it.watched_at);
+            if (isNaN(d)) return '';
+            const dateStr = `${d.getDate()}. ${d.getMonth()+1}. ${d.getFullYear()}`;
+            const timeStr = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            let epLabel = '';
+            if (type === 'tv' && it.episode) {
+                const ep = it.episode;
+                epLabel = ` <span style="opacity:0.7;">– S${String(ep.season).padStart(2,'0')}E${String(ep.number).padStart(2,'0')}${ep.title ? ' – '+ep.title : ''}</span>`;
+            }
+            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);"><span style="opacity:0.8;">🕓</span><span>${dateStr} – ${timeStr}</span>${epLabel}</div>`;
+        }).join('');
+        box.innerHTML = `<div class="trakt-watch-history" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+            <div style="font-weight:700;margin-bottom:8px;font-size:0.95rem;color:var(--gold);">🕓 Historie sledování${items.length > 1 ? ` <span style="opacity:0.6;font-weight:500;font-size:0.8rem;">(${items.length}×)</span>` : ''}</div>
+            ${rows}
+        </div>`;
     }
 
     function getCertLabel(cert) {
