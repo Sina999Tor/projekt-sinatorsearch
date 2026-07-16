@@ -8663,13 +8663,8 @@ EXAMPLES:
                 const region = watchProviders.results.CZ || watchProviders.results.US;
                 if (region) {
                     const link = region.link || '';
-                    const groups = [
-                        { key: 'flatrate', label: '📺 Streamování' },
-                        { key: 'rent', label: '💸 Půjčení' },
-                        { key: 'buy', label: '🛒 Koupě' }
-                    ];
-                    const sections = groups.map(g => {
-                        const list = region[g.key];
+                    const buildSection = (key, label) => {
+                        const list = region[key];
                         if (!list || !list.length) return '';
                         const seen = new Set();
                         const logos = list.filter(p => { if(seen.has(p.provider_name)) return false; seen.add(p.provider_name); return true; })
@@ -8677,12 +8672,22 @@ EXAMPLES:
                                 <img src="${IMG}w92${p.logo_path}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;">
                                 <span style="font-size:0.62rem;color:var(--text-muted);text-align:center;line-height:1.1;">${p.provider_name}</span>
                             </div>`).join('');
-                        return `<div style="margin-bottom:10px;"><div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);margin-bottom:6px;">${g.label}</div><div style="display:flex;flex-wrap:wrap;gap:10px;">${logos}</div></div>`;
-                    }).join('');
-                    if (sections) {
+                        return `<div style="margin-bottom:10px;"><div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);margin-bottom:6px;">${label}</div><div style="display:flex;flex-wrap:wrap;gap:10px;">${logos}</div></div>`;
+                    };
+                    const streamSection = buildSection('flatrate', '📺 Streamování');
+                    const otherSections = [buildSection('rent', '💸 Půjčení'), buildSection('buy', '🛒 Koupě')].filter(Boolean).join('');
+                    if (streamSection || otherSections) {
+                        const toggleLabel = streamSection ? 'Zobrazit i půjčení a koupi' : 'Zobrazit možnosti (půjčení/koupě)';
+                        const toggleBtn = otherSections
+                            ? `<button onclick="window.toggleModalProviders(${id})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.78rem;display:flex;align-items:center;gap:4px;padding:4px 0;margin-top:2px;">
+                                 <span id="providersArrow_${id}" style="display:inline-block;transition:transform 0.2s;">▸</span> ${toggleLabel}
+                               </button>`
+                            : '';
                         providersHtml = `<div class="modal-providers" style="margin:14px 0;padding:12px;background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border);">
                             <div style="font-size:0.85rem;font-weight:700;margin-bottom:10px;">Kde se to dá sledovat</div>
-                            ${sections}
+                            ${streamSection}
+                            ${toggleBtn}
+                            <div id="providersOther_${id}" style="display:none;">${otherSections}</div>
                             ${link ? `<a href="${link}" target="_blank" style="display:inline-block;margin-top:6px;font-size:0.72rem;color:var(--accent);text-decoration:none;">Zdroj: JustWatch ↗</a>` : ''}
                         </div>`;
                     }
@@ -9004,7 +9009,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         const box = document.getElementById(`traktWatchHistorySlot_${id}`);
         if (!box) return;
         if (!items.length) { box.innerHTML = ''; return; }
-        const rows = items.map(it => {
+        const rowHtml = it => {
             const d = new Date(it.watched_at);
             if (isNaN(d)) return '';
             const dateStr = `${d.getDate()}. ${d.getMonth()+1}. ${d.getFullYear()}`;
@@ -9015,12 +9020,39 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                 epLabel = ` <span style="opacity:0.7;">– S${String(ep.season).padStart(2,'0')}E${String(ep.number).padStart(2,'0')}${ep.title ? ' – '+ep.title : ''}</span>`;
             }
             return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);"><span style="opacity:0.8;">🕓</span><span>${dateStr} – ${timeStr}</span>${epLabel}</div>`;
-        }).join('');
+        };
+        const latestHtml = rowHtml(items[0]);
+        const olderHtml = items.slice(1).map(rowHtml).join('');
+        const toggleBtn = items.length > 1
+            ? `<button onclick="window.toggleTraktWatchHistory(${id})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.8rem;display:flex;align-items:center;gap:4px;padding:4px 0;">
+                 <span id="traktHistArrow_${id}" style="display:inline-block;transition:transform 0.2s;">▸</span> Zobrazit celou historii (${items.length - 1} další${items.length - 1 === 1 ? '' : items.length - 1 < 5 ? 'í' : 'ch'})
+               </button>`
+            : '';
         box.innerHTML = `<div class="trakt-watch-history" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
             <div style="font-weight:700;margin-bottom:8px;font-size:0.95rem;color:var(--gold);">🕓 Historie sledování${items.length > 1 ? ` <span style="opacity:0.6;font-weight:500;font-size:0.8rem;">(${items.length}×)</span>` : ''}</div>
-            ${rows}
+            ${latestHtml}
+            ${toggleBtn}
+            <div id="traktHistOlder_${id}" style="display:none;">${olderHtml}</div>
         </div>`;
     }
+
+    window.toggleTraktWatchHistory = (id) => {
+        const older = document.getElementById(`traktHistOlder_${id}`);
+        const arrow = document.getElementById(`traktHistArrow_${id}`);
+        if (!older) return;
+        const isOpen = older.style.display !== 'none';
+        older.style.display = isOpen ? 'none' : 'block';
+        if (arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+    };
+
+    window.toggleModalProviders = (id) => {
+        const other = document.getElementById(`providersOther_${id}`);
+        const arrow = document.getElementById(`providersArrow_${id}`);
+        if (!other) return;
+        const isOpen = other.style.display !== 'none';
+        other.style.display = isOpen ? 'none' : 'block';
+        if (arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+    };
 
     function getCertLabel(cert) {
         const map = {
