@@ -2951,6 +2951,22 @@
         $('traktModal')?.classList.remove('open'); 
     }
 
+    // Otevře Trakt/Simkl modal rovnou na seznamu "Hodnocené filmy" / "Hodnocené seriály"
+    window.openTraktRatingsList = (type) => {
+        const idx = type === 'shows' ? 1 : 0;
+        window._pendingTraktStatsOpen = idx;
+        if (window._traktListsCache?.length) state._traktActiveIdx = idx;
+        openTraktModal('trakt');
+    };
+
+    // Otevře Trakt/Simkl modal rovnou na seznamu "Historie filmů" / "Historie epizod"
+    window.openTraktHistoryList = (type) => {
+        const idx = type === 'episodes' ? 3 : 2;
+        window._pendingTraktStatsOpen = idx;
+        if (window._traktListsCache?.length) state._traktActiveIdx = idx;
+        openTraktModal('trakt');
+    };
+
     function openMdblistModal() {
         // Fallback chain: _store → _MDBLIST_USER_SAVED → state.trakt.username → _TRAKT_DATA_SAVED
         let storedUser = '';
@@ -3010,6 +3026,8 @@
 
     window._openFavsModal = () => openFavsModal();
     window._openWatchedModal = () => openWatchedModal();
+    window._openFavsModalTab = (tab) => { state._favsTab = tab; openFavsModal(); };
+    window._openWatchedModalTab = (tab) => { state._watchedTab = tab; openWatchedModal(); };
 
     function getAppTheme() { try { return localStorage.getItem('sinator_theme') || 'dark'; } catch(e) { return 'dark'; } }
     function updateThemeToggleUI() {
@@ -7799,7 +7817,10 @@ EXAMPLES:
             ];
             state.traktLists = [...ratingPseudoLists, ...historyPseudoLists, ...(Array.isArray(lists) ? lists : [])];
             if(state.traktLists.length === 0) { $('traktResultsContainer').innerHTML='<div class="empty">Žádné Trakt seznamy.</div>'; }
-            else { renderTraktLists(state.traktLists); }
+            else {
+                const pending = window._pendingTraktStatsOpen; window._pendingTraktStatsOpen = null;
+                renderTraktLists(state.traktLists, typeof pending === 'number' ? pending : 0);
+            }
         } catch(e) { $('traktResultsContainer').innerHTML='<div class="empty">⚠️ Chyba načtení seznamů.</div>'; }
     }
 
@@ -27109,16 +27130,31 @@ function renderMyStats() {
       ${clickable?`<span style="color:${color};font-size:1rem;opacity:0.7;">›</span>`:''}
     </div>`;
   };
-  const openFavs = `closeMyStatsModal();setTimeout(()=>window._openFavsModal&&window._openFavsModal(),80)`;
-  const openWatched = `closeMyStatsModal();setTimeout(()=>window._openWatchedModal&&window._openWatchedModal(),80)`;
+  const openFavMovies = `closeMyStatsModal();setTimeout(()=>window._openFavsModalTab&&window._openFavsModalTab('movie'),80)`;
+  const openFavTv = `closeMyStatsModal();setTimeout(()=>window._openFavsModalTab&&window._openFavsModalTab('tv'),80)`;
+  const openFavActors = `closeMyStatsModal();setTimeout(()=>window._openFavsModalTab&&window._openFavsModalTab('actor'),80)`;
+  const openWatchedMovies = `closeMyStatsModal();setTimeout(()=>window._openWatchedModalTab&&window._openWatchedModalTab('movie'),80)`;
+  const openWatchedTv = `closeMyStatsModal();setTimeout(()=>window._openWatchedModalTab&&window._openWatchedModalTab('tv'),80)`;
+  const openRatedMovies = `closeMyStatsModal();setTimeout(()=>window.openTraktRatingsList&&window.openTraktRatingsList('movies'),80)`;
+  const openRatedShows = `closeMyStatsModal();setTimeout(()=>window.openTraktRatingsList&&window.openTraktRatingsList('shows'),80)`;
+  const openHistMovies = `closeMyStatsModal();setTimeout(()=>window.openTraktHistoryList&&window.openTraktHistoryList('movies'),80)`;
+  const openHistEpisodes = `closeMyStatsModal();setTimeout(()=>window.openTraktHistoryList&&window.openTraktHistoryList('episodes'),80)`;
+  const ratedMoviesCount = Array.isArray(window._traktMovieRatingsCache) ? window._traktMovieRatingsCache.length : '–';
+  const ratedShowsCount = Array.isArray(window._traktShowRatingsCache) ? window._traktShowRatingsCache.length : '–';
+  const histMoviesCount = typeof window._traktHistMovieCount === 'number' ? window._traktHistMovieCount : '–';
+  const histEpisodesCount = typeof window._traktHistEpisodeCount === 'number' ? window._traktHistEpisodeCount : '–';
   body.innerHTML = `<div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-      ${statCard('❤️','Oblíbené filmy',movies.length,'#fb7185',openFavs)}
-      ${statCard('📺','Oblíbené seriály',tvShows.length,'#38bdf8',openFavs)}
-      ${statCard('✅','Shlédnuto filmů',watchedMovies.length,'#4ade80',openWatched)}
-      ${statCard('✅','Shlédnuto seriálů',watchedTv.length,'#4ade80',openWatched)}
-      ${statCard('🎭','Oblíbení herci',actorFavs.length,'#a855f7',null)}
+      ${statCard('❤️','Oblíbené filmy',movies.length,'#fb7185',openFavMovies)}
+      ${statCard('📺','Oblíbené seriály',tvShows.length,'#38bdf8',openFavTv)}
+      ${statCard('✅','Shlédnuto filmů',watchedMovies.length,'#4ade80',openWatchedMovies)}
+      ${statCard('✅','Shlédnuto seriálů',watchedTv.length,'#4ade80',openWatchedTv)}
+      ${statCard('🎭','Oblíbení herci',actorFavs.length,'#a855f7',openFavActors)}
       ${statCard('★','Průměrné hodnocení','★ '+avgRating,'#fbbf24',null)}
+      ${statCard('⭐','Hodnocené filmy',`<span id="statRatedMovies">${ratedMoviesCount}</span>`,'#ed2224',openRatedMovies)}
+      ${statCard('⭐','Hodnocené seriály',`<span id="statRatedShows">${ratedShowsCount}</span>`,'#ed2224',openRatedShows)}
+      ${statCard('🕓','Historie filmů',`<span id="statHistMovies">${histMoviesCount}</span>`,'#f59e0b',openHistMovies)}
+      ${statCard('🕓','Historie epizod',`<span id="statHistEpisodes">${histEpisodesCount}</span>`,'#f59e0b',openHistEpisodes)}
     </div>
     ${favs.length===0?`<div style="text-align:center;padding:20px;color:#555;font-size:0.85rem;">Zatím žádné oblíbené. Přidej filmy nebo seriály srdíčkem ❤️</div>`:''}
     ${topYears.length?`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:8px;">
@@ -27131,13 +27167,113 @@ function renderMyStats() {
         <span style="color:#888;font-size:0.75rem;min-width:20px;text-align:right;">${c}</span>
       </div>`).join('')}
     </div>`:''}
-    ${actorFavs.length?`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;">
-      <div style="font-weight:700;color:#a855f7;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">🎭 Oblíbení herci</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;">
-        ${actorFavs.slice(0,12).map(a=>`<span style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);color:#c084fc;padding:4px 10px;border-radius:16px;font-size:0.75rem;font-weight:600;">${a.name}</span>`).join('')}
-      </div>
-    </div>`:''}
+    <div id="genreStatsBox" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;">
+      <div style="font-weight:700;color:#4ade80;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">🎬 Shlédnuto dle žánru</div>
+      <div style="color:#666;font-size:0.8rem;">⏳ Počítám žánry…</div>
+    </div>
   </div>`;
+  renderGenreStats(watchedMovies, watchedTv);
+  refreshTraktRatingCounts();
+}
+
+// Dopočítá skutečný počet hodnocených a historicky zhlédnutých filmů/seriálů na Traktu (pro kartičky ve statistikách)
+async function refreshTraktRatingCounts() {
+  const _s = window._store || localStorage;
+  let traktData = {};
+  try { traktData = JSON.parse(_s.getItem('sinator_trakt') || '{}'); } catch(e) { traktData = {}; }
+  if (!traktData.accessToken) return;
+  const headers = {
+    'Content-Type': 'application/json',
+    'trakt-api-version': '2',
+    'trakt-api-key': 'ba089b58552ecc359dbdda94b7dbfc298456679d181a6ed900ad192e3aad8a48',
+    'Authorization': 'Bearer ' + traktData.accessToken
+  };
+  try {
+    const [mRes, sRes, hmRes, heRes] = await Promise.all([
+      fetch('https://api.trakt.tv/sync/ratings/movies', { headers }),
+      fetch('https://api.trakt.tv/sync/ratings/shows', { headers }),
+      fetch('https://api.trakt.tv/sync/history/movies?limit=1', { headers }),
+      fetch('https://api.trakt.tv/sync/history/episodes?limit=1', { headers })
+    ]);
+    const mData = mRes.ok ? await mRes.json() : [];
+    const sData = sRes.ok ? await sRes.json() : [];
+    window._traktMovieRatingsCache = Array.isArray(mData) ? mData : [];
+    window._traktShowRatingsCache = Array.isArray(sData) ? sData : [];
+    window._traktHistMovieCount = hmRes.ok ? parseInt(hmRes.headers.get('X-Pagination-Item-Count')||'0', 10) : null;
+    window._traktHistEpisodeCount = heRes.ok ? parseInt(heRes.headers.get('X-Pagination-Item-Count')||'0', 10) : null;
+    const elM = document.getElementById('statRatedMovies');
+    const elS = document.getElementById('statRatedShows');
+    const elHM = document.getElementById('statHistMovies');
+    const elHE = document.getElementById('statHistEpisodes');
+    if (elM) elM.textContent = window._traktMovieRatingsCache.length;
+    if (elS) elS.textContent = window._traktShowRatingsCache.length;
+    if (elHM && window._traktHistMovieCount != null) elHM.textContent = window._traktHistMovieCount;
+    if (elHE && window._traktHistEpisodeCount != null) elHE.textContent = window._traktHistEpisodeCount;
+  } catch(e) { /* Trakt nedostupný, necháme "–" */ }
+}
+
+// Přiřazení žánrů k shlédnutým titulům (z TMDB, s lokální cache aby se nemuselo pořád dotahovat)
+async function renderGenreStats(watchedMovies, watchedTv) {
+  const box = document.getElementById('genreStatsBox');
+  if (!box) return;
+  const _s = window._store || localStorage;
+  const tmdbKey = _s.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+  if (!tmdbKey) { box.innerHTML = ''; return; }
+  let genreCache = {};
+  try { genreCache = JSON.parse(_s.getItem('sinator_genre_cache') || '{}'); } catch(e) { genreCache = {}; }
+
+  const items = [
+    ...watchedMovies.map(w => ({ id: w.id, type: 'movie' })),
+    ...watchedTv.map(w => ({ id: w.id, type: 'tv' }))
+  ];
+
+  const paintGenres = () => {
+    const counts = {};
+    items.forEach(it => {
+      const key = `${it.type}_${it.id}`;
+      const names = genreCache[key];
+      if (!Array.isArray(names)) return;
+      names.forEach(n => { counts[n] = (counts[n]||0) + 1; });
+    });
+    const top = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    if (!top.length) {
+      box.innerHTML = `<div style="font-weight:700;color:#4ade80;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">🎬 Shlédnuto dle žánru</div><div style="color:#666;font-size:0.8rem;">Zatím žádná data o žánrech.</div>`;
+      return;
+    }
+    const max = Math.max(...top.map(x=>x[1]));
+    box.innerHTML = `<div style="font-weight:700;color:#4ade80;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">🎬 Shlédnuto dle žánru</div>
+      ${top.map(([g,c])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="color:#fff;font-size:0.82rem;min-width:110px;font-weight:600;">${g}</span>
+        <div style="flex:1;background:#2a2a2a;border-radius:4px;height:6px;overflow:hidden;">
+          <div style="height:100%;background:linear-gradient(90deg,#4ade80,#22c55e);border-radius:4px;width:${Math.round((c/max)*100)}%;"></div>
+        </div>
+        <span style="color:#888;font-size:0.75rem;min-width:24px;text-align:right;">${c}</span>
+      </div>`).join('')}`;
+  };
+
+  // Co ještě chybí v cache
+  const missing = items.filter(it => !Array.isArray(genreCache[`${it.type}_${it.id}`]));
+  if (!missing.length) { paintGenres(); return; }
+
+  paintGenres(); // vykreslit co už víme z cache, zbytek dopočítáme na pozadí
+  const batchSize = 10;
+  let done = 0;
+  for (let i = 0; i < missing.length; i += batchSize) {
+    const batch = missing.slice(i, i + batchSize);
+    await Promise.all(batch.map(async it => {
+      try {
+        const d = await (await fetch(`https://api.themoviedb.org/3/${it.type}/${it.id}?api_key=${tmdbKey}&language=cs-CZ`)).json();
+        genreCache[`${it.type}_${it.id}`] = Array.isArray(d.genres) ? d.genres.map(g=>g.name) : [];
+      } catch(e) { genreCache[`${it.type}_${it.id}`] = []; }
+    }));
+    done += batch.length;
+    try { _s.setItem('sinator_genre_cache', JSON.stringify(genreCache)); } catch(e) {}
+    const stillLoading = document.getElementById('genreStatsBox');
+    if (!stillLoading) return; // modal mezitím zavřený
+    paintGenres();
+    const hdr = stillLoading.querySelector('div');
+    if (hdr && done < missing.length) hdr.innerHTML = `🎬 Shlédnuto dle žánru <span style="opacity:0.6;font-weight:500;text-transform:none;">(dopočítávám ${done}/${missing.length})</span>`;
+  }
 }
 
 // =====================================================
