@@ -3237,10 +3237,36 @@
         state._omdbPage=1; state._omdbTotal=0;
     }
 
+    // Zkusí rozpoznat, že zadaný text je jméno herce/režiséra (přes TMDB) a rovnou zobrazit jeho filmografii
+    async function _tryOmdbPersonSearch(q) {
+        if(!tmdbApiKey || !q) return false;
+        try {
+            const pr = await fetch(`${BASE}/search/person?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&query=${encodeURIComponent(q)}&page=1`).then(r=>r.json());
+            if(pr.results && pr.results.length){
+                const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+                const qn = norm(q);
+                const top = pr.results[0];
+                const nameMatches = norm(top.name) === qn || (qn.length>2 && (norm(top.name).includes(qn) || qn.includes(norm(top.name))));
+                const isPerson = top.known_for_department==='Acting' || top.known_for_department==='Directing';
+                if(nameMatches && isPerson){
+                    toggleFiltersOverlay();
+                    await openOmdbPersonDetail(q);
+                    return true;
+                }
+            }
+        } catch(e){}
+        return false;
+    }
+
     async function runOmdbSearch() {
         const q=($('omdbSearchInput')?.value||'').trim();
         if(!omdbApiKey){alert('⚠️ Zadejte OMDb API klíč v Nastavení!');return;}
         const status=$('omdbSearchStatus');
+        // Pokud zadaný text vypadá jako jméno herce/režiséra → přeskočit rovnou na filmografii
+        if(q){
+            const handledAsPerson = await _tryOmdbPersonSearch(q);
+            if(handledAsPerson) return;
+        }
         toggleFiltersOverlay();
         _omdbDisconnectObserver();
         state.page=1; state._allItems=[]; state._loadingMore=false;
@@ -3322,6 +3348,22 @@
             if(lm) lm.remove();
             if(status) status.textContent='';
             if(data.Response==='False'){
+                // Fallback: OMDb hledá pouze podle přesného/blízkého názvu. Pokud nic nenašlo
+                // (téma, překlep, širší dotaz), zkus TMDB multi-search pro širší pokrytí.
+                if(reset && tmdbApiKey){
+                    try {
+                        const mUrl=`${BASE}/search/multi?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&query=${encodeURIComponent(state._omdbQuery)}&page=1`;
+                        const mdata=await fetch(mUrl).then(r=>r.json());
+                        const mItems=(mdata.results||[]).filter(it=>it.media_type==='movie'||it.media_type==='tv');
+                        if(mItems.length){
+                            if(status) status.textContent='🎬 OMDb nic nenašlo — zobrazeny podobné výsledky z TMDB';
+                            state._allItems=mItems;
+                            state._loadingMore=false;
+                            renderOmdbResults(mItems, mdata.total_results||mItems.length);
+                            return;
+                        }
+                    } catch(e){}
+                }
                 if(reset) resultsEl.innerHTML=`<div class="empty">🎬 OMDb: ${data.Error||'Nic nenalezeno'}</div>`;
                 state._loadingMore=false;
                 return;
@@ -5682,6 +5724,22 @@
             for (const [kw, id] of Object.entries(genreMap)) {
                 if (q.includes(kw)) { foundGenre = id; break; }
             }
+            // Země/národnost → TMDB origin_country + original_language (zachytí "české filmy 2026", "slovenské komedie" atd.)
+            const countryMap = {
+                'cesk':{country:'CZ',lang:'cs'}, 'slovensk':{country:'SK',lang:'sk'},
+                'americk':{country:'US',lang:'en'}, 'britsk':{country:'GB',lang:'en'}, 'anglick':{country:'GB',lang:'en'},
+                'nemeck':{country:'DE',lang:'de'}, 'rakousk':{country:'AT',lang:'de'},
+                'francouzsk':{country:'FR',lang:'fr'}, 'italsk':{country:'IT',lang:'it'},
+                'spanelsk':{country:'ES',lang:'es'}, 'polsk':{country:'PL',lang:'pl'},
+                'rusk':{country:'RU',lang:'ru'}, 'madarsk':{country:'HU',lang:'hu'},
+                'japonsk':{country:'JP',lang:'ja'}, 'korejsk':{country:'KR',lang:'ko'},
+                'cinsk':{country:'CN',lang:'zh'}, 'indick':{country:'IN',lang:'hi'},
+                'australsk':{country:'AU',lang:'en'}
+            };
+            let foundCountry = null;
+            for (const [kw, val] of Object.entries(countryMap)) {
+                if (q.includes(kw)) { foundCountry = val; break; }
+            }
             // Mediální typ
             const isTv = /serial|serie|seri[aá]l|show|epizod/.test(q);
             const mt = isTv ? 'tv' : 'movie';
@@ -5689,12 +5747,15 @@
             const isTop = /nejlepsi|nejl[eé]p|top |best|nejkvali/.test(q);
             const isNew = /nejnovej|nejnov[eě]|nov[eě] |latest|recent|letosni|letošni/.test(q);
             const sortBy = isTop ? 'vote_average.desc' : isNew ? 'release_date.desc' : 'popularity.desc';
-            const minVotes = isTop ? 150 : 5;
+            // U menších/národních kinematografií (ČR, SK...) je filmů s vysokým počtem hlasů málo → snížit práh
+            let minVotes = isTop ? 150 : 5;
+            if (foundCountry) minVotes = isTop ? 15 : 2;
 
-            // Pokud máme aspoň žánr nebo rok nebo dekádu → přeskočit AI, použít discover přímo
-            if (foundGenre || yr || decadeGte) {
+            // Pokud máme aspoň žánr, zemi, rok nebo dekádu → přeskočit AI, použít discover přímo
+            if (foundGenre || foundCountry || yr || decadeGte) {
                 const params = { sort_by: sortBy, 'vote_count.gte': minVotes };
                 if (foundGenre) params.with_genres = String(foundGenre);
+                if (foundCountry) { params.with_origin_country = foundCountry.country; params.with_original_language = foundCountry.lang; }
                 if (yr) params[mt === 'tv' ? 'first_air_date_year' : 'primary_release_year'] = yr;
                 if (decadeGte) { params['release_date.gte'] = decadeGte; params['release_date.lte'] = decadeLte; }
                 // Naplnit parsed objekt jako by to vrátila AI
