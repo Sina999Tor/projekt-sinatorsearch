@@ -5750,6 +5750,9 @@
             // U menších/národních kinematografií (ČR, SK...) je filmů s vysokým počtem hlasů málo → snížit práh
             let minVotes = isTop ? 150 : 5;
             if (foundCountry) minVotes = isTop ? 15 : 2;
+            // Aktuální/budoucí rok = filmy teprve vycházejí, hlasů je málo nebo žádné → práh na 0
+            const _curYear = new Date().getFullYear();
+            if (yr && yr >= _curYear) minVotes = 0;
 
             // Pokud máme aspoň žánr, zemi, rok nebo dekádu → přeskočit AI, použít discover přímo
             if (foundGenre || foundCountry || yr || decadeGte) {
@@ -6232,13 +6235,18 @@ EXAMPLES:
                     const dp = parsed.discoverParams;
                     const discType = dp.mediaType || 'movie';
                     const params = dp.params || {};
-                    let dpUrl = `${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}`;
-                    for (const [k, v] of Object.entries(params)) dpUrl += `&${k}=${v}`;
-                    if (aiYear && !params.primary_release_year && !params.first_air_date_year) dpUrl += (discType==='tv' ? `&first_air_date_year=${aiYear}` : `&primary_release_year=${aiYear}`);
+                    let dpBaseUrl = `${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}`;
+                    for (const [k, v] of Object.entries(params)) dpBaseUrl += `&${k}=${v}`;
+                    if (aiYear && !params.primary_release_year && !params.first_air_date_year) dpBaseUrl += (discType==='tv' ? `&first_air_date_year=${aiYear}` : `&primary_release_year=${aiYear}`);
                     try {
-                        const d = await (await fetch(dpUrl)).json();
-                        for (const item of (d.results || [])) {
-                            if (!seenIds_s.has(item.id)) { seenIds_s.add(item.id); found_s.push({...item, media_type: discType}); }
+                        // Načíst až 3 stránky, aby se u úzkých filtrů (země/rok) neztratily další výsledky
+                        for (let dpPage = 1; dpPage <= 3; dpPage++) {
+                            const d = await (await fetch(`${dpBaseUrl}&page=${dpPage}`)).json();
+                            const results = d.results || [];
+                            for (const item of results) {
+                                if (!seenIds_s.has(item.id)) { seenIds_s.add(item.id); found_s.push({...item, media_type: discType}); }
+                            }
+                            if (results.length < 20 || dpPage >= (d.total_pages || 1)) break;
                         }
                     } catch(e) {}
                 }
@@ -7018,7 +7026,7 @@ EXAMPLES:
 
         const { mediaType, genreId, year, sortBy, ageRating, studio, network, country } = state.filters;
         const isNowPlayingCZ = year === 'now_playing_cz';
-        const hasFilters = genreId || year || ageRating || studio || network || country || (sortBy && sortBy !== 'popularity.desc' && sortBy !== 'primary_release_date.desc');
+        const hasFilters = genreId || year || ageRating || studio || network || country || (sortBy && sortBy !== 'popularity.desc' && sortBy !== 'primary_release_date.desc') || (state.aiDiscoverExtra && Object.keys(state.aiDiscoverExtra).length > 0);
         const isAlphaSort = sortBy === 'original_title.asc' || sortBy === 'original_title.desc';
 
         let url = '';
@@ -7971,6 +7979,30 @@ EXAMPLES:
         }
     }
 
+    // Najde tituly (filmy/seriály) se stejným osobním hodnocením na Trakt
+    window.findSameTraktRating = async function(rating, type) {
+        if (!rating) return;
+        closeModal();
+        const ratingType = type === 'tv' ? 'shows' : 'movies';
+        const cacheKey = ratingType === 'movies' ? '_traktMovieRatingsCache' : '_traktShowRatingsCache';
+        openTraktModal('trakt');
+        $('traktResultsContainer').innerHTML = `<div class="loading"><div class="spinner"></div>Načítám...</div>`;
+        try {
+            await ensureTraktToken();
+            let items = window[cacheKey];
+            if (!Array.isArray(items)) {
+                const res = await fetch(`${TRAKT_BASE}/sync/ratings/${ratingType}`, { headers: getTraktHeaders() });
+                if (!res.ok) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba API: HTTP ${res.status}</div>`; return; }
+                items = await res.json();
+                window[cacheKey] = Array.isArray(items) ? items : [];
+            }
+            const filtered = (items || []).filter(it => Number(it.rating) === Number(rating));
+            if (!filtered.length) { $('traktResultsContainer').innerHTML = `<div class="empty">Žádné další tituly se stejným hodnocením.</div>`; return; }
+            const listLabel = `⭐ ${rating}/10 · ${ratingType === 'movies' ? 'Filmy' : 'Seriály'}`;
+            await renderTraktRatingsItems(filtered, listLabel, ratingType);
+        } catch (e) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba: ${e.message}</div>`; }
+    };
+
     // ── HISTORIE (kdy bylo co zhlédnuto — datum a čas, z Trakt /sync/history) ──
     async function loadTraktHistoryItems(historyType, listName) {
         window._traktHistoryType = historyType;
@@ -8160,7 +8192,7 @@ EXAMPLES:
             const liked = state.favs.some(f=>Number(f.id)===Number(it.id));
             const watched = isWatched(it.id, it.type);
             const overlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
-            const userRatingBadge = it.userRating ? `<span class="card-rating" style="color:#ffcc33;">👤 ${it.userRating}/10</span>` : '';
+            const userRatingBadge = it.userRating ? `<span class="card-rating" style="color:#ffcc33;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;" title="Najít filmy/seriály se stejným hodnocením" onclick="event.stopPropagation();window.findSameTraktRating(${it.userRating},'${it.type}')">👤 ${it.userRating}/10</span>` : '';
             return `<div class="card${watched?' is-watched':''}" onclick="window.openDetailFromTrakt(${it.id}, '${it.type}')">${img}${overlay}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="window.toggleFav(${it.id},'${jsq(it.title)}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span><span class="card-rating">★ ${it.vote_average?it.vote_average.toFixed(1):'—'}</span>${userRatingBadge}</div></div></div>`;
         }).join('')}</div>`;
         $('traktResultsContainer').innerHTML = count + grid;
@@ -8833,7 +8865,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 <button class="action-btn-modal" onclick="openTraktListPicker(${id},'${type}')" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">📋 Do seznamu</button>
 </div>`;
             const actionBtns = coreBtns + extraBtns + `</div>`;
-            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
+            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip" style="cursor:pointer;" title="Najít filmy/seriály se stejným hodnocením" onclick="openRatingBrowse(${d.vote_average||0},'${type}')"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
             
             if(type === 'tv') {
                 $('modalScrollBody').innerHTML += `<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);"><h3 style="margin-bottom:16px;font-size:1.2rem;">📺 Sezóny a epizody</h3><div id="seasons-container"></div></div>`;
@@ -8990,7 +9022,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 
     function traktRatingLabelHtml(id, type, current) {
         const removeBtn = current ? `<button class="trakt-rating-remove" onclick="removeTraktUserRating(${id},'${type}')">✕ Odebrat</button>` : '';
-        return `<span>⭐ Vaše hodnocení na Trakt${current ? ` <b style="color:#ffcc33;">${current}/10</b>` : ''}</span>${removeBtn}`;
+        const ratingBadge = current ? ` <b style="color:#ffcc33;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;" title="Najít filmy/seriály se stejným hodnocením" onclick="event.stopPropagation();window.findSameTraktRating(${current},'${type}')">${current}/10</b>` : '';
+        return `<span>⭐ Vaše hodnocení na Trakt${ratingBadge}</span>${removeBtn}`;
     }
 
     async function initTraktUserRating(id, type) {
@@ -11603,6 +11636,30 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     window.openAgeRatingBrowse = openAgeRatingBrowse;
+
+    function openRatingBrowse(rating, mediaType) {
+        if (!rating) { return; }
+        closeModal();
+        const viewKey = mediaType === 'tv' ? 'tv' : 'movies';
+        document.querySelectorAll('#mainTabs .tab').forEach(b => b.classList.remove('active'));
+        const tabBtn = document.querySelector(`#mainTabs .tab[data-view="${viewKey}"]`);
+        if (tabBtn) tabBtn.classList.add('active');
+        state.view = viewKey;
+        state.searchQuery = null;
+        state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
+        hideMainAzBar();
+        // Rozsah ±0.3 kolem zadaného hodnocení, seřazeno podle popularity
+        const r = Math.round(rating * 10) / 10;
+        const min = Math.max(0, Math.round((r - 0.3) * 10) / 10);
+        const max = Math.min(10, Math.round((r + 0.3) * 10) / 10);
+        state.filters = { mediaType: mediaType === 'tv' ? 'tv' : 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: '', studio: '', network: '', country: '' };
+        state.aiDiscoverExtra = { 'vote_average.gte': min, 'vote_average.lte': max, 'vote_count.gte': 50 };
+        $('mainContent').style.display = 'block';
+        closeHelperModals();
+        loadFilteredContent();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    window.openRatingBrowse = openRatingBrowse;
 
         const _navigateBack = navigateBack;
     const _openDetail = openDetail;
@@ -24655,7 +24712,7 @@ No explanation, no markdown.`;
             state._aiLastParsed._kwPage = kwPage + 1;
             btn?.remove();
             if (newItems.length > 0 && window._appendGrid) window._appendGrid(newItems, false);
-            if (kwPage + 1 <= (d.total_pages || 1)) _showAiLoadMore(p.keywords?.[0] || 'téma');
+            _showAiLoadMore(p.keywords?.[0] || 'téma');
         } catch(e) {
             if (btn) btn.innerHTML = '<div style="padding:8px;color:#f87171;font-size:0.8rem;">⚠️ Chyba načítání.</div>';
             setTimeout(() => _showAiLoadMore(p.keywords?.[0] || 'téma'), 3000);
@@ -24725,7 +24782,7 @@ No explanation, no markdown.`;
                 state._aiLastParsed._discoverPage = smartPage + 1;
                 btn?.remove();
                 if (newItems.length > 0 && window._appendGrid) window._appendGrid(newItems, false);
-                if (smartPage + 1 <= (d.total_pages || 1)) _showAiLoadMore(label);
+                _showAiLoadMore(label);
             } catch(e) {
                 if (btn) btn.innerHTML = '<div style="padding:8px;color:#f87171;font-size:0.8rem;">⚠️ Chyba načítání.</div>';
                 setTimeout(() => _showAiLoadMore(label), 3000);
@@ -24749,7 +24806,7 @@ No explanation, no markdown.`;
                 state._aiLastParsed._smartPage = smartPage + 1;
                 btn?.remove();
                 if (newItems.length > 0 && window._appendGrid) window._appendGrid(newItems, false);
-                if (newItems.length > 0) _showAiLoadMore(label);
+                _showAiLoadMore(label);
             } catch(e) {
                 if (btn) btn.innerHTML = '<div style="padding:8px;color:#f87171;font-size:0.8rem;">⚠️ Chyba načítání.</div>';
                 setTimeout(() => _showAiLoadMore(label), 3000);
