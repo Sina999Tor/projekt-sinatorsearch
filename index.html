@@ -2798,6 +2798,41 @@
         { val: 'vote_average.desc',         label: '⭐ Hodnocení' },
     ];
 
+    // Typy uvedení z TMDB release_dates — pro filtrování jen u filmů
+    const RELEASE_TYPE_OPTS = [
+        { val: 1, label: '🎪 Premiéra na festivalu' },
+        { val: 2, label: '🎬 Kino (limitovaně)' },
+        { val: 3, label: '🎬 Kino' },
+        { val: 4, label: '💻 Digitálně / VOD' },
+        { val: 5, label: '📀 Fyzické médium' },
+        { val: 6, label: '📺 TV' },
+    ];
+
+    window.renderSortOptions = function() {
+        const dd = $('tabSortDropdown');
+        const curSort = state.filters.sortBy || 'primary_release_date.desc';
+        let html = MEDIA_SORT_OPTS.map(o =>
+            `<button class="tab-sort-opt${curSort===o.val?' active':''}" onclick="applyTabSort('${o.val}')">${o.label}</button>`
+        ).join('');
+        if (state.view === 'movies') {
+            html += `<button class="tab-sort-opt" onclick="event.stopPropagation();renderReleaseTypeOptions()">🎬 Typ vydání</button>`;
+        }
+        dd.innerHTML = html;
+    };
+
+    window.renderReleaseTypeOptions = function() {
+        const dd = $('tabSortDropdown');
+        dd.innerHTML = RELEASE_TYPE_OPTS.map(o =>
+            `<button class="tab-sort-opt" onclick="event.stopPropagation();applyReleaseTypeFilter(${o.val})">${o.label}</button>`
+        ).join('') + `<button class="tab-sort-opt" onclick="event.stopPropagation();renderSortOptions()">← Zpět</button>`;
+    };
+
+    window.applyReleaseTypeFilter = function(val) {
+        $('tabSortDropdown').style.display = 'none';
+        $('globalSortBtn')?.classList.remove('active');
+        openReleaseTypeBrowse(val, 'movie');
+    };
+
     window.toggleTabSort = function(e) {
         e.stopPropagation();
         const dd = $('tabSortDropdown');
@@ -2807,10 +2842,7 @@
             btn.classList.remove('active');
             return;
         }
-        const curSort = state.filters.sortBy || 'primary_release_date.desc';
-        dd.innerHTML = MEDIA_SORT_OPTS.map(o =>
-            `<button class="tab-sort-opt${curSort===o.val?' active':''}" onclick="applyTabSort('${o.val}')">${o.label}</button>`
-        ).join('');
+        renderSortOptions();
         dd.style.display = 'flex';
         btn.classList.add('active');
     };
@@ -6871,6 +6903,7 @@ EXAMPLES:
     }
 
     async function loadPopularContent() {
+        state._customLoadMore = null; state._releaseTypeBrowse = null;
         if (!tmdbApiKey) { resultsEl.innerHTML = '<div class="empty">⚠️ Nejprve zadejte TMDB API klíč v nastavení!</div>'; return; }
         const isFirstPage = state.page === 1;
         if (isFirstPage) { state._autoFetchEmpty = 0; resultsEl.innerHTML = '<div class="loading"><div class="spinner"></div>Načítám...</div>'; state._allItems = []; hideMainAzBar(); }
@@ -7011,6 +7044,7 @@ EXAMPLES:
     }
 
     async function loadFilteredContent() {
+        state._customLoadMore = null; state._releaseTypeBrowse = null;
         if (state.omdbSource) return; // OMDb mode — nespouštět TMDB
         if (!tmdbApiKey) { 
             resultsEl.innerHTML = '<div class="empty">⚠️ Nejprve zadejte TMDB API klíč v nastavení!</div>'; 
@@ -7282,6 +7316,7 @@ EXAMPLES:
     }
 
     async function searchMedia(query = '') {
+        state._customLoadMore = null; state._releaseTypeBrowse = null;
         state._aiResultsLocked = false;
         const isFirstPage = state.page === 1;
         if (isFirstPage) { resultsEl.innerHTML = '<div class="loading"><div class="spinner"></div>Hledám...</div>'; state._allItems = []; hideMainAzBar(); }
@@ -7710,15 +7745,19 @@ EXAMPLES:
         }
         if (state._loadingMore) return;
         if (state._aiResultsLocked) return;
-        if (state.page >= state.totalPages) return;
+        if (!state._customLoadMore && state.page >= state.totalPages) return;
         const scrollBottom = window.scrollY + window.innerHeight;
         const pageBottom = document.documentElement.scrollHeight;
         if (scrollBottom >= pageBottom - 400) {
             state._loadingMore = true;
-            state.page++;
-            if (state.searchQuery) searchMedia(state.searchQuery);
-            else if (state.view === 'directors' || state.view === 'actors') loadPopularContent();
-            else loadFilteredContent();
+            if (state._customLoadMore) {
+                state._customLoadMore();
+            } else {
+                state.page++;
+                if (state.searchQuery) searchMedia(state.searchQuery);
+                else if (state.view === 'directors' || state.view === 'actors') loadPopularContent();
+                else loadFilteredContent();
+            }
         }
     }, { passive: true });
 
@@ -8767,7 +8806,7 @@ EXAMPLES:
                     const past = dates.filter(rd => (rd.release_date||'').slice(0,10) <= today).sort((a,b) => (b.release_date||'').localeCompare(a.release_date||''));
                     const entry = past[0] || dates.slice().sort((a,b) => (a.release_date||'').localeCompare(b.release_date||''))[0];
                     const info = entry ? releaseTypeLabels[entry.type] : null;
-                    if (info) releaseTypeChip = `<div class="modal-chip" style="border-color:${info.color};color:${info.color};font-weight:600;">${info.label}</div>`;
+                    if (info) releaseTypeChip = `<div class="modal-chip" style="border-color:${info.color};color:${info.color};font-weight:600;cursor:pointer;" title="Najít filmy se stejným typem uvedení" onclick="openReleaseTypeBrowse(${entry.type},'movie')">${info.label}</div>`;
                 }
             }
 
@@ -11660,6 +11699,99 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     window.openRatingBrowse = openRatingBrowse;
+
+    async function openReleaseTypeBrowse(releaseType, mediaType) {
+        if (!releaseType) return;
+        closeModal();
+        const viewKey = 'movies';
+        document.querySelectorAll('#mainTabs .tab').forEach(b => b.classList.remove('active'));
+        const tabBtn = document.querySelector(`#mainTabs .tab[data-view="${viewKey}"]`);
+        if (tabBtn) tabBtn.classList.add('active');
+        state.view = viewKey;
+        state.searchQuery = null;
+        state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
+        state.aiDiscoverExtra = null;
+        hideMainAzBar();
+        state.filters = { mediaType: 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: '', studio: '', network: '', country: '' };
+        $('mainContent').style.display = 'block';
+        closeHelperModals();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        resultsEl.innerHTML = '<div class="loading"><div class="spinner"></div>Načítám...</div>';
+        paginationContainer.style.display = 'none';
+
+        // Kino typy (2 = limitovaně, 3 = plošně). Pokud hledáme jiný typ (VOD/fyzické/TV/premiéra),
+        // vyřadíme tituly, které MĚLY i kinodistribuci — jinak by TMDB vracelo i běžné kino trháky,
+        // protože with_release_type samo o sobě jen ověří existenci daného typu, nevylučuje ostatní.
+        const isTheatrical = (releaseType === 2 || releaseType === 3);
+        const excludeTypes = isTheatrical ? [] : [2, 3];
+        state._releaseTypeBrowse = { releaseType, excludeTypes, tmdbPage: 0, tmdbTotalPages: 1, seen: new Set() };
+        state._customLoadMore = _loadMoreReleaseType;
+
+        setInfiniteLoading(true);
+        const got = await _fetchReleaseTypeBatch(20, true);
+        setInfiniteLoading(false);
+        state._loadingMore = false;
+        if (!got) resultsEl.innerHTML = `<div class="empty">Nenalezeny žádné tituly s tímto typem vydání.</div>`;
+    }
+    window.openReleaseTypeBrowse = openReleaseTypeBrowse;
+
+    // Vrátí typ uvedení filmu STEJNÝM způsobem, jakým se počítá chip v detailu (region CZ, jinak US;
+    // nejnovější typ, který už nastal, jinak nejbližší nadcházející). Díky tomu browse odpovídá přesně
+    // tomu, co je vidět na chipu v detailu — ne hrubému "má tento typ kdekoli na světě".
+    function resolveMovieReleaseType(rdData) {
+        if (!rdData || !rdData.results) return null;
+        const region = (rdData.results||[]).find(r => r.iso_3166_1 === 'CZ') || (rdData.results||[]).find(r => r.iso_3166_1 === 'US');
+        const dates = region?.release_dates || [];
+        if (!dates.length) return null;
+        const today = new Date().toISOString().slice(0,10);
+        const past = dates.filter(rd => (rd.release_date||'').slice(0,10) <= today).sort((a,b) => (b.release_date||'').localeCompare(a.release_date||''));
+        const entry = past[0] || dates.slice().sort((a,b) => (a.release_date||'').localeCompare(b.release_date||''))[0];
+        return entry ? entry.type : null;
+    }
+
+    // Dotáhne a vyfiltruje další dávku titulů pro browse podle typu vydání.
+    // Skenuje TMDB discover stránky, dokud nenajde targetCount výsledků, nebo nedojdou stránky.
+    async function _fetchReleaseTypeBatch(targetCount, isFirstBatch) {
+        const rtb = state._releaseTypeBrowse;
+        if (!rtb) return false;
+        const collected = [];
+        let scannedThisCall = 0;
+        const maxScansThisCall = 8; // bezpečnostní limit dotazů na jedno doctažení dávky
+        while (collected.length < targetCount && scannedThisCall < maxScansThisCall && (rtb.tmdbPage === 0 || rtb.tmdbPage < rtb.tmdbTotalPages)) {
+            rtb.tmdbPage++;
+            scannedThisCall++;
+            const durl = `${BASE}/discover/movie?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=popularity.desc&vote_count.gte=10&with_release_type=${rtb.releaseType}&region=US&release_date.gte=1900-01-01&release_date.lte=2030-12-31&page=${rtb.tmdbPage}`;
+            let ddata;
+            try {
+                const dres = await fetch(durl);
+                ddata = await dres.json();
+            } catch (e) { break; }
+            rtb.tmdbTotalPages = Math.min(ddata.total_pages || 1, 500);
+            const candidates = (ddata.results || []).filter(r => !rtb.seen.has(r.id));
+            if (!candidates.length) continue;
+            const checked = await Promise.all(candidates.map(async r => {
+                try {
+                    const rdRes = await fetch(`${BASE}/movie/${r.id}/release_dates?api_key=${tmdbApiKey}`);
+                    const rdData = await rdRes.json();
+                    const resolvedType = resolveMovieReleaseType(rdData);
+                    if (resolvedType !== rtb.releaseType) return null;
+                    return r;
+                } catch (e) { return null; }
+            }));
+            checked.forEach(r => { if (r && !rtb.seen.has(r.id)) { rtb.seen.add(r.id); collected.push(r); } });
+        }
+        if (!collected.length) return false;
+        const typedResults = collected.map(r => ({ ...r, media_type: 'movie' }));
+        appendGrid(typedResults, isFirstBatch, false);
+        return true;
+    }
+
+    async function _loadMoreReleaseType() {
+        setInfiniteLoading(true);
+        await _fetchReleaseTypeBatch(20, false);
+        setInfiniteLoading(false);
+        state._loadingMore = false;
+    }
 
         const _navigateBack = navigateBack;
     const _openDetail = openDetail;
