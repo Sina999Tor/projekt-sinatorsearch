@@ -4962,11 +4962,15 @@
     window.diagnoseTraktUser = async function() {
         if (!state.trakt.accessToken) { alert('⚠️ Nejsi připojen k Traktu.'); return; }
         try {
-            const res = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': state.trakt.clientId || TRAKT_CLIENT_ID, 'Authorization': `Bearer ${state.trakt.accessToken}` }});
+            const res = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'trakt-api-version': '2', 'trakt-api-key': state.trakt.clientId || TRAKT_CLIENT_ID, 'Authorization': `Bearer ${state.trakt.accessToken}` }});
             let bodyText = '';
             try { bodyText = await res.text(); } catch(eBody) { bodyText = '(nelze přečíst tělo odpovědi)'; }
             let pretty = bodyText;
             try { pretty = JSON.stringify(JSON.parse(bodyText), null, 2); } catch(eJson) {}
+            // Vypiš VŠECHNY hlavičky, které prohlížeč smí přečíst (CORS může některé skrýt)
+            let allHeaders = '';
+            try { res.headers.forEach((v, k) => { allHeaders += `\n  ${k}: ${v}`; }); } catch(eH) {}
+            if (!allHeaders) allHeaders = '\n  (žádné hlavičky nejsou čitelné — Trakt je přes CORS neexponuje prohlížeči)';
             if (res.ok) {
                 let uname = null;
                 try { uname = JSON.parse(bodyText).username; } catch(eParse) {}
@@ -4981,7 +4985,7 @@
                     alert('⚠️ /users/me vrátilo 200 OK, ale odpověď neobsahuje pole "username":\n\n' + pretty);
                 }
             } else {
-                alert('❌ Trakt /users/me selhalo.\n\nHTTP status: ' + res.status + '\n\nOdpověď serveru:\n' + pretty + '\n\nTrakt-Account-Limited hlavička: ' + (res.headers.get('X-Account-Limited') || '—'));
+                alert('❌ Trakt /users/me selhalo.\n\nHTTP status: ' + res.status + '\n\nOdpověď serveru:\n' + pretty + '\n\nČitelné hlavičky odpovědi:' + allHeaders + '\n\nPoužitý client-id (posledních 6 znaků): …' + (state.trakt.clientId || TRAKT_CLIENT_ID).slice(-6));
             }
         } catch(e) {
             alert('❌ Síťová chyba při volání /users/me:\n\n' + (e && e.message ? e.message : e));
@@ -5133,7 +5137,7 @@
                     state.trakt = { clientId: TRAKT_CLIENT_ID, clientSecret: TRAKT_CLIENT_SECRET, accessToken: data.access_token, refreshToken: data.refresh_token, tokenExpires: Date.now() + (data.expires_in * 1000), username: 'me' };
                     let username = 'me';
                     try {
-                        const userRes = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
+                        const userRes = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
                         if (userRes.ok) {
                             const userData = await userRes.json();
                             if (userData && userData.username) {
@@ -5193,7 +5197,7 @@
             const data = await res.json();
             let username = 'me';
             try {
-                const userRes = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
+                const userRes = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
                 if (userRes.ok) {
                     const userData = await userRes.json();
                     if (userData && userData.username) username = userData.username;
