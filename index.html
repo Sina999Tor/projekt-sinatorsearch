@@ -5045,17 +5045,24 @@
 
     function pollTraktDeviceToken(deviceCode, intervalMs, expiresIn) {
         if (window._traktDevicePoll) clearInterval(window._traktDevicePoll);
+        if (window._traktDeviceVisHandler) document.removeEventListener('visibilitychange', window._traktDeviceVisHandler);
         const startedAt = Date.now();
-        window._traktDevicePoll = setInterval(async () => {
-            if (Date.now() - startedAt > expiresIn * 1000) {
-                clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
-                const st = $('traktDeviceStatus'); if (st) st.textContent = '⏱️ Kód vypršel — otevřete připojení znovu.';
-                return;
-            }
+        let checking = false;
+        const stop = () => {
+            if (window._traktDevicePoll) { clearInterval(window._traktDevicePoll); window._traktDevicePoll = null; }
+            if (window._traktDeviceVisHandler) { document.removeEventListener('visibilitychange', window._traktDeviceVisHandler); window._traktDeviceVisHandler = null; }
+        };
+        const checkOnce = async () => {
+            if (checking) return; checking = true;
             try {
+                if (Date.now() - startedAt > expiresIn * 1000) {
+                    stop();
+                    const st = $('traktDeviceStatus'); if (st) st.textContent = '⏱️ Kód vypršel — otevřete připojení znovu.';
+                    return;
+                }
                 const res = await fetch(`${TRAKT_BASE}/oauth/device/token`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID }, body: JSON.stringify({ code: deviceCode, client_id: TRAKT_CLIENT_ID, client_secret: TRAKT_CLIENT_SECRET }) });
                 if (res.status === 200) {
-                    clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
+                    stop();
                     const data = await res.json();
                     const userRes = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
                     const userData = await userRes.json();
@@ -5071,21 +5078,25 @@
                         }
                     }, 100);
                 } else if (res.status === 404) {
-                    clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
+                    stop();
                     const st = $('traktDeviceStatus'); if (st) st.textContent = '❌ Neplatný kód.';
                 } else if (res.status === 409) {
-                    clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
+                    stop();
                     const st = $('traktDeviceStatus'); if (st) st.textContent = '❌ Kód už byl použit.';
                 } else if (res.status === 410) {
-                    clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
+                    stop();
                     const st = $('traktDeviceStatus'); if (st) st.textContent = '⏱️ Kód vypršel — otevřete připojení znovu.';
                 } else if (res.status === 418) {
-                    clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
+                    stop();
                     const st = $('traktDeviceStatus'); if (st) st.textContent = '🚫 Přístup byl na Traktu zamítnut.';
                 }
                 // 400 = pending (čekáme), 429 = slow down → v obou případech jen zkusíme znovu příště
             } catch(e) { /* dočasný výpadek sítě, zkusíme znovu při dalším tiku */ }
-        }, intervalMs);
+            finally { checking = false; }
+        };
+        window._traktDevicePoll = setInterval(checkOnce, intervalMs);
+        window._traktDeviceVisHandler = () => { if (document.visibilityState === 'visible') checkOnce(); };
+        document.addEventListener('visibilitychange', window._traktDeviceVisHandler);
     }
 
     async function handleTraktCallback(code) { await submitTraktCodeWithCode(code); }
@@ -8380,6 +8391,7 @@ EXAMPLES:
     function handleModalOverlayClick(event) { if (event.target === $('modal')) closeModal(); }
     function closeModal() { 
         if (window._traktDevicePoll) { clearInterval(window._traktDevicePoll); window._traktDevicePoll = null; }
+        if (window._traktDeviceVisHandler) { document.removeEventListener('visibilitychange', window._traktDeviceVisHandler); window._traktDeviceVisHandler = null; }
         $('modal')?.classList.remove('open');
         $('modal').style.zIndex = '';
         const collM = document.getElementById('collModal');
