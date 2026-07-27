@@ -5013,36 +5013,75 @@
     function connectTrakt() {
         if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
         closeSettingsModal();
-        const authUrl = `https://trakt.tv/oauth/authorize?response_type=code&client_id=${TRAKT_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
         const content = $('modalContent');
-        content.innerHTML = `<div style="padding: 40px; text-align: center;"><h2 style="margin-bottom: 20px;">Připojení k Trakt.tv</h2><p style="margin-bottom: 20px; color: var(--text-muted);">1. Klikněte pro autorizaci.<br>2. Zkopírujte kód.<br>3. Vložte kód do pole.</p><a href="${authUrl}" target="_blank" style="display: inline-block; margin-bottom: 30px; padding: 12px 24px; background: var(--trakt); color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600;">Otevřít Trakt.tv</a><div style="margin-top: 20px;"><input type="text" id="traktCodeInput" placeholder="Vložte kód z Trakt zde..." style="padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-elevated); color: #fff; width: 100%; max-width: 300px; margin-bottom: 15px;"><br><button onclick="submitTraktCode()" style="padding: 12px 24px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Připojit</button></div></div>`;
+        content.innerHTML = `<div style="padding: 40px; text-align: center;"><h2 style="margin-bottom: 20px;">Připojení k Trakt.tv</h2><p style="color: var(--text-muted);">Generuji kód…</p></div>`;
         $('modal').classList.add('open');
+        startTraktDeviceFlow();
     }
 
-    async function submitTraktCode() {
-        const codeInput = $('traktCodeInput'); const code = codeInput.value.trim();
-        if (!code) { alert('Prosím vložte kód!'); return; }
-        const btn = document.querySelector('button[onclick="submitTraktCode()"]'); const originalText = btn.textContent;
-        btn.textContent = 'Načítám...'; btn.disabled = true;
+    async function startTraktDeviceFlow() {
+        const content = $('modalContent');
         try {
-            const res = await fetch(`${TRAKT_BASE}/oauth/token`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, client_id: TRAKT_CLIENT_ID, client_secret: TRAKT_CLIENT_SECRET, redirect_uri: REDIRECT_URI, grant_type: 'authorization_code' }) });
-            if (!res.ok) { const err = await res.json(); throw new Error(err.error_description || `Chyba HTTP ${res.status}`); }
+            const res = await fetch(`${TRAKT_BASE}/oauth/device/code`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: TRAKT_CLIENT_ID }) });
+            if (!res.ok) throw new Error(`Chyba HTTP ${res.status}`);
             const data = await res.json();
-            const userRes = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
-            const userData = await userRes.json();
-            state.trakt = { clientId: TRAKT_CLIENT_ID, clientSecret: TRAKT_CLIENT_SECRET, accessToken: data.access_token, refreshToken: data.refresh_token, tokenExpires: Date.now() + (data.expires_in * 1000), username: userData.username || 'user' };
-            _TRAKT_DATA_SAVED = JSON.stringify(state.trakt);
-            _mem['sinator_trakt'] = _TRAKT_DATA_SAVED;
-            _store.setItem('sinator_trakt', JSON.stringify(state.trakt));
-            updateTraktStatus(); updateFavBadge(); syncMdblistFromTrakt();
-            closeModal();
-            // Na content:// se _store neukládá → nabídnout export zálohy ihned
-            setTimeout(() => {
-                if (confirm('✅ Trakt připojen jako ' + (userData.username||'user') + '!\n\nDoporučuji okamžitě exportovat zálohu — na content:// se přihlášení neukládá do souboru automaticky.\n\nExportovat zálohu teď?')) {
-                    exportBackup();
+            const verUrl = data.verification_url.startsWith('http') ? data.verification_url : `https://${data.verification_url}`;
+            content.innerHTML = `<div style="padding: 40px; text-align: center;">
+                <h2 style="margin-bottom: 16px;">Připojení k Trakt.tv</h2>
+                <p style="margin-bottom: 16px; color: var(--text-muted);">1. Otevřete stránku níže (na kterémkoliv zařízení).<br>2. Zadejte tento kód.<br>3. Potvrďte přístup appce.</p>
+                <a href="${verUrl}" target="_blank" style="display: inline-block; margin-bottom: 20px; padding: 12px 24px; background: var(--trakt); color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600;">Otevřít ${data.verification_url}</a>
+                <div style="font-size: 2.2rem; font-weight: 800; letter-spacing: 4px; margin: 10px 0 20px; color: #fff; user-select: all;">${data.user_code}</div>
+                <div id="traktDeviceStatus" style="color: var(--text-muted); font-size: 0.85rem;">⏳ Čekám na potvrzení na Trakt…</div>
+            </div>`;
+            pollTraktDeviceToken(data.device_code, (data.interval || 5) * 1000, data.expires_in || 600);
+        } catch(e) {
+            content.innerHTML = `<div style="padding: 40px; text-align: center;"><h2 style="margin-bottom: 16px;">❌ Chyba</h2><p style="color: var(--text-muted);">${e.message}</p></div>`;
+        }
+    }
+
+    function pollTraktDeviceToken(deviceCode, intervalMs, expiresIn) {
+        if (window._traktDevicePoll) clearInterval(window._traktDevicePoll);
+        const startedAt = Date.now();
+        window._traktDevicePoll = setInterval(async () => {
+            if (Date.now() - startedAt > expiresIn * 1000) {
+                clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
+                const st = $('traktDeviceStatus'); if (st) st.textContent = '⏱️ Kód vypršel — otevřete připojení znovu.';
+                return;
+            }
+            try {
+                const res = await fetch(`${TRAKT_BASE}/oauth/device/token`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: deviceCode, client_id: TRAKT_CLIENT_ID, client_secret: TRAKT_CLIENT_SECRET }) });
+                if (res.status === 200) {
+                    clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
+                    const data = await res.json();
+                    const userRes = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
+                    const userData = await userRes.json();
+                    state.trakt = { clientId: TRAKT_CLIENT_ID, clientSecret: TRAKT_CLIENT_SECRET, accessToken: data.access_token, refreshToken: data.refresh_token, tokenExpires: Date.now() + (data.expires_in * 1000), username: userData.username || 'user' };
+                    _TRAKT_DATA_SAVED = JSON.stringify(state.trakt);
+                    _mem['sinator_trakt'] = _TRAKT_DATA_SAVED;
+                    _store.setItem('sinator_trakt', JSON.stringify(state.trakt));
+                    updateTraktStatus(); updateFavBadge(); syncMdblistFromTrakt();
+                    closeModal();
+                    setTimeout(() => {
+                        if (confirm('✅ Trakt připojen jako ' + (userData.username||'user') + '!\n\nDoporučuji okamžitě exportovat zálohu — na content:// se přihlášení neukládá do souboru automaticky.\n\nExportovat zálohu teď?')) {
+                            exportBackup();
+                        }
+                    }, 100);
+                } else if (res.status === 404) {
+                    clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
+                    const st = $('traktDeviceStatus'); if (st) st.textContent = '❌ Neplatný kód.';
+                } else if (res.status === 409) {
+                    clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
+                    const st = $('traktDeviceStatus'); if (st) st.textContent = '❌ Kód už byl použit.';
+                } else if (res.status === 410) {
+                    clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
+                    const st = $('traktDeviceStatus'); if (st) st.textContent = '⏱️ Kód vypršel — otevřete připojení znovu.';
+                } else if (res.status === 418) {
+                    clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
+                    const st = $('traktDeviceStatus'); if (st) st.textContent = '🚫 Přístup byl na Traktu zamítnut.';
                 }
-            }, 100);
-        } catch(e) { alert(`❌ Chyba: ${e.message}`); btn.textContent = originalText; btn.disabled = false; }
+                // 400 = pending (čekáme), 429 = slow down → v obou případech jen zkusíme znovu příště
+            } catch(e) { /* dočasný výpadek sítě, zkusíme znovu při dalším tiku */ }
+        }, intervalMs);
     }
 
     async function handleTraktCallback(code) { await submitTraktCodeWithCode(code); }
@@ -8336,6 +8375,7 @@ EXAMPLES:
 
     function handleModalOverlayClick(event) { if (event.target === $('modal')) closeModal(); }
     function closeModal() { 
+        if (window._traktDevicePoll) { clearInterval(window._traktDevicePoll); window._traktDevicePoll = null; }
         $('modal')?.classList.remove('open');
         $('modal').style.zIndex = '';
         const collM = document.getElementById('collModal');
