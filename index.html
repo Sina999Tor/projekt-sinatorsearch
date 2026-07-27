@@ -4962,8 +4962,8 @@
     window.diagnoseTraktUser = async function() {
         if (!state.trakt.accessToken) { alert('⚠️ Nejsi připojen k Traktu.'); return; }
         const clientId = state.trakt.clientId || TRAKT_CLIENT_ID;
-        const authHeaders = { 'trakt-api-version': '2', 'trakt-api-key': clientId, 'Authorization': `Bearer ${state.trakt.accessToken}` };
-        const publicHeaders = { 'trakt-api-version': '2', 'trakt-api-key': clientId };
+        const authHeaders = { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': clientId, 'Authorization': `Bearer ${state.trakt.accessToken}` };
+        const publicHeaders = { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': clientId };
 
         const testEndpoint = async (label, url, headers) => {
             try {
@@ -4987,7 +4987,7 @@
     window.diagnoseTraktUserOld = async function() {
         if (!state.trakt.accessToken) { alert('⚠️ Nejsi připojen k Traktu.'); return; }
         try {
-            const res = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'trakt-api-version': '2', 'trakt-api-key': state.trakt.clientId || TRAKT_CLIENT_ID, 'Authorization': `Bearer ${state.trakt.accessToken}` }});
+            const res = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': state.trakt.clientId || TRAKT_CLIENT_ID, 'Authorization': `Bearer ${state.trakt.accessToken}` }});
             let bodyText = '';
             try { bodyText = await res.text(); } catch(eBody) { bodyText = '(nelze přečíst tělo odpovědi)'; }
             let pretty = bodyText;
@@ -5162,7 +5162,7 @@
                     state.trakt = { clientId: TRAKT_CLIENT_ID, clientSecret: TRAKT_CLIENT_SECRET, accessToken: data.access_token, refreshToken: data.refresh_token, tokenExpires: Date.now() + (data.expires_in * 1000), username: 'me' };
                     let username = 'me';
                     try {
-                        const userRes = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
+                        const userRes = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
                         if (userRes.ok) {
                             const userData = await userRes.json();
                             if (userData && userData.username) {
@@ -5222,7 +5222,7 @@
             const data = await res.json();
             let username = 'me';
             try {
-                const userRes = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
+                const userRes = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
                 if (userRes.ok) {
                     const userData = await userRes.json();
                     if (userData && userData.username) username = userData.username;
@@ -27612,7 +27612,7 @@ async function refreshTraktRatingCounts() {
   const headers = {
     'Content-Type': 'application/json',
     'trakt-api-version': '2',
-    'trakt-api-key': 'ba089b58552ecc359dbdda94b7dbfc298456679d181a6ed900ad192e3aad8a48',
+    'trakt-api-key': traktData.clientId || 'QOfvLB35_eg1LkJ-51VM7NckrgnWrCAe2xH5EbsumqE',
     'Authorization': 'Bearer ' + traktData.accessToken
   };
   try {
