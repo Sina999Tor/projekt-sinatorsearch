@@ -4961,6 +4961,31 @@
     }
     window.diagnoseTraktUser = async function() {
         if (!state.trakt.accessToken) { alert('⚠️ Nejsi připojen k Traktu.'); return; }
+        const clientId = state.trakt.clientId || TRAKT_CLIENT_ID;
+        const authHeaders = { 'trakt-api-version': '2', 'trakt-api-key': clientId, 'Authorization': `Bearer ${state.trakt.accessToken}` };
+        const publicHeaders = { 'trakt-api-version': '2', 'trakt-api-key': clientId };
+
+        const testEndpoint = async (label, url, headers) => {
+            try {
+                const res = await fetchWithRetry(url, { headers }, { retries: 1 });
+                let bodyText = ''; try { bodyText = await res.text(); } catch(e) {}
+                let headersDump = ''; try { res.headers.forEach((v,k)=>{ headersDump += `\n    ${k}: ${v}`; }); } catch(e) {}
+                return `${res.ok ? '✅' : '❌'} ${label} → HTTP ${res.status}${res.ok ? '' : (bodyText ? '\n    tělo: ' + bodyText.slice(0,200) : '\n    tělo: (prázdné)') + headersDump}`;
+            } catch(e) {
+                return `❌ ${label} → síťová chyba: ${e && e.message ? e.message : e}`;
+            }
+        };
+
+        alert('⏳ Spouštím diagnostiku 3 endpointů, chvíli strpení…');
+        const results = await Promise.all([
+            testEndpoint('Veřejný endpoint bez auth (/genres/movies)', `${TRAKT_BASE}/genres/movies`, publicHeaders),
+            testEndpoint('Přihlášený endpoint jiný než /users/me (/sync/last-activities)', `${TRAKT_BASE}/sync/last-activities`, authHeaders),
+            testEndpoint('/users/me', `${TRAKT_BASE}/users/me`, authHeaders)
+        ]);
+        alert('📋 Výsledek diagnostiky:\n\n' + results.join('\n\n') + '\n\n(client-id …' + clientId.slice(-6) + ')');
+    };
+    window.diagnoseTraktUserOld = async function() {
+        if (!state.trakt.accessToken) { alert('⚠️ Nejsi připojen k Traktu.'); return; }
         try {
             const res = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'trakt-api-version': '2', 'trakt-api-key': state.trakt.clientId || TRAKT_CLIENT_ID, 'Authorization': `Bearer ${state.trakt.accessToken}` }});
             let bodyText = '';
