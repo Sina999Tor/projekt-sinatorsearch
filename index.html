@@ -5035,6 +5035,7 @@
                 <p style="margin-bottom: 16px; color: var(--text-muted);">1. Otevřete stránku níže (na kterémkoliv zařízení).<br>2. Zadejte tento kód.<br>3. Potvrďte přístup appce.</p>
                 <a href="${verUrl}" target="_blank" style="display: inline-block; margin-bottom: 20px; padding: 12px 24px; background: var(--trakt); color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600;">Otevřít ${data.verification_url}</a>
                 <div style="font-size: 2.2rem; font-weight: 800; letter-spacing: 4px; margin: 10px 0 20px; color: #fff; user-select: all;">${data.user_code}</div>
+                <button onclick="window._traktDeviceCheckNow && window._traktDeviceCheckNow()" style="margin-bottom: 14px; padding: 10px 20px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">🔄 Zkontrolovat teď</button>
                 <div id="traktDeviceStatus" style="color: var(--text-muted); font-size: 0.85rem;">⏳ Čekám na potvrzení na Trakt…</div>
             </div>`;
             pollTraktDeviceToken(data.device_code, (data.interval || 5) * 1000, data.expires_in || 600);
@@ -5089,12 +5090,15 @@
                 } else if (res.status === 418) {
                     stop();
                     const st = $('traktDeviceStatus'); if (st) st.textContent = '🚫 Přístup byl na Traktu zamítnut.';
+                } else if (res.status === 400 || res.status === 429) {
+                    const st = $('traktDeviceStatus'); if (st) st.textContent = '⏳ Zatím neschváleno — potvrď kód na Trakt a zkus to znovu.';
                 }
                 // 400 = pending (čekáme), 429 = slow down → v obou případech jen zkusíme znovu příště
             } catch(e) { /* dočasný výpadek sítě, zkusíme znovu při dalším tiku */ }
             finally { checking = false; }
         };
         window._traktDevicePoll = setInterval(checkOnce, intervalMs);
+        window._traktDeviceCheckNow = checkOnce;
         window._traktDeviceVisHandler = () => { if (document.visibilityState === 'visible') checkOnce(); };
         document.addEventListener('visibilitychange', window._traktDeviceVisHandler);
     }
