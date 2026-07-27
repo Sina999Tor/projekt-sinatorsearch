@@ -5022,7 +5022,7 @@
     async function startTraktDeviceFlow() {
         const content = $('modalContent');
         try {
-            const res = await fetch(`${TRAKT_BASE}/oauth/device/code`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: TRAKT_CLIENT_ID }) });
+            const res = await fetch(`${TRAKT_BASE}/oauth/device/code`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID }, body: JSON.stringify({ client_id: TRAKT_CLIENT_ID }) });
             if (!res.ok) throw new Error(`Chyba HTTP ${res.status}`);
             const data = await res.json();
             const verUrl = data.verification_url.startsWith('http') ? data.verification_url : `https://${data.verification_url}`;
@@ -5049,7 +5049,7 @@
                 return;
             }
             try {
-                const res = await fetch(`${TRAKT_BASE}/oauth/device/token`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: deviceCode, client_id: TRAKT_CLIENT_ID, client_secret: TRAKT_CLIENT_SECRET }) });
+                const res = await fetch(`${TRAKT_BASE}/oauth/device/token`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID }, body: JSON.stringify({ code: deviceCode, client_id: TRAKT_CLIENT_ID, client_secret: TRAKT_CLIENT_SECRET }) });
                 if (res.status === 200) {
                     clearInterval(window._traktDevicePoll); window._traktDevicePoll = null;
                     const data = await res.json();
@@ -5087,7 +5087,7 @@
     async function handleTraktCallback(code) { await submitTraktCodeWithCode(code); }
     async function submitTraktCodeWithCode(code) {
         try {
-            const res = await fetch(`${TRAKT_BASE}/oauth/token`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, client_id: TRAKT_CLIENT_ID, client_secret: TRAKT_CLIENT_SECRET, redirect_uri: REDIRECT_URI, grant_type: 'authorization_code' }) });
+            const res = await fetch(`${TRAKT_BASE}/oauth/token`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID }, body: JSON.stringify({ code, client_id: TRAKT_CLIENT_ID, client_secret: TRAKT_CLIENT_SECRET, redirect_uri: REDIRECT_URI, grant_type: 'authorization_code' }) });
             if (!res.ok) { const err = await res.json(); throw new Error(err.error_description || `Chyba HTTP ${res.status}`); }
             const data = await res.json();
             const userRes = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
@@ -5110,7 +5110,7 @@
         if(state.trakt.tokenExpires && Date.now() < state.trakt.tokenExpires) return;
         if(!state.trakt.refreshToken) { state.trakt.accessToken = null; return; }
         try {
-            const res = await fetch(`${TRAKT_BASE}/oauth/token`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ refresh_token: state.trakt.refreshToken, client_id: state.trakt.clientId, client_secret: state.trakt.clientSecret, grant_type: 'refresh_token' }) });
+            const res = await fetch(`${TRAKT_BASE}/oauth/token`, { method: 'POST', headers: {'Content-Type':'application/json', 'trakt-api-version':'2', 'trakt-api-key': state.trakt.clientId}, body: JSON.stringify({ refresh_token: state.trakt.refreshToken, client_id: state.trakt.clientId, client_secret: state.trakt.clientSecret, grant_type: 'refresh_token' }) });
             if(!res.ok) throw new Error('Token vypršel');
             const data = await res.json();
             state.trakt.accessToken = data.access_token; state.trakt.refreshToken = data.refresh_token;
