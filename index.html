@@ -1895,6 +1895,9 @@
                     <button class="settings-btn-small" onclick="connectTrakt()">🔑 Připojit</button>
                     <button class="settings-btn-small settings-btn-remove" onclick="disconnectTrakt()">❌ Odhlásit</button>
                 </div>
+                <div class="settings-actions" style="margin-top:6px;">
+                    <button class="settings-btn-small" style="width:100%;border-color:#f59e0b;color:#f59e0b;" onclick="diagnoseTraktUser()">🩺 Diagnostika (zjistit chybu jména)</button>
+                </div>
                 <div class="settings-actions" style="margin-top:8px;">
                     <button class="settings-btn-small" id="fullResyncWatchedBtn" style="width:100%;border-color:#1db954;color:#1db954;" onclick="fullResyncWatched(this)">🔄 Sync + přepočítat shlédnuté seriály</button>
                 </div>
@@ -4935,6 +4938,34 @@
             else { dot.className = 'dot'; text.textContent = 'Nepřipojeno'; if (codeDisplay) codeDisplay.style.display = 'none'; }
         }
     }
+    window.diagnoseTraktUser = async function() {
+        if (!state.trakt.accessToken) { alert('⚠️ Nejsi připojen k Traktu.'); return; }
+        try {
+            const res = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': state.trakt.clientId || TRAKT_CLIENT_ID, 'Authorization': `Bearer ${state.trakt.accessToken}` }});
+            let bodyText = '';
+            try { bodyText = await res.text(); } catch(eBody) { bodyText = '(nelze přečíst tělo odpovědi)'; }
+            let pretty = bodyText;
+            try { pretty = JSON.stringify(JSON.parse(bodyText), null, 2); } catch(eJson) {}
+            if (res.ok) {
+                let uname = null;
+                try { uname = JSON.parse(bodyText).username; } catch(eParse) {}
+                if (uname) {
+                    state.trakt.username = uname;
+                    _TRAKT_DATA_SAVED = JSON.stringify(state.trakt);
+                    _mem['sinator_trakt'] = _TRAKT_DATA_SAVED;
+                    _store.setItem('sinator_trakt', JSON.stringify(state.trakt));
+                    updateTraktStatus();
+                    alert('✅ /users/me OK. Jméno bylo doplněno: ' + uname);
+                } else {
+                    alert('⚠️ /users/me vrátilo 200 OK, ale odpověď neobsahuje pole "username":\n\n' + pretty);
+                }
+            } else {
+                alert('❌ Trakt /users/me selhalo.\n\nHTTP status: ' + res.status + '\n\nOdpověď serveru:\n' + pretty + '\n\nTrakt-Account-Limited hlavička: ' + (res.headers.get('X-Account-Limited') || '—'));
+            }
+        } catch(e) {
+            alert('❌ Síťová chyba při volání /users/me:\n\n' + (e && e.message ? e.message : e));
+        }
+    };
     function updateFavBadge() {
         const badge = $('favBadge'); const count = state.favs.length + state.actorFavs.length;
         if (badge) { if (count > 0) { badge.textContent = count; badge.style.display = 'grid'; } else { badge.style.display = 'none'; } }
