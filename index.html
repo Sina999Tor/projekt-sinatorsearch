@@ -5023,7 +5023,11 @@
         const content = $('modalContent');
         try {
             const res = await fetch(`${TRAKT_BASE}/oauth/device/code`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID }, body: JSON.stringify({ client_id: TRAKT_CLIENT_ID }) });
-            if (!res.ok) throw new Error(`Chyba HTTP ${res.status}`);
+            if (!res.ok) {
+                let detail = '';
+                try { const errBody = await res.json(); detail = errBody.error_description || errBody.error || JSON.stringify(errBody); } catch(e2) { try { detail = await res.text(); } catch(e3) {} }
+                throw new Error(`HTTP ${res.status}${detail ? ' — ' + detail : ''}`);
+            }
             const data = await res.json();
             const verUrl = data.verification_url.startsWith('http') ? data.verification_url : `https://${data.verification_url}`;
             content.innerHTML = `<div style="padding: 40px; text-align: center;">
