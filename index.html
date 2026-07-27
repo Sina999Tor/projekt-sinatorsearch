@@ -2359,8 +2359,8 @@
     if (_store.getItem('sinator_adult_content') === null) _store.setItem('sinator_adult_content', 'false');
     let adultContent = _store.getItem('sinator_adult_content') === 'true';
     let _aiAbortController = null;
-    const TRAKT_CLIENT_ID = 'oxiuk-i_bX6KrQCp2rIMdOemw1OiRJ6J0TAXnR5OaWQ';
-    const TRAKT_CLIENT_SECRET = 'zIR1g2GCOEqBYVGA3gsVh_TWFHOIs9XmAREPUIkVgHY';
+    const TRAKT_CLIENT_ID = 'QOfvLB35_eg1LkJ-51VM7NckrgnWrCAe2xH5EbsumqE';
+    const TRAKT_CLIENT_SECRET = 'rIukoJbVTROcnT9W0-B3Ns3D7dkxN57uuzqsRJAYQVc';
     const REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob';
     const SIMKL_CLIENT_ID = 'a4b20739a0cbf73cfd54302fe2be81088b840262b9554059f180b91df334e545';
     const SIMKL_BASE = 'https://api.simkl.com';
@@ -2370,6 +2370,33 @@
     const IMG = 'https://image.tmdb.org/t/p/';
     const TRAKT_BASE = 'https://api.trakt.tv';
     const MDBLIST_BASE = 'https://mdblist.com/api';
+
+    // ── Univerzální fetch s retry a timeoutem ───────────────────────────────
+    // Použij pro volání, u kterých se stává, že server (zejména Trakt) občas
+    // odpoví 500/502/503 nebo timeoutne — zkusí to znovu s krátkou prodlevou
+    // dřív, než to appka nahlásí jako chybu.
+    function fetchWithRetry(url, opts = {}, { retries = 2, delayMs = 1200, timeoutMs = 10000 } = {}) {
+        const attempt = (n) => {
+            const ctrl = new AbortController();
+            const t = setTimeout(() => ctrl.abort(), timeoutMs);
+            return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(t))
+                .then(res => {
+                    // Server-side chyby (5xx) zkusíme zopakovat, klientské (4xx) ne
+                    if (!res.ok && res.status >= 500 && n < retries) {
+                        return new Promise(r => setTimeout(r, delayMs)).then(() => attempt(n + 1));
+                    }
+                    return res;
+                })
+                .catch(err => {
+                    // Síťová chyba / abort — zkusíme znovu, pokud ještě máme pokusy
+                    if (n < retries) {
+                        return new Promise(r => setTimeout(r, delayMs)).then(() => attempt(n + 1));
+                    }
+                    throw err;
+                });
+        };
+        return attempt(0);
+    }
 
     // Klíč uložen přímo v souboru (funguje i bez _store / přes file:// nebo content://)
     let _MDBLIST_USER_SAVED = ''; // ← MDBList uživatelské jméno
@@ -4607,16 +4634,10 @@
             const headers = getTraktHeaders();
             const username = state.trakt.username || 'me';
 
-            // Načíst watchlist + vlastní seznamy paralelně (timeout 10s)
-            const fetchWithTimeout = (url, opts, ms=10000) => {
-                const ctrl = new AbortController();
-                const t = setTimeout(() => ctrl.abort(), ms);
-                return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(t));
-            };
-
+            // Načíst watchlist + vlastní seznamy paralelně (timeout 10s, retry na 5xx)
             const [wlRes, listsRes] = await Promise.all([
-                fetchWithTimeout(`${TRAKT_BASE}/users/${username}/watchlist?extended=full&limit=50`, { headers }),
-                fetchWithTimeout(`${TRAKT_BASE}/users/${username}/lists`, { headers })
+                fetchWithRetry(`${TRAKT_BASE}/users/${username}/watchlist?extended=full&limit=50`, { headers }),
+                fetchWithRetry(`${TRAKT_BASE}/users/${username}/lists`, { headers })
             ]);
 
             const watchlistItems = wlRes.ok ? await wlRes.json() : [];
@@ -4782,7 +4803,7 @@
             let page = 1;
             const limit = 500;
             while (true) {
-                const res = await fetch(`${TRAKT_BASE}/users/${username}/lists/${listObj.id}/items?extended=full&limit=${limit}&page=${page}`, { headers });
+                const res = await fetchWithRetry(`${TRAKT_BASE}/users/${username}/lists/${listObj.id}/items?extended=full&limit=${limit}&page=${page}`, { headers });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const items = await res.json();
                 if (!Array.isArray(items) || !items.length) break;
@@ -4941,7 +4962,7 @@
     window.diagnoseTraktUser = async function() {
         if (!state.trakt.accessToken) { alert('⚠️ Nejsi připojen k Traktu.'); return; }
         try {
-            const res = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': state.trakt.clientId || TRAKT_CLIENT_ID, 'Authorization': `Bearer ${state.trakt.accessToken}` }});
+            const res = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': state.trakt.clientId || TRAKT_CLIENT_ID, 'Authorization': `Bearer ${state.trakt.accessToken}` }});
             let bodyText = '';
             try { bodyText = await res.text(); } catch(eBody) { bodyText = '(nelze přečíst tělo odpovědi)'; }
             let pretty = bodyText;
@@ -5112,7 +5133,7 @@
                     state.trakt = { clientId: TRAKT_CLIENT_ID, clientSecret: TRAKT_CLIENT_SECRET, accessToken: data.access_token, refreshToken: data.refresh_token, tokenExpires: Date.now() + (data.expires_in * 1000), username: 'me' };
                     let username = 'me';
                     try {
-                        const userRes = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
+                        const userRes = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
                         if (userRes.ok) {
                             const userData = await userRes.json();
                             if (userData && userData.username) {
@@ -5172,7 +5193,7 @@
             const data = await res.json();
             let username = 'me';
             try {
-                const userRes = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
+                const userRes = await fetchWithRetry(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
                 if (userRes.ok) {
                     const userData = await userRes.json();
                     if (userData && userData.username) username = userData.username;
@@ -8025,11 +8046,11 @@ EXAMPLES:
         if(!state.trakt.accessToken) { $('traktResultsContainer').innerHTML = '<div class="empty">⚙️ Nejprve se připojte k Traktu v nastavení.</div>'; return; }
         try {
             const [listsRes, movieRatingsRes, showRatingsRes, movieHistRes, epHistRes] = await Promise.all([
-                fetch(`${TRAKT_BASE}/users/${state.trakt.username||'me'}/lists`, { headers: getTraktHeaders() }),
-                fetch(`${TRAKT_BASE}/sync/ratings/movies`, { headers: getTraktHeaders() }),
-                fetch(`${TRAKT_BASE}/sync/ratings/shows`, { headers: getTraktHeaders() }),
-                fetch(`${TRAKT_BASE}/sync/history/movies?limit=1`, { headers: getTraktHeaders() }),
-                fetch(`${TRAKT_BASE}/sync/history/episodes?limit=1`, { headers: getTraktHeaders() })
+                fetchWithRetry(`${TRAKT_BASE}/users/${state.trakt.username||'me'}/lists`, { headers: getTraktHeaders() }),
+                fetchWithRetry(`${TRAKT_BASE}/sync/ratings/movies`, { headers: getTraktHeaders() }),
+                fetchWithRetry(`${TRAKT_BASE}/sync/ratings/shows`, { headers: getTraktHeaders() }),
+                fetchWithRetry(`${TRAKT_BASE}/sync/history/movies?limit=1`, { headers: getTraktHeaders() }),
+                fetchWithRetry(`${TRAKT_BASE}/sync/history/episodes?limit=1`, { headers: getTraktHeaders() })
             ]);
             const lists = await listsRes.json();
             const movieRatings = movieRatingsRes.ok ? await movieRatingsRes.json() : [];
@@ -8058,7 +8079,7 @@ EXAMPLES:
     }
 
     function getTraktHeaders() {
-        const h = { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': state.trakt.clientId || '' };
+        const h = { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': state.trakt.clientId || TRAKT_CLIENT_ID };
         if(state.trakt.accessToken) h['Authorization'] = `Bearer ${state.trakt.accessToken}`;
         return h;
     }
@@ -8304,7 +8325,7 @@ EXAMPLES:
             let page = 1;
             const limit = 500;
             while (true) {
-                const res = await fetch(`${TRAKT_BASE}/users/${username}/lists/${listObj.id}/items?extended=full&limit=${limit}&page=${page}`, { headers });
+                const res = await fetchWithRetry(`${TRAKT_BASE}/users/${username}/lists/${listObj.id}/items?extended=full&limit=${limit}&page=${page}`, { headers });
                 if (!res.ok) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba API: HTTP ${res.status}</div>`; return; }
                 const items = await res.json();
                 if (!Array.isArray(items) || !items.length) break;
