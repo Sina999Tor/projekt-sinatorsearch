@@ -2417,6 +2417,13 @@
             if (t && t.accessToken) { state.trakt = t; _mem['sinator_trakt'] = _TRAKT_DATA_SAVED; }
         } catch(e) {}
     }
+    // Migrace staré chyby: dřívější verze appky ukládala jako fallback jméno
+    // doslovný string 'user' (místo Traktího aliasu 'me'), což rozbilo načítání
+    // seznamů (/users/user/lists místo /users/me/lists). Oprav to potichu při startu.
+    if (state.trakt && state.trakt.username === 'user') {
+        state.trakt.username = 'me';
+        try { _store.setItem('sinator_trakt', JSON.stringify(state.trakt)); } catch(e) {}
+    }
     if (Object.keys(state.watched).length === 0 && _WATCHED_DATA_SAVED) {
         try {
             const w = JSON.parse(_WATCHED_DATA_SAVED);
@@ -5068,23 +5075,38 @@
                     // Ulož token hned — device_code je jednorázový a od teď je "spotřebovaný".
                     // Pokud by selhal následný dotaz na /users/me (výpadek sítě, appka na pozadí…),
                     // nesmíme token zahodit, jinak by další "Zkontrolovat" poslalo už neplatný kód → 404.
-                    state.trakt = { clientId: TRAKT_CLIENT_ID, clientSecret: TRAKT_CLIENT_SECRET, accessToken: data.access_token, refreshToken: data.refresh_token, tokenExpires: Date.now() + (data.expires_in * 1000), username: 'user' };
-                    let username = 'user';
+                    // POZOR: fallback jméno musí být 'me' (Traktí speciální alias pro přihlášeného
+                    // uživatele), NE 'user' — jinak appka volá /users/user/... na neexistujícího
+                    // uživatele a seznamy/hodnocení se přestanou načítat.
+                    state.trakt = { clientId: TRAKT_CLIENT_ID, clientSecret: TRAKT_CLIENT_SECRET, accessToken: data.access_token, refreshToken: data.refresh_token, tokenExpires: Date.now() + (data.expires_in * 1000), username: 'me' };
+                    let username = 'me';
                     try {
                         const userRes = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
-                        const userData = await userRes.json();
-                        username = userData.username || 'user';
-                        state.trakt.username = username;
-                    } catch(e2) { /* token už máme uložený, jméno dotáhneme příště */ }
+                        if (userRes.ok) {
+                            const userData = await userRes.json();
+                            if (userData && userData.username) {
+                                username = userData.username;
+                                state.trakt.username = username;
+                            }
+                        } else {
+                            console.warn('Trakt /users/me selhalo, status', userRes.status, '— ponechávám alias "me".');
+                        }
+                    } catch(e2) { console.warn('Trakt /users/me selhalo (síť):', e2); /* token už máme uložený, jméno dotáhneme příště */ }
                     _TRAKT_DATA_SAVED = JSON.stringify(state.trakt);
                     _mem['sinator_trakt'] = _TRAKT_DATA_SAVED;
                     _store.setItem('sinator_trakt', JSON.stringify(state.trakt));
-                    updateTraktStatus(); updateFavBadge(); syncMdblistFromTrakt();
-                    closeModal();
+                    // Token je bezpečně uložen výše. Vše následující je jen "hezčí UI" —
+                    // pokud by tu cokoliv spadlo, nesmí to shodit úspěšné přihlášení.
+                    try { updateTraktStatus(); } catch(e3) {}
+                    try { updateFavBadge(); } catch(e3) {}
+                    try { syncMdblistFromTrakt(); } catch(e3) {}
+                    try { closeModal(); } catch(e3) {}
                     setTimeout(() => {
-                        if (confirm('✅ Trakt připojen jako ' + username + '!\n\nDoporučuji okamžitě exportovat zálohu — na content:// se přihlášení neukládá do souboru automaticky.\n\nExportovat zálohu teď?')) {
-                            exportBackup();
-                        }
+                        try {
+                            if (confirm('✅ Trakt připojen jako ' + username + '!\n\nDoporučuji okamžitě exportovat zálohu — na content:// se přihlášení neukládá do souboru automaticky.\n\nExportovat zálohu teď?')) {
+                                exportBackup();
+                            }
+                        } catch(e3) {}
                     }, 100);
                 } else if (res.status === 404) {
                     stop();
@@ -5117,15 +5139,21 @@
             const res = await fetch(`${TRAKT_BASE}/oauth/token`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID }, body: JSON.stringify({ code, client_id: TRAKT_CLIENT_ID, client_secret: TRAKT_CLIENT_SECRET, redirect_uri: REDIRECT_URI, grant_type: 'authorization_code' }) });
             if (!res.ok) { const err = await res.json(); throw new Error(err.error_description || `Chyba HTTP ${res.status}`); }
             const data = await res.json();
-            const userRes = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
-            const userData = await userRes.json();
-            state.trakt = { clientId: TRAKT_CLIENT_ID, clientSecret: TRAKT_CLIENT_SECRET, accessToken: data.access_token, refreshToken: data.refresh_token, tokenExpires: Date.now() + (data.expires_in * 1000), username: userData.username || 'user' };
+            let username = 'me';
+            try {
+                const userRes = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
+                if (userRes.ok) {
+                    const userData = await userRes.json();
+                    if (userData && userData.username) username = userData.username;
+                }
+            } catch(e2) { console.warn('Trakt /users/me selhalo:', e2); }
+            state.trakt = { clientId: TRAKT_CLIENT_ID, clientSecret: TRAKT_CLIENT_SECRET, accessToken: data.access_token, refreshToken: data.refresh_token, tokenExpires: Date.now() + (data.expires_in * 1000), username };
             _TRAKT_DATA_SAVED = JSON.stringify(state.trakt);
             _mem['sinator_trakt'] = _TRAKT_DATA_SAVED;
             _store.setItem('sinator_trakt', JSON.stringify(state.trakt));
             updateTraktStatus(); updateFavBadge(); syncMdblistFromTrakt();
             setTimeout(() => {
-                if (confirm('✅ Trakt připojen jako ' + (userData.username||'user') + '!\n\nDoporučuji exportovat zálohu — na content:// se přihlášení neukládá automaticky.\n\nExportovat teď?')) {
+                if (confirm('✅ Trakt připojen jako ' + username + '!\n\nDoporučuji exportovat zálohu — na content:// se přihlášení neukládá automaticky.\n\nExportovat teď?')) {
                     exportBackup();
                 }
             }, 100);
