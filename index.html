@@ -5065,16 +5065,24 @@
                 if (res.status === 200) {
                     stop();
                     const data = await res.json();
-                    const userRes = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
-                    const userData = await userRes.json();
-                    state.trakt = { clientId: TRAKT_CLIENT_ID, clientSecret: TRAKT_CLIENT_SECRET, accessToken: data.access_token, refreshToken: data.refresh_token, tokenExpires: Date.now() + (data.expires_in * 1000), username: userData.username || 'user' };
+                    // Ulož token hned — device_code je jednorázový a od teď je "spotřebovaný".
+                    // Pokud by selhal následný dotaz na /users/me (výpadek sítě, appka na pozadí…),
+                    // nesmíme token zahodit, jinak by další "Zkontrolovat" poslalo už neplatný kód → 404.
+                    state.trakt = { clientId: TRAKT_CLIENT_ID, clientSecret: TRAKT_CLIENT_SECRET, accessToken: data.access_token, refreshToken: data.refresh_token, tokenExpires: Date.now() + (data.expires_in * 1000), username: 'user' };
+                    let username = 'user';
+                    try {
+                        const userRes = await fetch(`${TRAKT_BASE}/users/me`, { headers: { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': TRAKT_CLIENT_ID, 'Authorization': `Bearer ${data.access_token}` }});
+                        const userData = await userRes.json();
+                        username = userData.username || 'user';
+                        state.trakt.username = username;
+                    } catch(e2) { /* token už máme uložený, jméno dotáhneme příště */ }
                     _TRAKT_DATA_SAVED = JSON.stringify(state.trakt);
                     _mem['sinator_trakt'] = _TRAKT_DATA_SAVED;
                     _store.setItem('sinator_trakt', JSON.stringify(state.trakt));
                     updateTraktStatus(); updateFavBadge(); syncMdblistFromTrakt();
                     closeModal();
                     setTimeout(() => {
-                        if (confirm('✅ Trakt připojen jako ' + (userData.username||'user') + '!\n\nDoporučuji okamžitě exportovat zálohu — na content:// se přihlášení neukládá do souboru automaticky.\n\nExportovat zálohu teď?')) {
+                        if (confirm('✅ Trakt připojen jako ' + username + '!\n\nDoporučuji okamžitě exportovat zálohu — na content:// se přihlášení neukládá do souboru automaticky.\n\nExportovat zálohu teď?')) {
                             exportBackup();
                         }
                     }, 100);
