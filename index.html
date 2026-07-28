@@ -1925,6 +1925,17 @@
                 </div>
             </div>
             <div class="settings-divider"></div>
+            <div class="settings-section">
+                <span class="settings-label" style="color:#6090ff;">🧩 Sinator backend</span>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Vlastní náhrada za Trakt — watchlist, seznamy, hodnocení, historie.</div>
+                <input type="password" id="myBackendKeyInput" placeholder="API_SECRET" style="width:100%;margin-bottom:8px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;">
+                <div class="settings-actions">
+                    <button class="settings-btn-small" style="border-color:#6090ff;color:#6090ff;" onclick="saveMyBackendSettings()">💾 Uložit a otestovat</button>
+                    <button class="settings-btn-small settings-btn-remove" onclick="disconnectMyBackend()">❌ Odebrat</button>
+                </div>
+                <div style="font-size:0.75rem;margin-top:8px;" id="myBackendStatus"></div>
+            </div>
+            <div class="settings-divider"></div>
             <div class="settings-section" style="display:none;">
                 <span class="settings-label" style="color:#ff9800;">🗃️ MDBList</span>
                 <div class="settings-status">
@@ -2062,17 +2073,6 @@
                 <button class="settings-btn-small" id="checkUpdatesBtn" onclick="checkForUpdates()" style="width:100%;background:rgba(29,185,84,0.2);border:1px solid rgba(29,185,84,0.4);color:#1db954;font-weight:600;padding:10px;">🔄 Zkontrolovat aktualizace</button>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;" id="deployedVersionInfo">📅 Nahráno: —</div>
                 <div style="font-size:0.75rem;margin-top:8px;" id="checkUpdatesStatus"></div>
-            </div>
-            <div class="settings-divider"></div>
-            <div class="settings-section" style="background:rgba(96,144,255,0.07);border:1px solid rgba(96,144,255,0.25);border-radius:12px;padding:14px 16px;">
-                <span class="settings-label" style="color:#6090ff;">🧩 Vlastní backend (Sinator)</span>
-                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;line-height:1.5;">
-                    Náhrada za Trakt — watchlist, seznamy, hodnocení, historie na tvém vlastním serveru.
-                </div>
-                <input type="text" id="myBackendBaseInput" placeholder="https://sinator-backend.vercel.app/api" style="width:100%;margin-bottom:8px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;">
-                <input type="password" id="myBackendKeyInput" placeholder="API_SECRET" style="width:100%;margin-bottom:10px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;">
-                <button class="settings-btn-small" onclick="saveMyBackendSettings()" style="width:100%;background:rgba(96,144,255,0.2);border:1px solid rgba(96,144,255,0.4);color:#6090ff;font-weight:600;padding:10px;">💾 Uložit a otestovat</button>
-                <div style="font-size:0.75rem;margin-top:8px;" id="myBackendStatus"></div>
             </div>
             <div class="settings-divider"></div>
             <div class="settings-section">
@@ -2378,12 +2378,12 @@
     const TRAKT_CLIENT_ID = 'QOfvLB35_eg1LkJ-51VM7NckrgnWrCAe2xH5EbsumqE';
 
     // ── Vlastní backend (náhrada za Trakt, viz sinator-backend) ─────────────
-    // Uloženo v localStorage, aby šlo API_SECRET zadat/změnit v appce bez
-    // nutnosti přepisovat kód. Nastav v Nastavení → Ostatní (viz initMyBackendSettings).
-    function myBackendBase() { return (state.myBackend && state.myBackend.base) || ''; }
+    // Adresa je napevno (stejný princip jako TRAKT_BASE) — uživatel zadává jen klíč.
+    const MY_BACKEND_BASE = 'https://sinator-backend.vercel.app/api';
+    function myBackendBase() { return MY_BACKEND_BASE; }
     function myBackendKey() { return (state.myBackend && state.myBackend.key) || ''; }
     function myHeaders() { return { 'Content-Type': 'application/json', 'x-api-key': myBackendKey() }; }
-    function myBackendReady() { return !!(myBackendBase() && myBackendKey()); }
+    function myBackendReady() { return !!myBackendKey(); }
 
     async function myApi(path, opts = {}) {
         if (!myBackendReady()) throw new Error('Vlastní backend není nastavený (chybí adresa nebo klíč).');
@@ -2422,15 +2422,14 @@
     const myProgressRemove = (id, type, season, episode) => myApi('/progress', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode }) });
 
     window.saveMyBackendSettings = async function() {
-        const baseRaw = ($('myBackendBaseInput')?.value || '').trim().replace(/\/+$/, '');
         const key = ($('myBackendKeyInput')?.value || '').trim();
         const statusEl = $('myBackendStatus');
-        if (!baseRaw || !key) { if (statusEl) statusEl.innerHTML = '<span style="color:#e07a6f;">⚠️ Vyplň adresu i klíč.</span>'; return; }
-        state.myBackend = { base: baseRaw, key };
+        if (!key) { if (statusEl) statusEl.innerHTML = '<span style="color:#e07a6f;">⚠️ Vyplň klíč.</span>'; return; }
+        state.myBackend = { key };
         _store.setItem('sinator_mybackend', JSON.stringify(state.myBackend));
         if (statusEl) statusEl.innerHTML = 'Testuju…';
         try {
-            const res = await fetchWithRetry(`${baseRaw}/health`, { headers: myHeaders() });
+            const res = await fetchWithRetry(`${MY_BACKEND_BASE}/health`, { headers: myHeaders() });
             const data = await res.json();
             if (res.ok && data.ok) {
                 if (statusEl) statusEl.innerHTML = '<span style="color:#1db954;">✅ Připojeno. Redis: ' + data.redis + '</span>';
@@ -2441,8 +2440,14 @@
             if (statusEl) statusEl.innerHTML = '<span style="color:#e07a6f;">❌ ' + (e && e.message ? e.message : e) + '</span>';
         }
     };
+    window.disconnectMyBackend = function() {
+        if (!confirm('Odebrat klíč k vlastnímu backendu?')) return;
+        state.myBackend = {};
+        _store.removeItem('sinator_mybackend');
+        if ($('myBackendKeyInput')) $('myBackendKeyInput').value = '';
+        if ($('myBackendStatus')) $('myBackendStatus').innerHTML = '';
+    };
     function initMyBackendSettingsInputs() {
-        if ($('myBackendBaseInput')) $('myBackendBaseInput').value = myBackendBase();
         if ($('myBackendKeyInput')) $('myBackendKeyInput').value = myBackendKey();
     }
 
