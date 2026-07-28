@@ -2375,20 +2375,22 @@
     // Použij pro volání, u kterých se stává, že server (zejména Trakt) občas
     // odpoví 500/502/503 nebo timeoutne — zkusí to znovu s krátkou prodlevou
     // dřív, než to appka nahlásí jako chybu.
-    function fetchWithRetry(url, opts = {}, { retries = 2, delayMs = 1200, timeoutMs = 10000 } = {}) {
+    function fetchWithRetry(url, opts = {}, { retries = 3, delayMs = 1500, timeoutMs = 10000 } = {}) {
+        // Trakt bývá u těchto kódů nekonzistentní/edge-flaky — stejný validní
+        // požadavek jednou vrátí 500, podruhé 412, potřetí 405. Zkoušíme
+        // je proto znovu stejně jako klasické 5xx chyby.
+        const RETRYABLE = new Set([405, 412, 429, 500, 502, 503, 504]);
         const attempt = (n) => {
             const ctrl = new AbortController();
             const t = setTimeout(() => ctrl.abort(), timeoutMs);
             return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(t))
                 .then(res => {
-                    // Server-side chyby (5xx) zkusíme zopakovat, klientské (4xx) ne
-                    if (!res.ok && res.status >= 500 && n < retries) {
+                    if (!res.ok && RETRYABLE.has(res.status) && n < retries) {
                         return new Promise(r => setTimeout(r, delayMs)).then(() => attempt(n + 1));
                     }
                     return res;
                 })
                 .catch(err => {
-                    // Síťová chyba / abort — zkusíme znovu, pokud ještě máme pokusy
                     if (n < retries) {
                         return new Promise(r => setTimeout(r, delayMs)).then(() => attempt(n + 1));
                     }
