@@ -1732,6 +1732,7 @@
         <div class="ts-source-tabs">
             <button class="ts-source-btn active" id="tsSrcBtnTrakt" data-src="trakt" onclick="switchTsSource('trakt')">📋 Trakt</button>
             <button class="ts-source-btn" id="tsSrcBtnSimkl" data-src="simkl" onclick="switchTsSource('simkl')">🎯 Simkl</button>
+            <button class="ts-source-btn" id="tsSrcBtnOwn" data-src="own" onclick="switchTsSource('own')">🧩 Sinator</button>
         </div>
         <div class="ts-modal-body-scroll">
             <div id="traktListTabsWrap" style="display:none;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);background:var(--bg-card);">
@@ -1742,6 +1743,10 @@
                 <div id="simklListTabs" style="display:flex;gap:6px;padding:10px 16px;min-width:max-content;"></div>
             </div>
             <div class="trakt-modal-body" id="simklResultsContainer" style="display:none;"></div>
+            <div id="myBackendListTabsWrap" style="display:none;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);background:var(--bg-card);">
+                <div id="myBackendListTabs" style="display:flex;gap:6px;padding:10px 16px;min-width:max-content;"></div>
+            </div>
+            <div class="trakt-modal-body" id="myBackendResultsContainer" style="display:none;"></div>
         </div>
     </div>
 </div>
@@ -2059,6 +2064,17 @@
                 <div style="font-size:0.75rem;margin-top:8px;" id="checkUpdatesStatus"></div>
             </div>
             <div class="settings-divider"></div>
+            <div class="settings-section" style="background:rgba(96,144,255,0.07);border:1px solid rgba(96,144,255,0.25);border-radius:12px;padding:14px 16px;">
+                <span class="settings-label" style="color:#6090ff;">🧩 Vlastní backend (Sinator)</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;line-height:1.5;">
+                    Náhrada za Trakt — watchlist, seznamy, hodnocení, historie na tvém vlastním serveru.
+                </div>
+                <input type="text" id="myBackendBaseInput" placeholder="https://sinator-backend.vercel.app/api" style="width:100%;margin-bottom:8px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;">
+                <input type="password" id="myBackendKeyInput" placeholder="API_SECRET" style="width:100%;margin-bottom:10px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;">
+                <button class="settings-btn-small" onclick="saveMyBackendSettings()" style="width:100%;background:rgba(96,144,255,0.2);border:1px solid rgba(96,144,255,0.4);color:#6090ff;font-weight:600;padding:10px;">💾 Uložit a otestovat</button>
+                <div style="font-size:0.75rem;margin-top:8px;" id="myBackendStatus"></div>
+            </div>
+            <div class="settings-divider"></div>
             <div class="settings-section">
                 <span class="settings-label">Záloha dat</span>
                 <div class="settings-actions">
@@ -2360,6 +2376,105 @@
     let adultContent = _store.getItem('sinator_adult_content') === 'true';
     let _aiAbortController = null;
     const TRAKT_CLIENT_ID = 'QOfvLB35_eg1LkJ-51VM7NckrgnWrCAe2xH5EbsumqE';
+
+    // ── Vlastní backend (náhrada za Trakt, viz sinator-backend) ─────────────
+    // Uloženo v localStorage, aby šlo API_SECRET zadat/změnit v appce bez
+    // nutnosti přepisovat kód. Nastav v Nastavení → Ostatní (viz initMyBackendSettings).
+    function myBackendBase() { return (state.myBackend && state.myBackend.base) || ''; }
+    function myBackendKey() { return (state.myBackend && state.myBackend.key) || ''; }
+    function myHeaders() { return { 'Content-Type': 'application/json', 'x-api-key': myBackendKey() }; }
+    function myBackendReady() { return !!(myBackendBase() && myBackendKey()); }
+
+    async function myApi(path, opts = {}) {
+        if (!myBackendReady()) throw new Error('Vlastní backend není nastavený (chybí adresa nebo klíč).');
+        const res = await fetchWithRetry(`${myBackendBase()}${path}`, { ...opts, headers: { ...myHeaders(), ...(opts.headers || {}) } });
+        let body = null;
+        try { body = await res.json(); } catch (e) {}
+        if (!res.ok) throw new Error((body && body.error) || `HTTP ${res.status}`);
+        return body;
+    }
+
+    // Watchlist
+    const myWatchlistGet = () => myApi('/watchlist');
+    const myWatchlistAdd = (id, type, title, year, poster_path) => myApi('/watchlist', { method: 'POST', body: JSON.stringify({ id, type, title, year, poster_path }) });
+    const myWatchlistRemove = (id, type) => myApi('/watchlist', { method: 'DELETE', body: JSON.stringify({ id, type }) });
+
+    // Vlastní seznamy
+    const myListsGet = () => myApi('/lists');
+    const myListCreate = (name) => myApi('/lists', { method: 'POST', body: JSON.stringify({ name }) });
+    const myListDelete = (listId) => myApi(`/lists/${listId}`, { method: 'DELETE' });
+    const myListItemsGet = (listId) => myApi(`/lists/${listId}/items`);
+    const myListItemAdd = (listId, id, type) => myApi(`/lists/${listId}/items`, { method: 'POST', body: JSON.stringify({ id, type }) });
+    const myListItemRemove = (listId, id, type) => myApi(`/lists/${listId}/items`, { method: 'DELETE', body: JSON.stringify({ id, type }) });
+
+    // Hodnocení
+    const myRatingsGet = (type) => myApi(`/ratings?type=${type === 'tv' ? 'shows' : 'movies'}`);
+    const myRatingSet = (id, type, rating) => myApi('/ratings', { method: 'POST', body: JSON.stringify({ id, type, rating }) });
+    const myRatingRemove = (id, type) => myApi('/ratings', { method: 'DELETE', body: JSON.stringify({ id, type }) });
+
+    // Historie
+    const myHistoryGet = (type, page, limit) => myApi(`/history?type=${type}&page=${page || 1}&limit=${limit || 50}`);
+    const myHistoryAdd = (id, type, season, episode) => myApi('/history', { method: 'POST', body: JSON.stringify({ id, type, season, episode }) });
+
+    // Rozkoukanost
+    const myProgressGet = (type) => myApi(`/progress?type=${type === 'tv' ? 'shows' : 'movies'}`);
+    const myProgressSet = (id, type, progress, season, episode) => myApi('/progress', { method: 'POST', body: JSON.stringify({ id, type, progress, season, episode }) });
+    const myProgressRemove = (id, type, season, episode) => myApi('/progress', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode }) });
+
+    window.saveMyBackendSettings = async function() {
+        const baseRaw = ($('myBackendBaseInput')?.value || '').trim().replace(/\/+$/, '');
+        const key = ($('myBackendKeyInput')?.value || '').trim();
+        const statusEl = $('myBackendStatus');
+        if (!baseRaw || !key) { if (statusEl) statusEl.innerHTML = '<span style="color:#e07a6f;">⚠️ Vyplň adresu i klíč.</span>'; return; }
+        state.myBackend = { base: baseRaw, key };
+        _store.setItem('sinator_mybackend', JSON.stringify(state.myBackend));
+        if (statusEl) statusEl.innerHTML = 'Testuju…';
+        try {
+            const res = await fetchWithRetry(`${baseRaw}/health`, { headers: myHeaders() });
+            const data = await res.json();
+            if (res.ok && data.ok) {
+                if (statusEl) statusEl.innerHTML = '<span style="color:#1db954;">✅ Připojeno. Redis: ' + data.redis + '</span>';
+            } else {
+                if (statusEl) statusEl.innerHTML = '<span style="color:#e07a6f;">❌ HTTP ' + res.status + ': ' + (data.error || 'neznámá chyba') + '</span>';
+            }
+        } catch (e) {
+            if (statusEl) statusEl.innerHTML = '<span style="color:#e07a6f;">❌ ' + (e && e.message ? e.message : e) + '</span>';
+        }
+    };
+    function initMyBackendSettingsInputs() {
+        if ($('myBackendBaseInput')) $('myBackendBaseInput').value = myBackendBase();
+        if ($('myBackendKeyInput')) $('myBackendKeyInput').value = myBackendKey();
+    }
+
+    window.myBackendAddWatchlist = async function(id, type, title, year, poster) {
+        if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Ostatní.'); return; }
+        try {
+            await myWatchlistAdd(id, type, title, year || null, poster || null);
+            alert('✅ Přidáno do watchlistu (Sinator backend).');
+        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+    };
+
+    window.myBackendRate = async function(id, type) {
+        if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Ostatní.'); return; }
+        const val = prompt('Hodnocení 1–10:');
+        if (val == null) return;
+        const rating = parseInt(val, 10);
+        if (!rating || rating < 1 || rating > 10) { alert('⚠️ Zadej číslo 1–10.'); return; }
+        try {
+            await myRatingSet(id, type, rating);
+            alert('✅ Hodnocení ' + rating + '/10 uloženo (Sinator backend).');
+        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+    };
+
+    window.myBackendMarkWatched = async function(id, type) {
+        if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Ostatní.'); return; }
+        try {
+            await myHistoryAdd(id, type);
+            alert('✅ Označeno jako shlédnuté (Sinator backend).');
+        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+    };
+
+
     const TRAKT_CLIENT_SECRET = 'rIukoJbVTROcnT9W0-B3Ns3D7dkxN57uuzqsRJAYQVc';
     const REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob';
     const SIMKL_CLIENT_ID = 'a4b20739a0cbf73cfd54302fe2be81088b840262b9554059f180b91df334e545';
@@ -2423,6 +2538,7 @@
         actorFavs: (()=>{ try { return JSON.parse(_store.getItem('sinator_actor_favs')||'[]'); } catch(e) { return []; } })(),
         trakt: (()=>{ try { return JSON.parse(_store.getItem('sinator_trakt') || _TRAKT_DATA_SAVED || '{}'); } catch(e) { try { return JSON.parse(_TRAKT_DATA_SAVED||'{}'); } catch(e2) { return {}; } } })(),
         simkl: (()=>{ try { return JSON.parse(_store.getItem('sinator_simkl')||'{}'); } catch(e) { return {}; } })(),
+        myBackend: (()=>{ try { return JSON.parse(_store.getItem('sinator_mybackend')||'{}'); } catch(e) { return {}; } })(),
         watched: (()=>{ try { const w=JSON.parse(_store.getItem('sinator_watched') || _WATCHED_DATA_SAVED || '{}'); return (w && !Array.isArray(w) && typeof w==='object') ? w : {}; } catch{ try { const w=JSON.parse(_WATCHED_DATA_SAVED||'{}'); return (w && !Array.isArray(w) && typeof w==='object') ? w : {}; } catch{ return {}; } } })(),
         collFavs: (()=>{ try { return JSON.parse(_store.getItem('sinator_coll_favs')||'[]'); } catch(e) { return []; } })(),
         traktLists: [], genres: [],
@@ -2980,18 +3096,23 @@
     function switchTsSource(src) {
         window._tsSource = src;
         const isTrakt = src === 'trakt';
+        const isSimkl = src === 'simkl';
+        const isOwn = src === 'own';
         $('tsSrcBtnTrakt')?.classList.toggle('active', isTrakt);
-        $('tsSrcBtnSimkl')?.classList.toggle('active', !isTrakt);
+        $('tsSrcBtnSimkl')?.classList.toggle('active', isSimkl);
+        $('tsSrcBtnOwn')?.classList.toggle('active', isOwn);
         const heading = $('tsModalHeading');
         if (heading) {
-            heading.innerHTML = isTrakt
-                ? '📋 <span style="color:#ed2224;">TRAKT</span><span style="opacity:.4;"> / </span><span style="opacity:.5;">SIMKL</span>'
-                : '<span style="opacity:.5;">TRAKT</span><span style="opacity:.4;"> / </span>🎯 <span style="color:#1cb99a;">SIMKL</span>';
+            if (isTrakt) heading.innerHTML = '📋 <span style="color:#ed2224;">TRAKT</span><span style="opacity:.4;"> / </span><span style="opacity:.5;">SIMKL / SINATOR</span>';
+            else if (isSimkl) heading.innerHTML = '<span style="opacity:.5;">TRAKT</span><span style="opacity:.4;"> / </span>🎯 <span style="color:#1cb99a;">SIMKL</span><span style="opacity:.4;"> / </span><span style="opacity:.5;">SINATOR</span>';
+            else heading.innerHTML = '<span style="opacity:.5;">TRAKT / SIMKL</span><span style="opacity:.4;"> / </span>🧩 <span style="color:#6090ff;">SINATOR</span>';
         }
         if ($('traktResultsContainer')) $('traktResultsContainer').style.display = isTrakt ? '' : 'none';
-        if ($('simklResultsContainer')) $('simklResultsContainer').style.display = isTrakt ? 'none' : '';
+        if ($('simklResultsContainer')) $('simklResultsContainer').style.display = isSimkl ? '' : 'none';
+        if ($('myBackendResultsContainer')) $('myBackendResultsContainer').style.display = isOwn ? '' : 'none';
         if ($('traktListTabsWrap')) $('traktListTabsWrap').style.display = (isTrakt && window._traktListsCache?.length) ? 'block' : 'none';
-        if ($('simklListTabsWrap')) $('simklListTabsWrap').style.display = (!isTrakt && window._simklListsCache?.length) ? 'block' : 'none';
+        if ($('simklListTabsWrap')) $('simklListTabsWrap').style.display = (isSimkl && window._simklListsCache?.length) ? 'block' : 'none';
+        if ($('myBackendListTabsWrap')) $('myBackendListTabsWrap').style.display = 'none';
         if (isTrakt) {
             if (window._traktListsCache?.length) {
                 const idx = state._traktActiveIdx != null ? state._traktActiveIdx : (window._traktActiveIdx || 0);
@@ -3000,7 +3121,7 @@
             } else {
                 loadTraktLists();
             }
-        } else {
+        } else if (isSimkl) {
             if (window._simklListsCache?.length) {
                 const idx = state._simklActiveIdx != null ? state._simklActiveIdx : (window._simklActiveIdx || 0);
                 state._simklActiveIdx = null;
@@ -3008,6 +3129,8 @@
             } else {
                 loadSimklLists();
             }
+        } else {
+            loadMyBackendOverview();
         }
     }
     window.switchTsSource = switchTsSource;
@@ -3142,6 +3265,7 @@
         if($('groqApiKeyInput')) $('groqApiKeyInput').value = groqApiKey;
         if($('openRouterKeyInput')) $('openRouterKeyInput').value = openRouterKey;
         if($('omdbApiKeyInput')) $('omdbApiKeyInput').value = omdbApiKey;
+        initMyBackendSettingsInputs();
         updateGeminiStatus(); updateGroqStatus(); updateOpenRouterStatus(); updateOmdbStatus();
         updateThemeToggleUI();
         $('settingsModal')?.classList.add('open');
@@ -8072,6 +8196,95 @@ EXAMPLES:
         </div>`;
     }
 
+    // ── Vlastní backend (Sinator) — přehled watchlistu / seznamů / hodnocení / historie ──
+    window._myBackendTabsCache = null;
+    window._myBackendActiveTab = 'watchlist';
+
+    async function fetchMyBackendPosters(items) {
+        // Watchlist položky mají title/poster_path uložené rovnou; hodnocení/historie/
+        // rozkoukanost mají jen id+type, tak si detail dotáhneme z TMDB.
+        const need = items.filter(it => !it.title);
+        if (!need.length || !tmdbApiKey) return items;
+        await Promise.all(need.map(async it => {
+            try {
+                const kind = (it.type === 'tv' || it.type === 'shows' || it.type === 'episodes') ? 'tv' : 'movie';
+                const res = await fetch(`https://api.themoviedb.org/3/${kind}/${it.id}?api_key=${tmdbApiKey}&language=cs-CZ`);
+                if (!res.ok) return;
+                const d = await res.json();
+                it.title = d.title || d.name || `#${it.id}`;
+                it.year = (d.release_date || d.first_air_date || '').slice(0, 4);
+                it.poster_path = d.poster_path ? `https://image.tmdb.org/t/p/w342${d.poster_path}` : null;
+                it.tmdbType = kind;
+            } catch (e) {}
+        }));
+        return items;
+    }
+
+    function renderMyBackendGrid(items, emptyMsg) {
+        const c = $('myBackendResultsContainer');
+        if (!items.length) { c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">${emptyMsg}</div>`; return; }
+        c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:0 14px 14px;">${items.map(it => {
+            const poster = it.poster_path && it.poster_path.startsWith('http') ? it.poster_path : (it.poster_path ? `https://image.tmdb.org/t/p/w342${it.poster_path}` : null);
+            const kind = it.tmdbType || (it.type === 'tv' || it.type === 'shows' ? 'tv' : 'movie');
+            return `<div class="card" onclick="openDetail(${it.id},'${kind}')">
+                ${poster ? `<img class="card-image" src="${poster}" loading="lazy">` : `<div class="card-placeholder">${kind === 'tv' ? '📺' : '🎬'}</div>`}
+                <div class="card-info"><div class="card-title">${it.title || ('#' + it.id)}</div><div class="card-meta"><span>${it.year || '—'}</span>${it.rating ? `<span>★ ${it.rating}/10</span>` : ''}</div></div>
+            </div>`;
+        }).join('')}</div>`;
+    }
+
+    async function renderMyBackendTab(tab) {
+        window._myBackendActiveTab = tab;
+        // zvýrazni aktivní tab
+        document.querySelectorAll('#myBackendListTabs button').forEach(b => {
+            const active = b.dataset.tab === tab;
+            b.style.background = active ? 'rgba(96,144,255,0.2)' : 'var(--bg-elevated)';
+            b.style.borderColor = active ? '#6090ff' : 'var(--border)';
+            b.style.color = active ? '#6090ff' : 'var(--text)';
+        });
+        const c = $('myBackendResultsContainer');
+        c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">Načítám…</div>`;
+        try {
+            let items = [];
+            let emptyMsg = 'Žádné položky.';
+            if (tab === 'watchlist') { items = await myWatchlistGet(); emptyMsg = 'Watchlist je prázdný.'; }
+            else if (tab === 'ratings-movies') { items = (await myRatingsGet('movies')).map(r => ({ ...r, type: 'movie' })); emptyMsg = 'Zatím žádná hodnocení filmů.'; }
+            else if (tab === 'ratings-shows') { items = (await myRatingsGet('shows')).map(r => ({ ...r, type: 'tv' })); emptyMsg = 'Zatím žádná hodnocení seriálů.'; }
+            else if (tab === 'history-movies') { items = (await myHistoryGet('movies', 1, 50)).map(r => ({ ...r, type: 'movie' })); emptyMsg = 'Historie filmů je prázdná.'; }
+            else if (tab === 'history-episodes') { items = (await myHistoryGet('episodes', 1, 50)).map(r => ({ ...r, type: 'tv' })); emptyMsg = 'Historie epizod je prázdná.'; }
+            else if (tab.startsWith('list:')) { items = await myListItemsGet(tab.slice(5)); emptyMsg = 'Seznam je prázdný.'; }
+            items = await fetchMyBackendPosters(items);
+            renderMyBackendGrid(items, emptyMsg);
+        } catch (e) {
+            c.innerHTML = `<div class="empty" style="padding:20px;text-align:center;">⚠️ ${e && e.message ? e.message : e}<br><br><button onclick="renderMyBackendTab('${tab}')" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
+        }
+    }
+    window.renderMyBackendTab = renderMyBackendTab;
+
+    async function loadMyBackendOverview() {
+        const c = $('myBackendResultsContainer');
+        if (!myBackendReady()) {
+            c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">🧩 Vlastní backend není nastavený.<br><br>Nastav adresu a klíč v <b>Nastavení → Ostatní</b>.</div>`;
+            $('myBackendListTabsWrap').style.display = 'none';
+            return;
+        }
+        let lists = [];
+        try { lists = await myListsGet(); } catch (e) {}
+        const staticTabs = [
+            { key: 'watchlist', label: '🔖 Watchlist' },
+            { key: 'ratings-movies', label: '⭐ Hodnoc. filmy' },
+            { key: 'ratings-shows', label: '⭐ Hodnoc. seriály' },
+            { key: 'history-movies', label: '🕓 Hist. filmy' },
+            { key: 'history-episodes', label: '🕓 Hist. epizody' },
+        ];
+        const listTabs = lists.map(l => ({ key: `list:${l.id}`, label: `📁 ${l.name} (${l.item_count || 0})` }));
+        const allTabs = [...staticTabs, ...listTabs];
+        $('myBackendListTabs').innerHTML = allTabs.map(t => `<button class="ts-list-tab-btn" data-tab="${t.key}" onclick="renderMyBackendTab('${t.key}')" style="white-space:nowrap;padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.82rem;">${t.label}</button>`).join('');
+        $('myBackendListTabsWrap').style.display = 'block';
+        renderMyBackendTab('watchlist');
+    }
+    window.loadMyBackendOverview = loadMyBackendOverview;
+
     async function loadTraktLists() {
         await ensureTraktToken();
         if(!state.trakt.accessToken) { $('traktResultsContainer').innerHTML = '<div class="empty">⚙️ Nejprve se připojte k Traktu v nastavení.</div>'; return; }
@@ -9087,6 +9300,12 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 <div class="action-buttons" style="display:none;margin-top:4px;">
 <button class="action-btn-modal" onclick="toggleTraktWatchlist(${id},'${type}',this)" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">🔖 Watchlist</button>
 <button class="action-btn-modal" onclick="openTraktListPicker(${id},'${type}')" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">📋 Do seznamu</button>
+</div>
+<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">🧩 Sinator ▾</button>
+<div class="action-buttons" style="display:none;margin-top:4px;">
+<button class="action-btn-modal" onclick="myBackendAddWatchlist(${id},'${type}','${jsq(title)}','${year}','${posterPath}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">🔖 Watchlist</button>
+<button class="action-btn-modal" onclick="myBackendRate(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">⭐ Hodnotit</button>
+${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWatched(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">✅ Shlédnuto</button>` : ''}
 </div>`;
             const actionBtns = coreBtns + extraBtns + `</div>`;
             $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip" style="cursor:pointer;" title="Najít filmy/seriály se stejným hodnocením" onclick="openRatingBrowse(${d.vote_average||0},'${type}')"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
