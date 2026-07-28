@@ -8083,17 +8083,19 @@ EXAMPLES:
                 fetchWithRetry(`${TRAKT_BASE}/sync/history/movies?limit=1`, { headers: getTraktHeaders() }),
                 fetchWithRetry(`${TRAKT_BASE}/sync/history/episodes?limit=1`, { headers: getTraktHeaders() })
             ]);
-            const lists = await listsRes.json();
-            const movieRatings = movieRatingsRes.ok ? await movieRatingsRes.json() : [];
-            const showRatings = showRatingsRes.ok ? await showRatingsRes.json() : [];
-            window._traktMovieRatingsCache = Array.isArray(movieRatings) ? movieRatings : [];
-            window._traktShowRatingsCache = Array.isArray(showRatings) ? showRatings : [];
+            const lists = listsRes.ok ? await listsRes.json() : [];
+            const movieRatings = movieRatingsRes.ok ? await movieRatingsRes.json() : null;
+            const showRatings = showRatingsRes.ok ? await showRatingsRes.json() : null;
+            // Necachovat prázdné pole, když požadavek ve skutečnosti selhal (Trakt HTTP chyba) —
+            // jinak si appka natrvalo "zapamatuje" falešné 0 hodnocení a záložku už znovu nezkusí.
+            window._traktMovieRatingsCache = Array.isArray(movieRatings) ? movieRatings : (movieRatingsRes.ok ? [] : null);
+            window._traktShowRatingsCache = Array.isArray(showRatings) ? showRatings : (showRatingsRes.ok ? [] : null);
             const movieHistCount = movieHistRes.ok ? parseInt(movieHistRes.headers.get('X-Pagination-Item-Count')||'0', 10) : 0;
             const epHistCount = epHistRes.ok ? parseInt(epHistRes.headers.get('X-Pagination-Item-Count')||'0', 10) : 0;
             // Pseudo-seznamy "Moje hodnocení" (z Trakt /sync/ratings) — vždy na začátku
             const ratingPseudoLists = [
-                { name: 'HODNOCENÉ FILMY', item_count: window._traktMovieRatingsCache.length, isRatings: true, ratingType: 'movies', ids: { trakt: '__ratings_movies__' } },
-                { name: 'HODNOCENÉ SERIÁLY', item_count: window._traktShowRatingsCache.length, isRatings: true, ratingType: 'shows', ids: { trakt: '__ratings_shows__' } }
+                { name: 'HODNOCENÉ FILMY', item_count: window._traktMovieRatingsCache ? window._traktMovieRatingsCache.length : '?', isRatings: true, ratingType: 'movies', ids: { trakt: '__ratings_movies__' } },
+                { name: 'HODNOCENÉ SERIÁLY', item_count: window._traktShowRatingsCache ? window._traktShowRatingsCache.length : '?', isRatings: true, ratingType: 'shows', ids: { trakt: '__ratings_shows__' } }
             ];
             // Pseudo-seznamy "Historie" (z Trakt /sync/history) — datum a čas zhlédnutí
             const historyPseudoLists = [
@@ -8101,12 +8103,16 @@ EXAMPLES:
                 { name: 'HISTORIE EPIZOD', item_count: epHistCount, isHistory: true, historyType: 'episodes', ids: { trakt: '__history_episodes__' } }
             ];
             state.traktLists = [...ratingPseudoLists, ...historyPseudoLists, ...(Array.isArray(lists) ? lists : [])];
-            if(state.traktLists.length === 0) { $('traktResultsContainer').innerHTML='<div class="empty">Žádné Trakt seznamy.</div>'; }
+            if (!listsRes.ok) {
+                $('traktResultsContainer').innerHTML = `<div class="empty" style="padding:20px;text-align:center;">⚠️ Vlastní seznamy se nepodařilo načíst (Trakt HTTP ${listsRes.status}) — zobrazeny jsou aspoň hodnocení a historie, pokud se povedly.<br><br><button onclick="loadTraktLists()" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
+                const pending = window._pendingTraktStatsOpen; window._pendingTraktStatsOpen = null;
+                renderTraktLists(state.traktLists, typeof pending === 'number' ? pending : 0);
+            } else if(state.traktLists.length === 0) { $('traktResultsContainer').innerHTML='<div class="empty">Žádné Trakt seznamy.</div>'; }
             else {
                 const pending = window._pendingTraktStatsOpen; window._pendingTraktStatsOpen = null;
                 renderTraktLists(state.traktLists, typeof pending === 'number' ? pending : 0);
             }
-        } catch(e) { $('traktResultsContainer').innerHTML='<div class="empty">⚠️ Chyba načtení seznamů.</div>'; }
+        } catch(e) { $('traktResultsContainer').innerHTML = `<div class="empty" style="padding:20px;text-align:center;">⚠️ Chyba načtení seznamů: ${e && e.message ? e.message : e}<br><br><button onclick="loadTraktLists()" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`; }
     }
 
     function getTraktHeaders() {
@@ -8163,7 +8169,7 @@ EXAMPLES:
             const cacheKey = ratingType === 'movies' ? '_traktMovieRatingsCache' : '_traktShowRatingsCache';
             let items = window[cacheKey];
             if (!Array.isArray(items)) {
-                const res = await fetch(`${TRAKT_BASE}/sync/ratings/${ratingType}`, { headers: getTraktHeaders() });
+                const res = await fetchWithRetry(`${TRAKT_BASE}/sync/ratings/${ratingType}`, { headers: getTraktHeaders() });
                 if (!res.ok) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba API: HTTP ${res.status}</div>`; return; }
                 items = await res.json();
                 window[cacheKey] = Array.isArray(items) ? items : [];
@@ -8207,7 +8213,7 @@ EXAMPLES:
             await ensureTraktToken();
             let items = window[cacheKey];
             if (!Array.isArray(items)) {
-                const res = await fetch(`${TRAKT_BASE}/sync/ratings/${ratingType}`, { headers: getTraktHeaders() });
+                const res = await fetchWithRetry(`${TRAKT_BASE}/sync/ratings/${ratingType}`, { headers: getTraktHeaders() });
                 if (!res.ok) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba API: HTTP ${res.status}</div>`; return; }
                 items = await res.json();
                 window[cacheKey] = Array.isArray(items) ? items : [];
@@ -8238,7 +8244,7 @@ EXAMPLES:
         const historyType = window._traktHistoryType;
         const page = window._traktHistoryPage;
         try {
-            const res = await fetch(`${TRAKT_BASE}/sync/history/${historyType}?limit=50&page=${page}&extended=full`, { headers: getTraktHeaders() });
+            const res = await fetchWithRetry(`${TRAKT_BASE}/sync/history/${historyType}?limit=50&page=${page}&extended=full`, { headers: getTraktHeaders() });
             if (gen !== window._traktHistGen) return;
             if (!res.ok) { $('traktResultsContainer').innerHTML = `<div class="empty">Chyba API: HTTP ${res.status}</div>`; return; }
             const items = await res.json();
@@ -9255,7 +9261,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             if (!state.trakt.accessToken) { box.innerHTML = ''; return; }
             const traktType = type === 'tv' ? 'shows' : 'movies';
             const itemKey = type === 'tv' ? 'show' : 'movie';
-            const res = await fetch(`${TRAKT_BASE}/sync/ratings/${traktType}`, { headers: getTraktHeaders() });
+            const res = await fetchWithRetry(`${TRAKT_BASE}/sync/ratings/${traktType}`, { headers: getTraktHeaders() });
             if (!res.ok) return;
             const data = await res.json();
             const found = (Array.isArray(data) ? data : []).find(r => r[itemKey]?.ids?.tmdb === id);
@@ -9325,13 +9331,13 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             if (!state.trakt.accessToken) { box.innerHTML = ''; return; }
             const traktType = type === 'tv' ? 'show' : 'movie';
             const traktPlural = type === 'tv' ? 'shows' : 'movies';
-            const searchRes = await fetch(`${TRAKT_BASE}/search/tmdb/${id}?type=${traktType}`, { headers: getTraktHeaders() });
+            const searchRes = await fetchWithRetry(`${TRAKT_BASE}/search/tmdb/${id}?type=${traktType}`, { headers: getTraktHeaders() });
             if (!searchRes.ok) { box.innerHTML = ''; return; }
             const searchData = await searchRes.json();
             const item = searchData?.[0]?.[traktType];
             const traktId = item?.ids?.trakt;
             if (!traktId) { box.innerHTML = ''; return; }
-            const histRes = await fetch(`${TRAKT_BASE}/sync/history/${traktPlural}/${traktId}?limit=100`, { headers: getTraktHeaders() });
+            const histRes = await fetchWithRetry(`${TRAKT_BASE}/sync/history/${traktPlural}/${traktId}?limit=100`, { headers: getTraktHeaders() });
             if (!histRes.ok) { box.innerHTML = ''; return; }
             const hist = await histRes.json();
             renderTraktWatchHistory(id, Array.isArray(hist) ? hist : [], type);
@@ -10709,8 +10715,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         try {
             await ensureTraktToken();
             const [moviesRes, showsRes] = await Promise.all([
-                fetch(`${TRAKT_BASE}/sync/watched/movies`, { headers: getTraktHeaders() }),
-                fetch(`${TRAKT_BASE}/sync/watched/shows`, { headers: getTraktHeaders() })
+                fetchWithRetry(`${TRAKT_BASE}/sync/watched/movies`, { headers: getTraktHeaders() }),
+                fetchWithRetry(`${TRAKT_BASE}/sync/watched/shows`, { headers: getTraktHeaders() })
             ]);
             const movies = await moviesRes.json();
             const shows = await showsRes.json();
@@ -10865,7 +10871,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 
         try {
             await ensureTraktToken();
-            const res = await fetch(`${TRAKT_BASE}/sync/watched/shows`, { headers: getTraktHeaders() });
+            const res = await fetchWithRetry(`${TRAKT_BASE}/sync/watched/shows`, { headers: getTraktHeaders() });
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const watchedShowsRaw = await res.json();
             const watchedShows = Array.isArray(watchedShowsRaw) ? watchedShowsRaw : [];
@@ -11167,7 +11173,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 
         try {
             await ensureTraktToken();
-            const res = await fetch(`${TRAKT_BASE}/sync/playback/movies?limit=100`, { headers: getTraktHeaders() });
+            const res = await fetchWithRetry(`${TRAKT_BASE}/sync/playback/movies?limit=100`, { headers: getTraktHeaders() });
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const playback = await res.json();
             if (!Array.isArray(playback) || !playback.length) {
@@ -11279,7 +11285,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         try {
             // Načíst playback ID
             await ensureTraktToken();
-            const res = await fetch(`${TRAKT_BASE}/sync/playback/movies?limit=100`, { headers: getTraktHeaders() });
+            const res = await fetchWithRetry(`${TRAKT_BASE}/sync/playback/movies?limit=100`, { headers: getTraktHeaders() });
             const playback = await res.json();
             const item = (Array.isArray(playback) ? playback : []).find(p => p.movie?.ids?.tmdb == movieId);
             if (item?.id) {
@@ -11585,8 +11591,9 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         try {
             const username = state.trakt.username||'me';
             const headers = getTraktHeaders();
-            // Fetch all lists + check which ones contain this item
-            const lists = await fetch(`${TRAKT_BASE}/users/${username}/lists`, { headers }).then(r=>r.json());
+            const listsRes = await fetchWithRetry(`${TRAKT_BASE}/users/${username}/lists`, { headers });
+            if (!listsRes.ok) throw new Error(`HTTP ${listsRes.status} u /users/${username}/lists`);
+            const lists = await listsRes.json();
             if(!Array.isArray(lists)||!lists.length) {
                 document.getElementById('traktListPickerBody').innerHTML='<div style="color:var(--text-muted);text-align:center;padding:20px;">Žádné vlastní seznamy.<br>Vytvořte seznam na <a href="https://trakt.tv" target="_blank" style="color:#1db954;">trakt.tv</a></div>';
                 return;
@@ -11594,7 +11601,8 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
             // Check membership for each list
             const memberships = await Promise.all(lists.map(async l => {
                 try {
-                    const items = await fetch(`${TRAKT_BASE}/users/${username}/lists/${l.ids.trakt}/items`, { headers }).then(r=>r.json());
+                    const itemsRes = await fetchWithRetry(`${TRAKT_BASE}/users/${username}/lists/${l.ids.trakt}/items`, { headers });
+                    const items = itemsRes.ok ? await itemsRes.json() : [];
                     const mediaKey = type==='movie' ? 'movie' : 'show';
                     const inList = Array.isArray(items) && items.some(it => it[mediaKey]?.ids?.tmdb === tmdbId);
                     return { ...l, inList };
@@ -11611,7 +11619,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
                         ${l.inList?'➖ Odebrat':'➕ Přidat'}
                     </button>
                 </div>`).join('');
-        } catch(e) { const b=document.getElementById('traktListPickerBody'); if(b) b.innerHTML='<div style="color:var(--accent);padding:20px;">Chyba načtení seznamů.</div>'; }
+        } catch(e) { const b=document.getElementById('traktListPickerBody'); if(b) b.innerHTML=`<div style="color:var(--accent);padding:20px;text-align:center;">Chyba načtení seznamů: ${e && e.message ? e.message : e}<br><br><button onclick="document.getElementById('traktListPicker').remove();openTraktListPicker(${tmdbId},'${type}')" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`; }
     }
 
     async function toggleTraktListItem(listId, tmdbId, type, isInList, btn) {
