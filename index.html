@@ -9300,12 +9300,12 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         try {
             const key = type === 'tv' ? 'shows' : 'movies';
             const body = { [key]: [{ ids: { tmdb: id }, rating: value }] };
-            const res = await fetch(`${TRAKT_BASE}/sync/ratings`, { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
+            const res = await fetchWithRetry(`${TRAKT_BASE}/sync/ratings`, { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
             if (!res.ok) throw new Error('HTTP ' + res.status);
             window._traktMovieRatingsCache = null; window._traktShowRatingsCache = null;
         } catch (e) {
             console.warn('Trakt rating submit error:', e);
-            alert('⚠️ Hodnocení se nepodařilo odeslat na Trakt.');
+            alert('⚠️ Hodnocení se nepodařilo odeslat na Trakt (' + (e && e.message ? e.message : e) + '). Zkus to prosím za chvíli znovu.');
         }
     }
 
@@ -9316,7 +9316,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
         try {
             const key = type === 'tv' ? 'shows' : 'movies';
             const body = { [key]: [{ ids: { tmdb: id } }] };
-            await fetch(`${TRAKT_BASE}/sync/ratings/remove`, { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
+            await fetchWithRetry(`${TRAKT_BASE}/sync/ratings/remove`, { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
             window._traktMovieRatingsCache = null; window._traktShowRatingsCache = null;
         } catch (e) { console.warn('Trakt rating remove error:', e); }
     }
