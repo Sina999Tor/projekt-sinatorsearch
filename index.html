@@ -9930,6 +9930,9 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             console.log('[Sinator badge] výsledek:', Array.isArray(list) ? list.length + ' položek' : list);
             const watched = (list || []).some(h => String(h.id) === String(id));
             applyMySinatorWatchedBadgeStyle(btn, watched);
+            // DOČASNÝ DEBUG — ukáže rovnou v pilulce kolik záznamů v daném bucketu je
+            // a jaké id appka hledá, ať to jde poslat screenshotem bez devtools.
+            btn.textContent += ` [n=${list.length}, id=${id}]`;
         } catch (e) {
             console.warn('Sinator watched-badge load error:', e);
             btn.textContent = '⚠️ chyba';
