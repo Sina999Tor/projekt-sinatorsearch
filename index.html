@@ -1934,6 +1934,12 @@
                     <button class="settings-btn-small settings-btn-remove" onclick="disconnectMyBackend()">❌ Odebrat</button>
                 </div>
                 <div style="font-size:0.75rem;margin-top:8px;" id="myBackendStatus"></div>
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Máš exportovaná data z Traktu? Nahraj ZIP a appka je přenese sem (watchlist, hodnocení, historie, seznamy).</div>
+                    <input type="file" id="traktImportFileInput" accept=".zip" style="display:none;" onchange="handleTraktExportImport(this.files[0])">
+                    <button class="settings-btn-small" style="width:100%;border-color:#6090ff;color:#6090ff;" onclick="document.getElementById('traktImportFileInput').click()">📥 Import z Trakt exportu (ZIP)</button>
+                    <div id="traktImportStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;"></div>
+                </div>
             </div>
             <div class="settings-divider"></div>
             <div class="settings-section" style="display:none;">
@@ -2421,6 +2427,169 @@
     const myProgressGet = (type) => myApi(`/progress?type=${(type === 'tv' || type === 'shows') ? 'shows' : 'movies'}`);
     const myProgressSet = (id, type, progress, season, episode) => myApi('/progress', { method: 'POST', body: JSON.stringify({ id, type, progress, season, episode }) });
     const myProgressRemove = (id, type, season, episode) => myApi('/progress', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode }) });
+
+    // ── Import exportovaných dat z Traktu (ZIP) do vlastního backendu ──────────
+    function loadJSZipLib() {
+        if (window.JSZip) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+            s.onload = resolve;
+            s.onerror = () => reject(new Error('Nepodařilo se načíst JSZip knihovnu.'));
+            document.head.appendChild(s);
+        });
+    }
+
+    async function myImportBatch(kind, items, extra) {
+        return myApi('/import', { method: 'POST', body: JSON.stringify({ kind, items, ...extra }) });
+    }
+
+    async function myImportChunked(kind, items, statusEl, label, extra) {
+        const CHUNK = 300;
+        let done = 0;
+        for (let i = 0; i < items.length; i += CHUNK) {
+            const chunk = items.slice(i, i + CHUNK);
+            await myImportBatch(kind, chunk, extra);
+            done += chunk.length;
+            if (statusEl) statusEl.textContent = `${label}: ${done}/${items.length}…`;
+        }
+    }
+
+    window.handleTraktExportImport = async function(file) {
+        const statusEl = $('traktImportStatus');
+        if (!file) return;
+        if (!myBackendReady()) { alert('⚠️ Nejdřív nastav a ulož Sinator backend (klíč) výše.'); return; }
+        if (statusEl) statusEl.textContent = 'Načítám ZIP knihovnu…';
+        try { await loadJSZipLib(); } catch (e) { if (statusEl) statusEl.textContent = '❌ ' + e.message; return; }
+
+        try {
+            if (statusEl) statusEl.textContent = 'Rozbaluji ZIP…';
+            const buf = await file.arrayBuffer();
+            const zip = await window.JSZip.loadAsync(buf);
+
+            async function readJson(name) {
+                const f = zip.file(name);
+                if (!f) return null;
+                try { return JSON.parse(await f.async('string')); } catch (e) { return null; }
+            }
+            function filesMatching(re) {
+                return Object.keys(zip.files).filter(n => re.test(n));
+            }
+
+            // ── Watchlist ──
+            const watchlistItems = [];
+            for (const fname of filesMatching(/^lists-watchlist-\d+\.json$/)) {
+                const arr = await readJson(fname);
+                for (const e of (arr || [])) {
+                    const obj = e.movie || e.show;
+                    const tmdb = obj?.ids?.tmdb;
+                    if (!tmdb) continue;
+                    watchlistItems.push({ id: tmdb, type: e.type === 'show' ? 'tv' : 'movie', title: obj.title || null, year: obj.year || null, poster_path: null });
+                }
+            }
+
+            // ── Hodnocení ──
+            const ratingsMovies = [];
+            for (const fname of filesMatching(/^ratings-movies-\d+\.json$/)) {
+                const arr = await readJson(fname);
+                for (const r of (arr || [])) {
+                    const tmdb = r.movie?.ids?.tmdb;
+                    if (!tmdb) continue;
+                    ratingsMovies.push({ id: tmdb, rating: r.rating, rated_at: r.rated_at ? new Date(r.rated_at).getTime() : Date.now() });
+                }
+            }
+            const ratingsShows = [];
+            const showsRatingsRaw = await readJson('ratings-shows.json');
+            for (const r of (showsRatingsRaw || [])) {
+                const tmdb = r.show?.ids?.tmdb;
+                if (!tmdb) continue;
+                ratingsShows.push({ id: tmdb, rating: r.rating, rated_at: r.rated_at ? new Date(r.rated_at).getTime() : Date.now() });
+            }
+
+            // ── Historie sledování ──
+            const historyMovies = [], historyEpisodes = [];
+            for (const fname of filesMatching(/^watched-history-\d+\.json$/)) {
+                const arr = await readJson(fname);
+                for (const e of (arr || [])) {
+                    const ts = e.watched_at ? new Date(e.watched_at).getTime() : Date.now();
+                    if (e.type === 'movie') {
+                        const tmdb = e.movie?.ids?.tmdb;
+                        if (!tmdb) continue;
+                        historyMovies.push({ id: tmdb, watched_at: ts });
+                    } else if (e.type === 'episode') {
+                        const tmdb = e.show?.ids?.tmdb;
+                        if (!tmdb) continue;
+                        historyEpisodes.push({ id: tmdb, season: e.episode?.season ?? null, episode: e.episode?.number ?? null, watched_at: ts });
+                    }
+                }
+            }
+
+            // ── Rozkoukanost ──
+            const progressMovies = [], progressShows = [];
+            const playbackRaw = await readJson('watched-playback.json');
+            for (const e of (playbackRaw || [])) {
+                if (e.type === 'movie') {
+                    const tmdb = e.movie?.ids?.tmdb;
+                    if (!tmdb) continue;
+                    progressMovies.push({ id: tmdb, progress: e.progress, paused_at: e.paused_at ? new Date(e.paused_at).getTime() : Date.now() });
+                } else if (e.type === 'episode') {
+                    const tmdb = e.show?.ids?.tmdb;
+                    if (!tmdb) continue;
+                    progressShows.push({ id: tmdb, season: e.episode?.season ?? null, episode: e.episode?.number ?? null, progress: e.progress, paused_at: e.paused_at ? new Date(e.paused_at).getTime() : Date.now() });
+                }
+            }
+
+            // ── Vlastní seznamy (název podle lists-lists.json, položky podle lists-list-<traktId>-*.json) ──
+            const listsIndex = await readJson('lists-lists.json') || [];
+            const nameByTraktId = {};
+            for (const l of listsIndex) { if (l.ids?.trakt) nameByTraktId[l.ids.trakt] = l.name; }
+            const listFiles = filesMatching(/^lists-list-(\d+)-.*\.json$/);
+            const itemsByTraktId = {};
+            for (const fname of listFiles) {
+                const m = fname.match(/^lists-list-(\d+)-/);
+                const traktId = m[1];
+                const arr = await readJson(fname);
+                if (!itemsByTraktId[traktId]) itemsByTraktId[traktId] = [];
+                for (const e of (arr || [])) {
+                    const obj = e.movie || e.show;
+                    const tmdb = obj?.ids?.tmdb;
+                    if (!tmdb) continue;
+                    itemsByTraktId[traktId].push({ id: tmdb, type: e.type === 'show' ? 'tv' : 'movie' });
+                }
+            }
+
+            // ── Nahrávání ──
+            if (statusEl) statusEl.textContent = 'Nahrávám watchlist…';
+            await myImportChunked('watchlist', watchlistItems, statusEl, 'Watchlist');
+            await myImportChunked('ratings-movies', ratingsMovies, statusEl, 'Hodnocení filmů');
+            await myImportChunked('ratings-shows', ratingsShows, statusEl, 'Hodnocení seriálů');
+            await myImportChunked('history-movies', historyMovies, statusEl, 'Historie filmů');
+            await myImportChunked('history-episodes', historyEpisodes, statusEl, 'Historie epizod');
+            await myImportChunked('progress-movies', progressMovies, statusEl, 'Rozkoukanost filmů');
+            await myImportChunked('progress-shows', progressShows, statusEl, 'Rozkoukanost seriálů');
+
+            let listNum = 0;
+            const totalLists = Object.keys(itemsByTraktId).length;
+            for (const traktId of Object.keys(itemsByTraktId)) {
+                listNum++;
+                const name = nameByTraktId[traktId] || `Import ${traktId}`;
+                const items = itemsByTraktId[traktId];
+                if (statusEl) statusEl.textContent = `Seznam "${name}" (${listNum}/${totalLists})…`;
+                let listId = null;
+                for (let i = 0; i < items.length; i += 300) {
+                    const chunk = items.slice(i, i + 300);
+                    const resp = await myImportBatch('list', chunk, { name, listId });
+                    listId = resp.listId;
+                }
+            }
+
+            if (statusEl) statusEl.innerHTML = `<span style="color:#1db954;">✅ Hotovo! Watchlist: ${watchlistItems.length}, hodnocení: ${ratingsMovies.length + ratingsShows.length}, historie: ${historyMovies.length + historyEpisodes.length}, seznamy: ${totalLists}.</span>`;
+        } catch (e) {
+            console.error('Trakt export import error:', e);
+            if (statusEl) statusEl.innerHTML = `<span style="color:#e07a6f;">❌ ${e && e.message ? e.message : e}</span>`;
+        }
+    };
+
 
     window.saveMyBackendSettings = async function() {
         const key = ($('myBackendKeyInput')?.value || '').trim();
@@ -9402,7 +9571,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
 <button class="action-btn-modal" onclick="myBackendAddToList(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">📁 Do seznamu</button>
 </div>`;
             const actionBtns = coreBtns + extraBtns + `</div>`;
-            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip" style="cursor:pointer;" title="Najít filmy/seriály se stejným hodnocením" onclick="openRatingBrowse(${d.vote_average||0},'${type}')"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
+            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip" style="cursor:pointer;" title="Najít filmy/seriály se stejným hodnocením" onclick="openRatingBrowse(${d.vote_average||0},'${type}')"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button><button class="modal-chip" id="mySinatorWatchedBadge_${id}" style="display:none;cursor:pointer;padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleMySinatorWatched(${id},'${type}',this)">🧩 …</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="mySinatorRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
             
             if(type === 'tv') {
                 $('modalScrollBody').innerHTML += `<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);"><h3 style="margin-bottom:16px;font-size:1.2rem;">📺 Sezóny a epizody</h3><div id="seasons-container"></div></div>`;
@@ -9412,6 +9581,9 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             loadCsfdRating(id, type, safeTitle, year);
             // Vlastní hodnocení na Trakt (jen pokud je uživatel přihlášen)
             initTraktUserRating(id, type);
+            // Vlastní hodnocení a shlédnutost na Sinator backendu
+            initMySinatorRating(id, type);
+            initMySinatorWatchedBadge(id, type);
             // Historie sledování na Trakt (datum a čas zhlédnutí)
             initTraktWatchHistory(id, type);
             $('modalScrollBody').innerHTML += `</div>`;
@@ -9633,6 +9805,92 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             window._traktMovieRatingsCache = null; window._traktShowRatingsCache = null;
         } catch (e) { console.warn('Trakt rating remove error:', e); }
     }
+
+    // ── VLASTNÍ HODNOCENÍ NA SINATOR BACKENDU (10 hvězdiček) ────────────────────
+    function mySinatorStarsRowHtml(id, current) {
+        let out = '';
+        for (let i = 1; i <= 10; i++) {
+            out += `<span class="trakt-star${current && i <= current ? ' filled' : ''}" data-star="${i}" onclick="setMySinatorUserRating(${id},this,${i})" onmouseover="hoverTraktStars(this,${i})" onmouseout="unhoverTraktStars(this)">★</span>`;
+        }
+        return out;
+    }
+    function mySinatorRatingLabelHtml(id, type, current) {
+        const removeBtn = current ? `<button class="trakt-rating-remove" onclick="removeMySinatorUserRating(${id},'${type}')">✕ Odebrat</button>` : '';
+        const ratingBadge = current ? ` <b style="color:#6090ff;">${current}/10</b>` : '';
+        return `<span>🧩 Vaše hodnocení na Sinator${ratingBadge}</span>${removeBtn}`;
+    }
+    async function initMySinatorRating(id, type) {
+        const box = document.getElementById(`mySinatorRatingSlot_${id}`);
+        if (!box) return;
+        if (!myBackendReady()) { box.innerHTML = ''; return; }
+        box.dataset.type = type;
+        box.innerHTML = `<div class="trakt-user-rating"><div class="trakt-user-rating-label">${mySinatorRatingLabelHtml(id, type, 0)}</div><div class="trakt-stars">${mySinatorStarsRowHtml(id, 0)}</div></div>`;
+        try {
+            const rtype = (type === 'tv') ? 'shows' : 'movies';
+            const list = await myRatingsGet(rtype);
+            const found = (Array.isArray(list) ? list : []).find(r => String(r.id) === String(id));
+            updateMySinatorRatingUI(id, type, found ? found.rating : 0);
+        } catch (e) { console.warn('Sinator rating load error:', e); }
+    }
+    function updateMySinatorRatingUI(id, type, current) {
+        const box = document.getElementById(`mySinatorRatingSlot_${id}`);
+        if (!box || !box.firstElementChild) return;
+        const label = box.querySelector('.trakt-user-rating-label');
+        const starsRow = box.querySelector('.trakt-stars');
+        if (label) label.innerHTML = mySinatorRatingLabelHtml(id, type, current);
+        if (starsRow) starsRow.innerHTML = mySinatorStarsRowHtml(id, current);
+    }
+    async function setMySinatorUserRating(id, starEl, value) {
+        const box = starEl.closest('.trakt-user-rating')?.parentElement;
+        const type = box?.dataset.type;
+        if (!type) return;
+        if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Klíče → Propojení.'); return; }
+        updateMySinatorRatingUI(id, type, value);
+        try {
+            await myRatingSet(id, type, value);
+        } catch (e) {
+            alert('⚠️ Hodnocení se nepodařilo uložit na Sinator backend (' + (e && e.message ? e.message : e) + ').');
+        }
+    }
+    async function removeMySinatorUserRating(id, type) {
+        if (!myBackendReady()) return;
+        updateMySinatorRatingUI(id, type, 0);
+        try { await myRatingRemove(id, type); } catch (e) { console.warn('Sinator rating remove error:', e); }
+    }
+
+    // ── SHLÉDNUTOST NA SINATOR BACKENDU (odznak vedle lokálního/Trakt) ─────────
+    function applyMySinatorWatchedBadgeStyle(btn, watched) {
+        btn.dataset.watched = watched ? '1' : '0';
+        btn.style.border = '1px solid ' + (watched ? '#6090ff' : 'var(--border)');
+        btn.style.background = watched ? 'rgba(96,144,255,0.15)' : 'transparent';
+        btn.style.color = watched ? '#6090ff' : 'var(--text-muted)';
+        btn.textContent = watched ? '✅ Shlédnuto (Sinator)' : '☐ Shlédnuto (Sinator)';
+    }
+    async function initMySinatorWatchedBadge(id, type) {
+        const btn = document.getElementById(`mySinatorWatchedBadge_${id}`);
+        if (!btn) return;
+        if (!myBackendReady()) { btn.style.display = 'none'; return; }
+        btn.style.display = '';
+        try {
+            const histType = (type === 'tv') ? 'episodes' : 'movies';
+            const list = await myHistoryGet(histType, 1, 200);
+            const watched = (list || []).some(h => String(h.id) === String(id));
+            applyMySinatorWatchedBadgeStyle(btn, watched);
+        } catch (e) { console.warn('Sinator watched-badge load error:', e); }
+    }
+    window.toggleMySinatorWatched = async function(id, type, btnEl) {
+        if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Klíče → Propojení.'); return; }
+        const nowWatched = btnEl.dataset.watched === '1';
+        applyMySinatorWatchedBadgeStyle(btnEl, !nowWatched);
+        try {
+            if (nowWatched) await myHistoryRemove(id, type);
+            else await myHistoryAdd(id, type);
+        } catch (e) {
+            applyMySinatorWatchedBadgeStyle(btnEl, nowWatched);
+            alert('❌ ' + (e && e.message ? e.message : e));
+        }
+    };
+
 
     // ── HISTORIE SLEDOVÁNÍ NA TRAKT (datum a čas zhlédnutí) ─────────────────────
     async function initTraktWatchHistory(id, type) {
