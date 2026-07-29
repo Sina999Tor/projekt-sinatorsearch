@@ -2479,6 +2479,42 @@
         } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
     };
 
+    window.myBackendAddToList = async function(id, type) {
+        if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Klíče → Propojení.'); return; }
+        let lists = [];
+        try { lists = await myListsGet(); } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); return; }
+        document.getElementById('myBackendListPickerOverlay')?.remove();
+        const overlay = document.createElement('div');
+        overlay.id = 'myBackendListPickerOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        const listBtns = lists.map(l => `<button onclick="myBackendAddToListConfirm('${l.id}',${id},'${type}')" style="display:block;width:100%;text-align:left;padding:12px 16px;margin-bottom:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;color:#fff;cursor:pointer;">📁 ${l.name} (${l.item_count || 0})</button>`).join('');
+        overlay.innerHTML = `<div style="background:var(--bg-card);border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:480px;max-height:70vh;overflow-y:auto;">
+            <div style="font-weight:700;margin-bottom:14px;color:#6090ff;">📁 Přidat do seznamu (Sinator)</div>
+            ${listBtns || '<div style="color:var(--text-muted);margin-bottom:12px;">Zatím nemáš žádné seznamy.</div>'}
+            <button onclick="myBackendAddToListNew(${id},'${type}')" style="display:block;width:100%;text-align:center;padding:12px;margin-top:6px;background:transparent;border:1px dashed #6090ff;border-radius:10px;color:#6090ff;cursor:pointer;">➕ Nový seznam</button>
+            <button onclick="document.getElementById('myBackendListPickerOverlay').remove()" style="display:block;width:100%;text-align:center;padding:10px;margin-top:10px;background:transparent;border:none;color:var(--text-muted);cursor:pointer;">Zavřít</button>
+        </div>`;
+        document.body.appendChild(overlay);
+    };
+    window.myBackendAddToListConfirm = async function(listId, id, type) {
+        try {
+            await myListItemAdd(listId, id, type);
+            alert('✅ Přidáno do seznamu.');
+            document.getElementById('myBackendListPickerOverlay')?.remove();
+        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+    };
+    window.myBackendAddToListNew = async function(id, type) {
+        const name = prompt('Název nového seznamu:');
+        if (!name || !name.trim()) return;
+        try {
+            const list = await myListCreate(name.trim());
+            await myListItemAdd(list.id, id, type);
+            alert('✅ Seznam vytvořen a položka přidána.');
+            document.getElementById('myBackendListPickerOverlay')?.remove();
+        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+    };
+
 
     const TRAKT_CLIENT_SECRET = 'rIukoJbVTROcnT9W0-B3Ns3D7dkxN57uuzqsRJAYQVc';
     const REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob';
@@ -8225,23 +8261,44 @@ EXAMPLES:
         return items;
     }
 
-    function renderMyBackendGrid(items, emptyMsg) {
+    function myBackendCardRemoveArgs(tab, id, type) {
+        // Vrátí JS volání pro tlačítko ✕ podle toho, v jaké záložce zrovna jsme
+        if (tab === 'watchlist') return `myBackendRemoveItem('watchlist', ${id}, '${type}')`;
+        if (tab === 'ratings-movies' || tab === 'ratings-shows') return `myBackendRemoveItem('ratings', ${id}, '${type}')`;
+        if (tab.startsWith('list:')) return `myBackendRemoveItem('${tab}', ${id}, '${type}')`;
+        return '';
+    }
+
+    function renderMyBackendGrid(items, emptyMsg, tab) {
         const c = $('myBackendResultsContainer');
+        const canRemove = tab === 'watchlist' || tab === 'ratings-movies' || tab === 'ratings-shows' || tab.startsWith('list:');
         if (!items.length) { c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">${emptyMsg}</div>`; return; }
         c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:0 14px 14px;">${items.map(it => {
             const poster = it.poster_path && it.poster_path.startsWith('http') ? it.poster_path : (it.poster_path ? `https://image.tmdb.org/t/p/w342${it.poster_path}` : null);
             const kind = it.tmdbType || (it.type === 'tv' || it.type === 'shows' ? 'tv' : 'movie');
-            return `<div class="card" onclick="openDetail(${it.id},'${kind}')">
+            return `<div class="card" style="position:relative;" onclick="openDetail(${it.id},'${kind}')">
+                ${canRemove ? `<button onclick="event.stopPropagation();${myBackendCardRemoveArgs(tab, it.id, kind)}" style="position:absolute;top:6px;right:6px;z-index:5;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.25);color:#e07a6f;font-size:0.85rem;line-height:1;cursor:pointer;">✕</button>` : ''}
                 ${poster ? `<img class="card-image" src="${poster}" loading="lazy">` : `<div class="card-placeholder">${kind === 'tv' ? '📺' : '🎬'}</div>`}
                 <div class="card-info"><div class="card-title">${it.title || ('#' + it.id)}</div><div class="card-meta"><span>${it.year || '—'}</span>${it.rating ? `<span>★ ${it.rating}/10</span>` : ''}</div></div>
             </div>`;
         }).join('')}</div>`;
     }
 
+    window.myBackendRemoveItem = async function(scope, id, type) {
+        if (!confirm('Odebrat tuhle položku?')) return;
+        try {
+            if (scope === 'watchlist') await myWatchlistRemove(id, type);
+            else if (scope === 'ratings') await myRatingRemove(id, type);
+            else if (scope.startsWith('list:')) await myListItemRemove(scope.slice(5), id, type);
+            renderMyBackendTab(window._myBackendActiveTab);
+        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+    };
+
+
     async function renderMyBackendTab(tab) {
         window._myBackendActiveTab = tab;
         // zvýrazni aktivní tab
-        document.querySelectorAll('#myBackendListTabs button').forEach(b => {
+        document.querySelectorAll('#myBackendListTabs button.ts-list-tab-btn').forEach(b => {
             const active = b.dataset.tab === tab;
             b.style.background = active ? 'rgba(96,144,255,0.2)' : 'var(--bg-elevated)';
             b.style.borderColor = active ? '#6090ff' : 'var(--border)';
@@ -8259,7 +8316,7 @@ EXAMPLES:
             else if (tab === 'history-episodes') { items = (await myHistoryGet('episodes', 1, 50)).map(r => ({ ...r, type: 'tv' })); emptyMsg = 'Historie epizod je prázdná.'; }
             else if (tab.startsWith('list:')) { items = await myListItemsGet(tab.slice(5)); emptyMsg = 'Seznam je prázdný.'; }
             items = await fetchMyBackendPosters(items);
-            renderMyBackendGrid(items, emptyMsg);
+            renderMyBackendGrid(items, emptyMsg, tab);
         } catch (e) {
             c.innerHTML = `<div class="empty" style="padding:20px;text-align:center;">⚠️ ${e && e.message ? e.message : e}<br><br><button onclick="renderMyBackendTab('${tab}')" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
         }
@@ -8282,13 +8339,32 @@ EXAMPLES:
             { key: 'history-movies', label: '🕓 Hist. filmy' },
             { key: 'history-episodes', label: '🕓 Hist. epizody' },
         ];
-        const listTabs = lists.map(l => ({ key: `list:${l.id}`, label: `📁 ${l.name} (${l.item_count || 0})` }));
+        const listTabs = lists.map(l => ({ key: `list:${l.id}`, label: `📁 ${l.name} (${l.item_count || 0})`, id: l.id }));
         const allTabs = [...staticTabs, ...listTabs];
-        $('myBackendListTabs').innerHTML = allTabs.map(t => `<button class="ts-list-tab-btn" data-tab="${t.key}" onclick="renderMyBackendTab('${t.key}')" style="white-space:nowrap;padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.82rem;">${t.label}</button>`).join('');
+        $('myBackendListTabs').innerHTML = allTabs.map(t => `<span style="position:relative;display:inline-flex;">
+            <button class="ts-list-tab-btn" data-tab="${t.key}" onclick="renderMyBackendTab('${t.key}')" style="white-space:nowrap;padding:8px ${t.id ? '26px' : '14px'} 8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.82rem;">${t.label}</button>
+            ${t.id ? `<button onclick="event.stopPropagation();myBackendDeleteList('${t.id}')" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:rgba(224,122,111,0.25);border:none;color:#e07a6f;font-size:0.7rem;line-height:1;cursor:pointer;">✕</button>` : ''}
+        </span>`).join('') + `<button onclick="myBackendCreateList()" style="white-space:nowrap;padding:8px 14px;border-radius:20px;border:1px dashed #6090ff;background:transparent;color:#6090ff;cursor:pointer;font-size:0.82rem;">➕ Nový seznam</button>`;
         $('myBackendListTabsWrap').style.display = 'block';
         renderMyBackendTab('watchlist');
     }
     window.loadMyBackendOverview = loadMyBackendOverview;
+
+    window.myBackendCreateList = async function() {
+        const name = prompt('Název nového seznamu:');
+        if (!name || !name.trim()) return;
+        try {
+            await myListCreate(name.trim());
+            loadMyBackendOverview();
+        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+    };
+    window.myBackendDeleteList = async function(listId) {
+        if (!confirm('Smazat celý seznam i s obsahem?')) return;
+        try {
+            await myListDelete(listId);
+            loadMyBackendOverview();
+        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+    };
 
     async function loadTraktLists() {
         await ensureTraktToken();
@@ -9311,6 +9387,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 <button class="action-btn-modal" onclick="myBackendAddWatchlist(${id},'${type}','${jsq(title)}','${year}','${posterPath}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">🔖 Watchlist</button>
 <button class="action-btn-modal" onclick="myBackendRate(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">⭐ Hodnotit</button>
 ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWatched(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">✅ Shlédnuto</button>` : ''}
+<button class="action-btn-modal" onclick="myBackendAddToList(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">📁 Do seznamu</button>
 </div>`;
             const actionBtns = coreBtns + extraBtns + `</div>`;
             $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip" style="cursor:pointer;" title="Najít filmy/seriály se stejným hodnocením" onclick="openRatingBrowse(${d.vote_average||0},'${type}')"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
