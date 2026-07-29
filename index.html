@@ -595,7 +595,7 @@
         .ts-source-btn[data-src="trakt"].active { background: linear-gradient(135deg, rgba(237,34,36,0.28), rgba(237,34,36,0.08)); border-color: #ed2224; }
         .ts-source-btn[data-src="simkl"].active { background: linear-gradient(135deg, rgba(28,185,154,0.28), rgba(28,185,154,0.08)); border-color: #1cb99a; }
         .ts-modal-body-scroll { flex: 1; overflow-y: auto; min-height: 0; }
-        .ts-modal-body-scroll #traktListTabsWrap, .ts-modal-body-scroll #simklListTabsWrap { position: sticky; top: 0; z-index: 9; }
+        .ts-modal-body-scroll #traktListTabsWrap, .ts-modal-body-scroll #simklListTabsWrap, .ts-modal-body-scroll #myBackendListTabsWrap { position: sticky; top: 0; z-index: 9; }
         /* ── iVysílání modal ── */
         .ivysilani-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.97); backdrop-filter: blur(20px); z-index: 10500; flex-direction: column; overflow: hidden; }
         .ivysilani-modal-overlay.open { display: flex; animation: fadeInScale 0.25s ease; }
@@ -12918,7 +12918,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
     <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
         <button onclick="closeListsModal();openTraktModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📋</span>
-            <div><div style="font-weight:700;"><span style="color:#ed2224;">Trakt</span><span style="color:var(--text-muted);"> / </span><span style="color:#1cb99a;">Simkl</span></div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Sledované, watchlist, hodnocení</div></div>
+            <div><div style="font-weight:700;"><span style="color:#ed2224;">Trakt</span><span style="color:var(--text-muted);"> / </span><span style="color:#1cb99a;">Simkl</span><span style="color:var(--text-muted);"> / </span><span style="color:#8bc34a;">🧩 Sinator</span></div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Sledované, watchlist, hodnocení</div></div>
         </button>
         <button onclick="pushModalAndOpen('listsModal', openListsModal, openCollectionsModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📦</span>
