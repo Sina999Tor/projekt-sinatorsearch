@@ -9921,10 +9921,13 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
         btn.style.display = '';
         try {
             const histType = (type === 'tv') ? 'episodes' : 'movies';
-            const list = await myHistoryGet(histType, 1, 200);
+            const list = await myHistoryGetAll(histType);
             const watched = (list || []).some(h => String(h.id) === String(id));
             applyMySinatorWatchedBadgeStyle(btn, watched);
-        } catch (e) { console.warn('Sinator watched-badge load error:', e); }
+        } catch (e) {
+            console.warn('Sinator watched-badge load error:', e);
+            applyMySinatorWatchedBadgeStyle(btn, false);
+        }
     }
     window.toggleMySinatorWatched = async function(id, type, btnEl) {
         if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Klíče → Propojení.'); return; }
