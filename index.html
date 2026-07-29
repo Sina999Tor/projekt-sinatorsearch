@@ -2408,7 +2408,7 @@
     const myListItemRemove = (listId, id, type) => myApi(`/lists/${listId}/items`, { method: 'DELETE', body: JSON.stringify({ id, type }) });
 
     // Hodnocení
-    const myRatingsGet = (type) => myApi(`/ratings?type=${type === 'tv' ? 'shows' : 'movies'}`);
+    const myRatingsGet = (type) => myApi(`/ratings?type=${(type === 'tv' || type === 'shows') ? 'shows' : 'movies'}`);
     const myRatingSet = (id, type, rating) => myApi('/ratings', { method: 'POST', body: JSON.stringify({ id, type, rating }) });
     const myRatingRemove = (id, type) => myApi('/ratings', { method: 'DELETE', body: JSON.stringify({ id, type }) });
 
@@ -2417,7 +2417,7 @@
     const myHistoryAdd = (id, type, season, episode) => myApi('/history', { method: 'POST', body: JSON.stringify({ id, type, season, episode }) });
 
     // Rozkoukanost
-    const myProgressGet = (type) => myApi(`/progress?type=${type === 'tv' ? 'shows' : 'movies'}`);
+    const myProgressGet = (type) => myApi(`/progress?type=${(type === 'tv' || type === 'shows') ? 'shows' : 'movies'}`);
     const myProgressSet = (id, type, progress, season, episode) => myApi('/progress', { method: 'POST', body: JSON.stringify({ id, type, progress, season, episode }) });
     const myProgressRemove = (id, type, season, episode) => myApi('/progress', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode }) });
 
