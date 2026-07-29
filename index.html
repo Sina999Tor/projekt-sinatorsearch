@@ -2415,6 +2415,7 @@
     // Historie
     const myHistoryGet = (type, page, limit) => myApi(`/history?type=${type}&page=${page || 1}&limit=${limit || 50}`);
     const myHistoryAdd = (id, type, season, episode) => myApi('/history', { method: 'POST', body: JSON.stringify({ id, type, season, episode }) });
+    const myHistoryRemove = (id, type, season, episode) => myApi('/history', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode }) });
 
     // Rozkoukanost
     const myProgressGet = (type) => myApi(`/progress?type=${(type === 'tv' || type === 'shows') ? 'shows' : 'movies'}`);
@@ -2474,8 +2475,16 @@
     window.myBackendMarkWatched = async function(id, type) {
         if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Ostatní.'); return; }
         try {
-            await myHistoryAdd(id, type);
-            alert('✅ Označeno jako shlédnuté (Sinator backend).');
+            const histType = (type === 'tv' || type === 'shows') ? 'episodes' : 'movies';
+            const existing = await myHistoryGet(histType, 1, 200);
+            const already = (existing || []).some(h => String(h.id) === String(id));
+            if (already) {
+                await myHistoryRemove(id, type);
+                alert('🗑️ Odebráno ze shlédnutých (Sinator backend).');
+            } else {
+                await myHistoryAdd(id, type);
+                alert('✅ Přidáno do shlédnutých (Sinator backend).');
+            }
         } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
     };
 
@@ -8265,13 +8274,14 @@ EXAMPLES:
         // Vrátí JS volání pro tlačítko ✕ podle toho, v jaké záložce zrovna jsme
         if (tab === 'watchlist') return `myBackendRemoveItem('watchlist', ${id}, '${type}')`;
         if (tab === 'ratings-movies' || tab === 'ratings-shows') return `myBackendRemoveItem('ratings', ${id}, '${type}')`;
+        if (tab === 'history-movies' || tab === 'history-episodes') return `myBackendRemoveItem('history', ${id}, '${type}')`;
         if (tab.startsWith('list:')) return `myBackendRemoveItem('${tab}', ${id}, '${type}')`;
         return '';
     }
 
     function renderMyBackendGrid(items, emptyMsg, tab) {
         const c = $('myBackendResultsContainer');
-        const canRemove = tab === 'watchlist' || tab === 'ratings-movies' || tab === 'ratings-shows' || tab.startsWith('list:');
+        const canRemove = tab === 'watchlist' || tab === 'ratings-movies' || tab === 'ratings-shows' || tab === 'history-movies' || tab === 'history-episodes' || tab.startsWith('list:');
         if (!items.length) { c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">${emptyMsg}</div>`; return; }
         c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:0 14px 14px;">${items.map(it => {
             const poster = it.poster_path && it.poster_path.startsWith('http') ? it.poster_path : (it.poster_path ? `https://image.tmdb.org/t/p/w342${it.poster_path}` : null);
@@ -8289,8 +8299,10 @@ EXAMPLES:
         try {
             if (scope === 'watchlist') await myWatchlistRemove(id, type);
             else if (scope === 'ratings') await myRatingRemove(id, type);
+            else if (scope === 'history') await myHistoryRemove(id, type);
             else if (scope.startsWith('list:')) await myListItemRemove(scope.slice(5), id, type);
-            renderMyBackendTab(window._myBackendActiveTab);
+            if (scope.startsWith('list:')) loadMyBackendOverview(scope); // obnoví i počet v názvu záložky
+            else renderMyBackendTab(window._myBackendActiveTab);
         } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
     };
 
@@ -8323,7 +8335,7 @@ EXAMPLES:
     }
     window.renderMyBackendTab = renderMyBackendTab;
 
-    async function loadMyBackendOverview() {
+    async function loadMyBackendOverview(keepTab) {
         const c = $('myBackendResultsContainer');
         if (!myBackendReady()) {
             c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">🧩 Vlastní backend není nastavený.<br><br>Nastav adresu a klíč v <b>Nastavení → Ostatní</b>.</div>`;
@@ -8346,7 +8358,7 @@ EXAMPLES:
             ${t.id ? `<button onclick="event.stopPropagation();myBackendDeleteList('${t.id}')" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:rgba(224,122,111,0.25);border:none;color:#e07a6f;font-size:0.7rem;line-height:1;cursor:pointer;">✕</button>` : ''}
         </span>`).join('') + `<button onclick="myBackendCreateList()" style="white-space:nowrap;padding:8px 14px;border-radius:20px;border:1px dashed #6090ff;background:transparent;color:#6090ff;cursor:pointer;font-size:0.82rem;">➕ Nový seznam</button>`;
         $('myBackendListTabsWrap').style.display = 'block';
-        renderMyBackendTab('watchlist');
+        renderMyBackendTab(keepTab || 'watchlist');
     }
     window.loadMyBackendOverview = loadMyBackendOverview;
 
