@@ -2659,8 +2659,8 @@
     window.myBackendMarkWatched = async function(id, type) {
         if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Ostatní.'); return; }
         try {
-            const histType = (type === 'tv' || type === 'shows') ? 'episodes' : 'movies';
-            const existing = await myHistoryGet(histType, 1, 200);
+            const histType = (type === 'tv' || type === 'shows') ? 'shows' : 'movies';
+            const existing = await myHistoryGetAll(histType);
             const already = (existing || []).some(h => String(h.id) === String(id));
             if (already) {
                 await myHistoryRemove(id, type);
@@ -8472,14 +8472,14 @@ EXAMPLES:
         // Vrátí JS volání pro tlačítko ✕ podle toho, v jaké záložce zrovna jsme
         if (tab === 'watchlist') return `myBackendRemoveItem('watchlist', ${id}, '${type}')`;
         if (tab === 'ratings-movies' || tab === 'ratings-shows') return `myBackendRemoveItem('ratings', ${id}, '${type}')`;
-        if (tab === 'history-movies' || tab === 'history-episodes') return `myBackendRemoveItem('history', ${id}, '${type}')`;
+        if (tab === 'history-movies' || tab === 'history-episodes' || tab === 'history-shows') return `myBackendRemoveItem('history', ${id}, '${type}')`;
         if (tab.startsWith('list:')) return `myBackendRemoveItem('${tab}', ${id}, '${type}')`;
         return '';
     }
 
     function renderMyBackendGrid(items, emptyMsg, tab) {
         const c = $('myBackendResultsContainer');
-        const canRemove = tab === 'watchlist' || tab === 'ratings-movies' || tab === 'ratings-shows' || tab === 'history-movies' || tab === 'history-episodes' || tab.startsWith('list:');
+        const canRemove = tab === 'watchlist' || tab === 'ratings-movies' || tab === 'ratings-shows' || tab === 'history-movies' || tab === 'history-episodes' || tab === 'history-shows' || tab.startsWith('list:');
         if (!items.length) { c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">${emptyMsg}</div>`; return; }
         c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:0 14px 14px;">${items.map(it => {
             const poster = it.poster_path && it.poster_path.startsWith('http') ? it.poster_path : (it.poster_path ? `https://image.tmdb.org/t/p/w342${it.poster_path}` : null);
@@ -8541,6 +8541,7 @@ EXAMPLES:
             else if (tab === 'ratings-shows') { items = (await myRatingsGet('shows')).map(r => ({ ...r, type: 'tv' })); emptyMsg = 'Zatím žádná hodnocení seriálů.'; }
             else if (tab === 'history-movies') { items = dedupeHistoryItems((await myHistoryGetAll('movies')).map(r => ({ ...r, type: 'movie' })), false); emptyMsg = 'Historie filmů je prázdná.'; }
             else if (tab === 'history-episodes') { items = dedupeHistoryItems((await myHistoryGetAll('episodes')).map(r => ({ ...r, type: 'tv' })), true); emptyMsg = 'Historie epizod je prázdná.'; }
+            else if (tab === 'history-shows') { items = dedupeHistoryItems((await myHistoryGetAll('shows')).map(r => ({ ...r, type: 'tv' })), false); emptyMsg = 'Historie seriálů je prázdná.'; }
             else if (tab.startsWith('list:')) { items = await myListItemsGet(tab.slice(5)); emptyMsg = 'Seznam je prázdný.'; }
             items = await fetchMyBackendPosters(items);
             renderMyBackendGrid(items, emptyMsg, tab);
@@ -8565,6 +8566,7 @@ EXAMPLES:
             { key: 'ratings-shows', label: '⭐ Hodnoc. seriály' },
             { key: 'history-movies', label: '🕓 Hist. filmy' },
             { key: 'history-episodes', label: '🕓 Hist. epizody' },
+            { key: 'history-shows', label: '🕓 Hist. seriály' },
         ];
         const listTabs = lists.map(l => ({ key: `list:${l.id}`, label: `📁 ${l.name} (${l.item_count || 0})`, id: l.id }));
         const allTabs = [...staticTabs, ...listTabs];
@@ -9613,7 +9615,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 <div class="action-buttons" style="display:none;margin-top:4px;">
 <button class="action-btn-modal" onclick="myBackendAddWatchlist(${id},'${type}','${jsq(title)}','${year}','${posterPath}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">🔖 Watchlist</button>
 <button class="action-btn-modal" onclick="myBackendRate(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">⭐ Hodnotit</button>
-${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWatched(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">✅ Shlédnuto</button>` : ''}
+${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWatched(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">✅ Shlédnuto</button>` : `<button class="action-btn-modal" onclick="myBackendMarkWatched(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">✅ Shlédnuto (celý seriál)</button>`}
 <button class="action-btn-modal" onclick="myBackendAddToList(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">📁 Do seznamu</button>
 </div>`;
             const actionBtns = coreBtns + extraBtns + `</div>`;
@@ -9920,7 +9922,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
         if (!myBackendReady()) { btn.style.display = 'none'; return; }
         btn.style.display = '';
         try {
-            const histType = (type === 'tv') ? 'episodes' : 'movies';
+            const histType = (type === 'tv') ? 'shows' : 'movies';
             const list = await myHistoryGetAll(histType);
             const watched = (list || []).some(h => String(h.id) === String(id));
             applyMySinatorWatchedBadgeStyle(btn, watched);
@@ -10012,11 +10014,17 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
         if (!box) return;
         if (!myBackendReady()) { box.innerHTML = ''; return; }
         try {
-            const histType = type === 'tv' ? 'episodes' : 'movies';
-            const all = await myHistoryGetAll(histType);
-            const items = all
-                .filter(it => String(it.id) === String(id))
-                .sort((a, b) => (b.watched_at || 0) - (a.watched_at || 0));
+            let items;
+            if (type === 'tv') {
+                const [episodes, shows] = await Promise.all([
+                    myHistoryGetAll('episodes'),
+                    myHistoryGetAll('shows')
+                ]);
+                items = [...episodes, ...shows].filter(it => String(it.id) === String(id));
+            } else {
+                items = (await myHistoryGetAll('movies')).filter(it => String(it.id) === String(id));
+            }
+            items.sort((a, b) => (b.watched_at || 0) - (a.watched_at || 0));
             renderMySinatorWatchHistory(id, items, type);
         } catch (e) { console.warn('Sinator watch history load error:', e); box.innerHTML = ''; }
     }
