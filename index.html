@@ -2422,6 +2422,21 @@
     const myHistoryGet = (type, page, limit) => myApi(`/history?type=${type}&page=${page || 1}&limit=${limit || 50}`);
     const myHistoryAdd = (id, type, season, episode) => myApi('/history', { method: 'POST', body: JSON.stringify({ id, type, season, episode }) });
     const myHistoryRemove = (id, type, season, episode) => myApi('/history', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode }) });
+    // Načte kompletní historii (všechny stránky), ne jen prvních 50 položek.
+    async function myHistoryGetAll(type) {
+        const pageSize = 200;
+        let page = 1;
+        let all = [];
+        while (true) {
+            const batch = await myHistoryGet(type, page, pageSize);
+            if (!Array.isArray(batch) || !batch.length) break;
+            all = all.concat(batch);
+            if (batch.length < pageSize) break;
+            page++;
+            if (page > 50) break; // pojistka proti nekonečné smyčce
+        }
+        return all;
+    }
 
     // Rozkoukanost
     const myProgressGet = (type) => myApi(`/progress?type=${(type === 'tv' || type === 'shows') ? 'shows' : 'movies'}`);
@@ -8420,9 +8435,10 @@ EXAMPLES:
     window._myBackendActiveTab = 'watchlist';
 
     async function fetchMyBackendPosters(items) {
-        // Watchlist položky mají title/poster_path uložené rovnou; hodnocení/historie/
-        // rozkoukanost mají jen id+type, tak si detail dotáhneme z TMDB.
-        const need = items.filter(it => !it.title);
+        // Watchlist položky mívají title uložené, ale poster_path bývá při importu
+        // z Traktu prázdné (null) — proto se dotahuje podle chybějícího posteru,
+        // ne podle chybějícího titulu.
+        const need = items.filter(it => !it.poster_path);
         if (!need.length || !tmdbApiKey) return items;
         await Promise.all(need.map(async it => {
             try {
@@ -8430,8 +8446,8 @@ EXAMPLES:
                 const res = await fetch(`https://api.themoviedb.org/3/${kind}/${it.id}?api_key=${tmdbApiKey}&language=cs-CZ`);
                 if (!res.ok) return;
                 const d = await res.json();
-                it.title = d.title || d.name || `#${it.id}`;
-                it.year = (d.release_date || d.first_air_date || '').slice(0, 4);
+                if (!it.title) it.title = d.title || d.name || `#${it.id}`;
+                if (!it.year) it.year = (d.release_date || d.first_air_date || '').slice(0, 4);
                 it.poster_path = d.poster_path ? `https://image.tmdb.org/t/p/w342${d.poster_path}` : null;
                 it.tmdbType = kind;
             } catch (e) {}
@@ -8493,8 +8509,8 @@ EXAMPLES:
             if (tab === 'watchlist') { items = await myWatchlistGet(); emptyMsg = 'Watchlist je prázdný.'; }
             else if (tab === 'ratings-movies') { items = (await myRatingsGet('movies')).map(r => ({ ...r, type: 'movie' })); emptyMsg = 'Zatím žádná hodnocení filmů.'; }
             else if (tab === 'ratings-shows') { items = (await myRatingsGet('shows')).map(r => ({ ...r, type: 'tv' })); emptyMsg = 'Zatím žádná hodnocení seriálů.'; }
-            else if (tab === 'history-movies') { items = (await myHistoryGet('movies', 1, 50)).map(r => ({ ...r, type: 'movie' })); emptyMsg = 'Historie filmů je prázdná.'; }
-            else if (tab === 'history-episodes') { items = (await myHistoryGet('episodes', 1, 50)).map(r => ({ ...r, type: 'tv' })); emptyMsg = 'Historie epizod je prázdná.'; }
+            else if (tab === 'history-movies') { items = (await myHistoryGetAll('movies')).map(r => ({ ...r, type: 'movie' })); emptyMsg = 'Historie filmů je prázdná.'; }
+            else if (tab === 'history-episodes') { items = (await myHistoryGetAll('episodes')).map(r => ({ ...r, type: 'tv' })); emptyMsg = 'Historie epizod je prázdná.'; }
             else if (tab.startsWith('list:')) { items = await myListItemsGet(tab.slice(5)); emptyMsg = 'Seznam je prázdný.'; }
             items = await fetchMyBackendPosters(items);
             renderMyBackendGrid(items, emptyMsg, tab);
