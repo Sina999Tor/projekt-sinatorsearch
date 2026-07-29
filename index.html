@@ -9918,17 +9918,22 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
     }
     async function initMySinatorWatchedBadge(id, type) {
         const btn = document.getElementById(`mySinatorWatchedBadge_${id}`);
-        if (!btn) return;
+        if (!btn) { console.warn('[Sinator badge] tlačítko mySinatorWatchedBadge_' + id + ' v DOM nenalezeno v okamžiku volání.'); return; }
         if (!myBackendReady()) { btn.style.display = 'none'; return; }
         btn.style.display = '';
+        btn.textContent = '🧩 …';
+        const timeout = (ms) => new Promise((_, rej) => setTimeout(() => rej(new Error('timeout ' + ms + 'ms')), ms));
         try {
             const histType = (type === 'tv') ? 'shows' : 'movies';
-            const list = await myHistoryGetAll(histType);
+            console.log('[Sinator badge] kontroluju', histType, 'pro id', id);
+            const list = await Promise.race([myHistoryGetAll(histType), timeout(20000)]);
+            console.log('[Sinator badge] výsledek:', Array.isArray(list) ? list.length + ' položek' : list);
             const watched = (list || []).some(h => String(h.id) === String(id));
             applyMySinatorWatchedBadgeStyle(btn, watched);
         } catch (e) {
             console.warn('Sinator watched-badge load error:', e);
-            applyMySinatorWatchedBadgeStyle(btn, false);
+            btn.textContent = '⚠️ chyba';
+            btn.title = (e && e.message) ? e.message : String(e);
         }
     }
     window.toggleMySinatorWatched = async function(id, type, btnEl) {
