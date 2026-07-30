@@ -9925,13 +9925,17 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
         if (!myBackendReady()) { btn.style.display = 'none'; return; }
         btn.style.display = '';
         btn.textContent = '🧩 …';
+        console.log('[Sinator badge] START pro id', id, 'type', type);
         try {
             const histType = (type === 'tv') ? 'shows' : 'movies';
+            console.log('[Sinator badge] volám myHistoryGetForId', histType, id);
             const list = await myHistoryGetForId(histType, id);
+            console.log('[Sinator badge] odpověď přijata:', list);
             const watched = Array.isArray(list) && list.length > 0;
             applyMySinatorWatchedBadgeStyle(btn, watched);
+            console.log('[Sinator badge] HOTOVO, watched=', watched, 'nový text=', btn.textContent);
         } catch (e) {
-            console.warn('Sinator watched-badge load error:', e);
+            console.warn('[Sinator badge] CHYBA:', e);
             btn.textContent = '⚠️ chyba';
             btn.title = (e && e.message) ? e.message : String(e);
         }
@@ -27030,6 +27034,8 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <!-- ════════════════════════════════════════════════════════════════════ -->
 
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script>
 </body>
 </html><!-- ════════ DOPORUČUJI MODAL ════════ -->
 <div id="doporucujiOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.97);backdrop-filter:blur(16px);z-index:10000;flex-direction:column;overflow:hidden;" onclick="if(event.target===this)closeDoporucujiModal()">
