@@ -2420,6 +2420,9 @@
 
     // Historie
     const myHistoryGet = (type, page, limit) => myApi(`/history?type=${type}&page=${page || 1}&limit=${limit || 50}`);
+    // Cílený dotaz na konkrétní film/seriál — mnohem rychlejší než stahovat celou historii
+    // a filtrovat na klientovi (u velké historie by to jinak trvalo velmi dlouho).
+    const myHistoryGetForId = (type, id) => myApi(`/history?type=${type}&id=${encodeURIComponent(id)}`);
     const myHistoryAdd = (id, type, season, episode) => myApi('/history', { method: 'POST', body: JSON.stringify({ id, type, season, episode }) });
     const myHistoryRemove = (id, type, season, episode) => myApi('/history', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode }) });
     // Načte kompletní historii (všechny stránky), ne jen prvních 50 položek.
@@ -2660,8 +2663,8 @@
         if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Ostatní.'); return; }
         try {
             const histType = (type === 'tv' || type === 'shows') ? 'shows' : 'movies';
-            const existing = await myHistoryGetAll(histType);
-            const already = (existing || []).some(h => String(h.id) === String(id));
+            const existing = await myHistoryGetForId(histType, id);
+            const already = Array.isArray(existing) && existing.length > 0;
             if (already) {
                 await myHistoryRemove(id, type);
                 alert('🗑️ Odebráno ze shlédnutých (Sinator backend).');
@@ -9922,17 +9925,11 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
         if (!myBackendReady()) { btn.style.display = 'none'; return; }
         btn.style.display = '';
         btn.textContent = '🧩 …';
-        const timeout = (ms) => new Promise((_, rej) => setTimeout(() => rej(new Error('timeout ' + ms + 'ms')), ms));
         try {
             const histType = (type === 'tv') ? 'shows' : 'movies';
-            console.log('[Sinator badge] kontroluju', histType, 'pro id', id);
-            const list = await Promise.race([myHistoryGetAll(histType), timeout(20000)]);
-            console.log('[Sinator badge] výsledek:', Array.isArray(list) ? list.length + ' položek' : list);
-            const watched = (list || []).some(h => String(h.id) === String(id));
+            const list = await myHistoryGetForId(histType, id);
+            const watched = Array.isArray(list) && list.length > 0;
             applyMySinatorWatchedBadgeStyle(btn, watched);
-            // DOČASNÝ DEBUG — ukáže rovnou v pilulce kolik záznamů v daném bucketu je
-            // a jaké id appka hledá, ať to jde poslat screenshotem bez devtools.
-            btn.textContent += ` [n=${list.length}, id=${id}]`;
         } catch (e) {
             console.warn('Sinator watched-badge load error:', e);
             btn.textContent = '⚠️ chyba';
@@ -10025,12 +10022,12 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             let items;
             if (type === 'tv') {
                 const [episodes, shows] = await Promise.all([
-                    myHistoryGetAll('episodes'),
-                    myHistoryGetAll('shows')
+                    myHistoryGetForId('episodes', id),
+                    myHistoryGetForId('shows', id)
                 ]);
-                items = [...episodes, ...shows].filter(it => String(it.id) === String(id));
+                items = [...episodes, ...shows];
             } else {
-                items = (await myHistoryGetAll('movies')).filter(it => String(it.id) === String(id));
+                items = await myHistoryGetForId('movies', id);
             }
             items.sort((a, b) => (b.watched_at || 0) - (a.watched_at || 0));
             renderMySinatorWatchHistory(id, items, type);
