@@ -9429,7 +9429,11 @@ EXAMPLES:
         // (např. puzzle odznak "Shlédnuto na Sinatoru").
         const _key = `${id}:${type}`;
         const _now = Date.now();
-        if (_key === _lastOpenDetailKey && (_now - _lastOpenDetailAt) < 800) return;
+        if (_key === _lastOpenDetailKey && (_now - _lastOpenDetailAt) < 800) {
+            console.log('[openDetail debounce] přeskočeno duplicitní volání pro', _key, 'odstup', _now - _lastOpenDetailAt, 'ms');
+            return;
+        }
+        console.log('[openDetail] vykresluji', _key);
         _lastOpenDetailKey = _key;
         _lastOpenDetailAt = _now;
         const _origin = state._fromFavs ? 'favs' : state._fromTrakt ? 'trakt' : state._fromSimkl ? 'simkl' : state._fromWatched ? 'watched' : null;
@@ -9932,17 +9936,19 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
     }
     async function initMySinatorWatchedBadge(id, type) {
         const btn = document.getElementById(`mySinatorWatchedBadge_${id}`);
-        if (!btn) return;
+        if (!btn) { console.warn('[Sinator badge] tlačítko nenalezeno pro', id); return; }
         if (!myBackendReady()) { btn.style.display = 'none'; return; }
         btn.style.display = '';
         btn.textContent = '🧩 …';
+        console.log('[Sinator badge] START pro id', id, 'type', type);
         try {
             const histType = (type === 'tv') ? 'shows' : 'movies';
             const list = await myHistoryGetForId(histType, id);
             const watched = Array.isArray(list) && list.length > 0;
             applyMySinatorWatchedBadgeStyle(btn, watched);
+            console.log('[Sinator badge] HOTOVO pro id', id, 'watched=', watched, 'text=', btn.textContent);
         } catch (e) {
-            console.warn('Sinator watched-badge load error:', e);
+            console.warn('[Sinator badge] CHYBA:', e);
             btn.textContent = '⚠️ chyba';
             btn.title = (e && e.message) ? e.message : String(e);
         }
@@ -27041,6 +27047,14 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <!-- ════════════════════════════════════════════════════════════════════ -->
 
+<script>
+if (location.search.indexOf('debug=1') !== -1) {
+    var _erudaScript = document.createElement('script');
+    _erudaScript.src = 'https://cdn.jsdelivr.net/npm/eruda';
+    _erudaScript.onload = function() { eruda.init(); };
+    document.body.appendChild(_erudaScript);
+}
+</script>
 </body>
 </html><!-- ════════ DOPORUČUJI MODAL ════════ -->
 <div id="doporucujiOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.97);backdrop-filter:blur(16px);z-index:10000;flex-direction:column;overflow:hidden;" onclick="if(event.target===this)closeDoporucujiModal()">
