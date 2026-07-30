@@ -9429,11 +9429,7 @@ EXAMPLES:
         // (např. puzzle odznak "Shlédnuto na Sinatoru").
         const _key = `${id}:${type}`;
         const _now = Date.now();
-        if (_key === _lastOpenDetailKey && (_now - _lastOpenDetailAt) < 800) {
-            console.log('[openDetail debounce] přeskočeno duplicitní volání pro', _key, 'odstup', _now - _lastOpenDetailAt, 'ms');
-            return;
-        }
-        console.log('[openDetail] vykresluji', _key);
+        if (_key === _lastOpenDetailKey && (_now - _lastOpenDetailAt) < 800) return;
         _lastOpenDetailKey = _key;
         _lastOpenDetailAt = _now;
         const _origin = state._fromFavs ? 'favs' : state._fromTrakt ? 'trakt' : state._fromSimkl ? 'simkl' : state._fromWatched ? 'watched' : null;
@@ -9936,19 +9932,27 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
     }
     async function initMySinatorWatchedBadge(id, type) {
         const btn = document.getElementById(`mySinatorWatchedBadge_${id}`);
-        if (!btn) { console.warn('[Sinator badge] tlačítko nenalezeno pro', id); return; }
+        if (!btn) return;
         if (!myBackendReady()) { btn.style.display = 'none'; return; }
         btn.style.display = '';
         btn.textContent = '🧩 …';
-        console.log('[Sinator badge] START pro id', id, 'type', type);
         try {
             const histType = (type === 'tv') ? 'shows' : 'movies';
             const list = await myHistoryGetForId(histType, id);
             const watched = Array.isArray(list) && list.length > 0;
             applyMySinatorWatchedBadgeStyle(btn, watched);
-            console.log('[Sinator badge] HOTOVO pro id', id, 'watched=', watched, 'text=', btn.textContent);
+            // Sebeopravný mechanismus: kdyby něco jiného (např. duplicitní
+            // vykreslení) mezitím přepsalo pilulku zpět na výchozí stav,
+            // ještě párkrát v krátkých intervalech znovu vynutíme správný
+            // stav na aktuálně přítomném elementu (ne na zastaralé reference).
+            [250, 700, 1500].forEach(delay => {
+                setTimeout(() => {
+                    const freshBtn = document.getElementById(`mySinatorWatchedBadge_${id}`);
+                    if (freshBtn) applyMySinatorWatchedBadgeStyle(freshBtn, watched);
+                }, delay);
+            });
         } catch (e) {
-            console.warn('[Sinator badge] CHYBA:', e);
+            console.warn('Sinator watched-badge load error:', e);
             btn.textContent = '⚠️ chyba';
             btn.title = (e && e.message) ? e.message : String(e);
         }
