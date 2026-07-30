@@ -778,9 +778,8 @@
         .card-image { width: 100%; height: 250px; object-fit: cover; background: var(--bg-elevated); }
         .card-placeholder { width: 100%; height: 250px; display: grid; place-items: center; background: linear-gradient(135deg, var(--bg-elevated), var(--bg-card)); font-size: 2.5rem; color: var(--text-muted); }
         .card-badge { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.75); padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; color: var(--text); border: 1px solid var(--border); }
-        .card-watched-overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85)); padding: 18px 8px 6px; display: flex; align-items: center; gap: 4px; pointer-events: none; }
-        .card-watched-overlay span { color: var(--trakt); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px; }
-        .card.is-watched { outline: 1px solid rgba(255,255,255,0.18); outline-offset: -1px; }
+        .card-watched-overlay { display: none; }
+        .card.is-watched { border: 3px solid #1db954; box-shadow: 0 0 0 1px rgba(29,185,84,0.35), 0 2px 6px rgba(0,0,0,0.35); }
         .card-fav { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.6); border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 0.9rem; display: grid; place-items: center; transition: 0.2s; }
         .card-fav:hover { transform: scale(1.1); background: rgba(255,255,255,0.15); }
         .card-info { padding: 12px; }
@@ -2672,6 +2671,7 @@
                 await myHistoryAdd(id, type);
                 alert('✅ Přidáno do shlédnutých (Sinator backend).');
             }
+            refreshMySinatorWatchedCache();
         } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
     };
 
@@ -5089,9 +5089,8 @@
         grid.innerHTML = items.map(it => {
             const img = it.poster_path ? `<img class="card-image" src="${IMG}w500${it.poster_path}" loading="lazy">` : `<div class="card-placeholder">${it.type==='tv'?'📺':'🎬'}</div>`;
             const watched = isWatched(it.id, it.type);
-            const overlay = watched ? `<div class="card-watched-overlay"><span>✅</span></div>` : '';
             const liked = state.favs.some(f => Number(f.id) === Number(it.id));
-            return `<div class="card${watched?' is-watched':''}" data-mdb-id="${it.id}" data-mdb-type="${it.type}" onclick="window.openDetailFromMdb(${it.id},'${it.type}')">${img}${overlay}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="window.toggleFav(${it.id},'${jsq(it.title||'')}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span></div></div></div>`;
+            return `<div class="card${watched?' is-watched':''}" data-mdb-id="${it.id}" data-mdb-type="${it.type}" onclick="window.openDetailFromMdb(${it.id},'${it.type}')">${img}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="window.toggleFav(${it.id},'${jsq(it.title||'')}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span></div></div></div>`;
         }).join('');
     }
 
@@ -5869,8 +5868,7 @@
             const img = it.poster_path ? `<img class="card-image" src="${IMG}w500${it.poster_path}" loading="lazy">` : `<div class="card-placeholder">${it.type==='tv'?'📺':'🎬'}</div>`;
             const liked = state.favs.some(f => f.id === it.id);
             const watched = isWatched(it.id, it.type);
-            const overlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
-            return `<div class="card${watched?' is-watched':''}" onclick="window.openDetailFromSimkl(${it.id}, '${it.type}')">${img}${overlay}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${jsq(it.title)}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span><span class="card-rating">★ ${it.vote_average?it.vote_average.toFixed(1):'—'}</span></div></div></div>`;
+            return `<div class="card${watched?' is-watched':''}" onclick="window.openDetailFromSimkl(${it.id}, '${it.type}')">${img}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${jsq(it.title)}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span><span class="card-rating">★ ${it.vote_average?it.vote_average.toFixed(1):'—'}</span></div></div></div>`;
         }).join('')}</div>`;
         $('simklResultsContainer').innerHTML = count + grid;
     }
@@ -8268,9 +8266,8 @@ EXAMPLES:
         const clickAction = isActor ? `openPersonDetail(${it.id})` : `openDetail(${it.id}, '${mediaType}')`;
         const favAction = isActor ? `toggleActorFav(${it.id},'${titleJs}','${it.poster_path||''}',event)` : `toggleFav(${it.id},'${titleJs}','${year}',${it.vote_average||0},'${mediaType}','${it.poster_path||''}',event)`;
         const watched = !isActor && isWatched(it.id, mediaType);
-        const watchedOverlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
         const personBadge = mediaType === 'director' ? '🎥' : '👥';
-        return `<div class="card${watched?' is-watched':''}" data-tmdb-id="${it.id}" data-tmdb-type="${mediaType}" onclick="${clickAction}">${img}${watchedOverlay}<div class="card-badge">${isActor?personBadge:(mediaType==='tv'?'📺':'')}</div><button class="card-fav ${liked?'liked':''}" onclick="${favAction}">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${title}</div><div class="card-meta"><span>${year||'—'}</span>${!isActor?`<span class="card-rating">★ ${rating}</span>`:''}</div></div></div>`;
+        return `<div class="card${watched?' is-watched':''}" data-tmdb-id="${it.id}" data-tmdb-type="${mediaType}" onclick="${clickAction}">${img}<div class="card-badge">${isActor?personBadge:(mediaType==='tv'?'📺':'')}</div><button class="card-fav ${liked?'liked':''}" onclick="${favAction}">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${title}</div><div class="card-meta"><span>${year||'—'}</span>${!isActor?`<span class="card-rating">★ ${rating}</span>`:''}</div></div></div>`;
     }
 
     // ── INFINITE SCROLL LISTENER ─────────────────────────────────────────────
@@ -8299,8 +8296,23 @@ EXAMPLES:
         }
     }, { passive: true });
 
+    // Cache Sinator "shlédnuto" ID (filmy + celé seriály) pro okamžité zobrazení
+    // zeleného rámečku v gridech, bez nutnosti dotazovat backend pro každou kartu zvlášť.
+    const mySinatorWatchedCache = { movies: new Set(), shows: new Set(), loaded: false };
+    async function refreshMySinatorWatchedCache() {
+        if (typeof myBackendReady !== 'function' || !myBackendReady()) return;
+        try {
+            const [movies, shows] = await Promise.all([myHistoryGetAll('movies'), myHistoryGetAll('shows')]);
+            mySinatorWatchedCache.movies = new Set((movies || []).map(it => String(it.id)));
+            mySinatorWatchedCache.shows = new Set((shows || []).map(it => String(it.id)));
+            mySinatorWatchedCache.loaded = true;
+        } catch (e) { console.warn('Sinator watched cache refresh error:', e); }
+    }
+
     function isWatched(id, type) {
-        return !!(state.watched[`${type}_${id}`]);
+        if (state.watched[`${type}_${id}`]) return true;
+        const isTv = (type === 'tv' || type === 'show' || type === 'shows');
+        return isTv ? mySinatorWatchedCache.shows.has(String(id)) : mySinatorWatchedCache.movies.has(String(id));
     }
 
     function renderGrid(items) {
@@ -8487,7 +8499,8 @@ EXAMPLES:
         c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:0 14px 14px;">${items.map(it => {
             const poster = it.poster_path && it.poster_path.startsWith('http') ? it.poster_path : (it.poster_path ? `https://image.tmdb.org/t/p/w342${it.poster_path}` : null);
             const kind = it.tmdbType || (it.type === 'tv' || it.type === 'shows' ? 'tv' : 'movie');
-            return `<div class="card" style="position:relative;" onclick="openDetail(${it.id},'${kind}')">
+            const watched = isWatched(it.id, kind);
+            return `<div class="card${watched?' is-watched':''}" style="position:relative;" onclick="openDetail(${it.id},'${kind}')">
                 ${canRemove ? `<button onclick="event.stopPropagation();${myBackendCardRemoveArgs(tab, it.id, kind)}" style="position:absolute;top:6px;right:6px;z-index:5;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.25);color:#e07a6f;font-size:0.85rem;line-height:1;cursor:pointer;">✕</button>` : ''}
                 ${poster ? `<img class="card-image" src="${poster}" loading="lazy">` : `<div class="card-placeholder">${kind === 'tv' ? '📺' : '🎬'}</div>`}
                 <div class="card-info"><div class="card-title">${it.title || ('#' + it.id)}</div><div class="card-meta"><span>${it.year || '—'}</span>${it.rating ? `<span>★ ${it.rating}/10</span>` : ''}${it.watchCount > 1 ? `<span>👁 ${it.watchCount}×</span>` : ''}</div></div>
@@ -8939,9 +8952,8 @@ EXAMPLES:
             const img = it.poster_path ? `<img class="card-image" src="${IMG}w500${it.poster_path}" loading="lazy">` : `<div class="card-placeholder">${it.type==='tv'?'📺':'🎬'}</div>`;
             const liked = state.favs.some(f=>Number(f.id)===Number(it.id));
             const watched = isWatched(it.id, it.type);
-            const overlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
             const userRatingBadge = it.userRating ? `<span class="card-rating" style="color:#ffcc33;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;" title="Najít filmy/seriály se stejným hodnocením" onclick="event.stopPropagation();window.findSameTraktRating(${it.userRating},'${it.type}')">👤 ${it.userRating}/10</span>` : '';
-            return `<div class="card${watched?' is-watched':''}" onclick="window.openDetailFromTrakt(${it.id}, '${it.type}')">${img}${overlay}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="window.toggleFav(${it.id},'${jsq(it.title)}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span><span class="card-rating">★ ${it.vote_average?it.vote_average.toFixed(1):'—'}</span>${userRatingBadge}</div></div></div>`;
+            return `<div class="card${watched?' is-watched':''}" onclick="window.openDetailFromTrakt(${it.id}, '${it.type}')">${img}<div class="card-badge">${it.type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="window.toggleFav(${it.id},'${jsq(it.title)}','${it.year}',${it.vote_average||0},'${it.type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title}</div><div class="card-meta"><span>${it.year||'—'}</span><span class="card-rating">★ ${it.vote_average?it.vote_average.toFixed(1):'—'}</span>${userRatingBadge}</div></div></div>`;
         }).join('')}</div>`;
         $('traktResultsContainer').innerHTML = count + grid;
     }
@@ -9100,7 +9112,7 @@ EXAMPLES:
             const parts = collection.parts || [];
             if(parts.length === 0) { $('modalScrollBody').innerHTML = '<div class="empty">😕 Kolekce je prázdná</div>'; return; }
             parts.sort((a, b) => new Date(a.release_date).getTime() - new Date(b.release_date).getTime());
-            const grid = parts.map(p => { const img = p.poster_path ? `<img class="card-image" src="${IMG}w500${p.poster_path}">` : `<div class="card-placeholder">🎬</div>`; const watched = isWatched(p.id, 'movie'); const overlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : ''; return `<div class="card${watched?' is-watched':''}" onclick="openDetail(${p.id}, 'movie')">${img}${overlay}<div class="card-info"><div class="card-title">${p.title}</div><div class="card-meta"><span>${(p.release_date||'').slice(0,4)||'—'}</span></div></div></div>`; }).join('');
+            const grid = parts.map(p => { const img = p.poster_path ? `<img class="card-image" src="${IMG}w500${p.poster_path}">` : `<div class="card-placeholder">🎬</div>`; const watched = isWatched(p.id, 'movie'); return `<div class="card${watched?' is-watched':''}" onclick="openDetail(${p.id}, 'movie')">${img}<div class="card-info"><div class="card-title">${p.title}</div><div class="card-meta"><span>${(p.release_date||'').slice(0,4)||'—'}</span></div></div></div>`; }).join('');
             const isFavedColl = isCollFav(collectionId);
             const collFavNavBtn = `<button class="modal-fav-btn ${isFavedColl?'liked':''}" onclick="toggleCollFavInModal(${collectionId},'${collectionName.replace(/'/g,"\'")}')">${isFavedColl?'❤️':'🤍'}</button>`;
             $('modalScrollBody').innerHTML = `${modalNav(collectionName, hasBack, collFavNavBtn)}<div class="modal-body"><h2 class="modal-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">${collectionName} ↑</h2><p style="color:var(--text-muted); margin-bottom:20px;">${parts.length} filmů v kolekci (řazeno od nejstaršího)</p><div class="person-grid">${grid}</div></div>`;
@@ -9256,7 +9268,7 @@ EXAMPLES:
             <div class="episode-item" id="epItem_${epKey}" style="${watched?'border-left:3px solid #1db954;':''}">
                 <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
                     <div onclick="openEpisodeDetail(${tvId}, ${seasonNumber}, ${ep.episode_number}, '${epName}')" style="flex-shrink:0;cursor:pointer;">
-                        ${ep.still_path ? `<img src="${IMG}w300${ep.still_path}" style="width:120px;height:68px;object-fit:cover;border-radius:4px;" loading="lazy">` : `<div style="width:120px;height:68px;background:var(--bg-elevated);border-radius:4px;display:grid;place-items:center;color:var(--text-muted)">🎬</div>`}
+                        ${ep.still_path ? `<img src="${IMG}w300${ep.still_path}" style="width:120px;height:68px;object-fit:cover;border-radius:4px;${watched?'border:3px solid #1db954;':''}" loading="lazy">` : `<div style="width:120px;height:68px;background:var(--bg-elevated);border-radius:4px;display:grid;place-items:center;color:var(--text-muted);${watched?'border:3px solid #1db954;':''}">🎬</div>`}
                     </div>
                     <div style="flex:1;min-width:160px;">
                         <div style="font-weight:600;margin-bottom:4px;cursor:pointer;" onclick="openEpisodeDetail(${tvId}, ${seasonNumber}, ${ep.episode_number}, '${epName}')">${ep.episode_number}. ${ep.name || 'Neznámá epizoda'}</div>
@@ -9964,6 +9976,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
         try {
             if (nowWatched) await myHistoryRemove(id, type);
             else await myHistoryAdd(id, type);
+            refreshMySinatorWatchedCache();
         } catch (e) {
             applyMySinatorWatchedBadgeStyle(btnEl, nowWatched);
             alert('❌ ' + (e && e.message ? e.message : e));
@@ -10288,8 +10301,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             const mediaType = i.media_type || 'movie';
             const img = i.poster_path ? `<img class="card-image" src="${IMG}w342${i.poster_path}">` : `<div class="card-placeholder">🎬</div>`;
             const watched = isWatched(i.id, mediaType);
-            const overlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
-            return `<div class="card${watched?' is-watched':''}" onclick="openDetail(${i.id}, '${mediaType}')">${img}${overlay}<div class="card-badge">${mediaType==='tv'?'📺':''}</div><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating" style="background:#444;font-size:0.65rem">${i.character||label}</span></div></div></div>`; 
+            return `<div class="card${watched?' is-watched':''}" onclick="openDetail(${i.id}, '${mediaType}')">${img}<div class="card-badge">${mediaType==='tv'?'📺':''}</div><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating" style="background:#444;font-size:0.65rem">${i.character||label}</span></div></div></div>`; 
         }).join('')}</div>`;
     }
 
@@ -10317,8 +10329,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             const mediaType = i.media_type||'movie';
             const imgEl = i.poster_path ? `<img class="card-image" src="${IMG}w342${i.poster_path}">` : `<div class="card-placeholder">🎬</div>`;
             const watched = isWatched(i.id, mediaType);
-            const overlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
-            return `<div class="card${watched?' is-watched':''}" onclick="openDetail(${i.id},'${mediaType}')">${imgEl}${overlay}<div class="card-badge">${mediaType==='tv'?'📺':''}</div><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating" style="background:#8a2be2;font-size:0.65rem">Režie</span></div></div></div>`;
+            return `<div class="card${watched?' is-watched':''}" onclick="openDetail(${i.id},'${mediaType}')">${imgEl}<div class="card-badge">${mediaType==='tv'?'📺':''}</div><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating" style="background:#8a2be2;font-size:0.65rem">Režie</span></div></div></div>`;
         }).join('');
         return subTabs + `<div class="person-grid">${grid}</div>`;
     }
@@ -11392,14 +11403,6 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
         // Update card in grid live (find by onclick containing the id)
         document.querySelectorAll(`.card[onclick*="openDetail(${id}"]`).forEach(card => {
             card.classList.toggle('is-watched', nowFullyWatched);
-            let overlay = card.querySelector('.card-watched-overlay');
-            if(nowFullyWatched && !overlay) {
-                overlay = document.createElement('div');
-                overlay.className = 'card-watched-overlay';
-                overlay.innerHTML = '<span>✅ SHLÉDNUTO</span>';
-                const img = card.querySelector('.card-image, .card-placeholder');
-                if(img) img.after(overlay); else card.prepend(overlay);
-            } else if(!nowFullyWatched && overlay) { overlay.remove(); }
         });
         // Sync s Trakt (pokud připojen)
         if(state.trakt.accessToken) {
@@ -12360,7 +12363,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
     }
 
     // Přidáme badge update při startu
-    document.addEventListener('DOMContentLoaded', () => { updateWatchedCount(); if(state.trakt.accessToken) { setTimeout(syncWatchedFromTrakt, 3000); syncMdblistFromTrakt(); } updateMdblistStatus(); });
+    document.addEventListener('DOMContentLoaded', () => { updateWatchedCount(); if(state.trakt.accessToken) { setTimeout(syncWatchedFromTrakt, 3000); syncMdblistFromTrakt(); } updateMdblistStatus(); refreshMySinatorWatchedCache(); });
 
     function toggleToolbar() {
         const state = parseInt(_store.getItem('sinator_toolbar_state') || '0');
@@ -12433,8 +12436,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
                 const img = it.poster_path ? `<img class="card-image" src="${IMG}w342${it.poster_path}" loading="lazy">` : `<div class="card-placeholder">${type==='tv'?'📺':'🎬'}</div>`;
                 const liked = state.favs.some(f=>Number(f.id)===Number(it.id));
                 const watched = isWatched(it.id, type);
-                const watchedOverlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
-                return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('similarOverlay')?.remove();document.body.style.overflow='';openDetail(${it.id},'${type}')">${img}${watchedOverlay}<div class="card-badge">${type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${tJs}','${y}',${it.vote_average||0},'${type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating">★ ${r}</span></div></div></div>`;
+                return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('similarOverlay')?.remove();document.body.style.overflow='';openDetail(${it.id},'${type}')">${img}<div class="card-badge">${type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${tJs}','${y}',${it.vote_average||0},'${type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating">★ ${r}</span></div></div></div>`;
             }).join('') : '<div style="padding:24px;text-align:center;color:var(--text-muted);">😕 Žádné podobné tituly nenalezeny.</div>';
 
             overlay.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
@@ -12498,8 +12500,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
                     : `<div class="card-placeholder">${type==='tv'?'📺':'🎬'}</div>`;
                 const liked = state.favs.some(f=>Number(f.id)===Number(it.id));
                 const watched = isWatched(it.id, type);
-                const overlay = watched ? `<div class="card-watched-overlay"><span>✅ SHLÉDNUTO</span></div>` : '';
-                return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('similarOverlay')?.remove();document.body.style.overflow='';openDetail(${it.id},'${type}')">${img}${overlay}<div class="card-badge">${type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${tJs}','${y}',${it.vote_average||0},'${type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating">★ ${r}</span></div></div></div>`;
+                return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('similarOverlay')?.remove();document.body.style.overflow='';openDetail(${it.id},'${type}')">${img}<div class="card-badge">${type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${tJs}','${y}',${it.vote_average||0},'${type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating">★ ${r}</span></div></div></div>`;
             }).join('');
 
             if (grid) grid.insertAdjacentHTML('beforeend', cardsHtml);
