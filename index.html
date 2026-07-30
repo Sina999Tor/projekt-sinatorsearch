@@ -9419,8 +9419,19 @@ EXAMPLES:
         mainSearchLive(q);
     };
 
+    let _lastOpenDetailKey = '';
+    let _lastOpenDetailAt = 0;
     async function _openDetailNoStack(id, type) {
         if (!tmdbApiKey) return;
+        // Ochrana proti dvojitému vykreslení stejného detailu (mobilní touch+click
+        // umí na jedno klepnutí vystřelit onclick dvakrát) — druhé volání ve
+        // stejnou chvíli by přepsalo DOM a zrušilo právě proběhlé async aktualizace
+        // (např. puzzle odznak "Shlédnuto na Sinatoru").
+        const _key = `${id}:${type}`;
+        const _now = Date.now();
+        if (_key === _lastOpenDetailKey && (_now - _lastOpenDetailAt) < 800) return;
+        _lastOpenDetailKey = _key;
+        _lastOpenDetailAt = _now;
         const _origin = state._fromFavs ? 'favs' : state._fromTrakt ? 'trakt' : state._fromSimkl ? 'simkl' : state._fromWatched ? 'watched' : null;
         const hasBack = navigationStack.length >= 1;
         // Uložit origin do stack
