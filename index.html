@@ -1728,11 +1728,12 @@
                 <button class="close-modal-btn" onclick="closeTraktModal()" title="Zavřít">✕</button>
             </div>
         </div>
-        <div class="ts-source-tabs">
+        <div class="ts-source-tabs" id="tsSourceTabs">
             <button class="ts-source-btn active" id="tsSrcBtnTrakt" data-src="trakt" onclick="switchTsSource('trakt')">📋 Trakt</button>
             <button class="ts-source-btn" id="tsSrcBtnSimkl" data-src="simkl" onclick="switchTsSource('simkl')">🎯 Simkl</button>
             <button class="ts-source-btn" id="tsSrcBtnOwn" data-src="own" onclick="switchTsSource('own')">🧩 Sinator</button>
         </div>
+        <div id="tsNoConnectionMsg" class="empty" style="display:none;padding:40px 20px;text-align:center;">⚙️ Pro zobrazení sledovaného, hodnocení a seznamů se nejdřív připoj alespoň k jedné službě (Trakt, Simkl nebo Sinator) v Nastavení → Klíče.</div>
         <div class="ts-modal-body-scroll">
             <div id="traktListTabsWrap" style="display:none;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);background:var(--bg-card);">
                 <div id="traktListTabs" style="display:flex;gap:6px;padding:10px 16px;min-width:max-content;"></div>
@@ -2398,6 +2399,15 @@
         if (!res.ok) throw new Error((body && body.error) || `HTTP ${res.status}`);
         return body;
     }
+    // Stejné jako myApi, ale vrací i hlavičky odpovědi (potřeba pro X-Pagination-Item-Count).
+    async function myApiRaw(path, opts = {}) {
+        if (!myBackendReady()) throw new Error('Vlastní backend není nastavený (chybí adresa nebo klíč).');
+        const res = await fetchWithRetry(`${myBackendBase()}${path}`, { ...opts, headers: { ...myHeaders(), ...(opts.headers || {}) } });
+        let body = null;
+        try { body = await res.json(); } catch (e) {}
+        if (!res.ok) throw new Error((body && body.error) || `HTTP ${res.status}`);
+        return { body, headers: res.headers };
+    }
 
     // Watchlist
     const myWatchlistGet = () => myApi('/watchlist');
@@ -2424,18 +2434,26 @@
     const myHistoryGetForId = (type, id) => myApi(`/history?type=${type}&id=${encodeURIComponent(id)}`);
     const myHistoryAdd = (id, type, season, episode) => myApi('/history', { method: 'POST', body: JSON.stringify({ id, type, season, episode }) });
     const myHistoryRemove = (id, type, season, episode) => myApi('/history', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode }) });
-    // Načte kompletní historii (všechny stránky), ne jen prvních 50 položek.
+    // Načte kompletní historii (všechny stránky). První stránka zjistí celkový
+    // počet z hlavičky X-Pagination-Item-Count, zbylé stránky se pak stáhnou
+    // paralelně (v dávkách), místo jedné po druhé — u velkých historií (tisíce
+    // položek) to je řádově rychlejší.
     async function myHistoryGetAll(type) {
-        const pageSize = 200;
-        let page = 1;
-        let all = [];
-        while (true) {
-            const batch = await myHistoryGet(type, page, pageSize);
-            if (!Array.isArray(batch) || !batch.length) break;
-            all = all.concat(batch);
-            if (batch.length < pageSize) break;
-            page++;
-            if (page > 50) break; // pojistka proti nekonečné smyčce
+        const pageSize = 500;
+        const first = await myApiRaw(`/history?type=${type}&page=1&limit=${pageSize}`);
+        let all = Array.isArray(first.body) ? first.body.slice() : [];
+        const totalCount = parseInt(first.headers.get('X-Pagination-Item-Count') || '0', 10);
+        let totalPages = totalCount ? Math.ceil(totalCount / pageSize) : (all.length < pageSize ? 1 : 50);
+        totalPages = Math.min(totalPages, 50); // pojistka proti nekonečné smyčce
+        if (totalPages > 1) {
+            const remainingPages = [];
+            for (let p = 2; p <= totalPages; p++) remainingPages.push(p);
+            const concurrency = 8;
+            for (let i = 0; i < remainingPages.length; i += concurrency) {
+                const chunk = remainingPages.slice(i, i + concurrency);
+                const results = await Promise.all(chunk.map(p => myHistoryGet(type, p, pageSize)));
+                results.forEach(batch => { if (Array.isArray(batch)) all = all.concat(batch); });
+            }
         }
         return all;
     }
@@ -3372,10 +3390,39 @@
     }
     window.switchTsSource = switchTsSource;
 
+    function updateTsSourceTabsVisibility() {
+        const hasTrakt = !!state.trakt.accessToken;
+        const hasSimkl = !!state.simkl.accessToken;
+        const hasOwn = typeof myBackendReady === 'function' && myBackendReady();
+        const btnTrakt = $('tsSrcBtnTrakt'), btnSimkl = $('tsSrcBtnSimkl'), btnOwn = $('tsSrcBtnOwn');
+        if (btnTrakt) btnTrakt.style.display = hasTrakt ? '' : 'none';
+        if (btnSimkl) btnSimkl.style.display = hasSimkl ? '' : 'none';
+        if (btnOwn) btnOwn.style.display = hasOwn ? '' : 'none';
+        const noneConnected = !hasTrakt && !hasSimkl && !hasOwn;
+        if ($('tsSourceTabs')) $('tsSourceTabs').style.display = noneConnected ? 'none' : '';
+        return { hasTrakt, hasSimkl, hasOwn, noneConnected };
+    }
+
     function openTraktModal(source) {
         closeHelperModals();
         $('traktModal')?.classList.add('open');
-        switchTsSource(source || window._tsSource || 'trakt');
+        const { hasTrakt, hasSimkl, hasOwn, noneConnected } = updateTsSourceTabsVisibility();
+        const scrollBody = document.querySelector('#traktModal .ts-modal-body-scroll');
+        if (noneConnected) {
+            if (scrollBody) scrollBody.style.display = 'none';
+            if ($('tsNoConnectionMsg')) $('tsNoConnectionMsg').style.display = '';
+            const heading = $('tsModalHeading');
+            if (heading) heading.innerHTML = '📋 Seznamy';
+            return;
+        }
+        if (scrollBody) scrollBody.style.display = '';
+        if ($('tsNoConnectionMsg')) $('tsNoConnectionMsg').style.display = 'none';
+        let target = source || window._tsSource;
+        if (target === 'trakt' && !hasTrakt) target = null;
+        if (target === 'simkl' && !hasSimkl) target = null;
+        if (target === 'own' && !hasOwn) target = null;
+        if (!target) target = hasTrakt ? 'trakt' : (hasSimkl ? 'simkl' : 'own');
+        switchTsSource(target);
     }
     
     function closeTraktModal() { 
@@ -8449,13 +8496,26 @@ EXAMPLES:
     window._myBackendTabsCache = null;
     window._myBackendActiveTab = 'watchlist';
 
+    // Spustí async úlohy s omezenou souběžností (místo Promise.all na stovky
+    // položek najednou, což prohlížeč/TMDB jen zpomalí frontou spojení).
+    async function _runWithConcurrency(items, limit, worker) {
+        let idx = 0;
+        async function runNext() {
+            while (idx < items.length) {
+                const i = idx++;
+                await worker(items[i], i);
+            }
+        }
+        await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runNext));
+    }
+
     async function fetchMyBackendPosters(items) {
         // Watchlist položky mívají title uložené, ale poster_path bývá při importu
         // z Traktu prázdné (null) — proto se dotahuje podle chybějícího posteru,
         // ne podle chybějícího titulu.
         const need = items.filter(it => !it.poster_path);
         if (!need.length || !tmdbApiKey) return items;
-        await Promise.all(need.map(async it => {
+        await _runWithConcurrency(need, 15, async (it) => {
             try {
                 const kind = (it.type === 'tv' || it.type === 'shows' || it.type === 'episodes') ? 'tv' : 'movie';
                 const res = await fetch(`https://api.themoviedb.org/3/${kind}/${it.id}?api_key=${tmdbApiKey}&language=cs-CZ`);
@@ -8479,7 +8539,7 @@ EXAMPLES:
                 it.poster_path = d.poster_path ? `https://image.tmdb.org/t/p/w342${d.poster_path}` : null;
                 it.tmdbType = kind;
             } catch (e) {}
-        }));
+        });
         return items;
     }
 
