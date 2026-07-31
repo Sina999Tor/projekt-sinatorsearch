@@ -2434,26 +2434,26 @@
     const myHistoryGetForId = (type, id) => myApi(`/history?type=${type}&id=${encodeURIComponent(id)}`);
     const myHistoryAdd = (id, type, season, episode) => myApi('/history', { method: 'POST', body: JSON.stringify({ id, type, season, episode }) });
     const myHistoryRemove = (id, type, season, episode) => myApi('/history', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode }) });
-    // Načte kompletní historii (všechny stránky). První stránka zjistí celkový
-    // počet z hlavičky X-Pagination-Item-Count, zbylé stránky se pak stáhnou
-    // paralelně (v dávkách), místo jedné po druhé — u velkých historií (tisíce
-    // položek) to je řádově rychlejší.
+    // Načte kompletní historii (všechny stránky) paralelně po dávkách, aniž by
+    // se spoléhalo na hlavičku s celkovým počtem (ta nemusí být přes CORS
+    // viditelná) — prostě se stahují dávky stránek najednou, dokud dávka
+    // nevrátí neúplnou/prázdnou stránku.
     async function myHistoryGetAll(type) {
-        const pageSize = 500;
-        const first = await myApiRaw(`/history?type=${type}&page=1&limit=${pageSize}`);
-        let all = Array.isArray(first.body) ? first.body.slice() : [];
-        const totalCount = parseInt(first.headers.get('X-Pagination-Item-Count') || '0', 10);
-        let totalPages = totalCount ? Math.ceil(totalCount / pageSize) : (all.length < pageSize ? 1 : 50);
-        totalPages = Math.min(totalPages, 50); // pojistka proti nekonečné smyčce
-        if (totalPages > 1) {
-            const remainingPages = [];
-            for (let p = 2; p <= totalPages; p++) remainingPages.push(p);
-            const concurrency = 8;
-            for (let i = 0; i < remainingPages.length; i += concurrency) {
-                const chunk = remainingPages.slice(i, i + concurrency);
-                const results = await Promise.all(chunk.map(p => myHistoryGet(type, p, pageSize)));
-                results.forEach(batch => { if (Array.isArray(batch)) all = all.concat(batch); });
+        const pageSize = 300;
+        const concurrency = 6;
+        let all = [];
+        let page = 1;
+        let done = false;
+        let rounds = 0;
+        while (!done && rounds < 60) {
+            rounds++;
+            const pages = Array.from({ length: concurrency }, (_, i) => page + i);
+            const results = await Promise.all(pages.map(p => myHistoryGet(type, p, pageSize)));
+            for (const batch of results) {
+                if (Array.isArray(batch) && batch.length) all = all.concat(batch);
+                if (!Array.isArray(batch) || batch.length < pageSize) { done = true; }
             }
+            page += concurrency;
         }
         return all;
     }
@@ -8509,16 +8509,34 @@ EXAMPLES:
         await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runNext));
     }
 
+    // fetch s tvrdým časovým limitem — bez toho by jeden zaseknutý request na TMDB
+    // mohl navěky zablokovat celý "worker slot" v _runWithConcurrency.
+    function _fetchWithTimeout(url, ms = 8000) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), ms);
+        return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(t));
+    }
+
     async function fetchMyBackendPosters(items) {
         // Watchlist položky mívají title uložené, ale poster_path bývá při importu
         // z Traktu prázdné (null) — proto se dotahuje podle chybějícího posteru,
         // ne podle chybějícího titulu.
         const need = items.filter(it => !it.poster_path);
         if (!need.length || !tmdbApiKey) return items;
-        await _runWithConcurrency(need, 15, async (it) => {
+        // Seskup podle unikátního TMDB id — u historie epizod se stejný seriál
+        // opakuje desítkykrát, nemá smysl stahovat ten samý poster pro každou
+        // epizodu zvlášť.
+        const byId = new Map();
+        for (const it of need) {
+            const kind = (it.type === 'tv' || it.type === 'shows' || it.type === 'episodes') ? 'tv' : 'movie';
+            const key = `${kind}:${it.id}`;
+            if (!byId.has(key)) byId.set(key, []);
+            byId.get(key).push(it);
+        }
+        await _runWithConcurrency(Array.from(byId.entries()), 15, async ([key, group]) => {
+            const [kind, id] = key.split(':');
             try {
-                const kind = (it.type === 'tv' || it.type === 'shows' || it.type === 'episodes') ? 'tv' : 'movie';
-                const res = await fetch(`https://api.themoviedb.org/3/${kind}/${it.id}?api_key=${tmdbApiKey}&language=cs-CZ`);
+                const res = await _fetchWithTimeout(`https://api.themoviedb.org/3/${kind}/${id}?api_key=${tmdbApiKey}&language=cs-CZ`);
                 if (!res.ok) return;
                 const d = await res.json();
                 let csTitle = d.title || d.name || '';
@@ -8528,16 +8546,20 @@ EXAMPLES:
                 const origTitle = d.original_title || d.original_name || '';
                 if (!csTitle || (origTitle && csTitle === origTitle)) {
                     try {
-                        const transRes = await fetch(`https://api.themoviedb.org/3/${kind}/${it.id}/translations?api_key=${tmdbApiKey}`);
+                        const transRes = await _fetchWithTimeout(`https://api.themoviedb.org/3/${kind}/${id}/translations?api_key=${tmdbApiKey}`);
                         const transData = await transRes.json();
                         const csData = (transData.translations || []).find(t => t.iso_639_1 === 'cs' && t.data && (t.data.title || t.data.name));
                         if (csData) csTitle = csData.data.title || csData.data.name;
                     } catch (e) {}
                 }
-                if (!it.title) it.title = csTitle || `#${it.id}`;
-                if (!it.year) it.year = (d.release_date || d.first_air_date || '').slice(0, 4);
-                it.poster_path = d.poster_path ? `https://image.tmdb.org/t/p/w342${d.poster_path}` : null;
-                it.tmdbType = kind;
+                const posterUrl = d.poster_path ? `https://image.tmdb.org/t/p/w342${d.poster_path}` : null;
+                const year = (d.release_date || d.first_air_date || '').slice(0, 4);
+                group.forEach(it => {
+                    if (!it.title) it.title = csTitle || `#${it.id}`;
+                    if (!it.year) it.year = year;
+                    it.poster_path = posterUrl;
+                    it.tmdbType = kind;
+                });
             } catch (e) {}
         });
         return items;
@@ -8609,17 +8631,21 @@ EXAMPLES:
         });
         const c = $('myBackendResultsContainer');
         c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">Načítám…</div>`;
+        const _timeout = (ms) => new Promise((_, rej) => setTimeout(() => rej(new Error('Načítání trvá příliš dlouho (timeout). Zkus to prosím znovu.')), ms));
         try {
             let items = [];
             let emptyMsg = 'Žádné položky.';
-            if (tab === 'watchlist') { items = await myWatchlistGet(); emptyMsg = 'Watchlist je prázdný.'; }
-            else if (tab === 'ratings-movies') { items = (await myRatingsGet('movies')).map(r => ({ ...r, type: 'movie' })); emptyMsg = 'Zatím žádná hodnocení filmů.'; }
-            else if (tab === 'ratings-shows') { items = (await myRatingsGet('shows')).map(r => ({ ...r, type: 'tv' })); emptyMsg = 'Zatím žádná hodnocení seriálů.'; }
-            else if (tab === 'history-movies') { items = dedupeHistoryItems((await myHistoryGetAll('movies')).map(r => ({ ...r, type: 'movie' })), false); emptyMsg = 'Historie filmů je prázdná.'; }
-            else if (tab === 'history-episodes') { items = dedupeHistoryItems((await myHistoryGetAll('episodes')).map(r => ({ ...r, type: 'tv' })), true); emptyMsg = 'Historie epizod je prázdná.'; }
-            else if (tab === 'history-shows') { items = dedupeHistoryItems((await myHistoryGetAll('shows')).map(r => ({ ...r, type: 'tv' })), false); emptyMsg = 'Historie seriálů je prázdná.'; }
-            else if (tab.startsWith('list:')) { items = await myListItemsGet(tab.slice(5)); emptyMsg = 'Seznam je prázdný.'; }
-            items = await fetchMyBackendPosters(items);
+            const _load = (async () => {
+                if (tab === 'watchlist') { items = await myWatchlistGet(); emptyMsg = 'Watchlist je prázdný.'; }
+                else if (tab === 'ratings-movies') { items = (await myRatingsGet('movies')).map(r => ({ ...r, type: 'movie' })); emptyMsg = 'Zatím žádná hodnocení filmů.'; }
+                else if (tab === 'ratings-shows') { items = (await myRatingsGet('shows')).map(r => ({ ...r, type: 'tv' })); emptyMsg = 'Zatím žádná hodnocení seriálů.'; }
+                else if (tab === 'history-movies') { items = dedupeHistoryItems((await myHistoryGetAll('movies')).map(r => ({ ...r, type: 'movie' })), false); emptyMsg = 'Historie filmů je prázdná.'; }
+                else if (tab === 'history-episodes') { items = dedupeHistoryItems((await myHistoryGetAll('episodes')).map(r => ({ ...r, type: 'tv' })), true); emptyMsg = 'Historie epizod je prázdná.'; }
+                else if (tab === 'history-shows') { items = dedupeHistoryItems((await myHistoryGetAll('shows')).map(r => ({ ...r, type: 'tv' })), false); emptyMsg = 'Historie seriálů je prázdná.'; }
+                else if (tab.startsWith('list:')) { items = await myListItemsGet(tab.slice(5)); emptyMsg = 'Seznam je prázdný.'; }
+                items = await fetchMyBackendPosters(items);
+            })();
+            await Promise.race([_load, _timeout(30000)]);
             renderMyBackendGrid(items, emptyMsg, tab);
         } catch (e) {
             c.innerHTML = `<div class="empty" style="padding:20px;text-align:center;">⚠️ ${e && e.message ? e.message : e}<br><br><button onclick="renderMyBackendTab('${tab}')" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
