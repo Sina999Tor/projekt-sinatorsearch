@@ -2434,6 +2434,10 @@
     const myHistoryGetForId = (type, id) => myApi(`/history?type=${type}&id=${encodeURIComponent(id)}`);
     const myHistoryAdd = (id, type, season, episode) => myApi('/history', { method: 'POST', body: JSON.stringify({ id, type, season, episode }) });
     const myHistoryRemove = (id, type, season, episode) => myApi('/history', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode }) });
+    // Smaže jen JEDEN konkrétní záznam v historii (podle přesného watched_at),
+    // ne všechny watch-eventy daného id — používá se u mazání jednotlivých
+    // dat v sekci "Historie sledování – Sinator".
+    const myHistoryRemoveEntry = (id, type, watched_at, season, episode) => myApi('/history', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode, watched_at }) });
     // Načte kompletní historii (všechny stránky) paralelně po dávkách, aniž by
     // se spoléhalo na hlavičku s celkovým počtem (ta nemusí být přes CORS
     // viditelná) — prostě se stahují dávky stránek najednou, dokud dávka
@@ -9739,7 +9743,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
 <button class="action-btn-modal" onclick="myBackendAddToList(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">📁 Do seznamu</button>
 </div>`;
             const actionBtns = coreBtns + extraBtns + `</div>`;
-            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip" style="cursor:pointer;" title="Najít filmy/seriály se stejným hodnocením" onclick="openRatingBrowse(${d.vote_average||0},'${type}')"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button><button class="modal-chip" id="mySinatorWatchedBadge_${id}" style="display:none;cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;" onclick="toggleMySinatorWatched(${id},'${type}',this)">🧩 …</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="mySinatorRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div><div id="mySinatorWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
+            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip" style="cursor:pointer;" title="Najít filmy/seriály se stejným hodnocením" onclick="openRatingBrowse(${d.vote_average||0},'${type}')"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button><button class="modal-chip" id="mySinatorWatchedBadge_${id}" style="display:none;cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;" onclick="toggleMySinatorWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">🧩 …</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="mySinatorRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div><div id="mySinatorWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
             
             if(type === 'tv') {
                 $('modalScrollBody').innerHTML += `<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);"><h3 style="margin-bottom:16px;font-size:1.2rem;">📺 Sezóny a epizody</h3><div id="seasons-container"></div></div>`;
@@ -10063,14 +10067,44 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             btn.title = (e && e.message) ? e.message : String(e);
         }
     }
-    window.toggleMySinatorWatched = async function(id, type, btnEl) {
+    window.toggleMySinatorWatched = async function(id, type, title, year, posterPath, btnEl) {
         if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Klíče → Propojení.'); return; }
         const nowWatched = btnEl.dataset.watched === '1';
-        applyMySinatorWatchedBadgeStyle(btnEl, !nowWatched);
+        const willMark = !nowWatched;
+        applyMySinatorWatchedBadgeStyle(btnEl, willMark);
         try {
             if (nowWatched) await myHistoryRemove(id, type);
             else await myHistoryAdd(id, type);
             refreshMySinatorWatchedCache();
+
+            // Zpětná synchronizace s Traktem (pokud připojen) a s lokálním stavem,
+            // ať se hned projeví i na druhém tlačítku "✅ Shlédnuto" a v rámečcích v mřížkách.
+            const key = `${type}_${id}`;
+            if (willMark) state.watched[key] = { id, type, title, year, posterPath, addedAt: Date.now() };
+            else delete state.watched[key];
+            saveWatched();
+            const otherBtn = document.querySelector(`.modal-chip[onclick*="toggleWatched(${id},"]`);
+            if (otherBtn) {
+                otherBtn.style.border = '1px solid ' + (willMark ? '#1db954' : 'var(--border)');
+                otherBtn.style.background = willMark ? 'rgba(29,185,84,0.15)' : 'transparent';
+                otherBtn.style.color = willMark ? '#1db954' : 'var(--text-muted)';
+                otherBtn.textContent = willMark ? '✅ Shlédnuto' : '☐ Shlédnuto';
+            }
+            document.querySelectorAll(`.card[onclick*="openDetail(${id}"]`).forEach(card => {
+                card.classList.toggle('is-watched', willMark);
+            });
+            if (state.trakt.accessToken) {
+                try {
+                    await ensureTraktToken();
+                    if (willMark) {
+                        const body = type === 'movie' ? { movies: [{ ids: { tmdb: id } }] } : { shows: [{ ids: { tmdb: id } }] };
+                        await fetch(TRAKT_BASE + '/sync/history', { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
+                    } else {
+                        const body = type === 'movie' ? { movies: [{ ids: { tmdb: id } }] } : { shows: [{ ids: { tmdb: id } }] };
+                        await fetch(TRAKT_BASE + '/sync/history/remove', { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
+                    }
+                } catch (e) { console.warn('Trakt sync error (ze Sinator přepínače):', e); }
+            }
         } catch (e) {
             applyMySinatorWatchedBadgeStyle(btnEl, nowWatched);
             alert('❌ ' + (e && e.message ? e.message : e));
@@ -10176,7 +10210,10 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             if (type === 'tv' && (it.season || it.episode)) {
                 epLabel = ` <span style="opacity:0.7;">– S${String(it.season).padStart(2,'0')}E${String(it.episode).padStart(2,'0')}</span>`;
             }
-            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);"><span style="opacity:0.8;">🕓</span><span>${dateStr} – ${timeStr}</span>${epLabel}</div>`;
+            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);">
+                <span style="opacity:0.8;">🕓</span><span style="flex:1;">${dateStr} – ${timeStr}${epLabel}</span>
+                <button onclick="window.deleteMySinatorHistoryEntry(${id},'${type}',${it.watched_at},${it.season ?? 'null'},${it.episode ?? 'null'})" title="Smazat tento záznam" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;padding:2px 6px;">✕</button>
+            </div>`;
         };
         const latestHtml = rowHtml(items[0]);
         const olderHtml = items.slice(1).map(rowHtml).join('');
@@ -10192,6 +10229,16 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             <div id="mySinatorHistOlder_${id}" style="display:none;">${olderHtml}</div>
         </div>`;
     }
+
+    window.deleteMySinatorHistoryEntry = async function(id, type, watchedAt, season, episode) {
+        if (!confirm('Smazat tento záznam z historie sledování?')) return;
+        try {
+            await myHistoryRemoveEntry(id, type, watchedAt, season, episode);
+            if (typeof refreshMySinatorWatchedCache === 'function') refreshMySinatorWatchedCache();
+            if (typeof initMySinatorWatchedBadge === 'function') initMySinatorWatchedBadge(id, type);
+            if (typeof initMySinatorWatchHistory === 'function') initMySinatorWatchHistory(id, type);
+        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+    };
 
     window.toggleMySinatorWatchHistory = (id) => {
         const older = document.getElementById(`mySinatorHistOlder_${id}`);
@@ -11516,6 +11563,17 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             } catch(e) { console.warn('Trakt sync error:', e); }
         }
         // Pokud Trakt není připojen, zůstává jen lokální uložení (saveWatched() výše) - to je záměr.
+
+        // Sync se Sinator backendem (pokud připojen) — stejná akce označí/odškrtne
+        // shlédnutí i tam, ať není potřeba klikat na obě tlačítka zvlášť.
+        if (typeof myBackendReady === 'function' && myBackendReady() && (type === 'movie' || fullyAired)) {
+            try {
+                if (willMark) await myHistoryAdd(id, type);
+                else await myHistoryRemove(id, type);
+                if (typeof refreshMySinatorWatchedCache === 'function') refreshMySinatorWatchedCache();
+                if (typeof initMySinatorWatchedBadge === 'function') initMySinatorWatchedBadge(id, type);
+            } catch (e) { console.warn('Sinator sync error:', e); }
+        }
     }
 
     async function syncWatchedFromTrakt() {
