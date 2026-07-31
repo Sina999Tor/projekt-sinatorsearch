@@ -8641,7 +8641,15 @@ EXAMPLES:
                 else if (tab === 'ratings-shows') { items = (await myRatingsGet('shows')).map(r => ({ ...r, type: 'tv' })); emptyMsg = 'Zatím žádná hodnocení seriálů.'; }
                 else if (tab === 'history-movies') { items = dedupeHistoryItems((await myHistoryGetAll('movies')).map(r => ({ ...r, type: 'movie' })), false); emptyMsg = 'Historie filmů je prázdná.'; }
                 else if (tab === 'history-episodes') { items = dedupeHistoryItems((await myHistoryGetAll('episodes')).map(r => ({ ...r, type: 'tv' })), true); emptyMsg = 'Historie epizod je prázdná.'; }
-                else if (tab === 'history-shows') { items = dedupeHistoryItems((await myHistoryGetAll('shows')).map(r => ({ ...r, type: 'tv' })), false); emptyMsg = 'Historie seriálů je prázdná.'; }
+                else if (tab === 'history-shows') {
+                    // "Hist. seriály" = seskupení podle seriálu, ne podle jednotlivých epizod.
+                    // Bere v úvahu jak sledované epizody (bucket 'episodes'), tak explicitní
+                    // označení "celý seriál shlédnut" (bucket 'shows') — obojí se sloučí do
+                    // jedné karty na seriál.
+                    const [episodes, shows] = await Promise.all([myHistoryGetAll('episodes'), myHistoryGetAll('shows')]);
+                    items = dedupeHistoryItems([...episodes, ...shows].map(r => ({ ...r, type: 'tv' })), false);
+                    emptyMsg = 'Historie seriálů je prázdná.';
+                }
                 else if (tab.startsWith('list:')) { items = await myListItemsGet(tab.slice(5)); emptyMsg = 'Seznam je prázdný.'; }
                 items = await fetchMyBackendPosters(items);
             })();
