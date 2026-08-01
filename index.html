@@ -8357,7 +8357,22 @@ EXAMPLES:
             mySinatorWatchedCache.movies = new Set((movies || []).map(it => String(it.id)));
             mySinatorWatchedCache.shows = new Set((shows || []).map(it => String(it.id)));
             mySinatorWatchedCache.loaded = true;
+            applyWatchedBordersToAllCards();
         } catch (e) { console.warn('Sinator watched cache refresh error:', e); }
+    }
+
+    // Po (znovu)načtení Sinator cache je potřeba přepočítat zelené rámečky na
+    // VŠECH aktuálně vykreslených kartách — appka je vykresluje na spoustě
+    // různých míst (hlavní mřížka, oblíbené, seznamy...) a mřížka se často
+    // vykreslí dřív, než se cache stihne asynchronně dotáhnout, takže napoprvé
+    // vždy dopadnou jako "nesledováno".
+    function applyWatchedBordersToAllCards() {
+        document.querySelectorAll('.card[data-tmdb-id]').forEach(card => {
+            const id = card.getAttribute('data-tmdb-id');
+            const type = card.getAttribute('data-tmdb-type') || 'movie';
+            if (!id) return;
+            card.classList.toggle('is-watched', isWatched(id, type));
+        });
     }
 
     function isWatched(id, type) {
