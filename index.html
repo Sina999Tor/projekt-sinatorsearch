@@ -8366,6 +8366,18 @@ EXAMPLES:
         return isTv ? mySinatorWatchedCache.shows.has(String(id)) : mySinatorWatchedCache.movies.has(String(id));
     }
 
+    // Karty se v appce vykreslují několika různými funkcemi (hlavní mřížka,
+    // oblíbené, Trakt/Simkl/Sinator seznamy, filmografie...) s různě
+    // pojmenovanými onclick handlery (openDetail, openDetailFromFavs,
+    // openDetailFromTrakt...). Tenhle selektor pokryje všechny varianty,
+    // ať se zelený rámeček "shlédnuto" spolehlivě opraví všude, ne jen
+    // u jednoho konkrétního typu karty.
+    function refreshCardWatchedBorders(id, watched) {
+        document.querySelectorAll(`.card[data-tmdb-id="${id}"], .card[onclick*="(${id},"], .card[onclick*="(${id})"]`).forEach(card => {
+            card.classList.toggle('is-watched', watched);
+        });
+    }
+
     function renderGrid(items) {
         if(!items.length) { resultsEl.innerHTML='<div class="empty">😕 Žádné výsledky</div>'; return; }
         resultsEl.innerHTML = items.map(it => cardHtml(it)).join('');
@@ -10095,9 +10107,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
                 otherBtn.style.color = willMark ? '#1db954' : 'var(--text-muted)';
                 otherBtn.textContent = willMark ? '✅ Shlédnuto' : '☐ Shlédnuto';
             }
-            document.querySelectorAll(`.card[onclick*="openDetail(${id}"]`).forEach(card => {
-                card.classList.toggle('is-watched', willMark);
-            });
+            refreshCardWatchedBorders(id, willMark);
             if (state.trakt.accessToken && willMark) {
                 try {
                     await ensureTraktToken();
@@ -10234,9 +10244,15 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
         if (!confirm('Smazat tento záznam z historie sledování?')) return;
         try {
             await myHistoryRemoveEntry(id, type, watchedAt, season, episode);
-            if (typeof refreshMySinatorWatchedCache === 'function') refreshMySinatorWatchedCache();
+            if (typeof refreshMySinatorWatchedCache === 'function') await refreshMySinatorWatchedCache();
             if (typeof initMySinatorWatchedBadge === 'function') initMySinatorWatchedBadge(id, type);
             if (typeof initMySinatorWatchHistory === 'function') initMySinatorWatchHistory(id, type);
+            // Karty v mřížkách se po smazání záznamu samy nepřekreslí (jejich
+            // rámeček se nastavuje jen při vykreslení) — zkontroluj, jestli
+            // položka pořád platí za shlédnutou (lokálně/Trakt, nebo zbývající
+            // Sinator historie) a rámeček podle toho oprav napříč appkou.
+            const stillWatched = typeof isWatched === 'function' && isWatched(id, type);
+            refreshCardWatchedBorders(id, stillWatched);
         } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
     };
 
@@ -11542,9 +11558,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             seasonsContainer.dataset.seasons = JSON.stringify(seasons);
         }
         // Update card in grid live (find by onclick containing the id)
-        document.querySelectorAll(`.card[onclick*="openDetail(${id}"]`).forEach(card => {
-            card.classList.toggle('is-watched', nowFullyWatched);
-        });
+        refreshCardWatchedBorders(id, nowFullyWatched);
         // Sync s Trakt (pokud připojen)
         if(state.trakt.accessToken) {
             try {
