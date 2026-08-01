@@ -10073,9 +10073,14 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
         const willMark = !nowWatched;
         applyMySinatorWatchedBadgeStyle(btnEl, willMark);
         try {
-            if (nowWatched) await myHistoryRemove(id, type);
-            else await myHistoryAdd(id, type);
+            // Zaškrtnutí VŽDY přidá nový záznam do historie (i jako rewatch) —
+            // odškrtnutí samo o sobě historii nemaže (to by smazalo i starší
+            // zhlédnutí). Jednotlivá data se dají smazat jen ručně přes ✕
+            // v sekci "Historie sledování" níž. Díky tomu odškrtnutí a zpětné
+            // zaškrtnutí zapíše druhé (další) zhlédnutí, ne jen jedno místo všech.
+            if (willMark) await myHistoryAdd(id, type);
             refreshMySinatorWatchedCache();
+            if (typeof initMySinatorWatchHistory === 'function') initMySinatorWatchHistory(id, type);
 
             // Zpětná synchronizace s Traktem (pokud připojen) a s lokálním stavem,
             // ať se hned projeví i na druhém tlačítku "✅ Shlédnuto" a v rámečcích v mřížkách.
@@ -10093,16 +10098,11 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             document.querySelectorAll(`.card[onclick*="openDetail(${id}"]`).forEach(card => {
                 card.classList.toggle('is-watched', willMark);
             });
-            if (state.trakt.accessToken) {
+            if (state.trakt.accessToken && willMark) {
                 try {
                     await ensureTraktToken();
-                    if (willMark) {
-                        const body = type === 'movie' ? { movies: [{ ids: { tmdb: id } }] } : { shows: [{ ids: { tmdb: id } }] };
-                        await fetch(TRAKT_BASE + '/sync/history', { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
-                    } else {
-                        const body = type === 'movie' ? { movies: [{ ids: { tmdb: id } }] } : { shows: [{ ids: { tmdb: id } }] };
-                        await fetch(TRAKT_BASE + '/sync/history/remove', { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
-                    }
+                    const body = type === 'movie' ? { movies: [{ ids: { tmdb: id } }] } : { shows: [{ ids: { tmdb: id } }] };
+                    await fetch(TRAKT_BASE + '/sync/history', { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
                 } catch (e) { console.warn('Trakt sync error (ze Sinator přepínače):', e); }
             }
         } catch (e) {
