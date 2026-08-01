@@ -8361,9 +8361,14 @@ EXAMPLES:
     }
 
     function isWatched(id, type) {
-        if (state.watched[`${type}_${id}`]) return true;
         const isTv = (type === 'tv' || type === 'show' || type === 'shows');
-        return isTv ? mySinatorWatchedCache.shows.has(String(id)) : mySinatorWatchedCache.movies.has(String(id));
+        if (typeof myBackendReady === 'function' && myBackendReady()) {
+            // Když je Sinator připojený, je jediným zdrojem pravdy pro "shlédnuto"
+            // (historie sledování) — ne lokální state.watched flag, který se
+            // odškrtnutím maže, ale Sinator historie záměrně ne (viz toggleMySinatorWatched).
+            return isTv ? mySinatorWatchedCache.shows.has(String(id)) : mySinatorWatchedCache.movies.has(String(id));
+        }
+        return !!state.watched[`${type}_${id}`];
     }
 
     // Karty se v appce vykreslují několika různými funkcemi (hlavní mřížka,
