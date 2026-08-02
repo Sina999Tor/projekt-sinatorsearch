@@ -2442,7 +2442,7 @@
     // se spoléhalo na hlavičku s celkovým počtem (ta nemusí být přes CORS
     // viditelná) — prostě se stahují dávky stránek najednou, dokud dávka
     // nevrátí neúplnou/prázdnou stránku.
-    async function myHistoryGetAll(type) {
+    async function _myHistoryGetAllRaw(type) {
         const pageSize = 300;
         const concurrency = 6;
         let all = [];
@@ -2460,6 +2460,29 @@
             page += concurrency;
         }
         return all;
+    }
+    // Krátkodobá cache (10s) pro kompletní historii — appka ji potřebuje na
+    // víc místech najednou (cache pro zelené rámečky při startu, otevření
+    // záložky Hist. filmy/epizody/seriály...) a bez cache by se stejná
+    // (potenciálně velká) historie stahovala víckrát zbytečně za sebou.
+    const _historyGetAllCache = {};
+    async function myHistoryGetAll(type, forceRefresh) {
+        const cached = _historyGetAllCache[type];
+        const now = Date.now();
+        if (!forceRefresh && cached && (now - cached.ts) < 10000) {
+            if (cached.promise) return cached.promise; // probíhající fetch — počkej na stejný výsledek
+            return cached.data;
+        }
+        const promise = _myHistoryGetAllRaw(type);
+        _historyGetAllCache[type] = { ts: now, promise };
+        try {
+            const data = await promise;
+            _historyGetAllCache[type] = { ts: Date.now(), data };
+            return data;
+        } catch (e) {
+            delete _historyGetAllCache[type];
+            throw e;
+        }
     }
 
     // Rozkoukanost
@@ -8353,7 +8376,7 @@ EXAMPLES:
     async function refreshMySinatorWatchedCache() {
         if (typeof myBackendReady !== 'function' || !myBackendReady()) return;
         try {
-            const [movies, shows] = await Promise.all([myHistoryGetAll('movies'), myHistoryGetAll('shows')]);
+            const [movies, shows] = await Promise.all([myHistoryGetAll('movies', true), myHistoryGetAll('shows', true)]);
             mySinatorWatchedCache.movies = new Set((movies || []).map(it => String(it.id)));
             mySinatorWatchedCache.shows = new Set((shows || []).map(it => String(it.id)));
             mySinatorWatchedCache.loaded = true;
@@ -23821,8 +23844,9 @@ function openEpgDetail(ep) {
                 </div>
             </div>
             ${desc ? `<div style="font-size:0.85rem;color:var(--text-muted);line-height:1.6;margin-bottom:20px;padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;border-left:3px solid #00b4d8;">${desc}</div>` : ''}
-            ${ep.isNow ? `<div style="margin-bottom:16px;">
+            ${ep.isNow ? `<div style="margin-bottom:16px;display:flex;flex-direction:column;gap:8px;">
                 <button onclick="playEpgChannelLive('${channel.replace(/'/g,"\\'")}')" style="width:100%;padding:11px 16px;background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶ Přehrát živě ve VLC</button>
+                <button onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${title.replace(/'/g,"\\'")}'))" style="width:100%;padding:11px 16px;background:rgba(30,60,110,0.35);border:1px solid #3a6ea5;color:#9cc4f0;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶️ Přehrát od začátku (Hellspy)</button>
             </div>` : ''}
             <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Hledat / otevřít</div>
             <div style="display:flex;flex-wrap:wrap;gap:8px;">
