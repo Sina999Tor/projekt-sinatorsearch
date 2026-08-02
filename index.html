@@ -1940,6 +1940,11 @@
                     <button class="settings-btn-small" style="width:100%;border-color:#6090ff;color:#6090ff;" onclick="document.getElementById('traktImportFileInput').click()">📥 Import z Trakt exportu (ZIP)</button>
                     <div id="traktImportStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;"></div>
                 </div>
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Opakované importy uměly v historii vytvořit duplicitní záznamy (stejná položka víckrát). Tohle je jednorázově sloučí — pro každý film/epizodu/seriál ponechá jen nejnovější záznam.</div>
+                    <button class="settings-btn-small" id="myBackendCleanupBtn" style="width:100%;border-color:#e07a6f;color:#e07a6f;" onclick="cleanupMySinatorHistoryDuplicates(this)">🧹 Vyčistit duplicity v historii</button>
+                    <div id="myBackendCleanupStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;"></div>
+                </div>
             </div>
             <div class="settings-divider"></div>
             <div class="settings-section" style="display:none;">
@@ -2443,8 +2448,8 @@
     // viditelná) — prostě se stahují dávky stránek najednou, dokud dávka
     // nevrátí neúplnou/prázdnou stránku.
     async function _myHistoryGetAllRaw(type) {
-        const pageSize = 300;
-        const concurrency = 6;
+        const pageSize = 500;
+        const concurrency = 10;
         let all = [];
         let page = 1;
         let done = false;
@@ -8373,6 +8378,36 @@ EXAMPLES:
     // Cache Sinator "shlédnuto" ID (filmy + celé seriály) pro okamžité zobrazení
     // zeleného rámečku v gridech, bez nutnosti dotazovat backend pro každou kartu zvlášť.
     const mySinatorWatchedCache = { movies: new Set(), shows: new Set(), loaded: false };
+    window.cleanupMySinatorHistoryDuplicates = async function(btnEl) {
+        if (!myBackendReady()) { alert('⚠️ Nejdřív nastav a ulož Sinator backend (klíč) výše.'); return; }
+        if (!confirm('U každého filmu/epizody/seriálu v historii ponechá jen nejnovější záznam a zbytek trvale smaže. Pokračovat?')) return;
+        const statusEl = document.getElementById('myBackendCleanupStatus');
+        const origLabel = btnEl.textContent;
+        btnEl.disabled = true;
+        btnEl.textContent = '⏳ Čistím…';
+        if (statusEl) statusEl.textContent = '';
+        try {
+            const res = await myApi('/history-cleanup', { method: 'POST', body: JSON.stringify({ type: 'all' }) });
+            const r = res.results || {};
+            const lines = ['movies', 'episodes', 'shows']
+                .filter(t => r[t])
+                .map(t => {
+                    const label = t === 'movies' ? 'Filmy' : t === 'episodes' ? 'Epizody' : 'Seriály (celé)';
+                    return `${label}: ${r[t].before} → ${r[t].after} (smazáno ${r[t].removed})`;
+                });
+            if (statusEl) statusEl.textContent = '✅ Hotovo:\n' + lines.join('\n');
+            // Vymaž lokální cache historie a přenačti odznaky/rámečky, ať appka
+            // hned ukazuje aktuální (zbavená duplicit) data.
+            if (typeof _historyGetAllCache === 'object') { delete _historyGetAllCache.movies; delete _historyGetAllCache.episodes; delete _historyGetAllCache.shows; }
+            await refreshMySinatorWatchedCache();
+        } catch (e) {
+            if (statusEl) statusEl.textContent = '❌ ' + (e && e.message ? e.message : e);
+        } finally {
+            btnEl.disabled = false;
+            btnEl.textContent = origLabel;
+        }
+    };
+
     async function refreshMySinatorWatchedCache() {
         if (typeof myBackendReady !== 'function' || !myBackendReady()) return;
         try {
@@ -8712,7 +8747,7 @@ EXAMPLES:
                 else if (tab.startsWith('list:')) { items = await myListItemsGet(tab.slice(5)); emptyMsg = 'Seznam je prázdný.'; }
                 items = await fetchMyBackendPosters(items);
             })();
-            await Promise.race([_load, _timeout(30000)]);
+            await Promise.race([_load, _timeout(60000)]);
             renderMyBackendGrid(items, emptyMsg, tab);
         } catch (e) {
             c.innerHTML = `<div class="empty" style="padding:20px;text-align:center;">⚠️ ${e && e.message ? e.message : e}<br><br><button onclick="renderMyBackendTab('${tab}')" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
