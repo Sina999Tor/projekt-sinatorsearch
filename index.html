@@ -1746,6 +1746,16 @@
             <div id="myBackendListTabsWrap" style="display:none;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);background:var(--bg-card);">
                 <div id="myBackendListTabs" style="display:flex;gap:6px;padding:10px 16px;min-width:max-content;"></div>
             </div>
+            <div id="myBackendSortBarWrap" style="display:none;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg-card);gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="myBackendSortSelect" onchange="myBackendApplySort(this.value)" style="background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px;font-size:0.8rem;">
+                    <option value="default">Výchozí řazení</option>
+                    <option value="watched_desc">Dle data shlédnutí (nejnovější)</option>
+                    <option value="watched_asc">Dle data shlédnutí (nejstarší)</option>
+                    <option value="alpha_asc">Abecedně A-Z</option>
+                    <option value="alpha_desc">Abecedně Z-A</option>
+                </select>
+                <input type="text" id="myBackendLetterFilter" placeholder="Hledat podle počátečního písmene (např. D)" oninput="myBackendApplyLetterFilter(this.value)" style="flex:1;min-width:180px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:0.8rem;">
+            </div>
             <div class="trakt-modal-body" id="myBackendResultsContainer" style="display:none;"></div>
         </div>
     </div>
@@ -3400,6 +3410,7 @@
         if ($('traktListTabsWrap')) $('traktListTabsWrap').style.display = (isTrakt && window._traktListsCache?.length) ? 'block' : 'none';
         if ($('simklListTabsWrap')) $('simklListTabsWrap').style.display = (isSimkl && window._simklListsCache?.length) ? 'block' : 'none';
         if ($('myBackendListTabsWrap')) $('myBackendListTabsWrap').style.display = 'none';
+        if ($('myBackendSortBarWrap') && !isOwn) $('myBackendSortBarWrap').style.display = 'none';
         if (isTrakt) {
             if (window._traktListsCache?.length) {
                 const idx = state._traktActiveIdx != null ? state._traktActiveIdx : (window._traktActiveIdx || 0);
@@ -8748,18 +8759,57 @@ EXAMPLES:
                 items = await fetchMyBackendPosters(items);
             })();
             await Promise.race([_load, _timeout(60000)]);
+            window._myBackendCurrentItems = items;
+            window._myBackendCurrentEmptyMsg = emptyMsg;
+            window._myBackendCurrentLetterFilter = '';
+            const sortBar = $('myBackendSortBarWrap');
+            if (sortBar) sortBar.style.display = items.length ? 'flex' : 'none';
+            const sortSelect = $('myBackendSortSelect');
+            if (sortSelect) sortSelect.value = 'default';
+            const letterInput = $('myBackendLetterFilter');
+            if (letterInput) letterInput.value = '';
             renderMyBackendGrid(items, emptyMsg, tab);
         } catch (e) {
+            if ($('myBackendSortBarWrap')) $('myBackendSortBarWrap').style.display = 'none';
             c.innerHTML = `<div class="empty" style="padding:20px;text-align:center;">⚠️ ${e && e.message ? e.message : e}<br><br><button onclick="renderMyBackendTab('${tab}')" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
         }
     }
     window.renderMyBackendTab = renderMyBackendTab;
+
+    // Řazení a filtrování podle písmene pracují nad už načtenými položkami
+    // (žádný nový dotaz na backend) — jen se přerovná/prefiltruje a znovu vykreslí.
+    function myBackendGetSortedFilteredItems() {
+        let items = (window._myBackendCurrentItems || []).slice();
+        const letter = (window._myBackendCurrentLetterFilter || '').trim().toLocaleLowerCase('cs-CZ');
+        if (letter) {
+            items = items.filter(it => (it.title || '').trim().toLocaleLowerCase('cs-CZ').startsWith(letter));
+        }
+        const sortMode = $('myBackendSortSelect') ? $('myBackendSortSelect').value : 'default';
+        if (sortMode === 'watched_desc') items.sort((a, b) => (b.watched_at || 0) - (a.watched_at || 0));
+        else if (sortMode === 'watched_asc') items.sort((a, b) => (a.watched_at || 0) - (b.watched_at || 0));
+        else if (sortMode === 'alpha_asc') items.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'cs'));
+        else if (sortMode === 'alpha_desc') items.sort((a, b) => (b.title || '').localeCompare(a.title || '', 'cs'));
+        return items;
+    }
+
+    window.myBackendApplySort = function() {
+        const items = myBackendGetSortedFilteredItems();
+        renderMyBackendGrid(items, window._myBackendCurrentEmptyMsg || 'Žádné položky.', window._myBackendActiveTab);
+    };
+
+    window.myBackendApplyLetterFilter = function(value) {
+        window._myBackendCurrentLetterFilter = value;
+        const items = myBackendGetSortedFilteredItems();
+        const emptyMsg = value ? `Nic nezačíná na "${value}".` : (window._myBackendCurrentEmptyMsg || 'Žádné položky.');
+        renderMyBackendGrid(items, emptyMsg, window._myBackendActiveTab);
+    };
 
     async function loadMyBackendOverview(keepTab) {
         const c = $('myBackendResultsContainer');
         if (!myBackendReady()) {
             c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">🧩 Vlastní backend není nastavený.<br><br>Nastav adresu a klíč v <b>Nastavení → Ostatní</b>.</div>`;
             $('myBackendListTabsWrap').style.display = 'none';
+            if ($('myBackendSortBarWrap')) $('myBackendSortBarWrap').style.display = 'none';
             return;
         }
         let lists = [];
