@@ -9297,6 +9297,10 @@ EXAMPLES:
             else if (backTo === 'mdblist') openMdblistModal();
             else if (backTo === 'watching') openWatchingModal();
             else if (backTo === 'moviesprogress') openMoviesProgressModal();
+            else if (['zebricky','upcoming','porovnani','mood','tentoden','koukats','nahodnytip','uzbylo'].includes(backTo)) {
+                const modalIds = { zebricky:'zebrickyModal', upcoming:'upcomingModal', porovnani:'porovnaniModal', mood:'moodModal', tentoden:'tentodenModal', koukats:'koukatSModal', nahodnytip:'nahodnyTipModal', uzbylo:'uzByloVKineModal' };
+                if (window._reopenZabavaSub) window._reopenZabavaSub(modalIds[backTo]);
+            }
         }
     }
 
@@ -9330,7 +9334,7 @@ EXAMPLES:
     // Helper: generates sticky modal nav bar HTML
     function modalNav(title, hasBack, extraBtns = '') {
         const backTo = state._backTo;
-        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Trakt' : backTo === 'simkl' ? '← Simkl' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : '← Zpět';
+        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Trakt' : backTo === 'simkl' ? '← Simkl' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : '← Zpět';
         const back = hasBack ? `<button class="modal-back-btn" onclick="navigateBack()">${backLabel}</button>` : '';
         const nav = $('modalNavBar'); const left = $('modalNavLeft'); const right = $('modalNavRight');
         if(nav && left && right) {
@@ -13063,6 +13067,20 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
         state._backTo = 'mdblist';
         navigationStack.length = 0;
         navigationStack.push({ type, id });
+        _openDetailNoStack(id, type);
+    };
+    // Univerzální most: otevření detailu ze "Zábava" seznamů (Žebříčky, Co se chystá,
+    // Porovnání, Nálada, Tento den, Koukat s..., Náhodný tip) — seznam se jen SCHOVÁ
+    // (nezavře/neresetuje), takže tlačítkem "← Zpět" v detailu se uživatel vrátí
+    // přesně na ten samý seznam a stejný tab/výsledek.
+    window.openDetailFromZabavaList = function(listKey, modalId, id, type) {
+        if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
+        const m = document.getElementById(modalId);
+        if (m) m.style.display = 'none';
+        state._backTo = listKey;
+        navigationStack.length = 0;
+        navigationStack.push({ type, id });
+        if (window._saveLastZabavaList) window._saveLastZabavaList(listKey, modalId);
         _openDetailNoStack(id, type);
     };
     // openDetailFromMdb je definováno přímo výše jako window.openDetailFromMdb
@@ -28059,17 +28077,54 @@ if (_origOpenSettings) {
 
 <script>
 // =====================================================
+// 📌 Zábava — pamatování posledního otevřeného seznamu
+// =====================================================
+// Znovu ukáže seznam beze změny (bez resetu tabů/výsledků) — používá se
+// při návratu "← Zpět" z detailu filmu/seriálu otevřeného z tohoto seznamu.
+window._reopenZabavaSub = function(modalId) {
+    const m = document.getElementById(modalId);
+    if (m) m.style.display = 'flex';
+    if (window.updatePwaBtn) updatePwaBtn();
+};
+// Uloží, který Zábava seznam je aktuálně otevřený, aby šel po zavření/restartu appky obnovit.
+window._saveLastZabavaList = function(listKey, modalId) {
+    try { window._store?.setItem('sinator_last_zabava_list', JSON.stringify({ key: listKey, modalId })); } catch (e) {}
+};
+// Zavolá se při skutečném úmyslném zavření seznamu (uživatel dal ✕, ne detail filmu) — zapomene ho.
+window._clearLastZabavaList = function() {
+    try { window._store?.removeItem('sinator_last_zabava_list'); } catch (e) {}
+};
+// Po startu appky obnoví naposledy otevřený Zábava seznam.
+window._restoreLastZabavaList = function() {
+    try {
+        const raw = window._store?.getItem('sinator_last_zabava_list');
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        const openers = {
+            zebrickyModal: 'openZebricky', upcomingModal: 'openUpcomingModal',
+            porovnaniModal: 'openPorovnaniModal', moodModal: 'openMoodModal',
+            tentodenModal: 'openTentodenModal', koukatSModal: 'openKoukatSModal',
+            nahodnyTipModal: 'openNahodnyTipModal', uzByloVKineModal: 'openUzByloVKineModal'
+        };
+        const fnName = data && openers[data.modalId];
+        if (fnName && typeof window[fnName] === 'function') window[fnName]();
+    } catch (e) {}
+};
+
+// =====================================================
 // 🎲 NÁHODNÝ TIP
 // =====================================================
 let _ntFilter = 'movie';
 function openNahodnyTipModal() {
   const m = document.getElementById('nahodnyTipModal');
   if (m) { m.style.display = 'flex'; }
+  if(window._saveLastZabavaList) window._saveLastZabavaList('nahodnytip', 'nahodnyTipModal');
   if(window.updatePwaBtn) updatePwaBtn();
 }
 function closeNahodnyTipModal() {
   const m = document.getElementById('nahodnyTipModal');
   if (m) m.style.display = 'none';
+  if(window._clearLastZabavaList) window._clearLastZabavaList();
   if(window._returnToZabava) _returnToZabava();
 }
 function ntSetFilter(f) {
@@ -28106,7 +28161,7 @@ async function loadNahodnyTip() {
     const poster = item.poster_path ? `https://image.tmdb.org/t/p/w300${item.poster_path}` : '';
     const badge = type === 'tv' ? '📺 Seriál' : '🎬 Film';
     res.innerHTML = `<div style="display:flex;gap:14px;align-items:flex-start;width:100%;">
-      ${poster ? `<img src="${poster}" style="width:80px;border-radius:10px;flex-shrink:0;" onclick="closeNahodnyTipModal();setTimeout(()=>typeof openDetail==='function'&&openDetail(${item.id},'${type}'),50)" loading="lazy">` : ''}
+      ${poster ? `<img src="${poster}" style="width:80px;border-radius:10px;flex-shrink:0;" onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('nahodnytip','nahodnyTipModal',${item.id},'${type}')" loading="lazy">` : ''}
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:1rem;color:#fff;margin-bottom:4px;">${title}</div>
         <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
@@ -28115,7 +28170,7 @@ async function loadNahodnyTip() {
           <span style="color:#fbbf24;font-size:0.78rem;">★ ${rating}</span>
         </div>
         <p style="color:#aaa;font-size:0.78rem;line-height:1.5;margin:0 0 10px;">${(item.overview||'Popis není k dispozici.').substring(0,160)}${item.overview?.length>160?'…':''}</p>
-        <button onclick="closeNahodnyTipModal();setTimeout(()=>typeof openDetail==='function'&&openDetail(${item.id},'${type}'),50)" style="padding:8px 16px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:0.82rem;font-weight:600;cursor:pointer;">Detail →</button>
+        <button onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('nahodnytip','nahodnyTipModal',${item.id},'${type}')" style="padding:8px 16px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:0.82rem;font-weight:600;cursor:pointer;">Detail →</button>
       </div>
     </div>`;
   } catch(e) { res.innerHTML = '<p style="color:#e50914;text-align:center;font-size:0.85rem;">Chyba načítání. Zkus znovu.</p>'; }
@@ -28236,8 +28291,8 @@ function renderKvizResult() {
 // 🏆 FILMOVÉ ŽEBŘÍČKY
 // =====================================================
 let _zebrickyTab = 'top_all', _zebrickyCache = {};
-function openZebricky() { const m=document.getElementById('zebrickyModal'); if(m){m.style.display='flex';} zebrickySetTab('top_all'); if(window.updatePwaBtn)updatePwaBtn(); }
-function closeZebrickyModal() { const m=document.getElementById('zebrickyModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
+function openZebricky() { const m=document.getElementById('zebrickyModal'); if(m){m.style.display='flex';} zebrickySetTab('top_all'); if(window._saveLastZabavaList) window._saveLastZabavaList('zebricky','zebrickyModal'); if(window.updatePwaBtn)updatePwaBtn(); }
+function closeZebrickyModal() { const m=document.getElementById('zebrickyModal'); if(m)m.style.display='none'; if(window._clearLastZabavaList) window._clearLastZabavaList(); if(window._returnToZabava)_returnToZabava(); }
 function zebrickySetTab(tab) {
   _zebrickyTab = tab;
   document.querySelectorAll('.zeb-tab').forEach(b => {
@@ -28271,7 +28326,7 @@ async function loadZebricky(tab) {
       const year=(it.release_date||'').substring(0,4);
       const rating=it.vote_average?.toFixed(1)||'?';
       const poster=it.poster_path?`https://image.tmdb.org/t/p/w92${it.poster_path}`:'';
-      return `<div onclick="closeZebrickyModal();typeof openDetail==='function'&&openDetail(${it.id},'movie')" style="display:flex;align-items:center;gap:12px;padding:10px 6px;border-bottom:1px solid #1e1e1e;cursor:pointer;transition:background 0.15s;border-radius:8px;" onmouseover="this.style.background='#1a1a1a'" onmouseout="this.style.background='transparent'">
+      return `<div onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('zebricky','zebrickyModal',${it.id},'movie')" style="display:flex;align-items:center;gap:12px;padding:10px 6px;border-bottom:1px solid #1e1e1e;cursor:pointer;transition:background 0.15s;border-radius:8px;" onmouseover="this.style.background='#1a1a1a'" onmouseout="this.style.background='transparent'">
         <span style="color:#555;font-size:0.8rem;font-weight:700;min-width:22px;text-align:right;">${idx+1}.</span>
         ${poster?`<img src="${poster}" style="width:38px;height:56px;object-fit:cover;border-radius:5px;flex-shrink:0;" loading="lazy">`:'<div style="width:38px;height:56px;background:#1a1a1a;border-radius:5px;flex-shrink:0;"></div>'}
         <div style="flex:1;min-width:0;">
@@ -28290,8 +28345,8 @@ async function loadZebricky(tab) {
 // 📅 CO SE CHYSTÁ
 // =====================================================
 let _upcomingTab = 'movies', _upcomingCache = {};
-function openUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m){m.style.display='flex';} upcomingSetTab('movies'); if(window.updatePwaBtn)updatePwaBtn(); }
-function closeUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
+function openUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m){m.style.display='flex';} upcomingSetTab('movies'); if(window._saveLastZabavaList) window._saveLastZabavaList('upcoming','upcomingModal'); if(window.updatePwaBtn)updatePwaBtn(); }
+function closeUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m)m.style.display='none'; if(window._clearLastZabavaList) window._clearLastZabavaList(); if(window._returnToZabava)_returnToZabava(); }
 function upcomingSetTab(tab) {
   _upcomingTab = tab;
   const tabs = {movies:'upTabMovies',tv:'upTabTv'};
@@ -28325,7 +28380,7 @@ async function loadUpcoming(tab) {
       const type=tab==='movies'?'movie':'tv';
       const rating=it.vote_average>0?`★ ${it.vote_average.toFixed(1)}`:'Nové';
       const dateLabel=date?new Date(date).toLocaleDateString('cs-CZ',{day:'numeric',month:'long',year:'numeric'}):'';
-      return `<div onclick="closeUpcomingModal();typeof openDetail==='function'&&openDetail(${it.id},'${type}')" style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid #1a1a1a;cursor:pointer;border-radius:8px;transition:background 0.15s;" onmouseover="this.style.background='#1a1a1a'" onmouseout="this.style.background='transparent'">
+      return `<div onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('upcoming','upcomingModal',${it.id},'${type}')" style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid #1a1a1a;cursor:pointer;border-radius:8px;transition:background 0.15s;" onmouseover="this.style.background='#1a1a1a'" onmouseout="this.style.background='transparent'">
         ${poster?`<img src="${poster}" style="width:44px;height:64px;object-fit:cover;border-radius:6px;flex-shrink:0;" loading="lazy">`:'<div style="width:44px;height:64px;background:#1a1a1a;border-radius:6px;flex-shrink:0;"></div>'}
         <div style="flex:1;min-width:0;">
           <div style="font-weight:600;color:#fff;font-size:0.88rem;margin-bottom:3px;">${title}</div>
@@ -28342,8 +28397,8 @@ async function loadUpcoming(tab) {
 // =====================================================
 // 🎭 POROVNÁNÍ FILMŮ
 // =====================================================
-function openPorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m){m.style.display='flex';resetPorovnani();} if(window.updatePwaBtn)updatePwaBtn(); }
-function closePorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
+function openPorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m){m.style.display='flex';resetPorovnani();} if(window._saveLastZabavaList) window._saveLastZabavaList('porovnani','porovnaniModal'); if(window.updatePwaBtn)updatePwaBtn(); }
+function closePorovnaniModal() { const m=document.getElementById('porovnaniModal'); if(m)m.style.display='none'; if(window._clearLastZabavaList) window._clearLastZabavaList(); if(window._returnToZabava)_returnToZabava(); }
 function resetPorovnani() {
   const inp=document.getElementById('porovnaniInput'); const res=document.getElementById('porovnaniResult');
   if(inp){inp.style.display='block';} if(res){res.style.display='none';res.innerHTML='';}
@@ -28454,7 +28509,7 @@ Vrať POUZE validní JSON (žádný markdown):
       const clickable = !!sel?.id;
       const poster = sel?.poster ? `<img src="${sel.poster}" style="width:44px;height:64px;object-fit:cover;border-radius:6px;margin-bottom:6px;" loading="lazy">` : `<div style="font-size:1.6rem;margin-bottom:6px;">🎬</div>`;
       const label = sel?.type==='tv'?'📺':'🎬';
-      return `<div ${clickable?`onclick="closePorovnaniModal();typeof openDetail==='function'&&openDetail(${sel.id},'${sel.type}')"`:''}
+      return `<div ${clickable?`onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('porovnani','porovnaniModal',${sel.id},'${sel.type}')"`:''}
         style="background:rgba(251,113,133,0.1);border:1px solid rgba(251,113,133,0.3);border-radius:10px;padding:12px;text-align:center;${clickable?'cursor:pointer;':''};transition:background .15s;"
         ${clickable?`onmouseover="this.style.background='rgba(251,113,133,0.2)'" onmouseout="this.style.background='rgba(251,113,133,0.1)'"`:''}
       >
@@ -28490,8 +28545,8 @@ Vrať POUZE validní JSON (žádný markdown):
 // =====================================================
 // 🎬 FILMOVÁ NÁLADA
 // =====================================================
-function openMoodModal() { const m=document.getElementById('moodModal'); if(m){m.style.display='flex';resetMood();} if(window.updatePwaBtn)updatePwaBtn(); }
-function closeMoodModal() { const m=document.getElementById('moodModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
+function openMoodModal() { const m=document.getElementById('moodModal'); if(m){m.style.display='flex';resetMood();} if(window._saveLastZabavaList) window._saveLastZabavaList('mood','moodModal'); if(window.updatePwaBtn)updatePwaBtn(); }
+function closeMoodModal() { const m=document.getElementById('moodModal'); if(m)m.style.display='none'; if(window._clearLastZabavaList) window._clearLastZabavaList(); if(window._returnToZabava)_returnToZabava(); }
 function resetMood() {
   const pick=document.getElementById('moodPicker'); const res=document.getElementById('moodResult');
   if(pick)pick.style.display='grid'; if(res){res.style.display='none';res.innerHTML='';}
@@ -28532,7 +28587,7 @@ async function loadMoodTips(mood) {
       const ratingHtml = t.rating>0 ? `<span style="color:#fbbf24;font-size:0.72rem;margin-left:6px;">★ ${t.rating.toFixed(1)}</span>` : '';
       const clickable = t.tmdbId && typeof openDetail==='function';
       const clickStyle = clickable ? 'cursor:pointer;' : '';
-      const clickAttr = clickable ? `onclick="closeMoodModal();openDetail(${t.tmdbId},'${t.tmdbType||'movie'}')"` : '';
+      const clickAttr = clickable ? `onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('mood','moodModal',${t.tmdbId},'${t.tmdbType||'movie'}')"` : '';
       const arrowHtml = clickable ? `<div style="flex-shrink:0;align-self:center;color:#a855f7;font-size:1rem;">›</div>` : '';
       return `<div ${clickAttr} style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;${clickStyle}transition:background 0.15s,border-color 0.15s;" onmouseover="this.style.background='#222';this.style.borderColor='#a855f7'" onmouseout="this.style.background='#1a1a1a';this.style.borderColor='#2a2a2a'">
         ${posterHtml}
@@ -28755,12 +28810,14 @@ function openTentodenModal() {
   const m = document.getElementById('tentodenModal');
   if (!m) return;
   m.style.display = 'flex';
+  if (window._saveLastZabavaList) window._saveLastZabavaList('tentoden', 'tentodenModal');
   if (window.updatePwaBtn) updatePwaBtn();
   loadTentoDen();
 }
 function closeTentodenModal() {
   const m = document.getElementById('tentodenModal');
   if (m) m.style.display = 'none';
+  if(window._clearLastZabavaList) window._clearLastZabavaList();
   if(window._returnToZabava) _returnToZabava();
 }
 
@@ -28828,7 +28885,7 @@ async function loadTentoDen() {
       const rating = item.vote_average ? item.vote_average.toFixed(1) : '—';
       const ago = year ? `(před ${now.getFullYear()-parseInt(year)} lety)` : '';
       const tmdbType = isTv ? 'tv' : 'movie';
-      return `<div style="display:flex;gap:12px;background:var(--bg-elevated);border-radius:12px;overflow:hidden;cursor:pointer;" onclick="closeTentodenModal();typeof openDetail==='function'&&openDetail(${item.id},'${tmdbType}')">
+      return `<div style="display:flex;gap:12px;background:var(--bg-elevated);border-radius:12px;overflow:hidden;cursor:pointer;" onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('tentoden','tentodenModal',${item.id},'${tmdbType}')">
         ${poster ? `<img src="${poster}" style="width:64px;height:96px;object-fit:cover;flex-shrink:0;" loading="lazy" onerror="this.style.display='none'">` : '<div style="width:64px;height:96px;background:#222;flex-shrink:0;display:grid;place-items:center;font-size:1.5rem;">🎬</div>'}
         <div style="padding:10px 10px 10px 0;flex:1;min-width:0;">
           <div style="font-weight:700;font-size:0.9rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
@@ -28851,10 +28908,11 @@ async function loadTentoDen() {
 // =====================================================
 // 👥 KOUKAT S...
 // =====================================================
-function openKoukatSModal() { const m=document.getElementById('koukatSModal'); if(m){m.style.display='flex';resetKoukatS();} if(window.updatePwaBtn)updatePwaBtn(); }
-function closeKoukatSModal() { const m=document.getElementById('koukatSModal'); if(m)m.style.display='none'; if(window._returnToZabava)_returnToZabava(); }
+function openKoukatSModal() { const m=document.getElementById('koukatSModal'); if(m){m.style.display='flex';resetKoukatS();} if(window._saveLastZabavaList) window._saveLastZabavaList('koukats','koukatSModal'); if(window.updatePwaBtn)updatePwaBtn(); }
+function closeKoukatSModal() { const m=document.getElementById('koukatSModal'); if(m)m.style.display='none'; if(window._clearLastZabavaList) window._clearLastZabavaList(); if(window._returnToZabava)_returnToZabava(); }
 function closeKoukatSModalFull() {
   const m=document.getElementById('koukatSModal'); if(m)m.style.display='none';
+  if(window._clearLastZabavaList) window._clearLastZabavaList();
   if(typeof closeZabavaModal==='function') closeZabavaModal();
   if(window.updatePwaBtn) updatePwaBtn();
 }
@@ -28881,7 +28939,7 @@ function _koukatSTipCard(t, idx) {
   const ratingHtml = t.rating>0 ? `<span style="color:#fbbf24;font-size:0.72rem;margin-left:6px;">★ ${t.rating.toFixed(1)}</span>` : '';
   const clickable = t.tmdbId && typeof openDetail==='function';
   const clickStyle = clickable ? 'cursor:pointer;' : '';
-  const clickAttr = clickable ? `onclick="closeKoukatSModalFull();openDetail(${t.tmdbId},'${t.tmdbType||'movie'}')"` : '';
+  const clickAttr = clickable ? `onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('koukats','koukatSModal',${t.tmdbId},'${t.tmdbType||'movie'}')"` : '';
   const arrowHtml = clickable ? `<div style="flex-shrink:0;align-self:center;color:#facc15;font-size:1rem;">›</div>` : '';
   const genreHtml = t.genre ? `<span style="color:#facc15;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;">${t.genre}</span>` : '';
   return `<div id="koukatSCard_${idx}" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:12px;margin-bottom:10px;">
@@ -29077,7 +29135,7 @@ async function _zabavaAiCall(prompt) {
       : `<div style="width:100%;height:195px;background:#1e293b;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem;">🎬</div>`;
     const year = m.release_date ? m.release_date.slice(0,4) : '';
     const rating = m.vote_average ? `⭐ ${m.vote_average.toFixed(1)}` : '';
-    return `<div onclick="closeUzByloVKineModalFull();openDetail(${m.id},'movie')" style="background:#111827;border-radius:10px;border:1px solid #1e293b;cursor:pointer;overflow:hidden;transition:transform 0.15s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+    return `<div onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('uzbylo','uzByloVKineModal',${m.id},'movie')" style="background:#111827;border-radius:10px;border:1px solid #1e293b;cursor:pointer;overflow:hidden;transition:transform 0.15s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
       ${img}
       <div style="padding:8px;">
         <div style="font-size:0.8rem;font-weight:700;color:#e2e8f0;line-height:1.3;margin-bottom:4px;">${m.title}</div>
@@ -29144,12 +29202,14 @@ async function _zabavaAiCall(prompt) {
     document.getElementById('uzByloVKineResult').innerHTML = '';
     document.getElementById('uzByloGenreFilters').innerHTML = '';
     loadMovies(1, false);
+    if (window._saveLastZabavaList) window._saveLastZabavaList('uzbylo', 'uzByloVKineModal');
     if (window.updatePwaBtn) updatePwaBtn();
   };
 
   window.closeUzByloVKineModal = function() {
     const m = document.getElementById('uzByloVKineModal');
     if (m) m.style.display = 'none';
+    if (window._clearLastZabavaList) window._clearLastZabavaList();
     if (window._returnToZabava) _returnToZabava();
   };
 
@@ -29196,4 +29256,13 @@ async function _zabavaAiCall(prompt) {
   orig['uzByloVKineModal'] = function() { if(typeof closeUzByloVKineModal==='function') closeUzByloVKineModal(); };
   window._modalCloseMap = orig;
 })();
+
+// Po plném načtení appky obnovit naposledy otevřený Zábava seznam (Žebříčky, Co se
+// chystá, Porovnání, Nálada, Tento den, Koukat s..., Náhodný tip, Už bylo v kině) —
+// pokud v něm uživatel byl, když appku naposledy zavřel/vypnul.
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        if (window._restoreLastZabavaList) window._restoreLastZabavaList();
+    }, 400);
+});
 </script>
