@@ -8709,15 +8709,19 @@ EXAMPLES:
         const c = $('myBackendResultsContainer');
         const canRemove = tab === 'watchlist' || tab === 'ratings-movies' || tab === 'ratings-shows' || tab === 'history-movies' || tab === 'history-episodes' || tab === 'history-shows' || tab.startsWith('list:');
         if (!items.length) { c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">${emptyMsg}</div>`; return; }
-        c.style.padding = (window._myBackendGridCols||1) === 1 ? '' : '0';
-        c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(${window._myBackendGridCols||1},1fr);gap:${(window._myBackendGridCols||1)===1?'16px':'0'};padding:0 ${(window._myBackendGridCols||1)===1?'14px':'0'} 14px;">${items.map(it => {
+        const cols1 = (window._myBackendGridCols||1) === 1;
+        c.style.padding = '0';
+        c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(${window._myBackendGridCols||1},1fr);gap:${cols1?'16px':'0'};padding:0;">${items.map(it => {
             const poster = it.poster_path && it.poster_path.startsWith('http') ? it.poster_path : (it.poster_path ? `https://image.tmdb.org/t/p/w500${it.poster_path}` : null);
             const kind = it.tmdbType || (it.type === 'tv' || it.type === 'shows' ? 'tv' : 'movie');
             const watched = isWatched(it.id, kind);
-            return `<div class="card${watched?' is-watched':''}" style="position:relative;" onclick="typeof openDetailFromTrakt==='function'&&openDetailFromTrakt(${it.id},'${kind}')">
+            // V 1sloupcovém velkém zobrazení necháváme obrázek v přirozeném poměru stran
+            // (žádný object-fit:cover crop na pevnou výšku) - vidět je tak celý plakát.
+            const imgStyle = cols1 ? 'height:auto;object-fit:contain;' : '';
+            return `<div class="card${watched?' is-watched':''}" style="position:relative;${cols1?'border-radius:0;border:none;box-shadow:none;':''}" onclick="typeof openDetailFromTrakt==='function'&&openDetailFromTrakt(${it.id},'${kind}')">
                 ${canRemove ? `<button class="card-fav" data-watched="${watched?'1':'0'}" onclick="event.stopPropagation();toggleWatchedFromCard(${it.id},'${kind}','${jsq(it.title||'')}','${jsq(it.year||'')}','${jsq(poster||'')}',this)" style="${watched?'background:rgba(29,185,84,0.85);':''}">${watched?'👁️':'👁'}</button>` : ''}
                 ${canRemove ? `<button class="card-fav" style="left:auto;right:8px;color:#e07a6f;" onclick="event.stopPropagation();${myBackendCardRemoveArgs(tab, it.id, kind)}">✕</button>` : ''}
-                ${poster ? `<img class="card-image" src="${poster}" loading="lazy">` : `<div class="card-placeholder">${kind === 'tv' ? '📺' : '🎬'}</div>`}
+                ${poster ? `<img class="card-image" src="${poster}" loading="lazy" style="${imgStyle}">` : `<div class="card-placeholder">${kind === 'tv' ? '📺' : '🎬'}</div>`}
                 <div class="card-info"><div class="card-title">${it.title || ('#' + it.id)}</div><div class="card-meta"><span>${it.year || '—'}</span>${it.rating ? `<span>★ ${it.rating}/10</span>` : ''}${it.watchCount > 1 ? `<span>👁 ${it.watchCount}×</span>` : ''}</div></div>
             </div>`;
         }).join('')}</div>`;
