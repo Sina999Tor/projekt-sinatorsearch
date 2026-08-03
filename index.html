@@ -2775,6 +2775,32 @@
         } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
     };
 
+    // Tlačítko 🧩 na kartě (vedle 👁) — rychlé menu Sinator akcí (Watchlist,
+    // Hodnotit, Shlédnuto, Do seznamu) bez otevírání celého detailu. Stejné
+    // funkce jako pod "🧩 Sinator ▾" v detailu, jen jako malé plovoucí menu
+    // zavěšené na kliknuté tlačítko.
+    window.openCardSinatorMenu = function(id, type, title, year, poster, btnEl) {
+        document.getElementById('cardSinatorMenu')?.remove();
+        if (typeof myBackendReady === 'function' && !myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Ostatní.'); return; }
+        const rect = btnEl.getBoundingClientRect();
+        const menu = document.createElement('div');
+        menu.id = 'cardSinatorMenu';
+        const left = Math.max(8, Math.min(rect.left, window.innerWidth - 200));
+        menu.style.cssText = `position:fixed;z-index:9999;top:${rect.bottom + 6}px;left:${left}px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 20px rgba(0,0,0,0.5);min-width:180px;`;
+        const t = title || '';
+        menu.innerHTML = `
+<button class="action-btn-modal" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;" onclick="event.stopPropagation();myBackendAddWatchlist(${id},'${type}','${t}','${year||''}','${poster||''}');document.getElementById('cardSinatorMenu')?.remove();">🔖 Watchlist</button>
+<button class="action-btn-modal" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;" onclick="event.stopPropagation();myBackendRate(${id},'${type}');document.getElementById('cardSinatorMenu')?.remove();">⭐ Hodnotit</button>
+<button class="action-btn-modal" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;" onclick="event.stopPropagation();myBackendMarkWatched(${id},'${type}');document.getElementById('cardSinatorMenu')?.remove();">✅ Shlédnuto</button>
+<button class="action-btn-modal" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;" onclick="event.stopPropagation();myBackendAddToList(${id},'${type}');document.getElementById('cardSinatorMenu')?.remove();">📁 Do seznamu</button>`;
+        document.body.appendChild(menu);
+        setTimeout(() => {
+            document.addEventListener('click', function closeCardSinatorMenu(e) {
+                if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', closeCardSinatorMenu); }
+            });
+        }, 10);
+    };
+
 
     const TRAKT_CLIENT_SECRET = 'rIukoJbVTROcnT9W0-B3Ns3D7dkxN57uuzqsRJAYQVc';
     const REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob';
@@ -8371,11 +8397,14 @@ EXAMPLES:
         // Tlačítko 👁 vedle srdíčka pro rychlé (od)označení "shlédnuto" přímo z karty,
         // bez otevírání detailu. Jen u filmů/seriálů, ne u herců/režisérů.
         const watchBtn = !isActor ? `<button class="card-fav card-watch-btn ${watched?'liked':''}" data-watched="${watched?'1':'0'}" onclick="event.stopPropagation();toggleWatchedFromCard(${it.id},'${mediaType}','${titleJs}','${year}','${it.poster_path||''}',this)" style="left:44px;${watched?'background:rgba(29,185,84,0.85);':''}">${watched?'👁️':'👁'}</button>` : '';
+        // Tlačítko 🧩 vedle oka — rychlé menu Sinator akcí (Watchlist, Hodnotit,
+        // Shlédnuto, Do seznamu) přímo z karty, bez otevírání detailu.
+        const sinatorBtn = !isActor ? `<button class="card-fav" style="left:80px;" onclick="event.stopPropagation();openCardSinatorMenu(${it.id},'${mediaType}','${titleJs}','${year}','${it.poster_path||''}',this)">🧩</button>` : '';
         // Ve zvětšeném (1sloupcovém) zobrazení není vidět zelený rámeček karty celý
         // (poster je velký, rámeček splyne) — proto tam navíc zelená fajka v pravém
         // spodním rohu, jasně viditelná i na velkém plakátu.
         const watchedCheck = (!isActor && watched && cols1) ? `<div class="card-watched-check">✅</div>` : '';
-        return `<div class="card${watched?' is-watched':''}" data-tmdb-id="${it.id}" data-tmdb-type="${mediaType}" onclick="${clickAction}"${cardStyle}><div class="card-media">${img}<div class="card-badge">${isActor?personBadge:(mediaType==='tv'?'📺':'')}</div><button class="card-fav ${liked?'liked':''}" onclick="${favAction}">${liked?'❤️':'🤍'}</button>${watchBtn}${watchedCheck}</div><div class="card-info"><div class="card-title">${title}</div><div class="card-meta"><span>${year||'—'}</span>${!isActor?`<span class="card-rating">★ ${rating}</span>`:''}</div></div></div>`;
+        return `<div class="card${watched?' is-watched':''}" data-tmdb-id="${it.id}" data-tmdb-type="${mediaType}" onclick="${clickAction}"${cardStyle}><div class="card-media">${img}<div class="card-badge">${isActor?personBadge:(mediaType==='tv'?'📺':'')}</div><button class="card-fav ${liked?'liked':''}" onclick="${favAction}">${liked?'❤️':'🤍'}</button>${watchBtn}${sinatorBtn}${watchedCheck}</div><div class="card-info"><div class="card-title">${title}</div><div class="card-meta"><span>${year||'—'}</span>${!isActor?`<span class="card-rating">★ ${rating}</span>`:''}</div></div></div>`;
     }
 
     // ── INFINITE SCROLL LISTENER ─────────────────────────────────────────────
@@ -8780,6 +8809,7 @@ EXAMPLES:
                 ${poster ? `<img class="card-image" src="${poster}" loading="lazy" style="${imgStyle}">` : `<div class="card-placeholder">${kind === 'tv' ? '📺' : '🎬'}</div>`}
                 <button class="card-fav ${liked?'liked':''}" onclick="event.stopPropagation();toggleFav(${it.id},'${jsq(it.title||'')}','${it.year||''}',${it.rating||0},'${kind}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button>
                 ${canRemove ? `<button class="card-fav card-watch-btn ${watched?'liked':''}" data-watched="${watched?'1':'0'}" onclick="event.stopPropagation();toggleWatchedFromCard(${it.id},'${kind}','${jsq(it.title||'')}','${jsq(it.year||'')}','${jsq(poster||'')}',this)" style="left:44px;${watched?'background:rgba(29,185,84,0.85);':''}">${watched?'👁️':'👁'}</button>` : ''}
+                <button class="card-fav" style="left:80px;" onclick="event.stopPropagation();openCardSinatorMenu(${it.id},'${kind}','${jsq(it.title||'')}','${it.year||''}','${it.poster_path||''}',this)">🧩</button>
                 ${canRemove ? `<button class="card-fav" style="left:auto;right:8px;color:#e07a6f;" onclick="event.stopPropagation();${myBackendCardRemoveArgs(tab, it.id, kind)}">✕</button>` : ''}
                 ${watchedCheck}
                 </div>
@@ -11877,6 +11907,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
                 btnEl.textContent = nowWatched ? '👁️' : '👁';
                 btnEl.style.background = nowWatched ? 'rgba(29,185,84,0.85)' : 'rgba(0,0,0,0.65)';
                 if (typeof refreshCardWatchedBorders === 'function') refreshCardWatchedBorders(id, nowWatched);
+                if (typeof _favToast === 'function') _favToast(nowWatched ? '👁️ Označeno jako shlédnuto' : '⬜ Odznačeno jako shlédnuto');
             }
         }
     };
