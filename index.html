@@ -9540,6 +9540,16 @@ EXAMPLES:
         else { state.watched[key] = { id: key, type: 'episode', title: epName, year: '', posterPath: '', addedAt: Date.now(), tvId, seasonNumber, epNumber }; }
         saveWatched();
         syncEpisodeToTrakt(tvId, seasonNumber, epNumber, !wasWatched);
+        if (typeof myBackendReady === 'function' && myBackendReady()) {
+            (async () => {
+                try {
+                    if (!wasWatched) await myHistoryAdd(tvId, 'tv', seasonNumber, epNumber);
+                    else await myHistoryRemove(tvId, 'tv', seasonNumber, epNumber);
+                    if (typeof refreshMySinatorWatchedCache === 'function') refreshMySinatorWatchedCache();
+                    if (typeof initMySinatorWatchedBadge === 'function') initMySinatorWatchedBadge(tvId, 'tv');
+                } catch (e) { console.warn('Sinator episode sync error:', e); }
+            })();
+        }
         // Update button
         const isNowWatched = !wasWatched;
         btn.textContent = isNowWatched ? '✅ Shlédnuto' : '○ Označit';
