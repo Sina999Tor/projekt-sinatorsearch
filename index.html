@@ -8657,7 +8657,7 @@ EXAMPLES:
                         if (csData) csTitle = csData.data.title || csData.data.name;
                     } catch (e) {}
                 }
-                const posterUrl = d.poster_path ? `https://image.tmdb.org/t/p/w342${d.poster_path}` : null;
+                const posterUrl = d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : null;
                 const year = (d.release_date || d.first_air_date || '').slice(0, 4);
                 group.forEach(it => {
                     if (!it.title) it.title = csTitle || `#${it.id}`;
@@ -8683,8 +8683,8 @@ EXAMPLES:
         const c = $('myBackendResultsContainer');
         const canRemove = tab === 'watchlist' || tab === 'ratings-movies' || tab === 'ratings-shows' || tab === 'history-movies' || tab === 'history-episodes' || tab === 'history-shows' || tab.startsWith('list:');
         if (!items.length) { c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">${emptyMsg}</div>`; return; }
-        c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:0 14px 14px;">${items.map(it => {
-            const poster = it.poster_path && it.poster_path.startsWith('http') ? it.poster_path : (it.poster_path ? `https://image.tmdb.org/t/p/w342${it.poster_path}` : null);
+        c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(1,1fr);gap:16px;padding:0 14px 14px;">${items.map(it => {
+            const poster = it.poster_path && it.poster_path.startsWith('http') ? it.poster_path : (it.poster_path ? `https://image.tmdb.org/t/p/w500${it.poster_path}` : null);
             const kind = it.tmdbType || (it.type === 'tv' || it.type === 'shows' ? 'tv' : 'movie');
             const watched = isWatched(it.id, kind);
             return `<div class="card${watched?' is-watched':''}" style="position:relative;" onclick="typeof openDetailFromTrakt==='function'&&openDetailFromTrakt(${it.id},'${kind}')">
