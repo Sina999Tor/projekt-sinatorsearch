@@ -8687,7 +8687,7 @@ EXAMPLES:
             const poster = it.poster_path && it.poster_path.startsWith('http') ? it.poster_path : (it.poster_path ? `https://image.tmdb.org/t/p/w342${it.poster_path}` : null);
             const kind = it.tmdbType || (it.type === 'tv' || it.type === 'shows' ? 'tv' : 'movie');
             const watched = isWatched(it.id, kind);
-            return `<div class="card${watched?' is-watched':''}" style="position:relative;" onclick="openDetail(${it.id},'${kind}')">
+            return `<div class="card${watched?' is-watched':''}" style="position:relative;" onclick="typeof openDetailFromTrakt==='function'&&openDetailFromTrakt(${it.id},'${kind}')">
                 ${canRemove ? `<button onclick="event.stopPropagation();${myBackendCardRemoveArgs(tab, it.id, kind)}" style="position:absolute;top:6px;right:6px;z-index:5;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.25);color:#e07a6f;font-size:0.85rem;line-height:1;cursor:pointer;">✕</button>` : ''}
                 ${poster ? `<img class="card-image" src="${poster}" loading="lazy">` : `<div class="card-placeholder">${kind === 'tv' ? '📺' : '🎬'}</div>`}
                 <div class="card-info"><div class="card-title">${it.title || ('#' + it.id)}</div><div class="card-meta"><span>${it.year || '—'}</span>${it.rating ? `<span>★ ${it.rating}/10</span>` : ''}${it.watchCount > 1 ? `<span>👁 ${it.watchCount}×</span>` : ''}</div></div>
