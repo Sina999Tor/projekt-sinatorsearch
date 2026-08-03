@@ -8333,13 +8333,16 @@ EXAMPLES:
     function appendActorGrid(actors, isFirstPage) {
         if (!actors.length) return;
         const isDirectorsView = state.view === 'directors';
+        const cols1 = (window._mainGridCols||2) === 1;
+        const imgStyle = cols1 ? ' style="height:auto;object-fit:contain;"' : '';
+        const cardStyle = cols1 ? ' style="border-radius:0;border:none;box-shadow:none;"' : '';
         const newHtml = actors.map(a => {
-            const img = a.profile_path ? `<img class="card-image" src="${IMG}w185${a.profile_path}" loading="lazy">` : `<div class="card-placeholder">${isDirectorsView||a.known_for_department==='Directing'?'🎥':'👤'}</div>`;
+            const img = a.profile_path ? `<img class="card-image" src="${IMG}w185${a.profile_path}" loading="lazy"${imgStyle}>` : `<div class="card-placeholder">${isDirectorsView||a.known_for_department==='Directing'?'🎥':'👤'}</div>`;
             const liked = state.actorFavs.some(f=>f.id===a.id);
             const isDir = isDirectorsView || a.known_for_department === 'Directing' || a.media_type === 'director';
             const badge = isDir ? '🎥' : '👥';
             const deptLabel = isDir ? 'Režisér' : (a.known_for_department === 'Acting' ? 'Herec/Herečka' : (a.known_for_department || 'Herec'));
-            return `<div class="card" onclick="openPersonDetail(${a.id})">${img}<div class="card-badge">${badge}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleActorFav(${a.id},'${jsq(a.name)}','${a.profile_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${a.name}</div><div class="card-meta"><span>${deptLabel}</span></div></div></div>`;
+            return `<div class="card" onclick="openPersonDetail(${a.id})"${cardStyle}>${img}<div class="card-badge">${badge}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleActorFav(${a.id},'${jsq(a.name)}','${a.profile_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${a.name}</div><div class="card-meta"><span>${deptLabel}</span></div></div></div>`;
         }).join('');
         if (isFirstPage) resultsEl.innerHTML = newHtml;
         else resultsEl.insertAdjacentHTML('beforeend', newHtml);
@@ -8504,10 +8507,13 @@ EXAMPLES:
 
     function renderActorGrid(actors) {
         if(!actors.length) { resultsEl.innerHTML='<div class="empty">😕 Žádní herci</div>'; return; }
+        const cols1 = (window._mainGridCols||2) === 1;
+        const imgStyle = cols1 ? ' style="height:auto;object-fit:contain;"' : '';
+        const cardStyle = cols1 ? ' style="border-radius:0;border:none;box-shadow:none;"' : '';
         resultsEl.innerHTML = actors.map(a=>{
-            const img = a.profile_path ? `<img class="card-image" src="${IMG}w185${a.profile_path}" loading="lazy">` : `<div class="card-placeholder">👤</div>`;
+            const img = a.profile_path ? `<img class="card-image" src="${IMG}w185${a.profile_path}" loading="lazy"${imgStyle}>` : `<div class="card-placeholder">👤</div>`;
             const liked = state.actorFavs.some(f=>f.id===a.id);
-            return `<div class="card" onclick="openPersonDetail(${a.id})">${img}<button class="card-fav ${liked?'liked':''}" onclick="toggleActorFav(${a.id},'${jsq(a.name)}','${a.profile_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${a.name}</div><div class="card-meta"><span>${a.known_for_department||'Herec'}</span></div></div></div>`;
+            return `<div class="card" onclick="openPersonDetail(${a.id})"${cardStyle}>${img}<button class="card-fav ${liked?'liked':''}" onclick="toggleActorFav(${a.id},'${jsq(a.name)}','${a.profile_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${a.name}</div><div class="card-meta"><span>${a.known_for_department||'Herec'}</span></div></div></div>`;
         }).join('');
     }
 
