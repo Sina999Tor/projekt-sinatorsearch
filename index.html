@@ -8688,6 +8688,7 @@ EXAMPLES:
             const kind = it.tmdbType || (it.type === 'tv' || it.type === 'shows' ? 'tv' : 'movie');
             const watched = isWatched(it.id, kind);
             return `<div class="card${watched?' is-watched':''}" style="position:relative;" onclick="typeof openDetailFromTrakt==='function'&&openDetailFromTrakt(${it.id},'${kind}')">
+                ${canRemove ? `<button onclick="event.stopPropagation();toggleWatchedFromCard(${it.id},'${kind}','${jsq(it.title||'')}','${jsq(it.year||'')}','${jsq(poster||'')}',this)" style="position:absolute;top:6px;left:6px;z-index:5;width:26px;height:26px;border-radius:50%;background:${watched?'rgba(29,185,84,0.85)':'rgba(0,0,0,0.65)'};border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:0.85rem;line-height:1;cursor:pointer;">${watched?'👁️':'👁'}</button>` : ''}
                 ${canRemove ? `<button onclick="event.stopPropagation();${myBackendCardRemoveArgs(tab, it.id, kind)}" style="position:absolute;top:6px;right:6px;z-index:5;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.25);color:#e07a6f;font-size:0.85rem;line-height:1;cursor:pointer;">✕</button>` : ''}
                 ${poster ? `<img class="card-image" src="${poster}" loading="lazy">` : `<div class="card-placeholder">${kind === 'tv' ? '📺' : '🎬'}</div>`}
                 <div class="card-info"><div class="card-title">${it.title || ('#' + it.id)}</div><div class="card-meta"><span>${it.year || '—'}</span>${it.rating ? `<span>★ ${it.rating}/10</span>` : ''}${it.watchCount > 1 ? `<span>👁 ${it.watchCount}×</span>` : ''}</div></div>
@@ -11738,6 +11739,28 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
             } catch (e) { console.warn('Sinator sync error:', e); }
         }
     }
+
+    // Tlačítko 👁 na kartě (levý horní roh) — rychlé označení/odznačení "shlédnuto"
+    // přímo ze seznamu (Trakt/Simkl/Sinator: watchlist, historie, folders...),
+    // bez nutnosti otevírat detail. Používá stejnou logiku jako toggleWatched()
+    // v modalu (Trakt/Sinator sync, kaskáda epizod u seriálů), jen bez přepisu
+    // vzhledu tlačítka v modalu — btnEl v toggleWatched necháváme null a ikonu
+    // podle výsledku upravíme sami.
+    window.toggleWatchedFromCard = async function(id, type, title, year, posterPath, btnEl) {
+        if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳'; }
+        try {
+            await toggleWatched(id, type, title, year, posterPath, null);
+        } catch (e) {
+            console.warn('toggleWatchedFromCard error:', e);
+        } finally {
+            if (btnEl) {
+                btnEl.disabled = false;
+                const nowWatched = typeof isWatched === 'function' ? isWatched(id, type) : false;
+                btnEl.textContent = nowWatched ? '👁️' : '👁';
+                btnEl.style.background = nowWatched ? 'rgba(29,185,84,0.85)' : 'rgba(0,0,0,0.65)';
+            }
+        }
+    };
 
     async function syncWatchedFromTrakt() {
         if(!state.trakt.accessToken) return;
