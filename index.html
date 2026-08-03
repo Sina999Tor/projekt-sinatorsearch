@@ -8684,7 +8684,8 @@ EXAMPLES:
         const c = $('myBackendResultsContainer');
         const canRemove = tab === 'watchlist' || tab === 'ratings-movies' || tab === 'ratings-shows' || tab === 'history-movies' || tab === 'history-episodes' || tab === 'history-shows' || tab.startsWith('list:');
         if (!items.length) { c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">${emptyMsg}</div>`; return; }
-        c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(${window._myBackendGridCols||1},1fr);gap:${(window._myBackendGridCols||1)===1?'16px':'2px'};padding:0 ${(window._myBackendGridCols||1)===1?'14px':'0'} 14px;">${items.map(it => {
+        c.style.padding = (window._myBackendGridCols||1) === 1 ? '' : '0';
+        c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(${window._myBackendGridCols||1},1fr);gap:${(window._myBackendGridCols||1)===1?'16px':'0'};padding:0 ${(window._myBackendGridCols||1)===1?'14px':'0'} 14px;">${items.map(it => {
             const poster = it.poster_path && it.poster_path.startsWith('http') ? it.poster_path : (it.poster_path ? `https://image.tmdb.org/t/p/w500${it.poster_path}` : null);
             const kind = it.tmdbType || (it.type === 'tv' || it.type === 'shows' ? 'tv' : 'movie');
             const watched = isWatched(it.id, kind);
