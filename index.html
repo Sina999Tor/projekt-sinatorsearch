@@ -1754,6 +1754,7 @@
                     <option value="alpha_asc">Abecedně A-Z</option>
                     <option value="alpha_desc">Abecedně Z-A</option>
                 </select>
+                <button id="myBackendGridToggleBtn" onclick="myBackendToggleGridCols()" title="Přepnout zobrazení" style="background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:0.8rem;cursor:pointer;white-space:nowrap;">▤ 1 sloupec</button>
                 <input type="text" id="myBackendLetterFilter" placeholder="Hledat podle počátečního písmene (např. D)" oninput="myBackendApplyLetterFilter(this.value)" style="flex:1;min-width:180px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:0.8rem;">
             </div>
             <div class="trakt-modal-body" id="myBackendResultsContainer" style="display:none;"></div>
@@ -8683,7 +8684,7 @@ EXAMPLES:
         const c = $('myBackendResultsContainer');
         const canRemove = tab === 'watchlist' || tab === 'ratings-movies' || tab === 'ratings-shows' || tab === 'history-movies' || tab === 'history-episodes' || tab === 'history-shows' || tab.startsWith('list:');
         if (!items.length) { c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">${emptyMsg}</div>`; return; }
-        c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(1,1fr);gap:16px;padding:0 14px 14px;">${items.map(it => {
+        c.innerHTML = `<div style="padding:14px;font-weight:700;color:var(--text-muted);">${items.length} položek</div><div class="cards-grid" style="display:grid;grid-template-columns:repeat(${window._myBackendGridCols||1},1fr);gap:${(window._myBackendGridCols||1)===1?16:10}px;padding:0 14px 14px;">${items.map(it => {
             const poster = it.poster_path && it.poster_path.startsWith('http') ? it.poster_path : (it.poster_path ? `https://image.tmdb.org/t/p/w500${it.poster_path}` : null);
             const kind = it.tmdbType || (it.type === 'tv' || it.type === 'shows' ? 'tv' : 'movie');
             const watched = isWatched(it.id, kind);
@@ -8801,6 +8802,17 @@ EXAMPLES:
     }
 
     window.myBackendApplySort = function() {
+        const items = myBackendGetSortedFilteredItems();
+        renderMyBackendGrid(items, window._myBackendCurrentEmptyMsg || 'Žádné položky.', window._myBackendActiveTab);
+    };
+
+    // Přepínač zobrazení mřížky (1 sloupec = velké plakáty / 2 sloupce = kompaktnější přehled).
+    // Jen mění vzhled, žádný nový fetch - znovu vykreslí už načtené položky.
+    window._myBackendGridCols = window._myBackendGridCols || 1;
+    window.myBackendToggleGridCols = function() {
+        window._myBackendGridCols = (window._myBackendGridCols === 1) ? 2 : 1;
+        const btn = $('myBackendGridToggleBtn');
+        if (btn) btn.textContent = window._myBackendGridCols === 1 ? '▤ 1 sloupec' : '▦ 2 sloupce';
         const items = myBackendGetSortedFilteredItems();
         renderMyBackendGrid(items, window._myBackendCurrentEmptyMsg || 'Žádné položky.', window._myBackendActiveTab);
     };
