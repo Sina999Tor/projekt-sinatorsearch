@@ -8688,7 +8688,7 @@ EXAMPLES:
             const kind = it.tmdbType || (it.type === 'tv' || it.type === 'shows' ? 'tv' : 'movie');
             const watched = isWatched(it.id, kind);
             return `<div class="card${watched?' is-watched':''}" style="position:relative;" onclick="typeof openDetailFromTrakt==='function'&&openDetailFromTrakt(${it.id},'${kind}')">
-                ${canRemove ? `<button onclick="event.stopPropagation();toggleWatchedFromCard(${it.id},'${kind}','${jsq(it.title||'')}','${jsq(it.year||'')}','${jsq(poster||'')}',this)" style="position:absolute;top:6px;left:6px;z-index:5;width:26px;height:26px;border-radius:50%;background:${watched?'rgba(29,185,84,0.85)':'rgba(0,0,0,0.65)'};border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:0.85rem;line-height:1;cursor:pointer;">${watched?'👁️':'👁'}</button>` : ''}
+                ${canRemove ? `<button data-watched="${watched?'1':'0'}" onclick="event.stopPropagation();toggleWatchedFromCard(${it.id},'${kind}','${jsq(it.title||'')}','${jsq(it.year||'')}','${jsq(poster||'')}',this)" style="position:absolute;top:6px;left:6px;z-index:5;width:26px;height:26px;border-radius:50%;background:${watched?'rgba(29,185,84,0.85)':'rgba(0,0,0,0.65)'};border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:0.85rem;line-height:1;cursor:pointer;">${watched?'👁️':'👁'}</button>` : ''}
                 ${canRemove ? `<button onclick="event.stopPropagation();${myBackendCardRemoveArgs(tab, it.id, kind)}" style="position:absolute;top:6px;right:6px;z-index:5;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.25);color:#e07a6f;font-size:0.85rem;line-height:1;cursor:pointer;">✕</button>` : ''}
                 ${poster ? `<img class="card-image" src="${poster}" loading="lazy">` : `<div class="card-placeholder">${kind === 'tv' ? '📺' : '🎬'}</div>`}
                 <div class="card-info"><div class="card-title">${it.title || ('#' + it.id)}</div><div class="card-meta"><span>${it.year || '—'}</span>${it.rating ? `<span>★ ${it.rating}/10</span>` : ''}${it.watchCount > 1 ? `<span>👁 ${it.watchCount}×</span>` : ''}</div></div>
@@ -11747,15 +11747,30 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
     // vzhledu tlačítka v modalu — btnEl v toggleWatched necháváme null a ikonu
     // podle výsledku upravíme sami.
     window.toggleWatchedFromCard = async function(id, type, title, year, posterPath, btnEl) {
-        if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳'; }
+        // Optimistická aktualizace ikony hned po kliknutí — nečeká se na dokončení
+        // async synchronizace (Trakt/Sinator), takže není potřeba klikat dvakrát.
+        let intendedWatched;
+        if (btnEl) {
+            intendedWatched = btnEl.dataset.watched !== '1';
+            btnEl.disabled = true;
+            btnEl.dataset.watched = intendedWatched ? '1' : '0';
+            btnEl.textContent = intendedWatched ? '👁️' : '👁';
+            btnEl.style.background = intendedWatched ? 'rgba(29,185,84,0.85)' : 'rgba(0,0,0,0.65)';
+        }
         try {
             await toggleWatched(id, type, title, year, posterPath, null);
+            // Sinator cache se u toggleWatched() plní bez await — počkáme na ni tady,
+            // ať je isWatched() níž hned aktuální a ikona sedí i po zpětné kontrole.
+            if (typeof myBackendReady === 'function' && myBackendReady() && typeof refreshMySinatorWatchedCache === 'function') {
+                await refreshMySinatorWatchedCache();
+            }
         } catch (e) {
             console.warn('toggleWatchedFromCard error:', e);
         } finally {
             if (btnEl) {
                 btnEl.disabled = false;
-                const nowWatched = typeof isWatched === 'function' ? isWatched(id, type) : false;
+                const nowWatched = typeof isWatched === 'function' ? isWatched(id, type) : intendedWatched;
+                btnEl.dataset.watched = nowWatched ? '1' : '0';
                 btnEl.textContent = nowWatched ? '👁️' : '👁';
                 btnEl.style.background = nowWatched ? 'rgba(29,185,84,0.85)' : 'rgba(0,0,0,0.65)';
             }
