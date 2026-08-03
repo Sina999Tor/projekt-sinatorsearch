@@ -2704,39 +2704,53 @@
 
     window.myBackendAddWatchlist = async function(id, type, title, year, poster) {
         if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Ostatní.'); return; }
+        const toast = (typeof _favToast === 'function') ? _favToast : alert;
         try {
-            await myWatchlistAdd(id, type, title, year || null, poster || null);
-            alert('✅ Přidáno do watchlistu (Sinator backend).');
-        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+            // Toggle: pokud už je položka ve watchlistu, kliknutí ji odebere.
+            let already = false;
+            try {
+                const list = await myWatchlistGet();
+                already = Array.isArray(list) && list.some(it => Number(it.id) === Number(id) && (it.type === type || (it.type === 'shows' && type === 'tv') || (it.type === 'movies' && type === 'movie')));
+            } catch (e) { /* při chybě zjištění stavu prostě přidáme */ }
+            if (already) {
+                await myWatchlistRemove(id, type);
+                toast('🗑️ Odebráno z watchlistu');
+            } else {
+                await myWatchlistAdd(id, type, title, year || null, poster || null);
+                toast('🔖 Přidáno do watchlistu');
+            }
+        } catch (e) { toast('❌ ' + (e && e.message ? e.message : e)); }
     };
 
     window.myBackendRate = async function(id, type) {
         if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Ostatní.'); return; }
+        const toast = (typeof _favToast === 'function') ? _favToast : alert;
         const val = prompt('Hodnocení 1–10:');
         if (val == null) return;
         const rating = parseInt(val, 10);
-        if (!rating || rating < 1 || rating > 10) { alert('⚠️ Zadej číslo 1–10.'); return; }
+        if (!rating || rating < 1 || rating > 10) { toast('⚠️ Zadej číslo 1–10.'); return; }
         try {
             await myRatingSet(id, type, rating);
-            alert('✅ Hodnocení ' + rating + '/10 uloženo (Sinator backend).');
-        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+            toast('⭐ Hodnocení ' + rating + '/10 uloženo');
+        } catch (e) { toast('❌ ' + (e && e.message ? e.message : e)); }
     };
 
     window.myBackendMarkWatched = async function(id, type) {
         if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Ostatní.'); return; }
+        const toast = (typeof _favToast === 'function') ? _favToast : alert;
         try {
             const histType = (type === 'tv' || type === 'shows') ? 'shows' : 'movies';
             const existing = await myHistoryGetForId(histType, id);
             const already = Array.isArray(existing) && existing.length > 0;
             if (already) {
                 await myHistoryRemove(id, type);
-                alert('🗑️ Odebráno ze shlédnutých (Sinator backend).');
+                toast('🗑️ Odebráno ze shlédnutých');
             } else {
                 await myHistoryAdd(id, type);
-                alert('✅ Přidáno do shlédnutých (Sinator backend).');
+                toast('✅ Přidáno do shlédnutých');
             }
             refreshMySinatorWatchedCache();
-        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+        } catch (e) { toast('❌ ' + (e && e.message ? e.message : e)); }
     };
 
     window.myBackendAddToList = async function(id, type) {
@@ -2758,21 +2772,23 @@
         document.body.appendChild(overlay);
     };
     window.myBackendAddToListConfirm = async function(listId, id, type) {
+        const toast = (typeof _favToast === 'function') ? _favToast : alert;
         try {
             await myListItemAdd(listId, id, type);
-            alert('✅ Přidáno do seznamu.');
+            toast('📁 Přidáno do seznamu');
             document.getElementById('myBackendListPickerOverlay')?.remove();
-        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+        } catch (e) { toast('❌ ' + (e && e.message ? e.message : e)); }
     };
     window.myBackendAddToListNew = async function(id, type) {
+        const toast = (typeof _favToast === 'function') ? _favToast : alert;
         const name = prompt('Název nového seznamu:');
         if (!name || !name.trim()) return;
         try {
             const list = await myListCreate(name.trim());
             await myListItemAdd(list.id, id, type);
-            alert('✅ Seznam vytvořen a položka přidána.');
+            toast('📁 Seznam vytvořen a položka přidána');
             document.getElementById('myBackendListPickerOverlay')?.remove();
-        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
+        } catch (e) { toast('❌ ' + (e && e.message ? e.message : e)); }
     };
 
     // Tlačítko 🧩 na kartě (vedle 👁) — rychlé menu Sinator akcí (Watchlist,
