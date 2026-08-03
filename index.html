@@ -2322,6 +2322,7 @@
             </div>
         </div>
         <button class="tab-sort-btn" id="globalSortBtn" onclick="toggleTabSort(event)" title="Řadit" style="display:none;">⊿</button>
+        <button class="tab-sort-btn" id="mainGridColsBtn" onclick="toggleMainGridCols()" title="Přepnout zobrazení">▦ 2</button>
     </div>
     <!-- Inline sort dropdown -->
     <div id="tabSortDropdown" style="display:none;"></div>
@@ -8472,6 +8473,30 @@ EXAMPLES:
         if(!items.length) { resultsEl.innerHTML='<div class="empty">😕 Žádné výsledky</div>'; return; }
         resultsEl.innerHTML = items.map(it => cardHtml(it)).join('');
     }
+
+    // Přepínač 1/2 sloupce pro hlavní mřížku výsledků (Filmy/Seriály/...).
+    // Stejná logika jako u seznamů Trakt/Simkl/Sinator - jen mění vzhled
+    // mřížky přes inline styl, žádné nové načítání dat.
+    window._mainGridCols = window._mainGridCols || 2;
+    window.applyMainGridCols = function() {
+        const el = document.getElementById('results');
+        if (!el) return;
+        const cols = window._mainGridCols;
+        if (cols === 1) {
+            el.style.gridTemplateColumns = '1fr';
+            el.style.gap = '16px';
+        } else {
+            el.style.gridTemplateColumns = '';
+            el.style.gap = '';
+        }
+        const btn = document.getElementById('mainGridColsBtn');
+        if (btn) btn.textContent = cols === 1 ? '▤ 1' : '▦ 2';
+    };
+    window.toggleMainGridCols = function() {
+        window._mainGridCols = window._mainGridCols === 1 ? 2 : 1;
+        applyMainGridCols();
+    };
+    document.addEventListener('DOMContentLoaded', applyMainGridCols);
 
     function renderActorGrid(actors) {
         if(!actors.length) { resultsEl.innerHTML='<div class="empty">😕 Žádní herci</div>'; return; }
