@@ -8519,6 +8519,20 @@ EXAMPLES:
         }
         const btn = document.getElementById('mainGridColsBtn');
         if (btn) btn.textContent = cols === 1 ? '▤ 1' : '▦ 2';
+        // Přepočítat i vzhled už vykreslených karet (obrázek + rámeček) —
+        // dřív se tohle nastavilo jen kartám vykresleným PO přepnutí, takže
+        // stávající karty zůstaly oříznuté, dokud nedošlo k novému vykreslení.
+        const cols1 = cols === 1;
+        el.querySelectorAll('.card[data-tmdb-id]').forEach(card => {
+            const img = card.querySelector('.card-image');
+            if (img) {
+                img.style.height = cols1 ? 'auto' : '';
+                img.style.objectFit = cols1 ? 'contain' : '';
+            }
+            card.style.borderRadius = cols1 ? '0' : '';
+            card.style.border = cols1 ? 'none' : '';
+            card.style.boxShadow = cols1 ? 'none' : '';
+        });
         // Přepočítat zelené fajky "shlédnuto" na už vykreslených kartách —
         // v 1sloupcovém zobrazení má být fajka vidět, ve 2sloupcovém zmizet
         // (tam stačí zelený rámeček karty).
