@@ -780,6 +780,8 @@
         .card-badge { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.75); padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; color: var(--text); border: 1px solid var(--border); }
         .card-watched-overlay { display: none; }
         .card.is-watched { border: 3px solid #1db954; box-shadow: 0 0 0 1px rgba(29,185,84,0.35), 0 2px 6px rgba(0,0,0,0.35); }
+        .card-media { position: relative; }
+        .card-watched-check { position: absolute; right: 8px; bottom: 8px; background: rgba(29,185,84,0.9); border-radius: 50%; width: 30px; height: 30px; display: grid; place-items: center; font-size: 0.95rem; z-index: 2; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
         .card-fav { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.6); border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 0.9rem; display: grid; place-items: center; transition: 0.2s; }
         .card-fav:hover { transform: scale(1.1); background: rgba(255,255,255,0.15); }
         .card-info { padding: 12px; }
@@ -8366,7 +8368,14 @@ EXAMPLES:
         const watched = !isActor && isWatched(it.id, mediaType);
         const personBadge = mediaType === 'director' ? '🎥' : '👥';
         const cardStyle = cols1 ? ' style="border-radius:0;border:none;box-shadow:none;"' : '';
-        return `<div class="card${watched?' is-watched':''}" data-tmdb-id="${it.id}" data-tmdb-type="${mediaType}" onclick="${clickAction}"${cardStyle}>${img}<div class="card-badge">${isActor?personBadge:(mediaType==='tv'?'📺':'')}</div><button class="card-fav ${liked?'liked':''}" onclick="${favAction}">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${title}</div><div class="card-meta"><span>${year||'—'}</span>${!isActor?`<span class="card-rating">★ ${rating}</span>`:''}</div></div></div>`;
+        // Tlačítko 👁 vedle srdíčka pro rychlé (od)označení "shlédnuto" přímo z karty,
+        // bez otevírání detailu. Jen u filmů/seriálů, ne u herců/režisérů.
+        const watchBtn = !isActor ? `<button class="card-fav card-watch-btn ${watched?'liked':''}" data-watched="${watched?'1':'0'}" onclick="event.stopPropagation();toggleWatchedFromCard(${it.id},'${mediaType}','${titleJs}','${year}','${it.poster_path||''}',this)" style="left:44px;${watched?'background:rgba(29,185,84,0.85);':''}">${watched?'👁️':'👁'}</button>` : '';
+        // Ve zvětšeném (1sloupcovém) zobrazení není vidět zelený rámeček karty celý
+        // (poster je velký, rámeček splyne) — proto tam navíc zelená fajka v pravém
+        // spodním rohu, jasně viditelná i na velkém plakátu.
+        const watchedCheck = (!isActor && watched && cols1) ? `<div class="card-watched-check">✅</div>` : '';
+        return `<div class="card${watched?' is-watched':''}" data-tmdb-id="${it.id}" data-tmdb-type="${mediaType}" onclick="${clickAction}"${cardStyle}><div class="card-media">${img}<div class="card-badge">${isActor?personBadge:(mediaType==='tv'?'📺':'')}</div><button class="card-fav ${liked?'liked':''}" onclick="${favAction}">${liked?'❤️':'🤍'}</button>${watchBtn}${watchedCheck}</div><div class="card-info"><div class="card-title">${title}</div><div class="card-meta"><span>${year||'—'}</span>${!isActor?`<span class="card-rating">★ ${rating}</span>`:''}</div></div></div>`;
     }
 
     // ── INFINITE SCROLL LISTENER ─────────────────────────────────────────────
@@ -8473,6 +8482,18 @@ EXAMPLES:
     function refreshCardWatchedBorders(id, watched) {
         document.querySelectorAll(`.card[data-tmdb-id="${id}"], .card[onclick*="(${id},"], .card[onclick*="(${id})"]`).forEach(card => {
             card.classList.toggle('is-watched', watched);
+            // Ve zvětšeném (1sloupcovém) zobrazení navíc zelená fajka v pravém
+            // spodním rohu plakátu (rámeček karty tam moc vidět není).
+            const media = card.querySelector('.card-media');
+            if (media) {
+                let check = media.querySelector('.card-watched-check');
+                const cols1 = (window._mainGridCols||2) === 1;
+                if (watched && cols1) {
+                    if (!check) { check = document.createElement('div'); check.className = 'card-watched-check'; check.textContent = '✅'; media.appendChild(check); }
+                } else if (check) {
+                    check.remove();
+                }
+            }
         });
     }
 
@@ -8498,6 +8519,13 @@ EXAMPLES:
         }
         const btn = document.getElementById('mainGridColsBtn');
         if (btn) btn.textContent = cols === 1 ? '▤ 1' : '▦ 2';
+        // Přepočítat zelené fajky "shlédnuto" na už vykreslených kartách —
+        // v 1sloupcovém zobrazení má být fajka vidět, ve 2sloupcovém zmizet
+        // (tam stačí zelený rámeček karty).
+        el.querySelectorAll('.card.is-watched[data-tmdb-id]').forEach(card => {
+            const id = card.getAttribute('data-tmdb-id');
+            if (id && typeof refreshCardWatchedBorders === 'function') refreshCardWatchedBorders(id, true);
+        });
     };
     window.toggleMainGridCols = function() {
         window._mainGridCols = window._mainGridCols === 1 ? 2 : 1;
@@ -11825,6 +11853,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
                 btnEl.dataset.watched = nowWatched ? '1' : '0';
                 btnEl.textContent = nowWatched ? '👁️' : '👁';
                 btnEl.style.background = nowWatched ? 'rgba(29,185,84,0.85)' : 'rgba(0,0,0,0.65)';
+                if (typeof refreshCardWatchedBorders === 'function') refreshCardWatchedBorders(id, nowWatched);
             }
         }
     };
