@@ -8759,6 +8759,12 @@ EXAMPLES:
                 items = await fetchMyBackendPosters(items);
             })();
             await Promise.race([_load, _timeout(60000)]);
+            // Mezitím se uživatel mohl přepnout na jiný tab (jiné volání
+            // renderMyBackendTab už mezitím proběhlo/probíhá) — pokud tenhle
+            // běh už není pro aktuálně aktivní tab, výsledek zahodíme, ať
+            // nepřepíše nověji vykreslená data (race condition: pomalejší
+            // starší fetch by jinak dorazil později a přepsal správný obsah).
+            if (window._myBackendActiveTab !== tab) return;
             window._myBackendCurrentItems = items;
             window._myBackendCurrentEmptyMsg = emptyMsg;
             window._myBackendCurrentLetterFilter = '';
@@ -8770,6 +8776,7 @@ EXAMPLES:
             if (letterInput) letterInput.value = '';
             renderMyBackendGrid(items, emptyMsg, tab);
         } catch (e) {
+            if (window._myBackendActiveTab !== tab) return;
             if ($('myBackendSortBarWrap')) $('myBackendSortBarWrap').style.display = 'none';
             c.innerHTML = `<div class="empty" style="padding:20px;text-align:center;">⚠️ ${e && e.message ? e.message : e}<br><br><button onclick="renderMyBackendTab('${tab}')" style="margin-top:10px;padding:8px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
         }
