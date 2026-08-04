@@ -2833,11 +2833,17 @@
     // funkce jako pod "🧩 Sinator ▾" v detailu, jen jako malé plovoucí menu
     // zavěšené na kliknuté tlačítko.
     window.openCardSinatorMenu = function(id, type, title, year, poster, btnEl) {
-        document.getElementById('cardSinatorMenu')?.remove();
+        const existing = document.getElementById('cardSinatorMenu');
+        if (existing) {
+            const sameBtn = existing._ownerBtn === btnEl;
+            existing.remove();
+            if (sameBtn) return; // druhý klik na stejné puzzle jen zavře menu
+        }
         if (typeof myBackendReady === 'function' && !myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Ostatní.'); return; }
         const rect = btnEl.getBoundingClientRect();
         const menu = document.createElement('div');
         menu.id = 'cardSinatorMenu';
+        menu._ownerBtn = btnEl;
         const left = Math.max(8, Math.min(rect.left, window.innerWidth - 200));
         menu.style.cssText = `position:fixed;z-index:9999;top:${rect.bottom + 6}px;left:${left}px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 20px rgba(0,0,0,0.5);min-width:180px;`;
         const t = title || '';
