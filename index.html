@@ -9835,7 +9835,7 @@ EXAMPLES:
                             <button class="action-btn-modal kinobox" onclick="openKinobox('${seriesTitleJs}', '')">🎫 Kinobox</button>
                             <button class="action-btn-modal imdb" onclick="openImdb('${seriesTitleJs}', '')">🎬 IMDb</button>
                             <button class="action-btn-modal" onclick="openEdna('${seriesTitleJs}')">📺 Edna</button>
-                            <button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${seriesTitleJs}')">📊 Trakt</button>
+                            ${state.trakt.accessToken ? `<button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${seriesTitleJs}')">📊 Trakt</button>` : ''}
                         </div>
                     </div>
                 </div></div>`;
@@ -10082,13 +10082,13 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 <button class="action-btn-modal" onclick="openTvGuru('${safeTitle}')">📺 TVguru</button>
 <button class="action-btn-modal" style="background:rgba(0,85,165,0.15);border-color:#0055a5;color:#60b0ff;" onclick="openCT('${safeTitle}')">📡 ČT</button>
 <button class="action-btn-modal" onclick="openEdna('${safeTitle}')">📺 Edna</button>
-<button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${safeTitle}')">📊 Trakt hledat</button>
+${state.trakt.accessToken ? `<button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${safeTitle}')">📊 Trakt hledat</button>` : ''}
 </div>
-<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">📋 Trakt ▾</button>
+${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">📋 Trakt ▾</button>
 <div class="action-buttons" style="display:none;margin-top:4px;">
 <button class="action-btn-modal" onclick="toggleTraktWatchlist(${id},'${type}',this)" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">🔖 Watchlist</button>
 <button class="action-btn-modal" onclick="openTraktListPicker(${id},'${type}')" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">📋 Do seznamu</button>
-</div>
+</div>` : ''}
 <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">🧩 Sinator ▾</button>
 <div class="action-buttons" style="display:none;margin-top:4px;">
 <button class="action-btn-modal" onclick="myBackendAddWatchlist(${id},'${type}','${jsq(title)}','${year}','${posterPath}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">🔖 Watchlist</button>
