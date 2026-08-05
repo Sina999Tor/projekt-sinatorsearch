@@ -1659,6 +1659,10 @@
                     <span class="icon">🎟️</span>
                     <span class="name">Kinohled</span>
                 </button>
+                <button class="website-btn" onclick="window.open('https://dupe.cz/', '_blank')">
+                    <span class="icon">🐲</span>
+                    <span class="name">Dupe.cz</span>
+                </button>
                 <button class="website-btn" onclick="window.open('https://kulturnimapa.cz/filmy/premiery/', '_blank')">
                     <span class="icon">🗺️</span>
                     <span class="name">KulturníMapa</span>
@@ -2284,6 +2288,7 @@
                 <button class="source-btn" id="srcbtn-mrkaj" onclick="searchOnSource('mrkaj')"><span class="src-status"></span>👁️ Mrkaj.me</button>
                 <button class="source-btn" id="srcbtn-mrkni" onclick="searchOnSource('mrkni')"><span class="src-status"></span>📺 Mrkni.tv</button>
                 <button class="source-btn" id="srcbtn-openloadmovies" onclick="searchOnSource('openloadmovies')"><span class="src-status"></span>🎬 OpenloadMovies</button>
+                <button class="source-btn" id="srcbtn-dupe" onclick="searchOnSource('dupe')"><span class="src-status"></span>🐲 Dupe.cz</button>
             </div>
             <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
                 <button class="source-btn" style="width:100%; background:var(--bg-card);" onclick="copyTitleToClipboard()">📋 Zkopírovat název do schránky</button>
@@ -4402,7 +4407,11 @@
             'uzila': `https://uzi.la/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}`,
             'mrkaj': `https://mrkaj.me/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}?t=${state.currentSearchType==='tv'?'s':'m'}`,
             'mrkni': (()=>{ const raw=state.currentSearchTitle||''; const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); const yr=state.currentSearchYear||''; return `https://mrkni.tv/${slug}${yr?'-'+yr:''}/`; })(),
-            'openloadmovies': `https://openloadmovies.live/?s=${title}`
+            'openloadmovies': `https://openloadmovies.live/?s=${title}`,
+            // ⚠️ Nejisté: přesný formát vyhledávání na dupe.cz se nepodařilo ověřit
+            // (web blokuje automatické stahování). Odhad podle běžného WordPress
+            // formátu vyhledávání — pokud netrefuje výsledky, je potřeba upravit.
+            'dupe': `https://dupe.cz/?s=${title}`
         };
     }
 
