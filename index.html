@@ -4415,10 +4415,10 @@
             'dupe': `https://dupe.cz/?s=${title}`,
             // ⚠️ Nejisté: svetserialu.to nemá klasické vyhledávání s vlastní URL
             // (jen JS našeptávač), takže se URL cesty hádá přímo ze slugu názvu
-            // (/serial/{slug}), stejně jako u mrkni.tv. Web má patrně jen seriály,
-            // u filmů proto vede na hlavní stránku. Pokud slug neodpovídá skutečné
-            // cestě na webu, je potřeba upravit.
-            'svetserialu': (()=>{ const tp=state.currentSearchType||'movie'; if(tp!=='tv') return 'https://svetserialu.to/'; const raw=state.currentSearchOrigTitle||state.currentSearchTitle||''; const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); return `https://svetserialu.to/serial/${slug}`; })()
+            // (/serial/{slug}, u epizody /serial/{slug}/s{SS}e{EE}), stejně jako
+            // u mrkni.tv. Web má patrně jen seriály, u filmů proto vede na hlavní
+            // stránku. Pokud slug neodpovídá skutečné cestě na webu, je potřeba upravit.
+            'svetserialu': (()=>{ const tp=state.currentSearchType||'movie'; if(tp!=='tv') return 'https://svetserialu.to/'; const raw=state.currentSearchOrigTitle||state.currentSearchTitle||''; const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); const season=state.currentSearchSeason; const episode=state.currentSearchEpisode; if(season && episode) { const ss=String(season).padStart(2,'0'); const ee=String(episode).padStart(2,'0'); return `https://svetserialu.to/serial/${slug}/s${ss}e${ee}`; } return `https://svetserialu.to/serial/${slug}`; })()
         };
     }
 
