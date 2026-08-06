@@ -9830,6 +9830,7 @@ EXAMPLES:
             const safeSeriesTitle = (series.name || '').replace(/'/g, "&#39;").replace(/"/g, '&quot;');
             const titleJs = jsq(title);
             const seriesTitleJs = jsq(series.name || '');
+            const seriesOrigNameJs = jsq(series.original_name || series.name || '');
             const czSeriesNameJs = jsq(czSeriesName || '');
             $('modalScrollBody').innerHTML = `${modalNav(safeSeriesTitle, hasBack)}
                 ${bg}
@@ -9842,7 +9843,7 @@ EXAMPLES:
                     <div class="action-buttons">
                         <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${seriesTitleJs} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}'))">▶️ Přehrát</button>
                         <button class="action-btn-modal youtube" onclick="openYouTube('${seriesTitleJs} S${seasonNumber}E${episodeNumber}')">▶️ Trailer</button>
-                        <button class="action-btn-modal search-sources" onclick="openSourcesModal('${seriesTitleJs} S${seasonNumber}E${episodeNumber}', '', 'tv', '${seriesTitleJs}', '${titleJs}', ${seasonNumber}, ${episodeNumber}, '${czSeriesNameJs}')">🔍 Vyhledat zdroje</button>
+                        <button class="action-btn-modal search-sources" onclick="openSourcesModal('${seriesTitleJs} S${seasonNumber}E${episodeNumber}', '', 'tv', '${seriesOrigNameJs}', '${titleJs}', ${seasonNumber}, ${episodeNumber}, '${czSeriesNameJs}')">🔍 Vyhledat zdroje</button>
                         <button class="action-btn-modal" onclick="translateOverview()">🌐 Přeložit</button>
                         <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${tvId},type:'tv',title:'${seriesTitleJs}',year:'',poster:series?.poster_path||''})">📁 Složky</button>
                         <button class="action-btn-modal" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">🎬 Katalogy ▾</button>
