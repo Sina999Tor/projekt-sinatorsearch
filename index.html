@@ -8576,6 +8576,7 @@ EXAMPLES:
         }
         return !!state.watched[`${type}_${id}`];
     }
+    window.isWatched = isWatched; // zpřístupněno i pro samostatné bloky kódu (Moje složky)
 
     // Karty se v appce vykreslují několika různými funkcemi (hlavní mřížka,
     // oblíbené, Trakt/Simkl/Sinator seznamy, filmografie...) s různě
@@ -27215,10 +27216,16 @@ function slozkaCardHtml(item, idx, itemIdx, cols1) {
     const meta = `${item.type==='tv'?'Seriál':'Film'}${item.year?' · '+item.year:''}${item.rating?' · ★'+item.rating:''}`;
     const clickAction = `openDetailFromSlozka(${item.id},'${item.type}')`;
     const delAction = `event.stopPropagation();removeFromSlozka(${idx},${itemIdx})`;
+    const watched = typeof window.isWatched === 'function' && window.isWatched(item.id, item.type);
+    const watchAction = `event.stopPropagation();typeof toggleWatchedFromCard==='function'&&toggleWatchedFromCard(${item.id},'${item.type}','${jsq(item.title||'')}','${item.year||''}','${item.poster||''}',this)`;
+    const eyeBtn = `<button data-watched="${watched?'1':'0'}" onclick="${watchAction}" style="position:absolute;top:4px;left:4px;background:${watched?'rgba(29,185,84,0.85)':'rgba(0,0,0,0.65)'};border:none;border-radius:50%;width:26px;height:26px;font-size:0.8rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;color:#fff;">${watched?'👁️':'👁'}</button>`;
+    const watchedCheck = (watched && cols1) ? `<div class="card-watched-check">✅</div>` : '';
     if (cols1) {
         return `<div onclick="${clickAction}" style="position:relative;cursor:pointer;overflow:hidden;background:var(--bg-elevated);">
             ${poster ? `<img src="${poster}" loading="lazy" style="width:100%;height:auto;display:block;object-fit:contain;">` : `<div style="width:100%;aspect-ratio:2/3;display:grid;place-items:center;font-size:3rem;">${item.type==='tv'?'📺':'🎬'}</div>`}
+            ${eyeBtn}
             <button onclick="${delAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.8rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;color:#e07a6f;">✕</button>
+            ${watchedCheck}
             <div style="padding:8px 4px 12px;">
                 <div style="font-weight:700;font-size:0.9rem;">${title}</div>
                 <div style="font-size:0.75rem;color:#aaa;">${meta}</div>
@@ -27227,6 +27234,7 @@ function slozkaCardHtml(item, idx, itemIdx, cols1) {
     }
     return `<div onclick="${clickAction}" style="position:relative;cursor:pointer;overflow:hidden;background:var(--bg-elevated);display:flex;align-items:flex-end;height:220px;border-radius:8px;">
         ${poster ? `<img src="${poster}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="position:absolute;inset:0;display:grid;place-items:center;font-size:3rem;">${item.type==='tv'?'📺':'🎬'}</div>`}
+        ${eyeBtn}
         <button onclick="${delAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.8rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;color:#e07a6f;">✕</button>
         <div style="position:relative;z-index:1;width:100%;background:linear-gradient(transparent,rgba(0,0,0,0.9));padding:8px 8px 6px;">
             <div style="font-weight:700;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
