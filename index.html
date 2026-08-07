@@ -8900,7 +8900,7 @@ EXAMPLES:
             else if (scope === 'ratings') await myRatingRemove(id, type);
             else if (scope === 'history') await myHistoryRemove(id, type);
             else if (scope.startsWith('list:')) await myListItemRemove(scope.slice(5), id, type);
-            if (scope.startsWith('list:')) loadMyBackendOverview(scope); // obnoví i počet v názvu záložky
+            if (scope.startsWith('list:')) loadMyBackendOverview(scope, true); // obnoví i počet v názvu záložky
             else renderMyBackendTab(window._myBackendActiveTab);
         } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
     };
@@ -9020,7 +9020,7 @@ EXAMPLES:
         renderMyBackendGrid(items, emptyMsg, window._myBackendActiveTab);
     };
 
-    async function loadMyBackendOverview(keepTab) {
+    async function loadMyBackendOverview(keepTab, forceRefresh) {
         const c = $('myBackendResultsContainer');
         if (!myBackendReady()) {
             c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">🧩 Vlastní backend není nastavený.<br><br>Nastav adresu a klíč v <b>Nastavení → Ostatní</b>.</div>`;
@@ -9028,8 +9028,15 @@ EXAMPLES:
             if ($('myBackendSortBarWrap')) $('myBackendSortBarWrap').style.display = 'none';
             return;
         }
-        let lists = [];
-        try { lists = await myListsGet(); } catch (e) {}
+        const tab = keepTab || window._myBackendActiveTab || 'watchlist';
+        // Seznam záložek (vlastní seznamy) cachujeme, ať se při každém návratu
+        // znovu netahá z backendu - obnoví se jen po skutečné změně (nový/smazaný
+        // seznam, odebraná položka) přes forceRefresh=true.
+        let lists = window._myBackendListsCache;
+        if (!lists || forceRefresh) {
+            try { lists = await myListsGet(); } catch (e) { lists = lists || []; }
+            window._myBackendListsCache = lists;
+        }
         const staticTabs = [
             { key: 'watchlist', label: '🔖 Watchlist' },
             { key: 'ratings-movies', label: '⭐ Hodnoc. filmy' },
@@ -9045,7 +9052,24 @@ EXAMPLES:
             ${t.id ? `<button onclick="event.stopPropagation();myBackendDeleteList('${t.id}')" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:rgba(224,122,111,0.25);border:none;color:#e07a6f;font-size:0.7rem;line-height:1;cursor:pointer;">✕</button>` : ''}
         </span>`).join('') + `<button onclick="myBackendCreateList()" style="white-space:nowrap;padding:8px 14px;border-radius:20px;border:1px dashed #6090ff;background:transparent;color:#6090ff;cursor:pointer;font-size:0.82rem;">➕ Nový seznam</button>`;
         $('myBackendListTabsWrap').style.display = 'block';
-        renderMyBackendTab(keepTab || 'watchlist');
+
+        // Pokud se vracíme na tab, který už máme jednou načtený (a nejde o
+        // vynucený refresh), jen ho znovu vykreslíme z cache - bez fetch
+        // a bez "Načítám…" blikání.
+        if (!forceRefresh && window._myBackendActiveTab === tab && window._myBackendCurrentItems) {
+            document.querySelectorAll('#myBackendListTabs button.ts-list-tab-btn').forEach(b => {
+                const active = b.dataset.tab === tab;
+                b.style.background = active ? 'rgba(96,144,255,0.2)' : 'var(--bg-elevated)';
+                b.style.borderColor = active ? '#6090ff' : 'var(--border)';
+                b.style.color = active ? '#6090ff' : 'var(--text)';
+            });
+            const items = myBackendGetSortedFilteredItems();
+            const sortBar = $('myBackendSortBarWrap');
+            if (sortBar) sortBar.style.display = items.length ? 'flex' : 'none';
+            renderMyBackendGrid(items, window._myBackendCurrentEmptyMsg || 'Žádné položky.', tab);
+            return;
+        }
+        renderMyBackendTab(tab);
     }
     window.loadMyBackendOverview = loadMyBackendOverview;
 
@@ -9054,14 +9078,14 @@ EXAMPLES:
         if (!name || !name.trim()) return;
         try {
             await myListCreate(name.trim());
-            loadMyBackendOverview();
+            loadMyBackendOverview(null, true);
         } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
     };
     window.myBackendDeleteList = async function(listId) {
         if (!confirm('Smazat celý seznam i s obsahem?')) return;
         try {
             await myListDelete(listId);
-            loadMyBackendOverview();
+            loadMyBackendOverview(null, true);
         } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
     };
 
@@ -9500,7 +9524,7 @@ EXAMPLES:
             navigationStack.length = 0;
             $('modal')?.classList.remove('open');
             if (backTo === 'favs') openFavsModal();
-            else if (backTo === 'own') { /* listsModal se nikdy nezavíral, je pořád vykreslený pod detailem - nic dalšího netřeba */ }
+            else if (backTo === 'own') openTraktModal('own');
             else if (backTo === 'trakt') openTraktModal();
             else if (backTo === 'simkl') openSimklModal();
             else if (backTo === 'watched') openWatchedModal();
@@ -13299,9 +13323,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
     };
     window.openDetailFromMyBackend = function(id, type) {
         if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
-        // Na rozdíl od Trakt/Simkl/Favs modálu tady listsModal NEZAVÍRÁME —
-        // zůstává vykreslený (jen schovaný pod detailem), takže se po
-        // stisku "Zpět" nemusí nic znovu natahovat z backendu ani blikat.
+        closeTraktModal();
         state._backTo = 'own';
         navigationStack.length = 0;
         navigationStack.push({ type, id });
