@@ -27174,6 +27174,7 @@ window.closeSlozkyModal = function() {
 window.renderSlozkyList = function renderSlozkyList() {
     const modal = document.getElementById('slozkyModal');
     if(modal) modal.dataset.inFolder = '0';
+    window._slozkaCurrentIdx = null;
     const folders = loadSlozky();
     const body = document.getElementById('slozkyBody');
     window.renderSlozkyList = renderSlozkyList; // keep global ref
@@ -27198,19 +27199,54 @@ window.renderSlozkyList = function renderSlozkyList() {
     body.innerHTML = html;
 }
 
-// ── Open folder detail ───────────────────────────────────────────
-window.openSlozkaDetail = function(idx) {
+// ── Přepínač zobrazení (1 sloupec = velký plakát / 2 sloupce = kompaktní) ──
+window._slozkaGridCols = window._slozkaGridCols || 2;
+window._slozkaCurrentIdx = null;
+window.slozkaToggleGridCols = function() {
+    window._slozkaGridCols = (window._slozkaGridCols === 1) ? 2 : 1;
+    const btn = document.getElementById('slozkaGridToggleBtn');
+    if (btn) btn.textContent = window._slozkaGridCols === 1 ? '▤ 1 sloupec' : '▦ 2 sloupce';
+    if (window._slozkaCurrentIdx !== null) renderSlozkaDetailBody(window._slozkaCurrentIdx);
+};
+
+function slozkaCardHtml(item, idx, itemIdx, cols1) {
+    const poster = item.poster ? `https://image.tmdb.org/t/p/w500${item.poster}` : '';
+    const title = escHtml(item.title || 'Neznámý');
+    const meta = `${item.type==='tv'?'Seriál':'Film'}${item.year?' · '+item.year:''}${item.rating?' · ★'+item.rating:''}`;
+    const clickAction = `openDetailFromSlozka(${item.id},'${item.type}')`;
+    const delAction = `event.stopPropagation();removeFromSlozka(${idx},${itemIdx})`;
+    if (cols1) {
+        return `<div onclick="${clickAction}" style="position:relative;cursor:pointer;overflow:hidden;background:var(--bg-elevated);">
+            ${poster ? `<img src="${poster}" loading="lazy" style="width:100%;height:auto;display:block;object-fit:contain;">` : `<div style="width:100%;aspect-ratio:2/3;display:grid;place-items:center;font-size:3rem;">${item.type==='tv'?'📺':'🎬'}</div>`}
+            <button onclick="${delAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.8rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;color:#e07a6f;">✕</button>
+            <div style="padding:8px 4px 12px;">
+                <div style="font-weight:700;font-size:0.9rem;">${title}</div>
+                <div style="font-size:0.75rem;color:#aaa;">${meta}</div>
+            </div>
+        </div>`;
+    }
+    return `<div onclick="${clickAction}" style="position:relative;cursor:pointer;overflow:hidden;background:var(--bg-elevated);display:flex;align-items:flex-end;height:220px;border-radius:8px;">
+        ${poster ? `<img src="${poster}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="position:absolute;inset:0;display:grid;place-items:center;font-size:3rem;">${item.type==='tv'?'📺':'🎬'}</div>`}
+        <button onclick="${delAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.8rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;color:#e07a6f;">✕</button>
+        <div style="position:relative;z-index:1;width:100%;background:linear-gradient(transparent,rgba(0,0,0,0.9));padding:8px 8px 6px;">
+            <div style="font-weight:700;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
+            <div style="font-size:0.68rem;color:#aaa;">${meta}</div>
+        </div>
+    </div>`;
+}
+
+// ── Vykreslení obsahu složky (bez pushState - volá se i při refreshi) ──
+function renderSlozkaDetailBody(idx) {
     const folders = loadSlozky();
     const f = folders[idx];
     if (!f) return;
-    // Track that we're in folder detail for back-button handling
-    document.getElementById('slozkyModal').dataset.inFolder = '1';
-    // Push extra history state so back = return to folder list
-    if(window.isStandalone && isStandalone()) history.pushState({pwaGuard:true, slozkyFolder:true},'',window.location.href);
     const body = document.getElementById('slozkyBody');
-    let html = `<div class="slozka-detail-header">
+    const cols = window._slozkaGridCols || 2;
+    const cols1 = cols === 1;
+    let html = `<div class="slozka-detail-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <button class="back-btn" onclick="renderSlozkyList()">← Zpět</button>
-        <h3>${f.emoji||'📁'} ${escHtml(f.name)}</h3>
+        <h3 style="flex:1;">${f.emoji||'📁'} ${escHtml(f.name)}</h3>
+        <button id="slozkaGridToggleBtn" onclick="slozkaToggleGridCols()" title="Přepnout zobrazení" style="background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:0.8rem;cursor:pointer;white-space:nowrap;">${cols1?'▤ 1 sloupec':'▦ 2 sloupce'}</button>
     </div>`;
     if (f.items.length === 0) {
         html += `<div style="text-align:center;padding:40px 20px;color:#555;">
@@ -27218,21 +27254,69 @@ window.openSlozkaDetail = function(idx) {
             <div style="font-size:0.88rem;">Složka je prázdná.<br>Přidejte filmy nebo seriály z jejich detailu.</div>
         </div>`;
     } else {
-        f.items.forEach((item, ii) => {
-            const img = item.poster
-                ? `<img src="https://image.tmdb.org/t/p/w92${item.poster}" loading="lazy" onerror="this.style.display='none'">`
-                : `<div style="width:38px;height:56px;background:#2a2a2a;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">${item.type==='tv'?'📺':'🎬'}</div>`;
-            html += `<div class="slozka-item" onclick="openDetailFromSlozka(${item.id},'${item.type}')">
-                ${img}
-                <div class="slozka-item-info">
-                    <div class="slozka-item-title">${escHtml(item.title)}</div>
-                    <div class="slozka-item-meta">${item.type==='tv'?'Seriál':'Film'}${item.year?' · '+item.year:''}${item.rating?' · ★'+item.rating:''}</div>
-                </div>
-                <button class="slozka-item-del" onclick="event.stopPropagation();removeFromSlozka(${idx},${ii})" title="Odebrat">✕</button>
-            </div>`;
-        });
+        html += `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:${cols1?'16px':'4px'};padding:10px 0;">`;
+        f.items.forEach((item, ii) => { html += slozkaCardHtml(item, idx, ii, cols1); });
+        html += `</div>`;
     }
     body.innerHTML = html;
+}
+
+// ── Dotažení českých názvů/plakátů z TMDB (a uložení zpět) ──────────
+async function refreshSlozkaCzTitles(idx) {
+    const apiKey = (window._store && window._store.getItem('sinator_tmdb_api_key')) || '';
+    const folders = loadSlozky();
+    const f = folders[idx];
+    if (!apiKey || !f || !f.items.length) return;
+    let cursor = 0;
+    async function worker() {
+        while (cursor < f.items.length) {
+            const it = f.items[cursor++];
+            const kind = it.type === 'tv' ? 'tv' : 'movie';
+            try {
+                const ctrl = new AbortController();
+                const t = setTimeout(() => ctrl.abort(), 8000);
+                const res = await fetch(`https://api.themoviedb.org/3/${kind}/${it.id}?api_key=${apiKey}&language=cs-CZ`, { signal: ctrl.signal });
+                clearTimeout(t);
+                if (!res.ok) continue;
+                const d = await res.json();
+                let csTitle = d.title || d.name || '';
+                const origTitle = d.original_title || d.original_name || '';
+                // Pokud TMDB nemá pro tenhle titul český překlad, dohledáme ho
+                // přes /translations, stejně jako to dělá zbytek appky.
+                if (!csTitle || (origTitle && csTitle === origTitle)) {
+                    try {
+                        const transRes = await fetch(`https://api.themoviedb.org/3/${kind}/${it.id}/translations?api_key=${apiKey}`);
+                        const transData = await transRes.json();
+                        const csData = (transData.translations || []).find(t2 => t2.iso_639_1 === 'cs' && t2.data && (t2.data.title || t2.data.name));
+                        if (csData) csTitle = csData.data.title || csData.data.name;
+                    } catch (e) {}
+                }
+                if (csTitle) it.title = csTitle;
+                const year = (d.release_date || d.first_air_date || '').slice(0, 4);
+                if (year) it.year = year;
+                if (d.poster_path) it.poster = d.poster_path;
+            } catch (e) {}
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(6, f.items.length) }, worker));
+    saveSlozky(folders);
+    // Znovu vykreslíme jen pokud je uživatel pořád v téhle složce (mezitím
+    // mohl dát Zpět nebo přepnout jinam).
+    if (window._slozkaCurrentIdx === idx) renderSlozkaDetailBody(idx);
+}
+
+// ── Open folder detail ───────────────────────────────────────────
+window.openSlozkaDetail = function(idx) {
+    const folders = loadSlozky();
+    const f = folders[idx];
+    if (!f) return;
+    window._slozkaCurrentIdx = idx;
+    // Track that we're in folder detail for back-button handling
+    document.getElementById('slozkyModal').dataset.inFolder = '1';
+    // Push extra history state so back = return to folder list
+    if(window.isStandalone && isStandalone()) history.pushState({pwaGuard:true, slozkyFolder:true},'',window.location.href);
+    renderSlozkaDetailBody(idx);
+    refreshSlozkaCzTitles(idx);
 };
 
 window.openDetailFromSlozka = function(id, type) {
@@ -27245,7 +27329,7 @@ window.removeFromSlozka = function(folderIdx, itemIdx) {
     if (!folders[folderIdx]) return;
     folders[folderIdx].items.splice(itemIdx, 1);
     saveSlozky(folders);
-    openSlozkaDetail(folderIdx);
+    renderSlozkaDetailBody(folderIdx);
 };
 
 window.deleteSlozka = function(idx) {
