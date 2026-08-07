@@ -24286,6 +24286,7 @@ function openEpgDetail(ep) {
             </div>` : ''}
             <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Hledat / otevřít</div>
             <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <button onclick="document.getElementById('epgDetailModal').style.display='none'; if(typeof openSourcesModal==='function') openSourcesModal('${title.replace(/'/g,"\\'")}', '', 'tv');" style="background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">🔍 Vyhledat zdroje</button>
                 <button onclick="tvSearchProgram('${title.replace(/'/g,"\'")}'); document.getElementById('epgDetailModal').style.display='none';" style="background:var(--accent);border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">🔍 Hledat v Sinatoru</button>
                 <button onclick="window.open('https://www.csfd.cz/hledat/?q=${q}','_blank')" style="background:var(--bg-elevated);border:1px solid var(--border);color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;">🎬 ČSFD</button>
                 <button onclick="window.open('https://www.imdb.com/find/?q=${q}','_blank')" style="background:var(--bg-elevated);border:1px solid var(--border);color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;">⭐ IMDb</button>
