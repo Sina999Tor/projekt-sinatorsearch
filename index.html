@@ -8690,8 +8690,9 @@ EXAMPLES:
                 <button onclick="setFavsSort('az')" id="fSort-az" style="padding:4px 11px;border-radius:14px;border:1px solid ${sort==='az'?'#1db954':'var(--border)'};background:${sort==='az'?'#1db954':'var(--bg-elevated)'};color:${sort==='az'?'#000':'var(--text)'};cursor:pointer;font-size:0.75rem;font-weight:${sort==='az'?'600':'normal'};">A–Z</button>
                 <button onclick="setFavsSort('za')" id="fSort-za" style="padding:4px 11px;border-radius:14px;border:1px solid ${sort==='za'?'#1db954':'var(--border)'};background:${sort==='za'?'#1db954':'var(--bg-elevated)'};color:${sort==='za'?'#000':'var(--text)'};cursor:pointer;font-size:0.75rem;font-weight:${sort==='za'?'600':'normal'};">Z–A</button>
                 <button onclick="setFavsSort('year')" id="fSort-year" style="padding:4px 11px;border-radius:14px;border:1px solid ${sort==='year'?'#1db954':'var(--border)'};background:${sort==='year'?'#1db954':'var(--bg-elevated)'};color:${sort==='year'?'#000':'var(--text)'};cursor:pointer;font-size:0.75rem;font-weight:${sort==='year'?'600':'normal'};">🗓 Rok</button>
+                <button id="favsGridToggleBtn" onclick="favsToggleGridCols()" title="Přepnout zobrazení" style="margin-left:auto;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:4px 11px;border-radius:14px;font-size:0.75rem;cursor:pointer;white-space:nowrap;">${(window._favsGridCols||2)===1?'▤ 1 sloupec':'▦ 2 sloupce'}</button>
             </div>
-            <div id="favsGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;padding:0;width:100%;"></div>
+            <div id="favsGrid" style="display:grid;grid-template-columns:repeat(${window._favsGridCols||2},1fr);gap:${(window._favsGridCols||2)===1?'16px':'4px'};padding:0;width:100%;"></div>
         </div>`;
 
         $('modalScrollBody').innerHTML = html;
@@ -8733,6 +8734,8 @@ EXAMPLES:
 
         if (!items.length) { grid.innerHTML = '<div style="grid-column:span 2;text-align:center;padding:40px;color:var(--text-muted);">😕 Žádné oblíbené položky</div>'; renderWatchedAzBar([]); return; }
 
+        const cols = window._favsGridCols || 2;
+        const cols1 = cols === 1;
         const useAz = (sort === 'az' || sort === 'za');
         if (useAz) {
             const groups = {};
@@ -8745,19 +8748,28 @@ EXAMPLES:
             const letters = Object.keys(groups).sort((a,b) => a.localeCompare(b,'cs'));
             let html = '';
             letters.forEach(letter => {
-                html += `<div class="watched-letter-anchor" id="wletter-${letter}" style="grid-column:span 2;">${letter}</div>`;
-                html += groups[letter].map(it => favCardHtml(it)).join('');
+                html += `<div class="watched-letter-anchor" id="wletter-${letter}" style="grid-column:span ${cols};">${letter}</div>`;
+                html += groups[letter].map(it => favCardHtml(it, cols1)).join('');
             });
-            grid.style.cssText = 'display:grid;grid-template-columns:repeat(2,1fr);gap:4px;width:100%;';
+            grid.style.cssText = `display:grid;grid-template-columns:repeat(${cols},1fr);gap:${cols1?'16px':'4px'};width:100%;`;
             grid.innerHTML = html;
             renderWatchedAzBar(letters);
         } else {
-            grid.innerHTML = items.map(it => favCardHtml(it)).join('');
+            grid.style.cssText = `display:grid;grid-template-columns:repeat(${cols},1fr);gap:${cols1?'16px':'4px'};width:100%;`;
+            grid.innerHTML = items.map(it => favCardHtml(it, cols1)).join('');
             renderWatchedAzBar([]);
         }
     }
 
-    function favCardHtml(it) {
+    window._favsGridCols = window._favsGridCols || 2;
+    window.favsToggleGridCols = function() {
+        window._favsGridCols = (window._favsGridCols === 1) ? 2 : 1;
+        const btn = $('favsGridToggleBtn');
+        if (btn) btn.textContent = window._favsGridCols === 1 ? '▤ 1 sloupec' : '▦ 2 sloupce';
+        renderFavsGrid();
+    };
+
+    function favCardHtml(it, cols1) {
         const isActor = it.media_type === 'actor';
         const titleRaw = it.title || it.name || 'Neznámý';
         const title = titleRaw.replace(/'/g, "&#39;");
@@ -8769,6 +8781,19 @@ EXAMPLES:
         const favAction = isActor
             ? `toggleActorFav(${it.id},'${titleJs}','${it.poster_path||''}',event);renderFavsGrid()`
             : `toggleFav(${it.id},'${titleJs}','${year}',${it.vote_average||0},'${mediaType}','${it.poster_path||''}',event);renderFavsGrid()`;
+        if (cols1) {
+            // V 1sloupcovém režimu necháváme obrázek v přirozeném poměru stran
+            // (bez object-fit:cover crop na pevnou výšku) - vidět je tak celý plakát,
+            // stejně jako u ostatních seznamů (myBackend, hlavní mřížka...).
+            return `<div onclick="${clickAction}" style="position:relative;cursor:pointer;overflow:hidden;background:var(--bg-elevated);border-radius:0;">
+                ${poster ? `<img src="${poster}" loading="lazy" style="width:100%;height:auto;display:block;object-fit:contain;">` : `<div style="width:100%;aspect-ratio:2/3;display:grid;place-items:center;font-size:3rem;">${isActor?'👤':(mediaType==='tv'?'📺':'🎬')}</div>`}
+                <button onclick="${favAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.85rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;">❤️</button>
+                <div style="padding:8px 4px 12px;">
+                    <div style="font-weight:700;font-size:0.9rem;">${title}</div>
+                    <div style="font-size:0.75rem;color:#aaa;">${year||'—'} <span style="color:var(--gold);">❤</span></div>
+                </div>
+            </div>`;
+        }
         return `<div onclick="${clickAction}" style="position:relative;cursor:pointer;overflow:hidden;background:var(--bg-elevated);display:flex;align-items:flex-end;height:220px;border-radius:8px;">
             ${poster ? `<img src="${poster}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="position:absolute;inset:0;display:grid;place-items:center;font-size:3rem;">${isActor?'👤':(mediaType==='tv'?'📺':'🎬')}</div>`}
             <button onclick="${favAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.85rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;">❤️</button>
@@ -8805,10 +8830,14 @@ EXAMPLES:
     }
 
     async function fetchMyBackendPosters(items) {
-        // Watchlist položky mívají title uložené, ale poster_path bývá při importu
-        // z Traktu prázdné (null) — proto se dotahuje podle chybějícího posteru,
-        // ne podle chybějícího titulu.
-        const need = items.filter(it => !it.poster_path);
+        // Dřív se název dotahoval z TMDB jen u položek bez posteru (poster
+        // z backendu bývá prázdný, ale title byl uložený - často anglicky,
+        // např. po importu z Traktu). To ale znamenalo, že položky s posterem
+        // si držely anglický název navždy. Teď se pro všechny položky vždy
+        // strhne čerstvý český název i poster z TMDB - díky cache v
+        // loadMyBackendOverview se tohle spustí jen jednou za skutečné
+        // načtení tabu, ne při každém návratu z detailu.
+        const need = items.filter(it => it.id);
         if (!need.length || !tmdbApiKey) return items;
         // Seskup podle unikátního TMDB id — u historie epizod se stejný seriál
         // opakuje desítkykrát, nemá smysl stahovat ten samý poster pro každou
@@ -8842,9 +8871,9 @@ EXAMPLES:
                 const posterUrl = d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : null;
                 const year = (d.release_date || d.first_air_date || '').slice(0, 4);
                 group.forEach(it => {
-                    if (!it.title) it.title = csTitle || `#${it.id}`;
-                    if (!it.year) it.year = year;
-                    it.poster_path = posterUrl;
+                    it.title = csTitle || it.title || `#${it.id}`;
+                    it.year = year || it.year;
+                    if (posterUrl) it.poster_path = posterUrl;
                     it.tmdbType = kind;
                 });
             } catch (e) {}
