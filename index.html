@@ -8879,7 +8879,7 @@ EXAMPLES:
             // (hlavní mřížka, oblíbené, Trakt/Simkl/Sinator seznamy...), proto stejné
             // pozice (srdíčko vlevo, oko vedle něj) i zelená fajka v rohu v 1sloupci.
             const watchedCheck = (watched && cols1) ? `<div class="card-watched-check">✅</div>` : '';
-            return `<div class="card${watched?' is-watched':''}" data-tmdb-id="${it.id}" data-tmdb-type="${kind}" style="position:relative;${cols1?'border-radius:0;border:none;box-shadow:none;':''}" onclick="typeof openDetailFromTrakt==='function'&&openDetailFromTrakt(${it.id},'${kind}')">
+            return `<div class="card${watched?' is-watched':''}" data-tmdb-id="${it.id}" data-tmdb-type="${kind}" style="position:relative;${cols1?'border-radius:0;border:none;box-shadow:none;':''}" onclick="typeof openDetailFromMyBackend==='function'&&openDetailFromMyBackend(${it.id},'${kind}')">
                 <div class="card-media">
                 ${poster ? `<img class="card-image" src="${poster}" loading="lazy" style="${imgStyle}">` : `<div class="card-placeholder">${kind === 'tv' ? '📺' : '🎬'}</div>`}
                 <button class="card-fav ${liked?'liked':''}" onclick="event.stopPropagation();toggleFav(${it.id},'${jsq(it.title||'')}','${it.year||''}',${it.rating||0},'${kind}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button>
@@ -9500,6 +9500,7 @@ EXAMPLES:
             navigationStack.length = 0;
             $('modal')?.classList.remove('open');
             if (backTo === 'favs') openFavsModal();
+            else if (backTo === 'own') { /* listsModal se nikdy nezavíral, je pořád vykreslený pod detailem - nic dalšího netřeba */ }
             else if (backTo === 'trakt') openTraktModal();
             else if (backTo === 'simkl') openSimklModal();
             else if (backTo === 'watched') openWatchedModal();
@@ -13295,6 +13296,16 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
         navigationStack.length = 0;
         navigationStack.push({ type: 'person', id });
         _openPersonDetailNoStack(id);
+    };
+    window.openDetailFromMyBackend = function(id, type) {
+        if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
+        // Na rozdíl od Trakt/Simkl/Favs modálu tady listsModal NEZAVÍRÁME —
+        // zůstává vykreslený (jen schovaný pod detailem), takže se po
+        // stisku "Zpět" nemusí nic znovu natahovat z backendu ani blikat.
+        state._backTo = 'own';
+        navigationStack.length = 0;
+        navigationStack.push({ type, id });
+        _openDetailNoStack(id, type);
     };
     window.openDetailFromTrakt = (id, type) => {
         if (!tmdbApiKey) return;
