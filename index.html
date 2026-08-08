@@ -6173,6 +6173,7 @@
             { id: 28,    name: 'Akční' },
             { id: 12,    name: 'Dobrodružný' },
             { id: 16,    name: 'Animovaný' },
+            { id: 'anime', name: '🎌 Anime' },
             { id: 35,    name: 'Komedie' },
             { id: 80,    name: 'Krimi' },
             { id: 99,    name: 'Dokumentární' },
@@ -6228,20 +6229,26 @@
     // Detekce japonských/čínských znaků (kanji, hiragana, katakana) v názvu
     const CJK_REGEX = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\uff66-\uff9f]/;
 
-    // Pro anime s japonským/čínským názvem dohledá anglický (příp. český) název u TMDB
-    async function translateAnimeTitles(results) {
+    // Pro anime s japonským/čínským názvem dohledá anglický (příp. český) název u TMDB.
+    // explicitType lze vynutit ('movie'|'tv'); jinak se odvodí z item.media_type,
+    // a pokud chybí, z přítomnosti pole title (film) vs. name (seriál).
+    async function translateAnimeTitles(results, explicitType) {
         if (!Array.isArray(results) || !results.length) return results;
         const toFix = results.filter(r => CJK_REGEX.test(r.name || r.title || ''));
         if (!toFix.length) return results;
         await Promise.all(toFix.map(async item => {
+            const itemType = explicitType || item.media_type || (item.title !== undefined ? 'movie' : 'tv');
             try {
-                const res = await fetch(`${BASE}/tv/${item.id}?api_key=${tmdbApiKey}&language=en-US`);
+                const res = await fetch(`${BASE}/${itemType}/${item.id}?api_key=${tmdbApiKey}&language=en-US`);
                 const d = await res.json();
-                if (d && d.name && !CJK_REGEX.test(d.name)) {
-                    item.name = d.name;
-                    if (item.original_name === undefined) item.original_name = item.name;
-                } else if (d && d.original_name && !CJK_REGEX.test(d.original_name)) {
-                    item.name = d.original_name;
+                const enName = d && (d.name || d.title);
+                if (enName && !CJK_REGEX.test(enName)) {
+                    if (itemType === 'movie') item.title = enName; else item.name = enName;
+                } else {
+                    const origName = d && (d.original_name || d.original_title);
+                    if (origName && !CJK_REGEX.test(origName)) {
+                        if (itemType === 'movie') item.title = origName; else item.name = origName;
+                    }
                 }
             } catch(e) { /* necháme původní název, pokud dohledání selže */ }
         }));
@@ -7828,7 +7835,7 @@ EXAMPLES:
             let results = data.results || [];
             state.totalPages = Math.min(data.total_pages || 1, 500);
             if (state.view === 'tv' || state.view === 'miniseries') results = results.filter(r => !isAnimeItem(r));
-            if (state.view === 'anime') results = await translateAnimeTitles(results);
+            if (state.view === 'anime') results = await translateAnimeTitles(results, 'tv');
 
             if (state.view === 'actors') {
                 appendActorGrid(results, isFirstPage);
@@ -7964,11 +7971,11 @@ EXAMPLES:
             // Vyřadit anime ze Seriálů a Minisérií (má vlastní kategorii "Anime"), ale ne když si uživatel
             // sám vybral žánr "Anime" ve filtru — tam naopak chceme JEN anime.
             if (genreId === 'anime') {
-                results = await translateAnimeTitles(results);
+                results = await translateAnimeTitles(results, mediaType === 'movie' ? 'movie' : 'tv');
             } else if (state.view === 'tv' || state.view === 'miniseries') {
                 results = results.filter(r => !isAnimeItem(r));
             }
-            if (state.view === 'anime') results = await translateAnimeTitles(results);
+            if (state.view === 'anime') results = await translateAnimeTitles(results, 'tv');
 
             // Pozn.: stránka už přichází z TMDB řazená podle original_title/original_name (sort_by),
             // takže žádné lokální přeřazení zde neprovádíme – appendGrid pak jen přidává nové karty
@@ -7998,7 +8005,7 @@ EXAMPLES:
                             let allExtra = pages.flatMap(data =>
                                 (data.results || []).map(r => ({...r, media_type: state.view === 'movies' ? 'movie' : 'tv'}))
                             );
-                            if (state.view === 'anime') allExtra = await translateAnimeTitles(allExtra);
+                            if (state.view === 'anime' || genreId === 'anime') allExtra = await translateAnimeTitles(allExtra);
                             if (allExtra.length) appendGrid(allExtra, false, true);
                             state.page = Math.min(extraPages + 1, state.totalPages);
                             state._loadingMore = false;
@@ -10335,11 +10342,17 @@ EXAMPLES:
 
             // Anime s japonským/čínským názvem (chybí CZ překlad na TMDB) → dohledat anglický název,
             // aby detail, vyhledávání zdrojů i kopírování názvu používaly stejný přeložený titul jako karta.
-            if (type === 'tv' && d && d.name && CJK_REGEX.test(d.name)) {
-                try {
-                    const enD = await fetch(`${BASE}/tv/${id}?api_key=${tmdbApiKey}&language=en-US`).then(r=>r.json());
-                    if (enD && enD.name && !CJK_REGEX.test(enD.name)) d.name = enD.name;
-                } catch(e) { /* necháme původní název, pokud dohledání selže */ }
+            {
+                const rawTitle = type === 'movie' ? d?.title : d?.name;
+                if (d && rawTitle && CJK_REGEX.test(rawTitle)) {
+                    try {
+                        const enD = await fetch(`${BASE}/${type}/${id}?api_key=${tmdbApiKey}&language=en-US`).then(r=>r.json());
+                        const enTitle = type === 'movie' ? enD?.title : enD?.name;
+                        if (enTitle && !CJK_REGEX.test(enTitle)) {
+                            if (type === 'movie') d.title = enTitle; else d.name = enTitle;
+                        }
+                    } catch(e) { /* necháme původní název, pokud dohledání selže */ }
+                }
             }
 
 
