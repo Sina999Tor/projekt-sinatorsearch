@@ -6210,11 +6210,18 @@
         ]
     };
 
-    // Anime = TV položka se žánrem Animovaný (16) a původem Japonsko (JP) — používá se k vyřazení anime ze Seriálů/Minisérií
+    // Anime = animovaná TV položka (žánr 16) z Japonska/Koreje/Číny/Tchaj-wanu/Hongkongu
+    // (zahrnuje i korejské/čínské anime-style seriály jako donghua nebo adaptace webtoonů) —
+    // používá se k vyřazení anime ze Seriálů/Minisérií
+    const ANIME_ORIGIN_COUNTRIES = ['JP', 'KR', 'CN', 'TW', 'HK'];
+    const ANIME_ORIGIN_LANGS = ['ja', 'ko', 'zh', 'cn'];
     function isAnimeItem(item) {
         const genreIds = item.genre_ids || (item.genres ? item.genres.map(g=>g.id) : []) || [];
+        if (!genreIds.includes(16)) return false;
         const origins = item.origin_country || [];
-        return genreIds.includes(16) && origins.includes('JP');
+        if (origins.length) return origins.some(c => ANIME_ORIGIN_COUNTRIES.includes(c));
+        // Fallback, pokud TMDB nevrátí origin_country (stává se u některých discover odpovědí)
+        return ANIME_ORIGIN_LANGS.includes(item.original_language || '');
     }
 
     // Detekce japonských/čínských znaků (kanji, hiragana, katakana) v názvu
