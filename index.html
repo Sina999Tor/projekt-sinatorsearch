@@ -1378,43 +1378,6 @@
                 <option value="TH">🇹🇭 Thajsko</option>
             </select>
         </div>
-        <div class="filters-row" id="actorNationalityFilterRow" style="display:none;">
-            <button type="button" id="actorNatModeAllBtn" onclick="setActorNationalityMode('all')" style="padding:8px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-size:0.85rem;">Všichni herci</button>
-            <button type="button" id="actorNatModeCountryBtn" onclick="setActorNationalityMode('nationality')" style="padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.85rem;">🌍 Dle národnosti</button>
-            <select id="actorNationalitySelect" onchange="setActorNationalityCode(this.value)" style="display:none;">
-                <option value="CZ">🇨🇿 Česko</option>
-                <option value="SK">🇸🇰 Slovensko</option>
-                <option value="US">🇺🇸 USA</option>
-                <option value="GB">🇬🇧 Velká Británie</option>
-                <option value="DE">🇩🇪 Německo</option>
-                <option value="FR">🇫🇷 Francie</option>
-                <option value="IT">🇮🇹 Itálie</option>
-                <option value="ES">🇪🇸 Španělsko</option>
-                <option value="PL">🇵🇱 Polsko</option>
-                <option value="AT">🇦🇹 Rakousko</option>
-                <option value="HU">🇭🇺 Maďarsko</option>
-                <option value="RU">🇷🇺 Rusko</option>
-                <option value="UA">🇺🇦 Ukrajina</option>
-                <option value="JP">🇯🇵 Japonsko</option>
-                <option value="KR">🇰🇷 Korea</option>
-                <option value="CN">🇨🇳 Čína</option>
-                <option value="IN">🇮🇳 Indie</option>
-                <option value="AU">🇦🇺 Austrálie</option>
-                <option value="CA">🇨🇦 Kanada</option>
-                <option value="SE">🇸🇪 Švédsko</option>
-                <option value="NO">🇳🇴 Norsko</option>
-                <option value="DK">🇩🇰 Dánsko</option>
-                <option value="FI">🇫🇮 Finsko</option>
-                <option value="TR">🇹🇷 Turecko</option>
-                <option value="MX">🇲🇽 Mexiko</option>
-                <option value="BR">🇧🇷 Brazílie</option>
-                <option value="AR">🇦🇷 Argentina</option>
-                <option value="IL">🇮🇱 Izrael</option>
-                <option value="IR">🇮🇷 Írán</option>
-                <option value="TH">🇹🇭 Thajsko</option>
-            </select>
-        </div>
-        <div style="font-size:0.7rem;color:var(--text-muted);margin:-4px 0 4px;" id="actorNationalityHint">🌍 Filtr národnosti platí jen pro procházení herců. Národnost se dotahuje z TMDB za běhu (podle místa narození), takže načítání může chvíli trvat a méně obvyklé národnosti mají méně výsledků.</div>
         <div class="ai-search-section">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                 <div class="ai-search-label">✨ AI Vyhledávání</div>
@@ -2355,6 +2318,43 @@
         <button class="tab-sort-btn" id="globalSortBtn" onclick="toggleTabSort(event)" title="Řadit" style="display:none;">⊿</button>
         <button class="tab-sort-btn" id="mainGridColsBtn" onclick="toggleMainGridCols()" title="Přepnout zobrazení">▦ 2</button>
     </div>
+    <div id="actorNationalityFilterRow" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px;">
+        <button type="button" id="actorNatModeAllBtn" onclick="setActorNationalityMode('all')" style="padding:6px 12px;border-radius:14px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-size:0.78rem;white-space:nowrap;">Všichni herci</button>
+        <button type="button" id="actorNatModeCountryBtn" onclick="setActorNationalityMode('nationality')" style="padding:6px 12px;border-radius:14px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.78rem;white-space:nowrap;">🌍 Dle národnosti</button>
+        <select id="actorNationalitySelect" onchange="setActorNationalityCode(this.value)" style="display:none;padding:5px 8px;border-radius:14px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.78rem;">
+            <option value="CZ">🇨🇿 Česko</option>
+            <option value="SK">🇸🇰 Slovensko</option>
+            <option value="US">🇺🇸 USA</option>
+            <option value="GB">🇬🇧 Velká Británie</option>
+            <option value="DE">🇩🇪 Německo</option>
+            <option value="FR">🇫🇷 Francie</option>
+            <option value="IT">🇮🇹 Itálie</option>
+            <option value="ES">🇪🇸 Španělsko</option>
+            <option value="PL">🇵🇱 Polsko</option>
+            <option value="AT">🇦🇹 Rakousko</option>
+            <option value="HU">🇭🇺 Maďarsko</option>
+            <option value="RU">🇷🇺 Rusko</option>
+            <option value="UA">🇺🇦 Ukrajina</option>
+            <option value="JP">🇯🇵 Japonsko</option>
+            <option value="KR">🇰🇷 Korea</option>
+            <option value="CN">🇨🇳 Čína</option>
+            <option value="IN">🇮🇳 Indie</option>
+            <option value="AU">🇦🇺 Austrálie</option>
+            <option value="CA">🇨🇦 Kanada</option>
+            <option value="SE">🇸🇪 Švédsko</option>
+            <option value="NO">🇳🇴 Norsko</option>
+            <option value="DK">🇩🇰 Dánsko</option>
+            <option value="FI">🇫🇮 Finsko</option>
+            <option value="TR">🇹🇷 Turecko</option>
+            <option value="MX">🇲🇽 Mexiko</option>
+            <option value="BR">🇧🇷 Brazílie</option>
+            <option value="AR">🇦🇷 Argentina</option>
+            <option value="IL">🇮🇱 Izrael</option>
+            <option value="IR">🇮🇷 Írán</option>
+            <option value="TH">🇹🇭 Thajsko</option>
+        </select>
+    </div>
+    <div id="actorNationalityHint" style="display:none;font-size:0.68rem;color:var(--text-muted);padding:0 10px 6px;">🌍 Národnost se dotahuje z TMDB za běhu (podle místa narození) — načtení může chvíli trvat, méně obvyklé národnosti mají méně výsledků.</div>
     <!-- Inline sort dropdown -->
     <div id="tabSortDropdown" style="display:none;"></div>
     <div id="results" class="results"></div>
