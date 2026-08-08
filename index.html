@@ -2044,20 +2044,6 @@
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Zobrazí v detailu filmu/seriálu, na kterých službách (Netflix, HBO Max…) je dostupný (zdroj: JustWatch)</div>
             </div>
             <div class="settings-divider"></div>
-            <div class="settings-section">
-                <span class="settings-label">🧩 Podrobnosti v detailu</span>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
-                    <span style="font-size:0.85rem;color:var(--text-muted);">Zobrazit rozšířená tlačítka</span>
-                    <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
-                        <input type="checkbox" id="detailExtrasToggle" onchange="applyDetailExtrasMode(this.checked)" style="opacity:0;width:0;height:0;position:absolute;">
-                        <span id="detailExtrasSlider" style="position:absolute;inset:0;background:#333;border-radius:24px;transition:0.3s;border:1px solid var(--border);">
-                            <span style="position:absolute;left:3px;top:3px;width:16px;height:16px;background:#888;border-radius:50%;transition:0.3s;" id="detailExtrasThumb"></span>
-                        </span>
-                    </label>
-                </div>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Vypnuto = v detailu zůstanou jen ▶️ Přehrát, 🔍 Vyhledat zdroje a ▶️ Trailer. Zapnuto = i Galerie, Kolekce, Soundtrack, Složky, Herci, Katalogy a další.</div>
-            </div>
-            <div class="settings-divider"></div>
             <button class="settings-full-btn" onclick="toggleFullscreen()" id="settingsFullscreenBtn">🔒 Fullscreen (zapnuto)</button>
             <button class="settings-full-btn" id="pwaInstallBtn" onclick="installPWA()" style="display:none;">📲 Instalovat aplikaci</button>
             <div id="pwaInstallInfo" style="font-size:0.7rem; color:var(--text-muted); text-align:center; margin-top:4px; display:none;">Dostupné v Chrome/Edge na Androidu přes HTTPS</div>
@@ -3702,9 +3688,6 @@
         if(wpTog) wpTog.checked = wpEnabled;
         _syncWatchProvidersSlider(wpEnabled);
         const deEnabled = _store.getItem('sinator_detail_extras') !== '0';
-        const deTog = $('detailExtrasToggle');
-        if(deTog) deTog.checked = deEnabled;
-        _syncDetailExtrasSlider(deEnabled);
     }
 
     window.applyWatchProvidersMode = function(enabled) {
@@ -10131,17 +10114,25 @@ EXAMPLES:
             const collectionBtn = d.belongs_to_collection ? `<button class="action-btn-modal collection" onclick="showCollection(${d.belongs_to_collection.id}, '${jsq(d.belongs_to_collection.name)}')">📦 Kolekce</button>` : '';
             
             const posterPath = d.poster_path || '';
-            const showDetailExtras = window._store.getItem('sinator_detail_extras') !== '0';
             const coreBtns = `<div class="action-buttons">
 <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeTitle}'))">▶️ Přehrát</button>
 <button class="action-btn-modal search-sources" onclick="openSourcesModal('${safeTitle}', '${year}', '${type}', '${origTitle}', '', '', '', '${jsq(czTvName||'')}')">🔍 Vyhledat zdroje</button>
-<button class="action-btn-modal youtube" onclick="openYouTube('${safeTitle}')">▶️ Trailer</button>`;
-            const extraBtns = !showDetailExtras ? '' : `
+<button class="action-btn-modal" onclick="translateOverview()">🌐 Přeložit</button>
+<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${id},type:'${type}',title:'${safeTitle}',year:${year||0},poster:'${d.poster_path||''}',rating:${d.vote_average||0}})">📁 Složky</button>
+<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">🧩 Sinator ▾</button>
+<div class="action-buttons" style="display:none;margin-top:4px;">
+<button class="action-btn-modal" onclick="myBackendAddWatchlist(${id},'${type}','${jsq(title)}','${year}','${posterPath}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">🔖 Watchlist</button>
+<button class="action-btn-modal" onclick="myBackendRate(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">⭐ Hodnotit</button>
+${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWatched(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">✅ Shlédnuto</button>` : `<button class="action-btn-modal" onclick="myBackendMarkWatched(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">✅ Shlédnuto (celý seriál)</button>`}
+<button class="action-btn-modal" onclick="myBackendAddToList(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">📁 Do seznamu</button>
+</div>
+<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">ℹ️ Další informace ▾</button>`;
+            const extraBtns = `
+<div class="action-buttons" style="display:none;margin-top:4px;">
+<button class="action-btn-modal youtube" onclick="openYouTube('${safeTitle}')">▶️ Trailer</button>
 <button class="action-btn-modal" onclick="showMediaGallery(${id}, '${type}', '${safeTitle}')">🖼️ Galerie</button>
 ${collectionBtn}
 <button class="action-btn-modal soundtrack" onclick="openSoundtrack('${safeTitle}')">🎵 Soundtrack</button>
-<button class="action-btn-modal" onclick="translateOverview()">🌐 Přeložit</button>
-<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${id},type:'${type}',title:'${safeTitle}',year:${year||0},poster:'${d.poster_path||''}',rating:${d.vote_average||0}})">📁 Složky</button>
 <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="showSimilarInModal(${id},'${type}',this)">🎯 Podobné tituly</button>
 <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="window._dPrefill={tmdbId:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}'};openAddDoporuceni()">⭐ Doporučit</button>
 ${cast ? `<button class="action-btn-modal" onclick="showCastModal(${id},'${type}')">👥 Herci</button>` : ''}
@@ -10161,12 +10152,6 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 <button class="action-btn-modal" onclick="toggleTraktWatchlist(${id},'${type}',this)" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">🔖 Watchlist</button>
 <button class="action-btn-modal" onclick="openTraktListPicker(${id},'${type}')" style="background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;">📋 Do seznamu</button>
 </div>` : ''}
-<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">🧩 Sinator ▾</button>
-<div class="action-buttons" style="display:none;margin-top:4px;">
-<button class="action-btn-modal" onclick="myBackendAddWatchlist(${id},'${type}','${jsq(title)}','${year}','${posterPath}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">🔖 Watchlist</button>
-<button class="action-btn-modal" onclick="myBackendRate(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">⭐ Hodnotit</button>
-${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWatched(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">✅ Shlédnuto</button>` : `<button class="action-btn-modal" onclick="myBackendMarkWatched(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">✅ Shlédnuto (celý seriál)</button>`}
-<button class="action-btn-modal" onclick="myBackendAddToList(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">📁 Do seznamu</button>
 </div>`;
             const actionBtns = coreBtns + extraBtns + `</div>`;
             $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div class="modal-chips"><div class="modal-chip" style="cursor:pointer;" title="Najít filmy/seriály se stejným hodnocením" onclick="openRatingBrowse(${d.vote_average||0},'${type}')"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;${(typeof myBackendReady==='function'&&myBackendReady())?'display:none;':''}" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button><button class="modal-chip" id="mySinatorWatchedBadge_${id}" style="display:none;cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;" onclick="toggleMySinatorWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">🧩 …</button></div>${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="mySinatorRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div><div id="mySinatorWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
