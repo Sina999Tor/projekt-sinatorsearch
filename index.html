@@ -2259,7 +2259,6 @@
         </div>
         <div class="sources-modal-body">
             <div class="sources-grid">
-                <button class="source-btn" id="srcbtn-prehraj" onclick="searchOnSource('prehraj')"><span class="src-status"></span>🎬 Prehraj.to</button>
                 <button class="source-btn" id="srcbtn-hellspy" onclick="searchOnSource('hellspy')"><span class="src-status"></span>👹 Hellspy</button>
                 <button class="source-btn" id="srcbtn-sledujteto" onclick="searchOnSource('sledujteto')"><span class="src-status"></span>👁️ Sledujte.to</button>
                 <button class="source-btn" id="srcbtn-fastshare" onclick="searchOnSource('fastshare')"><span class="src-status"></span>⚡ FastShare</button>
@@ -4413,8 +4412,6 @@
     function getAllSourceUrls() {
         const title = encodeURIComponent(state.currentSearchTitle);
         return {
-            // Prehraj.to: /hledej/{název}
-            'prehraj': `https://prehraj.to/hledej/${title}`,
             // Hellspy: /?query={název}
             'hellspy': `https://www.hellspy.to/?query=${title}`,
             // Ostatní: standardní query parametry
@@ -4609,7 +4606,7 @@
             // mívají, takže "nejisté" výsledky (blok i pouhé nenalezení názvu v textu)
             // u nich bereme jako ✅. Pokud ale stránka VÝSLOVNĚ řekne "nenalezeno",
             // pořád se poctivě ukáže ❌ — tohle není slepé skip.
-            const LENIENT_SOURCES = new Set(['hellspy','fastshare','prehraj','sledujfilmy','bombuj','ceskarepublika','svetserialu']);
+            const LENIENT_SOURCES = new Set(['hellspy','fastshare','sledujfilmy','bombuj','ceskarepublika','svetserialu']);
             const markUnknown = () => {
                 if(LENIENT_SOURCES.has(key)) {
                     btn?.classList.add('src-found'); if(st) st.textContent = '✅';
