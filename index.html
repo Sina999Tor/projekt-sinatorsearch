@@ -2314,6 +2314,7 @@
                 <button class="tab active" data-view="movies">🎬 Filmy</button>
                 <button class="tab" data-view="tv">📺 Seriály</button>
                 <button class="tab" data-view="miniseries">📖 Minisérie</button>
+                <button class="tab" data-view="anime">🎌 Anime</button>
                 <button class="tab" data-view="actors">👥 Herci</button>
                 <button class="tab" data-view="directors">🎥 Režiséři</button>
             </div>
@@ -3452,6 +3453,9 @@
                 state.filters.mediaType = 'tv';
                 if($('mediaType')) $('mediaType').value = 'tv';
             } else if (state.view === 'miniseries') {
+                state.filters.mediaType = 'tv';
+                if($('mediaType')) $('mediaType').value = 'tv';
+            } else if (state.view === 'anime') {
                 state.filters.mediaType = 'tv';
                 if($('mediaType')) $('mediaType').value = 'tv';
             }
@@ -6142,7 +6146,7 @@
                 const dd = $('tabSortDropdown'); if(dd) dd.style.display='none';
                 $('globalSortBtn')?.classList.remove('active');
                 // Show sort btn only for media views, reset sort to default
-                const isMediaView = ['movies','tv','miniseries'].includes(state.view);
+                const isMediaView = ['movies','tv','miniseries','anime'].includes(state.view);
                 const sortBtn = $('globalSortBtn');
                 if (sortBtn) sortBtn.style.display = isMediaView ? '' : 'none';
                 if (isMediaView) {
@@ -6150,7 +6154,7 @@
                     const sel = $('sortFilter'); if(sel) sel.value = 'primary_release_date.desc';
                 }
                 if(state.view!=='actors' && state.view!=='directors') {
-                    if(state.view==='miniseries') loadGenres('tv');
+                    if(state.view==='miniseries' || state.view==='anime') loadGenres('tv');
                     else loadGenres();
                 }
                 const natRow = $('actorNationalityFilterRow'), natHint = $('actorNationalityHint');
@@ -6206,12 +6210,20 @@
         ]
     };
 
+    // Anime = TV položka se žánrem Animovaný (16) a původem Japonsko (JP) — používá se k vyřazení anime ze Seriálů/Minisérií
+    function isAnimeItem(item) {
+        const genreIds = item.genre_ids || (item.genres ? item.genres.map(g=>g.id) : []) || [];
+        const origins = item.origin_country || [];
+        return genreIds.includes(16) && origins.includes('JP');
+    }
+
     async function loadGenres(explicitType) {
         // If no explicit type given, sync from current view tab
         if (!explicitType) {
             if (state.view === 'movies') state.filters.mediaType = 'movie';
             else if (state.view === 'tv') state.filters.mediaType = 'tv';
             else if (state.view === 'miniseries') state.filters.mediaType = 'tv';
+            else if (state.view === 'anime') state.filters.mediaType = 'tv';
         }
         const type = explicitType || state.filters.mediaType;
         state.filters.mediaType = type;
@@ -7673,6 +7685,7 @@ EXAMPLES:
         if (state.view === 'movies') url = `${BASE}/movie/popular?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${state.page}`;
         else if (state.view === 'tv') url = `${BASE}/tv/popular?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${state.page}`;
         else if (state.view === 'miniseries') url = `${BASE}/discover/tv?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_type=2&sort_by=popularity.desc&vote_count.gte=10&number_of_seasons.lte=1&number_of_episodes.lte=12&page=${state.page}`;
+        else if (state.view === 'anime') url = `${BASE}/discover/tv?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_genres=16&with_origin_country=JP&sort_by=popularity.desc&vote_count.gte=5&page=${state.page}`;
         else if (state.view === 'actors') url = `${BASE}/person/popular?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${state.page}`;
         // Directors: pevný seznam TMDB ID světově známých režisérů
         if (state.view === 'directors') {
@@ -7781,8 +7794,9 @@ EXAMPLES:
             const res = await fetch(url);
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
-            const results = data.results || [];
+            let results = data.results || [];
             state.totalPages = Math.min(data.total_pages || 1, 500);
+            if (state.view === 'tv' || state.view === 'miniseries') results = results.filter(r => !isAnimeItem(r));
 
             if (state.view === 'actors') {
                 appendActorGrid(results, isFirstPage);
@@ -7834,9 +7848,11 @@ EXAMPLES:
                 url = `${BASE}/tv/popular?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${state.page}`;
             } else if (state.view === 'miniseries') {
                 url = `${BASE}/discover/tv?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_type=2&sort_by=popularity.desc&vote_count.gte=10&number_of_seasons.lte=1&number_of_episodes.lte=12&page=${state.page}`;
+            } else if (state.view === 'anime') {
+                url = `${BASE}/discover/tv?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_genres=16&with_origin_country=JP&sort_by=popularity.desc&vote_count.gte=5&page=${state.page}`;
             }
         } else {
-            if (state.view === 'movies' || state.view === 'tv' || state.view === 'miniseries') {
+            if (state.view === 'movies' || state.view === 'tv' || state.view === 'miniseries' || state.view === 'anime') {
                 const type = state.view === 'movies' ? 'movie' : 'tv';
                 const isTv = type === 'tv';
                 // Translate sort param: primary_release_date → first_air_date for TV, original_title → original_name for TV
@@ -7849,7 +7865,9 @@ EXAMPLES:
                 }
                 url = `${BASE}/discover/${type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${state.page}`;
                 if (state.view === 'miniseries') url += `&with_type=2&number_of_seasons.lte=1&number_of_episodes.lte=12`;
+                if (state.view === 'anime') url += `&with_origin_country=JP`;
                 if (genreId) url += `&with_genres=${genreId}`;
+                else if (state.view === 'anime') url += `&with_genres=16`;
                 if (year && !isNowPlayingCZ) {
                     if (type === 'movie') url += `&primary_release_year=${year}`;
                     else url += `&first_air_date_year=${year}`;
@@ -7862,7 +7880,7 @@ EXAMPLES:
                 if (ageRating) url += `&certification_country=US&certification=${encodeURIComponent(ageRating)}`;
                 if (studio) url += `&with_companies=${studio}`;
                 if (network) url += `&with_networks=${network}`;
-                if (country) url += `&with_origin_country=${country}`;
+                if (country && state.view !== 'anime') url += `&with_origin_country=${country}`;
                 url += `&sort_by=${effectiveSortBy}`;
                 // AI discover extra params – klice nekodovat (TMDB potrebuje vote_count.gte atd. doslova)
                 let voteCountSet = false;
@@ -7906,6 +7924,9 @@ EXAMPLES:
                     return false;
                 });
             }
+
+            // Vyřadit anime ze Seriálů a Minisérií (má vlastní kategorii "Anime")
+            if (state.view === 'tv' || state.view === 'miniseries') results = results.filter(r => !isAnimeItem(r));
 
             // Pozn.: stránka už přichází z TMDB řazená podle original_title/original_name (sort_by),
             // takže žádné lokální přeřazení zde neprovádíme – appendGrid pak jen přidává nové karty
