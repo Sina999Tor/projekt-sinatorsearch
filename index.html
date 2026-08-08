@@ -2271,7 +2271,6 @@
                 <button class="source-btn" id="srcbtn-bombuj" onclick="searchOnSource('bombuj')"><span class="src-status"></span>💣 Bombuj.si</button>
                 <button class="source-btn" id="srcbtn-uzila" onclick="searchOnSource('uzila')"><span class="src-status"></span>🔍 Uzi.la</button>
                 <button class="source-btn" id="srcbtn-mrkaj" onclick="searchOnSource('mrkaj')"><span class="src-status"></span>👁️ Mrkaj.me</button>
-                <button class="source-btn" id="srcbtn-mrkni" onclick="searchOnSource('mrkni')"><span class="src-status"></span>📺 Mrkni.tv</button>
                 <button class="source-btn" id="srcbtn-openloadmovies" onclick="searchOnSource('openloadmovies')"><span class="src-status"></span>🎬 OpenloadMovies</button>
                 <button class="source-btn" id="srcbtn-dupe" onclick="searchOnSource('dupe')"><span class="src-status"></span>🐲 Dupe.cz</button>
                 <button class="source-btn" id="srcbtn-svetserialu" onclick="searchOnSource('svetserialu')"><span class="src-status"></span>🌍 Svetserialu.to</button>
@@ -4426,7 +4425,6 @@
             'bombuj': (()=>{ const tp=state.currentSearchType||'movie'; const raw=tp==='tv'?(state.currentSearchOrigTitle||state.currentSearchTitle||''):(state.currentSearchTitle||''); const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); if(tp==='tv') return `https://serialy.bombuj.si/serial-${slug}#serial`; const yr=state.currentSearchYear||''; return `https://www.bombuj.si/online-film-${slug}${yr?'-'+yr:''}`; })(),
             'uzila': `https://uzi.la/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}`,
             'mrkaj': `https://mrkaj.me/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}?t=${state.currentSearchType==='tv'?'s':'m'}`,
-            'mrkni': (()=>{ const raw=state.currentSearchTitle||''; const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); const yr=state.currentSearchYear||''; return `https://mrkni.tv/${slug}${yr?'-'+yr:''}/`; })(),
             'openloadmovies': `https://openloadmovies.live/?s=${title}`,
             // ⚠️ Nejisté: přesný formát vyhledávání na dupe.cz se nepodařilo ověřit
             // (web blokuje automatické stahování). Odhad podle běžného WordPress
@@ -10436,6 +10434,7 @@ ${directors.length ? `<button class="action-btn-modal" style="background:var(--b
 <button class="action-btn-modal" onclick="openTvGuru('${safeTitle}')">📺 TVguru</button>
 <button class="action-btn-modal" style="background:rgba(0,85,165,0.15);border-color:#0055a5;color:#60b0ff;" onclick="openCT('${safeTitle}')">📡 ČT</button>
 <button class="action-btn-modal" onclick="openEdna('${safeTitle}')">📺 Edna</button>
+<button class="action-btn-modal" onclick="openMrkni('${safeTitle}', '${year}')">📺 Mrkni.tv</button>
 ${state.trakt.accessToken ? `<button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${safeTitle}')">📊 Trakt hledat</button>` : ''}
 </div>
 ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">📋 Trakt ▾</button>
@@ -11049,6 +11048,12 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     function openEdna(t) { window.open(`https://www.edna.cz/vyhledavani/?q=${encodeURIComponent(t)}`, '_blank'); }
     window.openEdna = openEdna;
     function openImdb(t, y) { window.open(`https://www.imdb.com/find?q=${encodeURIComponent(t+' '+y)}`, '_blank'); }
+    function openMrkni(title, year) {
+        const s = (title||'').toLowerCase();
+        const m = {'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'};
+        const slug = [...s].map(c => m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+        window.open(`https://mrkni.tv/${slug}${year?'-'+year:''}/`, '_blank');
+    }
     function openTraktSearch(t) { window.open(`https://trakt.tv/search?query=${encodeURIComponent(t)}`, '_blank'); }
     function openYouTube(q) { window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(q+' trailer')}`, '_blank'); }
 
