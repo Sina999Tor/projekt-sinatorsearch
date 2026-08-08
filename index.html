@@ -8553,14 +8553,15 @@ EXAMPLES:
         }
         if (state.view === 'actors' && state.actorNationalityMode === 'nationality' && state.actorNationalityCode) {
             state._loadingMore = true;
-            filterActorsByNationality(actors, state.actorNationalityCode).then(filtered => {
+            const _timeoutMs = 15000;
+            Promise.race([
+                filterActorsByNationality(actors, state.actorNationalityCode),
+                new Promise((_, rej) => setTimeout(() => rej(new Error('Vypršel časový limit (TMDB neodpovídá).')), _timeoutMs))
+            ]).then(filtered => {
                 if (!filtered.length) {
                     const canRetry = state.page < state.totalPages && (window._actorNatAttempts || 0) < 15;
                     if (canRetry) {
                         window._actorNatAttempts = (window._actorNatAttempts || 0) + 1;
-                        // Zprávu o průběhu měníme jen dokud ještě nic nenašlo — jakmile
-                        // uživatel má na obrazovce výsledky a jen dojíždí scroll na konec,
-                        // radši potichu zkusíme další stránku, než mu to přepisovat.
                         if (!window._actorNatHasResults) {
                             resultsEl.innerHTML = `<div class="loading"><div class="spinner"></div>Hledám herce s touto národností… (stránka ${state.page}/${state.totalPages})</div>`;
                         }
@@ -8580,6 +8581,12 @@ EXAMPLES:
                 window._actorNatAttempts = 0;
                 _renderActorCards(filtered, !window._actorNatHasResults);
                 window._actorNatHasResults = true;
+            }).catch(err => {
+                console.error('Chyba při filtrování herců podle národnosti:', err);
+                state._loadingMore = false;
+                if (!window._actorNatHasResults) {
+                    resultsEl.innerHTML = `<div class="empty">⚠️ Chyba při zjišťování národnosti<br><small style="color:#888;font-size:0.75rem;">${err && err.message ? err.message : err}</small><br><br><button onclick="setActorNationalityCode(state.actorNationalityCode)" style="margin-top:8px;padding:8px 18px;background:var(--accent);border:none;border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
+                }
             });
             return;
         }
