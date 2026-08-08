@@ -6157,7 +6157,7 @@
                 const showNatRow = state.view === 'actors';
                 if (natRow) natRow.style.display = showNatRow ? 'flex' : 'none';
                 if (natHint) natHint.style.display = showNatRow ? '' : 'none';
-                if (!showNatRow) { state.actorNationalityMode = 'all'; window._actorNatAttempts = 0; }
+                if (!showNatRow) { state.actorNationalityMode = 'all'; window._actorNatAttempts = 0; window._actorNatHasResults = false; }
                 loadPopularContent();
             };
         });
@@ -8534,35 +8534,52 @@ EXAMPLES:
         if (sel) sel.style.display = mode === 'nationality' ? '' : 'none';
         if (mode === 'nationality' && sel && !state.actorNationalityCode) { state.actorNationalityCode = sel.value; }
         window._actorNatAttempts = 0;
+        window._actorNatHasResults = false;
         state.page = 1; state._allItems = [];
         loadPopularContent();
     };
     window.setActorNationalityCode = function(code) {
         state.actorNationalityCode = code;
         window._actorNatAttempts = 0;
+        window._actorNatHasResults = false;
         state.page = 1; state._allItems = [];
         loadPopularContent();
     };
 
     function appendActorGrid(actors, isFirstPage) {
-        if (!actors.length) { if (isFirstPage) resultsEl.innerHTML = '<div class="empty">😕 Nic nenalezeno.</div>'; return; }
+        if (!actors.length) {
+            if (isFirstPage && !window._actorNatHasResults) resultsEl.innerHTML = '<div class="empty">😕 Nic nenalezeno.</div>';
+            return;
+        }
         if (state.view === 'actors' && state.actorNationalityMode === 'nationality' && state.actorNationalityCode) {
-            resultsEl.dataset.natLoading = '1';
+            state._loadingMore = true;
             filterActorsByNationality(actors, state.actorNationalityCode).then(filtered => {
                 if (!filtered.length) {
-                    if (state.page < state.totalPages && (window._actorNatAttempts || 0) < 8) {
+                    const canRetry = state.page < state.totalPages && (window._actorNatAttempts || 0) < 15;
+                    if (canRetry) {
                         window._actorNatAttempts = (window._actorNatAttempts || 0) + 1;
-                        if (isFirstPage) resultsEl.innerHTML = `<div class="loading"><div class="spinner"></div>Hledám herce s touto národností… (stránka ${state.page}/${state.totalPages})</div>`;
+                        // Zprávu o průběhu měníme jen dokud ještě nic nenašlo — jakmile
+                        // uživatel má na obrazovce výsledky a jen dojíždí scroll na konec,
+                        // radši potichu zkusíme další stránku, než mu to přepisovat.
+                        if (!window._actorNatHasResults) {
+                            resultsEl.innerHTML = `<div class="loading"><div class="spinner"></div>Hledám herce s touto národností… (stránka ${state.page}/${state.totalPages})</div>`;
+                        }
                         state.page++;
                         state._loadingMore = true;
                         loadPopularContent();
-                    } else if (isFirstPage) {
-                        resultsEl.innerHTML = '<div class="empty">😕 Pro tuhle národnost se nic nenašlo. Zkuste jinou zemi.</div>';
+                    } else {
+                        state._loadingMore = false;
+                        if (!window._actorNatHasResults) {
+                            resultsEl.innerHTML = '<div class="empty">😕 Pro tuhle národnost se nic nenašlo. Zkuste jinou zemi.</div>';
+                        }
+                        window._actorNatAttempts = 0;
                     }
                     return;
                 }
+                state._loadingMore = false;
                 window._actorNatAttempts = 0;
-                _renderActorCards(filtered, isFirstPage);
+                _renderActorCards(filtered, !window._actorNatHasResults);
+                window._actorNatHasResults = true;
             });
             return;
         }
