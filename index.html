@@ -6157,7 +6157,7 @@
                 const showNatRow = state.view === 'actors';
                 if (natRow) natRow.style.display = showNatRow ? 'flex' : 'none';
                 if (natHint) natHint.style.display = showNatRow ? '' : 'none';
-                if (!showNatRow) { state.actorNationalityMode = 'all'; window._actorNatAttempts = 0; window._actorNatHasResults = false; }
+                if (!showNatRow) { state.actorNationalityMode = 'all'; state._customLoadMore = null; window._actorNatAttempts = 0; window._actorNatHasResults = false; }
                 loadPopularContent();
             };
         });
@@ -8533,61 +8533,99 @@ EXAMPLES:
         if (countryBtn) { countryBtn.style.background = mode === 'nationality' ? 'var(--accent)' : 'var(--bg-elevated)'; countryBtn.style.borderColor = mode === 'nationality' ? 'var(--accent)' : 'var(--border)'; countryBtn.style.color = mode === 'nationality' ? '#fff' : 'var(--text)'; }
         if (sel) sel.style.display = mode === 'nationality' ? '' : 'none';
         if (mode === 'nationality' && sel && !state.actorNationalityCode) { state.actorNationalityCode = sel.value; }
-        window._actorNatAttempts = 0;
-        window._actorNatHasResults = false;
-        state.page = 1; state._allItems = [];
-        loadPopularContent();
+        if (mode === 'nationality') {
+            state._customLoadMore = () => loadActorsByCountry(false);
+            loadActorsByCountry(true);
+        } else {
+            state._customLoadMore = null;
+            state.page = 1; state._allItems = [];
+            loadPopularContent();
+        }
     };
     window.setActorNationalityCode = function(code) {
         state.actorNationalityCode = code;
-        window._actorNatAttempts = 0;
-        window._actorNatHasResults = false;
-        state.page = 1; state._allItems = [];
-        loadPopularContent();
+        state._customLoadMore = () => loadActorsByCountry(false);
+        loadActorsByCountry(true);
     };
+
+    // ── Herci podle národnosti přes filmy/seriály dané země ──────────────
+    // TMDB neumí filtrovat OSOBY podle národnosti a řazení "popularity" u lidí
+    // je silně zkreslené směrem ke globálně "trending" celebritám (K-pop, čínské
+    // hvězdy...) — i stovky takových by mohly projít bez jediného Čecha. Funguje
+    // to mnohem líp obráceně: najít filmy/seriály PŮVODEM z dané země (to TMDB
+    // umí spolehlivě přes with_origin_country) a vytáhnout jejich herecké obsazení.
+    async function loadActorsByCountry(isFirstPage) {
+        if (!tmdbApiKey) return;
+        if (isFirstPage) {
+            resultsEl.innerHTML = `<div class="loading"><div class="spinner"></div>Hledám herce podle filmů a seriálů z vybrané země…</div>`;
+            window._actorCountrySeen = new Set();
+            window._actorCountryHasRendered = false;
+            state._actorCountryPage = 1;
+            state._actorCountryDone = false;
+        }
+        if (state._actorCountryDone) return;
+        state._loadingMore = true;
+        const code = state.actorNationalityCode;
+        const page = state._actorCountryPage || 1;
+        try {
+            const [movData, tvData] = await Promise.all([
+                _fetchWithTimeout(`${BASE}/discover/movie?api_key=${tmdbApiKey}&language=cs-CZ&with_origin_country=${code}&sort_by=popularity.desc&page=${page}`, 12000).then(r => r.json()).catch(() => ({ results: [] })),
+                _fetchWithTimeout(`${BASE}/discover/tv?api_key=${tmdbApiKey}&language=cs-CZ&with_origin_country=${code}&sort_by=popularity.desc&page=${page}`, 12000).then(r => r.json()).catch(() => ({ results: [] }))
+            ]);
+            const titles = [
+                ...(movData.results || []).map(m => ({ id: m.id, type: 'movie' })),
+                ...(tvData.results || []).map(m => ({ id: m.id, type: 'tv' }))
+            ];
+            const maxPages = Math.max(movData.total_pages || 1, tvData.total_pages || 1);
+            state.totalPages = maxPages;
+
+            if (!titles.length) {
+                state._loadingMore = false;
+                state._actorCountryDone = true;
+                if (!window._actorCountrySeen.size) resultsEl.innerHTML = '<div class="empty">😕 Pro tuhle zemi TMDB nemá žádné filmy/seriály. Zkuste jinou.</div>';
+                return;
+            }
+
+            const newActors = [];
+            await _runWithConcurrency(titles, 6, async (t) => {
+                try {
+                    const cRes = await _fetchWithTimeout(`${BASE}/${t.type}/${t.id}/credits?api_key=${tmdbApiKey}&language=cs-CZ`);
+                    const cData = await cRes.json();
+                    (cData.cast || []).slice(0, 10).forEach(a => {
+                        if (!window._actorCountrySeen.has(a.id)) {
+                            window._actorCountrySeen.add(a.id);
+                            newActors.push({ id: a.id, name: a.name, profile_path: a.profile_path, known_for_department: 'Acting' });
+                        }
+                    });
+                } catch (e) {}
+            });
+
+            state._loadingMore = false;
+            state._actorCountryPage = page + 1;
+            if (page >= maxPages) state._actorCountryDone = true;
+
+            if (newActors.length) {
+                _renderActorCards(newActors, !window._actorCountryHasRendered);
+                window._actorCountryHasRendered = true;
+            } else if (!window._actorCountryHasRendered && !state._actorCountryDone && page < maxPages) {
+                // Tahle dávka filmů/seriálů náhodou nepřinesla nové herce (možná
+                // samé duplicity) — potichu zkusíme další stránku.
+                loadActorsByCountry(false);
+            } else if (!window._actorCountryHasRendered) {
+                resultsEl.innerHTML = '<div class="empty">😕 Pro tuhle zemi se nepodařilo najít herce. Zkuste jinou.</div>';
+            }
+        } catch (e) {
+            console.error('Chyba při hledání herců podle země:', e);
+            state._loadingMore = false;
+            if (!window._actorCountrySeen || !window._actorCountrySeen.size) {
+                resultsEl.innerHTML = `<div class="empty">⚠️ Chyba při načítání<br><small style="color:#888;font-size:0.75rem;">${e && e.message ? e.message : e}</small><br><br><button onclick="loadActorsByCountry(true)" style="margin-top:8px;padding:8px 18px;background:var(--accent);border:none;border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
+            }
+        }
+    }
 
     function appendActorGrid(actors, isFirstPage) {
         if (!actors.length) {
-            if (isFirstPage && !window._actorNatHasResults) resultsEl.innerHTML = '<div class="empty">😕 Nic nenalezeno.</div>';
-            return;
-        }
-        if (state.view === 'actors' && state.actorNationalityMode === 'nationality' && state.actorNationalityCode) {
-            state._loadingMore = true;
-            const _timeoutMs = 15000;
-            Promise.race([
-                filterActorsByNationality(actors, state.actorNationalityCode),
-                new Promise((_, rej) => setTimeout(() => rej(new Error('Vypršel časový limit (TMDB neodpovídá).')), _timeoutMs))
-            ]).then(filtered => {
-                if (!filtered.length) {
-                    const canRetry = state.page < state.totalPages && (window._actorNatAttempts || 0) < 60;
-                    if (canRetry) {
-                        window._actorNatAttempts = (window._actorNatAttempts || 0) + 1;
-                        if (!window._actorNatHasResults) {
-                            resultsEl.innerHTML = `<div class="loading"><div class="spinner"></div>Hledám herce s touto národností… (stránka ${state.page}/${state.totalPages})</div>`;
-                        }
-                        state.page++;
-                        state._loadingMore = true;
-                        loadPopularContent();
-                    } else {
-                        state._loadingMore = false;
-                        if (!window._actorNatHasResults) {
-                            resultsEl.innerHTML = '<div class="empty">😕 Pro tuhle národnost se nic nenašlo. Zkuste jinou zemi.</div>';
-                        }
-                        window._actorNatAttempts = 0;
-                    }
-                    return;
-                }
-                state._loadingMore = false;
-                window._actorNatAttempts = 0;
-                _renderActorCards(filtered, !window._actorNatHasResults);
-                window._actorNatHasResults = true;
-            }).catch(err => {
-                console.error('Chyba při filtrování herců podle národnosti:', err);
-                state._loadingMore = false;
-                if (!window._actorNatHasResults) {
-                    resultsEl.innerHTML = `<div class="empty">⚠️ Chyba při zjišťování národnosti<br><small style="color:#888;font-size:0.75rem;">${err && err.message ? err.message : err}</small><br><br><button onclick="setActorNationalityCode(state.actorNationalityCode)" style="margin-top:8px;padding:8px 18px;background:var(--accent);border:none;border-radius:8px;color:#fff;cursor:pointer;">🔄 Zkusit znovu</button></div>`;
-                }
-            });
+            if (isFirstPage) resultsEl.innerHTML = '<div class="empty">😕 Nic nenalezeno.</div>';
             return;
         }
         _renderActorCards(actors, isFirstPage);
