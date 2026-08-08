@@ -6217,6 +6217,29 @@
         return genreIds.includes(16) && origins.includes('JP');
     }
 
+    // Detekce japonských/čínských znaků (kanji, hiragana, katakana) v názvu
+    const CJK_REGEX = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\uff66-\uff9f]/;
+
+    // Pro anime s japonským/čínským názvem dohledá anglický (příp. český) název u TMDB
+    async function translateAnimeTitles(results) {
+        if (!Array.isArray(results) || !results.length) return results;
+        const toFix = results.filter(r => CJK_REGEX.test(r.name || r.title || ''));
+        if (!toFix.length) return results;
+        await Promise.all(toFix.map(async item => {
+            try {
+                const res = await fetch(`${BASE}/tv/${item.id}?api_key=${tmdbApiKey}&language=en-US`);
+                const d = await res.json();
+                if (d && d.name && !CJK_REGEX.test(d.name)) {
+                    item.name = d.name;
+                    if (item.original_name === undefined) item.original_name = item.name;
+                } else if (d && d.original_name && !CJK_REGEX.test(d.original_name)) {
+                    item.name = d.original_name;
+                }
+            } catch(e) { /* necháme původní název, pokud dohledání selže */ }
+        }));
+        return results;
+    }
+
     async function loadGenres(explicitType) {
         // If no explicit type given, sync from current view tab
         if (!explicitType) {
@@ -7797,6 +7820,7 @@ EXAMPLES:
             let results = data.results || [];
             state.totalPages = Math.min(data.total_pages || 1, 500);
             if (state.view === 'tv' || state.view === 'miniseries') results = results.filter(r => !isAnimeItem(r));
+            if (state.view === 'anime') results = await translateAnimeTitles(results);
 
             if (state.view === 'actors') {
                 appendActorGrid(results, isFirstPage);
@@ -7927,6 +7951,7 @@ EXAMPLES:
 
             // Vyřadit anime ze Seriálů a Minisérií (má vlastní kategorii "Anime")
             if (state.view === 'tv' || state.view === 'miniseries') results = results.filter(r => !isAnimeItem(r));
+            if (state.view === 'anime') results = await translateAnimeTitles(results);
 
             // Pozn.: stránka už přichází z TMDB řazená podle original_title/original_name (sort_by),
             // takže žádné lokální přeřazení zde neprovádíme – appendGrid pak jen přidává nové karty
@@ -7951,11 +7976,12 @@ EXAMPLES:
                         for (let p = 2; p <= extraPages + 1; p++) {
                             extraFetches.push(fetch(`${baseUrl}&page=${p}`).then(r => r.json()).catch(() => ({ results: [] })));
                         }
-                        Promise.all(extraFetches).then(pages => {
+                        Promise.all(extraFetches).then(async pages => {
                             // Všechny výsledky najednou — bez race condition
-                            const allExtra = pages.flatMap(data =>
+                            let allExtra = pages.flatMap(data =>
                                 (data.results || []).map(r => ({...r, media_type: state.view === 'movies' ? 'movie' : 'tv'}))
                             );
+                            if (state.view === 'anime') allExtra = await translateAnimeTitles(allExtra);
                             if (allExtra.length) appendGrid(allExtra, false, true);
                             state.page = Math.min(extraPages + 1, state.totalPages);
                             state._loadingMore = false;
