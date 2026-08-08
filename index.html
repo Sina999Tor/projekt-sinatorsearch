@@ -1378,6 +1378,43 @@
                 <option value="TH">🇹🇭 Thajsko</option>
             </select>
         </div>
+        <div class="filters-row" id="actorNationalityFilterRow" style="display:none;">
+            <button type="button" id="actorNatModeAllBtn" onclick="setActorNationalityMode('all')" style="padding:8px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-size:0.85rem;">Všichni herci</button>
+            <button type="button" id="actorNatModeCountryBtn" onclick="setActorNationalityMode('nationality')" style="padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.85rem;">🌍 Dle národnosti</button>
+            <select id="actorNationalitySelect" onchange="setActorNationalityCode(this.value)" style="display:none;">
+                <option value="CZ">🇨🇿 Česko</option>
+                <option value="SK">🇸🇰 Slovensko</option>
+                <option value="US">🇺🇸 USA</option>
+                <option value="GB">🇬🇧 Velká Británie</option>
+                <option value="DE">🇩🇪 Německo</option>
+                <option value="FR">🇫🇷 Francie</option>
+                <option value="IT">🇮🇹 Itálie</option>
+                <option value="ES">🇪🇸 Španělsko</option>
+                <option value="PL">🇵🇱 Polsko</option>
+                <option value="AT">🇦🇹 Rakousko</option>
+                <option value="HU">🇭🇺 Maďarsko</option>
+                <option value="RU">🇷🇺 Rusko</option>
+                <option value="UA">🇺🇦 Ukrajina</option>
+                <option value="JP">🇯🇵 Japonsko</option>
+                <option value="KR">🇰🇷 Korea</option>
+                <option value="CN">🇨🇳 Čína</option>
+                <option value="IN">🇮🇳 Indie</option>
+                <option value="AU">🇦🇺 Austrálie</option>
+                <option value="CA">🇨🇦 Kanada</option>
+                <option value="SE">🇸🇪 Švédsko</option>
+                <option value="NO">🇳🇴 Norsko</option>
+                <option value="DK">🇩🇰 Dánsko</option>
+                <option value="FI">🇫🇮 Finsko</option>
+                <option value="TR">🇹🇷 Turecko</option>
+                <option value="MX">🇲🇽 Mexiko</option>
+                <option value="BR">🇧🇷 Brazílie</option>
+                <option value="AR">🇦🇷 Argentina</option>
+                <option value="IL">🇮🇱 Izrael</option>
+                <option value="IR">🇮🇷 Írán</option>
+                <option value="TH">🇹🇭 Thajsko</option>
+            </select>
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin:-4px 0 4px;" id="actorNationalityHint">🌍 Filtr národnosti platí jen pro procházení herců. Národnost se dotahuje z TMDB za běhu (podle místa narození), takže načítání může chvíli trvat a méně obvyklé národnosti mají méně výsledků.</div>
         <div class="ai-search-section">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                 <div class="ai-search-label">✨ AI Vyhledávání</div>
@@ -2907,6 +2944,8 @@
         view: 'movies', 
         page: 1, 
         totalPages: 1,
+        actorNationalityMode: 'all',
+        actorNationalityCode: '',
         searchQuery: null,
         aiDiscoverExtra: null,
         filters: { mediaType: 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: '', country: '' },
@@ -6114,6 +6153,11 @@
                     if(state.view==='miniseries') loadGenres('tv');
                     else loadGenres();
                 }
+                const natRow = $('actorNationalityFilterRow'), natHint = $('actorNationalityHint');
+                const showNatRow = state.view === 'actors';
+                if (natRow) natRow.style.display = showNatRow ? 'flex' : 'none';
+                if (natHint) natHint.style.display = showNatRow ? '' : 'none';
+                if (!showNatRow) { state.actorNationalityMode = 'all'; window._actorNatAttempts = 0; }
                 loadPopularContent();
             };
         });
@@ -8416,8 +8460,116 @@ EXAMPLES:
     }
 
 
+    // ── Filtr herců podle národnosti (procházení, ne jen Oblíbené) ───────
+    // TMDB nemá pole "nationality" ani filtr u /person endpointů — odvozuje
+    // se z posledního úseku "place_of_birth" (např. "Seoul, South Korea").
+    // Výsledek se cachuje trvale, ať se stejný herec neptá na TMDB opakovaně
+    // napříč prohlížením i mezi sezeními appky.
+    const COUNTRY_ALIASES = {
+        CZ: ['czech republic','czechia','czechoslovakia'],
+        SK: ['slovakia','slovak republic','czechoslovakia'],
+        US: ['usa','united states','united states of america'],
+        GB: ['uk','united kingdom','england','scotland','wales','northern ireland','great britain'],
+        DE: ['germany','west germany','east germany'],
+        FR: ['france'],
+        IT: ['italy'],
+        ES: ['spain'],
+        PL: ['poland'],
+        AT: ['austria'],
+        HU: ['hungary'],
+        RU: ['russia','soviet union','ussr'],
+        UA: ['ukraine'],
+        JP: ['japan'],
+        KR: ['south korea','korea'],
+        CN: ['china'],
+        IN: ['india'],
+        AU: ['australia'],
+        CA: ['canada'],
+        SE: ['sweden'],
+        NO: ['norway'],
+        DK: ['denmark'],
+        FI: ['finland'],
+        TR: ['turkey'],
+        MX: ['mexico'],
+        BR: ['brazil'],
+        AR: ['argentina'],
+        IL: ['israel'],
+        IR: ['iran'],
+        TH: ['thailand']
+    };
+    let _personCountryCache = {};
+    try { _personCountryCache = JSON.parse(_store.getItem('sinator_person_country_cache') || '{}'); } catch (e) { _personCountryCache = {}; }
+    function _savePersonCountryCache() {
+        try { _store.setItem('sinator_person_country_cache', JSON.stringify(_personCountryCache)); } catch (e) {}
+    }
+    async function resolvePersonCountry(id) {
+        if (_personCountryCache[id] !== undefined) return _personCountryCache[id];
+        if (!tmdbApiKey) return null;
+        try {
+            const res = await _fetchWithTimeout(`https://api.themoviedb.org/3/person/${id}?api_key=${tmdbApiKey}`);
+            if (!res.ok) { _personCountryCache[id] = null; return null; }
+            const d = await res.json();
+            const pob = (d.place_of_birth || '').toLowerCase();
+            let matched = null;
+            if (pob) {
+                for (const [code, aliases] of Object.entries(COUNTRY_ALIASES)) {
+                    if (aliases.some(a => pob.includes(a))) { matched = code; break; }
+                }
+            }
+            _personCountryCache[id] = matched;
+            return matched;
+        } catch (e) { _personCountryCache[id] = null; return null; }
+    }
+    async function filterActorsByNationality(actors, code) {
+        await _runWithConcurrency(actors, 10, async (a) => { a._nationalityCode = await resolvePersonCountry(a.id); });
+        _savePersonCountryCache();
+        return actors.filter(a => a._nationalityCode === code);
+    }
+
+    window.setActorNationalityMode = function(mode) {
+        state.actorNationalityMode = mode;
+        const allBtn = $('actorNatModeAllBtn'), countryBtn = $('actorNatModeCountryBtn'), sel = $('actorNationalitySelect');
+        if (allBtn) { allBtn.style.background = mode === 'all' ? 'var(--accent)' : 'var(--bg-elevated)'; allBtn.style.borderColor = mode === 'all' ? 'var(--accent)' : 'var(--border)'; allBtn.style.color = mode === 'all' ? '#fff' : 'var(--text)'; }
+        if (countryBtn) { countryBtn.style.background = mode === 'nationality' ? 'var(--accent)' : 'var(--bg-elevated)'; countryBtn.style.borderColor = mode === 'nationality' ? 'var(--accent)' : 'var(--border)'; countryBtn.style.color = mode === 'nationality' ? '#fff' : 'var(--text)'; }
+        if (sel) sel.style.display = mode === 'nationality' ? '' : 'none';
+        if (mode === 'nationality' && sel && !state.actorNationalityCode) { state.actorNationalityCode = sel.value; }
+        window._actorNatAttempts = 0;
+        state.page = 1; state._allItems = [];
+        loadPopularContent();
+    };
+    window.setActorNationalityCode = function(code) {
+        state.actorNationalityCode = code;
+        window._actorNatAttempts = 0;
+        state.page = 1; state._allItems = [];
+        loadPopularContent();
+    };
+
     function appendActorGrid(actors, isFirstPage) {
-        if (!actors.length) return;
+        if (!actors.length) { if (isFirstPage) resultsEl.innerHTML = '<div class="empty">😕 Nic nenalezeno.</div>'; return; }
+        if (state.view === 'actors' && state.actorNationalityMode === 'nationality' && state.actorNationalityCode) {
+            resultsEl.dataset.natLoading = '1';
+            filterActorsByNationality(actors, state.actorNationalityCode).then(filtered => {
+                if (!filtered.length) {
+                    if (state.page < state.totalPages && (window._actorNatAttempts || 0) < 8) {
+                        window._actorNatAttempts = (window._actorNatAttempts || 0) + 1;
+                        if (isFirstPage) resultsEl.innerHTML = `<div class="loading"><div class="spinner"></div>Hledám herce s touto národností… (stránka ${state.page}/${state.totalPages})</div>`;
+                        state.page++;
+                        state._loadingMore = true;
+                        loadPopularContent();
+                    } else if (isFirstPage) {
+                        resultsEl.innerHTML = '<div class="empty">😕 Pro tuhle národnost se nic nenašlo. Zkuste jinou zemi.</div>';
+                    }
+                    return;
+                }
+                window._actorNatAttempts = 0;
+                _renderActorCards(filtered, isFirstPage);
+            });
+            return;
+        }
+        _renderActorCards(actors, isFirstPage);
+    }
+
+    function _renderActorCards(actors, isFirstPage) {
         const isDirectorsView = state.view === 'directors';
         const cols1 = (window._mainGridCols||2) === 1;
         const imgStyle = cols1 ? ' style="height:auto;object-fit:contain;"' : '';
