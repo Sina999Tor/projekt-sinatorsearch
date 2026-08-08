@@ -8554,6 +8554,19 @@ EXAMPLES:
     // hvězdy...) — i stovky takových by mohly projít bez jediného Čecha. Funguje
     // to mnohem líp obráceně: najít filmy/seriály PŮVODEM z dané země (to TMDB
     // umí spolehlivě přes with_origin_country) a vytáhnout jejich herecké obsazení.
+    // Mapa jazyk odpovídající zemi — pro filmy/seriály přidáváme kromě
+    // with_origin_country i with_original_language, protože "origin_country"
+    // sama o sobě znamená jen "vyrobeno v téhle zemi" (typicky mezinárodní
+    // koprodukce natáčené třeba v pražských studiích s cizím obsazením), ne
+    // že je obsazení domácí. U anglicky mluvících zemí (US/GB/AU/CA) jazyk
+    // nepomůže rozlišit (angličtina je globální), tam se necháváme jen na
+    // origin_country.
+    const LANG_FOR_COUNTRY = {
+        CZ: 'cs', SK: 'sk', DE: 'de', FR: 'fr', IT: 'it', ES: 'es', PL: 'pl',
+        AT: 'de', HU: 'hu', RU: 'ru', UA: 'uk', JP: 'ja', KR: 'ko', CN: 'zh',
+        AU: 'en', CA: null, SE: 'sv', NO: 'no', DK: 'da', FI: 'fi', TR: 'tr',
+        MX: 'es', BR: 'pt', AR: 'es', IL: 'he', IR: 'fa', TH: 'th'
+    };
     async function loadActorsByCountry(isFirstPage) {
         if (!tmdbApiKey) return;
         if (isFirstPage) {
@@ -8567,10 +8580,12 @@ EXAMPLES:
         state._loadingMore = true;
         const code = state.actorNationalityCode;
         const page = state._actorCountryPage || 1;
+        const lang = LANG_FOR_COUNTRY[code];
+        const langParam = lang ? `&with_original_language=${lang}` : '';
         try {
             const [movData, tvData] = await Promise.all([
-                _fetchWithTimeout(`${BASE}/discover/movie?api_key=${tmdbApiKey}&language=cs-CZ&with_origin_country=${code}&sort_by=popularity.desc&page=${page}`, 12000).then(r => r.json()).catch(() => ({ results: [] })),
-                _fetchWithTimeout(`${BASE}/discover/tv?api_key=${tmdbApiKey}&language=cs-CZ&with_origin_country=${code}&sort_by=popularity.desc&page=${page}`, 12000).then(r => r.json()).catch(() => ({ results: [] }))
+                _fetchWithTimeout(`${BASE}/discover/movie?api_key=${tmdbApiKey}&language=cs-CZ&with_origin_country=${code}${langParam}&sort_by=popularity.desc&page=${page}`, 12000).then(r => r.json()).catch(() => ({ results: [] })),
+                _fetchWithTimeout(`${BASE}/discover/tv?api_key=${tmdbApiKey}&language=cs-CZ&with_origin_country=${code}${langParam}&sort_by=popularity.desc&page=${page}`, 12000).then(r => r.json()).catch(() => ({ results: [] }))
             ]);
             const titles = [
                 ...(movData.results || []).map(m => ({ id: m.id, type: 'movie' })),
@@ -8591,7 +8606,7 @@ EXAMPLES:
                 try {
                     const cRes = await _fetchWithTimeout(`${BASE}/${t.type}/${t.id}/credits?api_key=${tmdbApiKey}&language=cs-CZ`);
                     const cData = await cRes.json();
-                    (cData.cast || []).slice(0, 10).forEach(a => {
+                    (cData.cast || []).slice(0, 6).forEach(a => {
                         if (!window._actorCountrySeen.has(a.id)) {
                             window._actorCountrySeen.add(a.id);
                             newActors.push({ id: a.id, name: a.name, profile_path: a.profile_path, known_for_department: 'Acting' });
