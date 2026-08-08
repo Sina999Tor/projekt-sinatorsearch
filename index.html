@@ -8466,8 +8466,8 @@ EXAMPLES:
     // Výsledek se cachuje trvale, ať se stejný herec neptá na TMDB opakovaně
     // napříč prohlížením i mezi sezeními appky.
     const COUNTRY_ALIASES = {
-        CZ: ['czech republic','czechia','czechoslovakia'],
-        SK: ['slovakia','slovak republic','czechoslovakia'],
+        CZ: ['czech republic','czechia','czechoslovakia','czech','bohemia','moravia','česko','československo','česká republika'],
+        SK: ['slovakia','slovak republic','czechoslovakia','slovensko','československo'],
         US: ['usa','united states','united states of america'],
         GB: ['uk','united kingdom','england','scotland','wales','northern ireland','great britain'],
         DE: ['germany','west germany','east germany'],
@@ -8521,7 +8521,7 @@ EXAMPLES:
         } catch (e) { _personCountryCache[id] = null; return null; }
     }
     async function filterActorsByNationality(actors, code) {
-        await _runWithConcurrency(actors, 10, async (a) => { a._nationalityCode = await resolvePersonCountry(a.id); });
+        await _runWithConcurrency(actors, 15, async (a) => { a._nationalityCode = await resolvePersonCountry(a.id); });
         _savePersonCountryCache();
         return actors.filter(a => a._nationalityCode === code);
     }
@@ -8559,7 +8559,7 @@ EXAMPLES:
                 new Promise((_, rej) => setTimeout(() => rej(new Error('Vypršel časový limit (TMDB neodpovídá).')), _timeoutMs))
             ]).then(filtered => {
                 if (!filtered.length) {
-                    const canRetry = state.page < state.totalPages && (window._actorNatAttempts || 0) < 15;
+                    const canRetry = state.page < state.totalPages && (window._actorNatAttempts || 0) < 60;
                     if (canRetry) {
                         window._actorNatAttempts = (window._actorNatAttempts || 0) + 1;
                         if (!window._actorNatHasResults) {
