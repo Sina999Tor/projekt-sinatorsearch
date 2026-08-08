@@ -8676,6 +8676,12 @@ EXAMPLES:
                 <button onclick="setFavsSort('year')" id="fSort-year" style="padding:4px 11px;border-radius:14px;border:1px solid ${sort==='year'?'#1db954':'var(--border)'};background:${sort==='year'?'#1db954':'var(--bg-elevated)'};color:${sort==='year'?'#000':'var(--text)'};cursor:pointer;font-size:0.75rem;font-weight:${sort==='year'?'600':'normal'};">🗓 Rok</button>
                 <button id="favsGridToggleBtn" onclick="favsToggleGridCols()" title="Přepnout zobrazení" style="margin-left:auto;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:4px 11px;border-radius:14px;font-size:0.75rem;cursor:pointer;white-space:nowrap;">${(window._favsGridCols||2)===1?'▤ 1 sloupec':'▦ 2 sloupce'}</button>
             </div>
+            ${tab === 'actor' ? `<div style="display:flex;gap:6px;margin:0 16px 14px;flex-wrap:wrap;align-items:center;">
+                <span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-right:2px;">Zobrazit:</span>
+                <button onclick="setFavsActorFilterMode('all')" style="padding:4px 11px;border-radius:14px;border:1px solid ${(window._favsActorFilterMode||'all')==='all'?'#1db954':'var(--border)'};background:${(window._favsActorFilterMode||'all')==='all'?'#1db954':'var(--bg-elevated)'};color:${(window._favsActorFilterMode||'all')==='all'?'#000':'var(--text)'};cursor:pointer;font-size:0.75rem;font-weight:${(window._favsActorFilterMode||'all')==='all'?'600':'normal'};">Všichni</button>
+                <button onclick="setFavsActorFilterMode('nationality')" style="padding:4px 11px;border-radius:14px;border:1px solid ${window._favsActorFilterMode==='nationality'?'#1db954':'var(--border)'};background:${window._favsActorFilterMode==='nationality'?'#1db954':'var(--bg-elevated)'};color:${window._favsActorFilterMode==='nationality'?'#000':'var(--text)'};cursor:pointer;font-size:0.75rem;font-weight:${window._favsActorFilterMode==='nationality'?'600':'normal'};">🌍 Dle národnosti</button>
+                ${window._favsActorFilterMode === 'nationality' ? `<select id="favsNationalitySelect" onchange="setFavsNationality(this.value)" style="padding:5px 10px;border-radius:14px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.75rem;max-width:160px;">${favsNationalityOptionsHtml()}</select>` : ''}
+            </div>` : ''}
             <div id="favsGrid" style="display:grid;grid-template-columns:repeat(${window._favsGridCols||2},1fr);gap:${(window._favsGridCols||2)===1?'16px':'4px'};padding:0;width:100%;"></div>
         </div>`;
 
@@ -8686,6 +8692,61 @@ EXAMPLES:
     function setFavsTab(tab) {
         state._favsTab = tab;
         renderFavsModal();
+    }
+
+    // ── Filtr herců podle národnosti ─────────────────────────────
+    window._favsActorFilterMode = window._favsActorFilterMode || 'all';
+    window._favsActorNationality = window._favsActorNationality || '';
+
+    window.setFavsActorFilterMode = function(mode) {
+        window._favsActorFilterMode = mode;
+        if (mode === 'nationality') {
+            refreshActorNationalities().then(() => {
+                const opts = getActorNationalityList();
+                if (!window._favsActorNationality || !opts.includes(window._favsActorNationality)) {
+                    window._favsActorNationality = opts[0] || '';
+                }
+                renderFavsModal();
+            });
+        }
+        renderFavsModal();
+    };
+    window.setFavsNationality = function(val) {
+        window._favsActorNationality = val;
+        renderFavsGrid();
+    };
+    function getActorNationalityList() {
+        const set = new Set();
+        state.actorFavs.forEach(a => { if (a.nationality) set.add(a.nationality); });
+        return Array.from(set).sort((a, b) => a.localeCompare(b, 'cs'));
+    }
+    function favsNationalityOptionsHtml() {
+        const opts = getActorNationalityList();
+        if (!opts.length) return `<option value="">(zjišťuji…)</option>`;
+        return opts.map(n => `<option value="${n}" ${n === window._favsActorNationality ? 'selected' : ''}>${n}</option>`).join('');
+    }
+    // Dotáhne a do sinator_actor_favs natrvalo uloží zemi narození (poslední
+    // část TMDB "place_of_birth", např. "Seoul, South Korea" -> "South Korea").
+    // Dělá se jen jednou na herce - další otevření si to už bere z cache.
+    async function refreshActorNationalities() {
+        const need = state.actorFavs.filter(a => !a.nationality);
+        if (!need.length || !tmdbApiKey) return;
+        let cursor = 0;
+        async function worker() {
+            while (cursor < need.length) {
+                const a = need[cursor++];
+                try {
+                    const res = await _fetchWithTimeout(`https://api.themoviedb.org/3/person/${a.id}?api_key=${tmdbApiKey}`);
+                    if (!res.ok) { a.nationality = 'Neznámá'; continue; }
+                    const d = await res.json();
+                    const pob = d.place_of_birth || '';
+                    const parts = pob.split(',').map(s => s.trim()).filter(Boolean);
+                    a.nationality = parts.length ? parts[parts.length - 1] : 'Neznámá';
+                } catch (e) { a.nationality = 'Neznámá'; }
+            }
+        }
+        await Promise.all(Array.from({ length: Math.min(10, need.length) }, worker));
+        _store.setItem('sinator_actor_favs', JSON.stringify(state.actorFavs));
     }
 
     function setFavsSort(sort) {
@@ -8706,7 +8767,11 @@ EXAMPLES:
                 ...state.actorFavs.map(f => ({...f, media_type: 'actor', title: f.name, poster_path: f.poster, vote_average: 0}))
             ];
         } else if (tab === 'actor') {
-            items = state.actorFavs.map(f => ({...f, media_type: 'actor', title: f.name, poster_path: f.poster, vote_average: 0}));
+            let arr = state.actorFavs;
+            if (window._favsActorFilterMode === 'nationality' && window._favsActorNationality) {
+                arr = arr.filter(a => a.nationality === window._favsActorNationality);
+            }
+            items = arr.map(f => ({...f, media_type: 'actor', title: f.name, poster_path: f.poster, vote_average: 0}));
         } else {
             items = state.favs.filter(f => (f.type || 'movie') === tab).map(f => ({...f, media_type: f.type || 'movie', poster_path: f.poster}));
         }
