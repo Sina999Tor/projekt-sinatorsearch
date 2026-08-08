@@ -10314,6 +10314,16 @@ EXAMPLES:
                 fetch(`${BASE}/${type}/${id}/watch/providers?api_key=${tmdbApiKey}`).then(r=>r.json()).catch(()=>null)
             ]);
 
+            // Anime s japonským/čínským názvem (chybí CZ překlad na TMDB) → dohledat anglický název,
+            // aby detail, vyhledávání zdrojů i kopírování názvu používaly stejný přeložený titul jako karta.
+            if (type === 'tv' && d && d.name && CJK_REGEX.test(d.name)) {
+                try {
+                    const enD = await fetch(`${BASE}/tv/${id}?api_key=${tmdbApiKey}&language=en-US`).then(r=>r.json());
+                    if (enD && enD.name && !CJK_REGEX.test(enD.name)) d.name = enD.name;
+                } catch(e) { /* necháme původní název, pokud dohledání selže */ }
+            }
+
+
             // Získání certifikace (věkové hodnocení)
             let certification = '';
             if (certData && type === 'movie') {
