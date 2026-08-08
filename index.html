@@ -6193,6 +6193,7 @@
         tv: [
             { id: 10759, name: 'Akční & Dobrodružný' },
             { id: 16,    name: 'Animovaný' },
+            { id: 'anime', name: '🎌 Anime' },
             { id: 35,    name: 'Komedie' },
             { id: 80,    name: 'Krimi' },
             { id: 99,    name: 'Dokumentární' },
@@ -7896,9 +7897,13 @@ EXAMPLES:
                 }
                 url = `${BASE}/discover/${type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${state.page}`;
                 if (state.view === 'miniseries') url += `&with_type=2&number_of_seasons.lte=1&number_of_episodes.lte=12`;
-                if (state.view === 'anime') url += `&with_origin_country=JP`;
-                if (genreId) url += `&with_genres=${genreId}`;
-                else if (state.view === 'anime') url += `&with_genres=16`;
+                if (genreId === 'anime') {
+                    url += `&with_genres=16&with_origin_country=${ANIME_ORIGIN_COUNTRIES.join('|')}`;
+                } else {
+                    if (state.view === 'anime') url += `&with_origin_country=JP`;
+                    if (genreId) url += `&with_genres=${genreId}`;
+                    else if (state.view === 'anime') url += `&with_genres=16`;
+                }
                 if (year && !isNowPlayingCZ) {
                     if (type === 'movie') url += `&primary_release_year=${year}`;
                     else url += `&first_air_date_year=${year}`;
@@ -7956,8 +7961,13 @@ EXAMPLES:
                 });
             }
 
-            // Vyřadit anime ze Seriálů a Minisérií (má vlastní kategorii "Anime")
-            if (state.view === 'tv' || state.view === 'miniseries') results = results.filter(r => !isAnimeItem(r));
+            // Vyřadit anime ze Seriálů a Minisérií (má vlastní kategorii "Anime"), ale ne když si uživatel
+            // sám vybral žánr "Anime" ve filtru — tam naopak chceme JEN anime.
+            if (genreId === 'anime') {
+                results = await translateAnimeTitles(results);
+            } else if (state.view === 'tv' || state.view === 'miniseries') {
+                results = results.filter(r => !isAnimeItem(r));
+            }
             if (state.view === 'anime') results = await translateAnimeTitles(results);
 
             // Pozn.: stránka už přichází z TMDB řazená podle original_title/original_name (sort_by),
@@ -8252,7 +8262,8 @@ EXAMPLES:
                 }
             } else {
                 let url = `${BASE}/discover/${mediaType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}`;
-                if(genreId) url += `&with_genres=${genreId}`;
+                if(genreId === 'anime') url += `&with_genres=16&with_origin_country=${ANIME_ORIGIN_COUNTRIES.join('|')}`;
+                else if(genreId) url += `&with_genres=${genreId}`;
                 if(year) url += mediaType === 'movie' ? `&primary_release_year=${year}` : `&first_air_date_year=${year}`;
                 if(country) url += `&with_origin_country=${country}`;
                 const effSortBy = mediaType === 'tv' ? (sortBy||'').replace('original_title','original_name') : sortBy;
@@ -8261,6 +8272,7 @@ EXAMPLES:
                 const data = await res.json();
                 results = (data.results || []).map(r => ({...r, media_type: mediaType}));
                 state.totalPages = Math.min(data.total_pages || 1, 500);
+                if (genreId === 'anime') results = await translateAnimeTitles(results);
             }
             
             if(results.length === 0 && isFirstPage) { 
