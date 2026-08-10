@@ -501,21 +501,21 @@
         .search-overlay button.close-btn { padding: 14px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-size: 1.2rem; cursor: pointer; }
         .search-overlay button:hover { filter: brightness(1.2); }
 
-        .filters-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.97); backdrop-filter: blur(20px); z-index: 150; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 20px 40px; }
+        .filters-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.97); backdrop-filter: blur(20px); z-index: 150; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 16px 20px 40px; box-sizing: border-box; }
         .filters-overlay.show { display: flex; flex-direction: column; animation: slideDown 0.3s ease; }
-        .filters-overlay-inner { max-width: 650px; margin: 0 auto; }
+        .filters-overlay-inner { max-width: 650px; width: 100%; margin: 0 auto; box-sizing: border-box; }
         .filters-overlay .filters-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; margin-bottom: 12px; }
-        .filters-overlay select, .filters-overlay input { padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text); outline: none; font-size: 0.85rem; }
+        .filters-overlay select, .filters-overlay input { padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text); outline: none; font-size: 0.85rem; max-width: 100%; box-sizing: border-box; }
         .filters-overlay .apply { padding: 10px 16px; background: var(--accent); border: none; border-radius: 8px; color: #fff; cursor: pointer; font-weight: 500; }
         .filters-overlay .reset-btn { padding: 10px 16px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text); cursor: pointer; }
         .filters-overlay .close-filters { padding: 10px 16px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text); cursor: pointer; }
-        .ai-search-section { background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.12)); border: 1px solid rgba(99,102,241,0.35); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
-        .ai-search-label { font-size: 0.78rem; font-weight: 700; color: #a78bfa; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
-        .ai-search-row { display: flex; gap: 8px; align-items: center; }
-        .ai-search-input { flex: 1; padding: 10px 14px; background: rgba(0,0,0,0.4); border: 1px solid rgba(99,102,241,0.4); border-radius: 10px; color: #fff; font-size: 0.88rem; outline: none; transition: border 0.2s; }
+        .ai-search-section { background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.12)); border: 1px solid rgba(99,102,241,0.35); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; box-sizing: border-box; max-width: 100%; }
+        .ai-search-label { font-size: 0.78rem; font-weight: 700; color: #a78bfa; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .ai-search-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .ai-search-input { flex: 1 1 140px; min-width: 0; padding: 10px 14px; background: rgba(0,0,0,0.4); border: 1px solid rgba(99,102,241,0.4); border-radius: 10px; color: #fff; font-size: 0.88rem; outline: none; transition: border 0.2s; box-sizing: border-box; }
         .ai-search-input::placeholder { color: rgba(255,255,255,0.35); }
         .ai-search-input:focus { border-color: rgba(99,102,241,0.8); }
-        .ai-search-btn { padding: 10px 16px; background: linear-gradient(135deg, #6366f1, #a855f7); border: none; border-radius: 10px; color: #fff; font-weight: 600; font-size: 0.85rem; cursor: pointer; white-space: nowrap; transition: opacity 0.2s; display: flex; align-items: center; gap: 6px; }
+        .ai-search-btn { padding: 10px 16px; background: linear-gradient(135deg, #6366f1, #a855f7); border: none; border-radius: 10px; color: #fff; font-weight: 600; font-size: 0.85rem; cursor: pointer; white-space: nowrap; transition: opacity 0.2s; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .ai-search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .ai-search-status { font-size: 0.78rem; color: #a78bfa; margin-top: 8px; min-height: 18px; }
         .filmtoro-btn { width: 100%; margin-top: 10px; padding: 10px 16px; background: linear-gradient(135deg, #10a37f, #1a7f64); border: none; border-radius: 10px; color: #fff; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: opacity 0.2s; text-decoration: none; }
@@ -1531,7 +1531,7 @@
                 <input class="ai-search-input" id="aiSearchInput" type="text"
                     placeholder="napr. nejlepší komedie 2025, filmy s Arnoldem..."
                     onkeydown="if(event.key==='Enter') runAiSearch()" />
-                <button class="ai-search-btn" id="aiVoiceSearchBtn" onclick="startVoiceSearch('aiSearchInput','aiVoiceSearchBtn')" title="Hlasové vyhledávání" style="background:rgba(99,102,241,0.25);border:1px solid rgba(99,102,241,0.4);padding:10px 12px;">
+                <button class="ai-search-btn" id="aiVoiceSearchBtn" onclick="startVoiceSearch('aiSearchInput','aiVoiceSearchBtn')" title="Hlasové vyhledávání" style="background:rgba(99,102,241,0.25);border:1px solid rgba(99,102,241,0.4);padding:10px 12px;flex:0 0 auto;">
                     <span>🎤</span>
                 </button>
                 <button class="ai-search-btn" id="aiSearchBtn" onclick="runAiSearch()">
