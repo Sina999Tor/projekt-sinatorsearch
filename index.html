@@ -1241,6 +1241,7 @@
     <div class="search-overlay-inner" style="position:relative;">
         <button class="close-btn" onclick="toggleSearchOverlay()">✕</button>
         <input type="text" id="searchInput" placeholder="Hledat filmy, seriály nebo herce..." autocomplete="off">
+        <button class="close-btn" id="voiceSearchBtn" onclick="startVoiceSearch()" title="Hlasové vyhledávání" style="font-size:1.1rem;">🎤</button>
         <button class="search-btn" onclick="startSearch()">Hledat</button>
     </div>
     <div id="mainSearchLiveResults" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--bg-card);border:1px solid var(--border);border-top:none;border-radius:0 0 14px 14px;max-height:380px;overflow-y:auto;z-index:10001;box-shadow:0 8px 32px rgba(0,0,0,0.8);"></div>
@@ -8123,6 +8124,49 @@ EXAMPLES:
             el.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-muted);">Chyba vyhledávání</div>';
         }
     }
+
+    function startVoiceSearch() {
+        const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const btn = $('voiceSearchBtn');
+        if(!SpeechRecognitionCtor) {
+            alert('Hlasové vyhledávání není v tomto prohlížeči podporováno.');
+            return;
+        }
+        if(state._voiceRecognizing) {
+            if(state._voiceRecognition) { try { state._voiceRecognition.stop(); } catch(e) {} }
+            return;
+        }
+        const recognition = new SpeechRecognitionCtor();
+        state._voiceRecognition = recognition;
+        recognition.lang = 'cs-CZ';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        state._voiceRecognizing = true;
+        if(btn) { btn.textContent = '🔴'; btn.title = 'Poslouchám… (klepnutím zastavíte)'; btn.style.color = '#ef4444'; }
+        recognition.onresult = (e) => {
+            const transcript = e.results?.[0]?.[0]?.transcript || '';
+            const input = $('searchInput');
+            if(input && transcript) {
+                input.value = transcript;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        };
+        recognition.onerror = () => {
+            if(btn) { btn.textContent = '🎤'; btn.title = 'Hlasové vyhledávání'; btn.style.color = ''; }
+            state._voiceRecognizing = false;
+        };
+        recognition.onend = () => {
+            if(btn) { btn.textContent = '🎤'; btn.title = 'Hlasové vyhledávání'; btn.style.color = ''; }
+            state._voiceRecognizing = false;
+        };
+        try {
+            recognition.start();
+        } catch(e) {
+            if(btn) { btn.textContent = '🎤'; btn.title = 'Hlasové vyhledávání'; btn.style.color = ''; }
+            state._voiceRecognizing = false;
+        }
+    }
+    window.startVoiceSearch = startVoiceSearch;
 
     function startSearch() {
         const q = $('searchInput')?.value.trim();
