@@ -520,6 +520,19 @@
         .ai-search-status { font-size: 0.78rem; color: #a78bfa; margin-top: 8px; min-height: 18px; }
         .filmtoro-btn { width: 100%; margin-top: 10px; padding: 10px 16px; background: linear-gradient(135deg, #10a37f, #1a7f64); border: none; border-radius: 10px; color: #fff; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: opacity 0.2s; text-decoration: none; }
         .filmtoro-btn:hover { opacity: 0.85; }
+        /* --- Filter tab switcher --- */
+        .filter-tabs { display: flex; gap: 8px; margin-bottom: 16px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 14px; padding: 5px; }
+        .filter-tab { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 11px 10px; background: transparent; border: none; border-radius: 10px; color: var(--text-muted); font-size: 0.86rem; font-weight: 600; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
+        .filter-tab-icon { font-size: 1rem; }
+        .filter-tab.active { color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.25); }
+        .filter-tab#tabBtnAdvanced.active { background: linear-gradient(135deg, #0891b2, #0e7490); }
+        .filter-tab#tabBtnAi.active { background: linear-gradient(135deg, #6366f1, #a855f7); }
+        .filter-tab:not(.active):hover { color: var(--text); background: rgba(255,255,255,0.05); }
+        .filter-panel-desc { font-size: 0.74rem; color: var(--text-muted); margin-bottom: 14px; text-align: center; }
+        .filter-group { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+        .filter-group-title { font-size: 0.68rem; font-weight: 700; color: #00b4d8; letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 8px; }
+        .filter-group .filters-row { margin-bottom: 0; }
+        .filter-group .filters-row + .filters-row { margin-top: 8px; }
         .ai-spin { display: inline-block; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .custom-year-input { display: none; margin-top: 12px; }
@@ -1253,10 +1266,20 @@
         <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
             <button class="close-filters" onclick="toggleFiltersOverlay()">✕ Zavřít</button>
         </div>
-        <div style="margin-bottom:10px;">
-            <div style="font-size:0.78rem;font-weight:700;color:#00b4d8;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;gap:6px;">🎛️ Pokročilé řazení</div>
-            <div style="font-size:0.74rem;color:var(--text-muted);margin-top:2px;">Filtrování podle žánrů, roku vydání, hodnocení nebo dostupnosti dabingu a titulků.</div>
+
+        <div class="filter-tabs">
+            <button class="filter-tab active" id="tabBtnAdvanced" onclick="_switchFilterTab('advanced')">
+                <span class="filter-tab-icon">🎛️</span><span>Pokročilé hledání</span>
+            </button>
+            <button class="filter-tab" id="tabBtnAi" onclick="_switchFilterTab('ai')">
+                <span class="filter-tab-icon">✨</span><span>AI vyhledávání</span>
+            </button>
         </div>
+
+        <div id="filterTabAdvanced" class="filter-tab-panel">
+        <div class="filter-panel-desc">Filtrování podle žánrů, roku vydání, hodnocení nebo dostupnosti dabingu a titulků.</div>
+        <div class="filter-group">
+        <div class="filter-group-title">Typ a žánr</div>
         <div class="filters-row">
             <select id="mediaType" onchange="handleFilterChange('mediaType', this.value)">
                 <option value="movie">Filmy</option>
@@ -1265,6 +1288,12 @@
             <select id="genre-select" onchange="handleFilterChange('genreId', this.value)">
                 <option value="">Všechny žánry</option>
             </select>
+        </div>
+        </div>
+
+        <div class="filter-group">
+        <div class="filter-group-title">Rok a řazení</div>
+        <div class="filters-row">
             <select id="yearFilter" onchange="handleYearFilterChange(this.value)">
                 <option value="">Všechny roky</option>
                 <option value="now_playing_cz">🎬 Nyní v kinech v ČR</option>
@@ -1297,6 +1326,16 @@
                 <option value="original_title.asc">🔤 Abecedně A-Z</option>
                 <option value="original_title.desc">🔤 Abecedně Z-A</option>
             </select>
+        </div>
+        <div id="customYearInput" class="custom-year-input">
+            <input type="number" id="customYearValue" placeholder="Zadejte rok (1980-2026)" min="1980" max="2026" style="padding:10px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:8px; color:var(--text); width:200px;">
+            <button class="apply" onclick="applyCustomYear()">✓ Použít</button>
+        </div>
+        </div>
+
+        <div class="filter-group">
+        <div class="filter-group-title">Hodnocení a dostupnost</div>
+        <div class="filters-row">
             <select id="ageRatingFilter" onchange="handleFilterChange('ageRating', this.value)">
                 <option value="">🔞 Všechna hodnocení</option>
                 <option value="G">G – Pro všechny</option>
@@ -1310,11 +1349,11 @@
                 <option value="cz">🇨🇿 Jen s CZ dabingem/titulky</option>
             </select>
         </div>
-        <div id="customYearInput" class="custom-year-input">
-            <input type="number" id="customYearValue" placeholder="Zadejte rok (1980-2026)" min="1980" max="2026" style="padding:10px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:8px; color:var(--text); width:200px;">
-            <button class="apply" onclick="applyCustomYear()">✓ Použít</button>
         </div>
-        <div class="filters-row" style="margin-top:8px;">
+
+        <div class="filter-group">
+        <div class="filter-group-title">Studio, služba a země</div>
+        <div class="filters-row">
             <select id="studioFilter" onchange="handleFilterChange('studio', this.value)">
                 <option value="">🎬 Všechna studia</option>
                 <option value="420">Marvel Studios</option>
@@ -1388,27 +1427,17 @@
                 <option value="TH">🇹🇭 Thajsko</option>
             </select>
         </div>
-        <div class="ai-search-section">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div class="ai-search-label">✨ AI Vyhledávání</div>
-                <div id="omdbToggleWrap" style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text-muted);">
-                    <span style="color:#999;">TMDB</span>
-                    <div id="omdbSourceToggle" onclick="toggleOmdbSource()" style="width:40px;height:22px;border-radius:11px;background:#333;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
-                        <div id="omdbSourceKnob" style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;"></div>
-                    </div>
-                    <span id="omdbSourceLabel" style="color:#999;">OMDb</span>
-                </div>
-            </div>
-            <div id="omdbSearchRow" style="display:none;margin-bottom:10px;">
-                <div style="display:flex;gap:8px;">
-                    <input class="ai-search-input" id="omdbSearchInput" type="text" placeholder="Název (volitelné – filtry se použijí automaticky)" onkeydown="if(event.key==='Enter') runOmdbSearch()" style="flex:1;" />
-                    <button class="ai-search-btn" onclick="runOmdbSearch()" style="background:linear-gradient(135deg,#b8860b,#f5c518);color:#000;min-width:90px;">
-                        <span>🎬</span> Hledat
-                    </button>
-                </div>
-                <div id="omdbActiveFilters" style="font-size:0.72rem;color:#f5c518;margin-top:5px;display:none;"></div>
-                <div id="omdbSearchStatus" style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;"></div>
-            </div>
+        </div>
+
+        <div class="filters-row" style="margin-top:4px;">
+            <button class="apply" onclick="applyFilters()">✓ Použít filtry</button>
+            <button class="reset-btn" onclick="resetFilters()">↺ Reset</button>
+        </div>
+        </div>
+
+        <div id="filterTabAi" class="filter-tab-panel" style="display:none;">
+        <div class="ai-search-section" style="margin-bottom:10px;">
+            <div class="ai-search-label">✨ AI Vyhledávání</div>
             <div style="margin-bottom:8px;">
                 <button onclick="_toggleThemesPanel()" style="width:100%;background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.35);color:#a78bfa;border-radius:10px;padding:8px 14px;font-size:0.82rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
                     <span>🎭 Témata</span><span id="themesPanelArrow" style="transition:transform 0.2s;">▼</span>
@@ -1551,10 +1580,8 @@
                 <span>🤖</span> Hledat také ve FilmToro GPT
             </button>
         </div>
-        <div class="filters-row" style="margin-top:12px;">
-            <button class="apply" onclick="applyFilters()">✓ Použít filtry</button>
-            <button class="reset-btn" onclick="resetFilters()">↺ Reset</button>
         </div>
+
     </div>
 </div>
 
@@ -3457,6 +3484,7 @@
     function toggleFiltersOverlay() {
         state.filtersOpen = !state.filtersOpen;
         if (state.filtersOpen) {
+            _switchFilterTab('advanced');
             // Sync mediaType select with the active view tab
             if (state.view === 'movies') {
                 state.filters.mediaType = 'movie';
@@ -3486,6 +3514,17 @@
         document.body.style.overflow = state.filtersOpen ? 'hidden' : '';
         $('btnFiltersToggle')?.classList.toggle('active', state.filtersOpen);
     }
+
+    function _switchFilterTab(tab) {
+        const advPanel = $('filterTabAdvanced'), aiPanel = $('filterTabAi');
+        const advBtn = $('tabBtnAdvanced'), aiBtn = $('tabBtnAi');
+        const isAi = tab === 'ai';
+        if (advPanel) advPanel.style.display = isAi ? 'none' : '';
+        if (aiPanel) aiPanel.style.display = isAi ? '' : 'none';
+        advBtn?.classList.toggle('active', !isAi);
+        aiBtn?.classList.toggle('active', isAi);
+    }
+    window._switchFilterTab = _switchFilterTab;
 
     function closeFiltersOverlay() {
         if (!state.filtersOpen) return; // už zavřeno, nic nedělat
