@@ -559,7 +559,7 @@
         .music-modal-header h2 { font-family: 'Playfair Display', serif; font-size: 1.4rem; background: linear-gradient(135deg, #fff, var(--music)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .music-modal-header .close-music { background: var(--bg-elevated); border: 1px solid var(--border); color: #fff; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: grid; place-items: center; transition: 0.2s; }
         .music-modal-header .close-music:hover { background: var(--music); border-color: var(--music); transform: rotate(90deg); }
-        .music-search-bar { display: flex; gap: 8px; padding: 16px 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+        .music-search-bar { display: flex; gap: 8px; padding: 16px 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap; position: relative; }
         .music-search-bar input { flex: 1; min-width: 200px; padding: 12px 16px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 0.95rem; outline: none; }
         .music-search-bar input:focus { border-color: var(--music); box-shadow: 0 0 0 1px var(--music); }
         .music-search-bar button { padding: 12px 20px; background: var(--music); border: none; border-radius: 10px; color: #fff; font-weight: 600; cursor: pointer; }
@@ -1751,6 +1751,7 @@
             <input type="text" id="musicSearchInput" placeholder="Hledat interpreta, písničku nebo album..." autocomplete="off">
             <button onclick="searchMusic()">🔍 Hledat</button>
             <button onclick="searchMusicYoutube()" style="background:#ff0000;padding:12px 14px;" title="Hledat na YouTube">▶</button>
+            <div id="musicSearchLiveResults" style="display:none;position:absolute;left:24px;right:24px;top:100%;background:var(--bg-card);border:1px solid var(--border);border-top:none;border-radius:0 0 14px 14px;max-height:380px;overflow-y:auto;z-index:10001;box-shadow:0 8px 32px rgba(0,0,0,0.8);"></div>
         </div>
         <div class="music-database-tabs">
             <button class="music-db-tab active" onclick="setMusicDB('all')">Všechny databáze</button>
@@ -3111,11 +3112,25 @@
         }
         
         const musicSearchInput = $('musicSearchInput');
+        let _musicSearchTimer = null;
         if(musicSearchInput) {
             musicSearchInput.addEventListener('keydown', e => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
+                    musicSearchLiveHide();
                     searchMusic();
+                }
+                if (e.key === 'Escape') { musicSearchLiveHide(); }
+            });
+            musicSearchInput.addEventListener('input', e => {
+                clearTimeout(_musicSearchTimer);
+                const q = e.target.value.trim();
+                if(q.length < 2) { musicSearchLiveHide(); return; }
+                _musicSearchTimer = setTimeout(() => musicSearchLive(q), 350);
+            });
+            document.addEventListener('click', e => {
+                if(!musicSearchInput.contains(e.target) && !document.getElementById('musicSearchLiveResults')?.contains(e.target)) {
+                    musicSearchLiveHide();
                 }
             });
         }
@@ -11571,6 +11586,64 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                         <button class="action-btn-modal" onclick="openDBSearch('czech')">České zdroje</button>
                     </div>
                 </div>`;
+        }
+    }
+
+    function musicSearchLiveHide() {
+        const el = document.getElementById('musicSearchLiveResults');
+        if(el) el.style.display = 'none';
+    }
+
+    async function loadReleaseGroupCoverThumb(rgid, elemId) {
+        try {
+            const res = await fetch(`${COVERART_BASE}/release-group/${rgid}`, { headers: { 'Accept': 'application/json' } });
+            if (res.ok) {
+                const data = await res.json();
+                const front = data.images?.find(i => i.front) || data.images?.[0];
+                const url = front?.thumbnails?.small || front?.thumbnails?.['250'] || front?.image;
+                if (url) setThumbImg(elemId, url);
+            }
+        } catch(e) {}
+    }
+
+    async function musicSearchLive(q) {
+        const el = document.getElementById('musicSearchLiveResults');
+        if(!el) return;
+        el.style.display = 'block';
+        el.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-muted);font-size:0.85rem;">🔍 Hledám…</div>';
+        try {
+            const encoded = encodeURIComponent(q);
+            const artistQuery = encodeURIComponent(`${q} AND (type:person OR type:group OR type:orchestra OR type:choir)`);
+            const [artistsRes, rgRes] = await Promise.all([
+                fetch(`${MUSICBRAINZ_BASE}/artist?query=${artistQuery}&limit=5&fmt=json`, { headers: MUSIC_HEADERS }).then(r=>r.json()).catch(()=>({artists:[]})),
+                fetch(`${MUSICBRAINZ_BASE}/release-group?query=${encoded}&limit=6&fmt=json`, { headers: MUSIC_HEADERS }).then(r=>r.json()).catch(()=>({['release-groups']:[]}))
+            ]);
+            const artists = (artistsRes.artists || []).slice(0, 5).map(a => ({ kind: 'artist', id: a.id, title: a.name, meta: [a.type, a.country].filter(Boolean).join(' • ') }));
+            const albums = (rgRes['release-groups'] || []).slice(0, 6).map(r => ({ kind: 'album', id: r.id, title: r.title, artist: getArtistsName(r), meta: [getArtistsName(r), (r['first-release-date']||'').slice(0,4)].filter(Boolean).join(' • ') }));
+
+            const hits = [...artists, ...albums].slice(0, 10);
+            if(!hits.length) { el.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-muted);">Nic nenalezeno</div>'; return; }
+
+            el.innerHTML = hits.map(item => {
+                const imgId = 'msl-img-' + item.kind + '-' + item.id;
+                const icon = item.kind === 'artist' ? '🎤' : '💿';
+                const safeTitle = jsq(item.title);
+                const safeArtist = jsq(item.artist || '');
+                const onclick = item.kind === 'artist'
+                    ? `musicSearchLiveHide();openArtistDetail('${item.id}','${safeTitle}')`
+                    : `musicSearchLiveHide();playOnYouTube('${safeArtist ? safeArtist + ' - ' : ''}${safeTitle} album')`;
+                if (item.kind === 'artist') setTimeout(() => loadArtistThumb(item.id, item.title, imgId), 50);
+                else setTimeout(() => loadReleaseGroupCoverThumb(item.id, imgId), 50);
+                return `<div onclick="${onclick}" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05);transition:0.15s;" onmouseover="this.style.background='rgba(255,107,107,0.1)'" onmouseout="this.style.background=''">
+                    <div id="${imgId}" style="width:36px;height:36px;border-radius:${item.kind==='artist'?'50%':'5px'};background:var(--bg-elevated);display:grid;place-items:center;flex-shrink:0;font-size:1.1rem;overflow:hidden;">${icon}</div>
+                    <div style="min-width:0;">
+                        <div style="font-size:0.88rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${icon} ${safeTitle}</div>
+                        <div style="font-size:0.72rem;color:var(--text-muted);">${jsq(item.meta)}</div>
+                    </div>
+                </div>`;
+            }).join('') + `<div onclick="musicSearchLiveHide();searchMusic()" style="padding:11px 14px;text-align:center;font-size:0.8rem;color:var(--music);cursor:pointer;border-top:1px solid rgba(255,255,255,0.07);" onmouseover="this.style.background='rgba(255,107,107,0.08)'" onmouseout="this.style.background=''">Zobrazit všechny výsledky →</div>`;
+        } catch(e) {
+            el.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-muted);">Chyba vyhledávání</div>';
         }
     }
 
