@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0a0a0a">
+    <meta name="theme-color" content="#0a0a0a" id="theme-color-meta">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Sinator_Search">
@@ -26,8 +26,22 @@
     <link rel="dns-prefetch" href="https://api.simkl.com">
     <link rel="preconnect" href="https://www.omdbapi.com">
     <link rel="dns-prefetch" href="https://www.omdbapi.com">
+    <link rel="preconnect" href="https://sinator-backend.vercel.app">
+    <link rel="dns-prefetch" href="https://sinator-backend.vercel.app">
+    <link rel="preconnect" href="https://mdblist.com">
+    <link rel="dns-prefetch" href="https://mdblist.com">
+    <link rel="preconnect" href="https://generativelanguage.googleapis.com">
+    <link rel="dns-prefetch" href="https://generativelanguage.googleapis.com">
+    <link rel="preconnect" href="https://api.groq.com">
+    <link rel="dns-prefetch" href="https://api.groq.com">
+    <link rel="preconnect" href="https://openrouter.ai">
+    <link rel="dns-prefetch" href="https://openrouter.ai">
+    <link rel="preconnect" href="https://musicbrainz.org">
+    <link rel="dns-prefetch" href="https://musicbrainz.org">
+    <link rel="preconnect" href="https://epgshare01.online">
+    <link rel="dns-prefetch" href="https://epgshare01.online">
     
-    <script>(function(){try{var t=localStorage.getItem('sinator_theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+    <script>(function(){try{var t=localStorage.getItem('sinator_theme')||'dark';document.documentElement.setAttribute('data-theme',t);var m=document.getElementById('theme-color-meta');if(m)m.setAttribute('content', t==='light' ? '#f4f4f6' : '#0a0a0a');}catch(e){}})();</script>
     <title>Sinator Search - Filmové Vyhledávání</title>
     <link rel="preconnect" href="https://www.hellspy.to">
     <link rel="dns-prefetch" href="https://www.hellspy.to">
@@ -3076,6 +3090,38 @@
             .replace(/\r/g, '');
     }
     window.jsq = jsq;
+
+    // === Přímé "one-click" odkazy na streamovací platformy podle titulu ===
+    // TMDB u watch/providers nedává URL konkrétní služby pro daný titul, jen obecný
+    // JustWatch odkaz. Tady si pro nejběžnější služby v CZ/SK regionu poskládáme
+    // přímý vyhledávací odkaz (funguje jako univerzální/app link – pokud má uživatel
+    // appku nainstalovanou, Android/iOS ji sám nabídne místo prohlížeče).
+    const STREAMING_DEEPLINKS = {
+        'Netflix': q => `https://www.netflix.com/search?q=${q}`,
+        'Disney Plus': q => `https://www.disneyplus.com/search?q=${q}`,
+        'Disney+': q => `https://www.disneyplus.com/search?q=${q}`,
+        'Max': q => `https://play.max.com/search?q=${q}`,
+        'HBO Max': q => `https://play.max.com/search?q=${q}`,
+        'Amazon Prime Video': q => `https://www.primevideo.com/search/?phrase=${q}`,
+        'Apple TV Plus': q => `https://tv.apple.com/search?term=${q}`,
+        'Apple TV+': q => `https://tv.apple.com/search?term=${q}`,
+        'Apple TV': q => `https://tv.apple.com/search?term=${q}`,
+        'Google Play Movies': q => `https://play.google.com/store/search?q=${q}&c=movies`,
+        'YouTube': q => `https://www.youtube.com/results?search_query=${q}`,
+        'SkyShowtime': q => `https://www.skyshowtime.com/search?q=${q}`,
+        'Voyo': q => `https://voyo.nova.cz/hledej?q=${q}`,
+        'Rakuten TV': q => `https://www.rakuten.tv/cz/search?q=${q}`,
+        'Oneplay': q => `https://www.oneplay.cz/hledani?q=${q}`,
+        'Prima+': q => `https://prima.iprima.cz/hledani?q=${q}`,
+        'Prima Plus': q => `https://prima.iprima.cz/hledani?q=${q}`
+    };
+    function buildProviderDeepLink(providerName, title, fallbackLink) {
+        const fn = STREAMING_DEEPLINKS[providerName];
+        if (fn) return fn(encodeURIComponent(title || ''));
+        return fallbackLink || '';
+    }
+    window.buildProviderDeepLink = buildProviderDeepLink;
+
     const resultsEl = $('results');
     const paginationContainer = $('paginationContainer');
     const MUSIC_HEADERS = { 'User-Agent': 'SinatorSearch/1.0 (https://sinator.app)' };
@@ -3767,6 +3813,8 @@
         const next = getAppTheme() === 'light' ? 'dark' : 'light';
         try { localStorage.setItem('sinator_theme', next); } catch(e) {}
         document.documentElement.setAttribute('data-theme', next);
+        const meta = $('theme-color-meta');
+        if (meta) meta.setAttribute('content', next === 'light' ? '#f4f4f6' : '#0a0a0a');
         updateThemeToggleUI();
     }
     function switchKeysSubTab(tab) {
@@ -10636,10 +10684,13 @@ EXAMPLES:
                         if (!list || !list.length) return '';
                         const seen = new Set();
                         const logos = list.filter(p => { if(seen.has(p.provider_name)) return false; seen.add(p.provider_name); return true; })
-                            .map(p => `<div class="provider-item" title="${p.provider_name}" style="display:flex;flex-direction:column;align-items:center;gap:4px;width:56px;">
+                            .map(p => {
+                                const dl = buildProviderDeepLink(p.provider_name, title, link);
+                                return `<a href="${dl}" target="_blank" rel="noopener" class="provider-item" title="Otevřít ${jsq(p.provider_name)}" style="display:flex;flex-direction:column;align-items:center;gap:4px;width:56px;text-decoration:none;">
                                 <img src="${IMG}w92${p.logo_path}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;">
                                 <span style="font-size:0.62rem;color:var(--text-muted);text-align:center;line-height:1.1;">${p.provider_name}</span>
-                            </div>`).join('');
+                            </a>`;
+                            }).join('');
                         return `<div style="margin-bottom:10px;"><div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);margin-bottom:6px;">${label}</div><div style="display:flex;flex-wrap:wrap;gap:10px;">${logos}</div></div>`;
                     };
                     const streamSection = buildSection('flatrate', '📺 Streamování');
