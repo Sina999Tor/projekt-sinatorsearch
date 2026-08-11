@@ -1253,6 +1253,10 @@
         <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
             <button class="close-filters" onclick="toggleFiltersOverlay()">✕ Zavřít</button>
         </div>
+        <div style="margin-bottom:10px;">
+            <div style="font-size:0.78rem;font-weight:700;color:#00b4d8;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;gap:6px;">🎛️ Pokročilé řazení</div>
+            <div style="font-size:0.74rem;color:var(--text-muted);margin-top:2px;">Filtrování podle žánrů, roku vydání, hodnocení nebo dostupnosti dabingu a titulků.</div>
+        </div>
         <div class="filters-row">
             <select id="mediaType" onchange="handleFilterChange('mediaType', this.value)">
                 <option value="movie">Filmy</option>
@@ -1300,6 +1304,10 @@
                 <option value="PG-13">PG-13 – Od 13 let</option>
                 <option value="R">R – Od 17 let</option>
                 <option value="NC-17">NC-17 – Pouze dospělí</option>
+            </select>
+            <select id="audioFilter" onchange="handleFilterChange('audio', this.value)" title="Dostupnost českého dabingu / titulků (dle TMDB lokalizace)">
+                <option value="">🎧 Dabing/titulky – vše</option>
+                <option value="cz">🇨🇿 Jen s CZ dabingem/titulky</option>
             </select>
         </div>
         <div id="customYearInput" class="custom-year-input">
@@ -2956,7 +2964,7 @@
         actorNationalityCode: '',
         searchQuery: null,
         aiDiscoverExtra: null,
-        filters: { mediaType: 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: '', country: '' },
+        filters: { mediaType: 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: '', country: '', audio: '' },
         favType: 'all',
         omdbSource: false,
         favs: (()=>{ try { return JSON.parse(_store.getItem('sinator_favs')||'[]'); } catch(e) { return []; } })(),
@@ -7699,7 +7707,7 @@ EXAMPLES:
     
     function resetFilters() {
         state._aiResultsLocked = false;
-        state.filters = { mediaType: 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: '', studio: '', network: '', country: '' };
+        state.filters = { mediaType: 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: '', studio: '', network: '', country: '', audio: '' };
         if($('mediaType')) $('mediaType').value = 'movie';
         if($('genre-select')) $('genre-select').value = '';
         if($('yearFilter')) $('yearFilter').value = '';
@@ -7708,6 +7716,7 @@ EXAMPLES:
         if($('studioFilter')) $('studioFilter').value = '';
         if($('networkFilter')) $('networkFilter').value = '';
         if($('countryFilter')) $('countryFilter').value = '';
+        if($('audioFilter')) $('audioFilter').value = '';
         $('customYearInput')?.classList.remove('show');
         if($('aiSearchInput')) $('aiSearchInput').value = '';
         state.page = 1; state._allItems = []; state._loadingMore = false;
@@ -7860,6 +7869,31 @@ EXAMPLES:
         }
     }
 
+    // Zjistí, zda titul má v TMDB dostupnou českou lokalizaci (název/popis přeložený do CZ) —
+    // nejlepší dostupný signál pro pravděpodobnou existenci CZ dabingu/titulků, protože TMDB
+    // sám o sobě neeviduje audio stopy ani titulkové soubory jednotlivých streamů.
+    const _czLocalizationCache = new Map();
+    async function _hasCzLocalization(id, kind) {
+        const cacheKey = `${kind}-${id}`;
+        if (_czLocalizationCache.has(cacheKey)) return _czLocalizationCache.get(cacheKey);
+        try {
+            const res = await fetch(`${BASE}/${kind}/${id}/translations?api_key=${tmdbApiKey}`);
+            const data = await res.json();
+            const cs = (data.translations || []).find(t => t.iso_639_1 === 'cs' && t.data && (t.data.title || t.data.name || t.data.overview));
+            const has = !!cs;
+            _czLocalizationCache.set(cacheKey, has);
+            return has;
+        } catch(e) {
+            _czLocalizationCache.set(cacheKey, false);
+            return false;
+        }
+    }
+    async function filterByCzLocalization(results, kind) {
+        if (!results.length) return results;
+        const flags = await Promise.all(results.map(item => _hasCzLocalization(item.id, kind)));
+        return results.filter((item, i) => flags[i]);
+    }
+
     async function loadFilteredContent() {
         state._customLoadMore = null; state._releaseTypeBrowse = null;
         if (state.omdbSource) return; // OMDb mode — nespouštět TMDB
@@ -7875,9 +7909,9 @@ EXAMPLES:
         $('mainContent').style.display = 'block';
         setInfiniteLoading(true);
 
-        const { mediaType, genreId, year, sortBy, ageRating, studio, network, country } = state.filters;
+        const { mediaType, genreId, year, sortBy, ageRating, studio, network, country, audio } = state.filters;
         const isNowPlayingCZ = year === 'now_playing_cz';
-        const hasFilters = genreId || year || ageRating || studio || network || country || (sortBy && sortBy !== 'popularity.desc' && sortBy !== 'primary_release_date.desc') || (state.aiDiscoverExtra && Object.keys(state.aiDiscoverExtra).length > 0);
+        const hasFilters = genreId || year || ageRating || studio || network || country || audio || (sortBy && sortBy !== 'popularity.desc' && sortBy !== 'primary_release_date.desc') || (state.aiDiscoverExtra && Object.keys(state.aiDiscoverExtra).length > 0);
         const isAlphaSort = sortBy === 'original_title.asc' || sortBy === 'original_title.desc';
 
         let url = '';
@@ -7972,6 +8006,12 @@ EXAMPLES:
                     }
                     return false;
                 });
+            }
+
+            // Filtr dostupnosti CZ dabingu/titulků (dle TMDB lokalizačních dat)
+            if (audio === 'cz') {
+                const kind = (state.view === 'tv' || state.view === 'miniseries' || state.view === 'anime') ? 'tv' : 'movie';
+                results = await filterByCzLocalization(results, kind);
             }
 
             // Vyřadit anime ze Seriálů a Minisérií (má vlastní kategorii "Anime"), ale ne když si uživatel
@@ -13582,7 +13622,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
         hideMainAzBar();
         // Nastavit filtr žánru
-        state.filters = { mediaType: mediaType === 'tv' ? 'tv' : 'movie', genreId: String(genreId), year: '', sortBy: 'popularity.desc', ageRating: '', studio: '', network: '', country: '' };
+        state.filters = { mediaType: mediaType === 'tv' ? 'tv' : 'movie', genreId: String(genreId), year: '', sortBy: 'popularity.desc', ageRating: '', studio: '', network: '', country: '', audio: '' };
         // Zobrazit hlavní obsah
         $('mainContent').style.display = 'block';
         closeHelperModals();
@@ -13614,7 +13654,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         state.searchQuery = null;
         state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
         hideMainAzBar();
-        state.filters = { mediaType: mediaType === 'tv' ? 'tv' : 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: certification, studio: '', network: '', country: '' };
+        state.filters = { mediaType: mediaType === 'tv' ? 'tv' : 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: certification, studio: '', network: '', country: '', audio: '' };
         $('mainContent').style.display = 'block';
         closeHelperModals();
         const sel = $('ageRatingFilter');
@@ -13639,7 +13679,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const r = Math.round(rating * 10) / 10;
         const min = Math.max(0, Math.round((r - 0.3) * 10) / 10);
         const max = Math.min(10, Math.round((r + 0.3) * 10) / 10);
-        state.filters = { mediaType: mediaType === 'tv' ? 'tv' : 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: '', studio: '', network: '', country: '' };
+        state.filters = { mediaType: mediaType === 'tv' ? 'tv' : 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: '', studio: '', network: '', country: '', audio: '' };
         state.aiDiscoverExtra = { 'vote_average.gte': min, 'vote_average.lte': max, 'vote_count.gte': 50 };
         $('mainContent').style.display = 'block';
         closeHelperModals();
@@ -13660,7 +13700,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
         state.aiDiscoverExtra = null;
         hideMainAzBar();
-        state.filters = { mediaType: 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: '', studio: '', network: '', country: '' };
+        state.filters = { mediaType: 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: '', studio: '', network: '', country: '', audio: '' };
         $('mainContent').style.display = 'block';
         closeHelperModals();
         window.scrollTo({ top: 0, behavior: 'smooth' });
