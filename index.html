@@ -2040,6 +2040,7 @@
                     <span id="histraStatusText">Nepřipojeno</span>
                 </div>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin:8px 0;line-height:1.5;">Zadej osobní token z <a href="https://histra.net" target="_blank" style="color:#8b5cf6;">histra.net</a>. Synchronizace stáhne z Histry shlédnuté, watchlist a seznamy a jen doplní do Sinatoru to, co tam ještě není — nic nepřepisuje ani nemaže.</div>
+                <div style="font-size:0.68rem;color:#f5a623;margin-bottom:8px;line-height:1.5;">⚠️ Histra API nepovoluje volání přímo z prohlížeče (CORS) — aby sync fungoval, potřebuješ na svém sinator-backend nasadit malý proxy endpoint <code>/api/histra-proxy</code>. Kód a instrukce od Claude, stačí zkopírovat do repa.</div>
                 <input type="password" id="histraTokenInput" placeholder="Histra token" style="width:100%;margin-bottom:8px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;" autocomplete="off">
                 <div class="settings-actions">
                     <button class="settings-btn-small" style="border-color:#8b5cf6;color:#8b5cf6;" onclick="saveHistraToken()">🔑 Uložit a otestovat</button>
@@ -2639,11 +2640,47 @@
     function histraReady() { return !!histraToken(); }
     async function histraApi(path) {
         if (!histraReady()) throw new Error('Histra token není nastavený.');
-        const res = await fetchWithRetry(`${HISTRA_BASE}${path}`, { headers: { 'Authorization': `Bearer ${histraToken()}` } });
-        let body = null;
-        try { body = await res.json(); } catch (e) {}
-        if (!res.ok) throw new Error((body && (body.error || body.message)) || `HTTP ${res.status}`);
-        return body;
+        const token = histraToken();
+        const targetUrl = `${HISTRA_BASE}${path}`;
+        const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+        async function parseBody(res) {
+            let body = null;
+            try { body = await res.json(); } catch (e) {}
+            return body;
+        }
+
+        // 1) Vlastní backend jako proxy (sinator-backend/api/histra-proxy.js — viz
+        // instrukce v UI u tlačítka "Synchronizovat nyní"). Žádné CORS, token se
+        // nikdy neposílá přes cizí server. Pokud endpoint není nasazený, rychle
+        // selže (retries:1, 404) a jde se na přímé volání.
+        if (myBackendReady()) {
+            try {
+                const res = await fetchWithRetry(
+                    `${myBackendBase()}/histra-proxy?path=${encodeURIComponent(path)}`,
+                    { headers: { ...myHeaders(), 'x-histra-token': token } },
+                    { retries: 1, delayMs: 500, timeoutMs: 10000 }
+                );
+                if (res.status !== 404) {
+                    const body = await parseBody(res);
+                    if (!res.ok) throw new Error((body && (body.error || body.message)) || `HTTP ${res.status}`);
+                    return body;
+                }
+            } catch (e) { /* proxy není nasazená nebo selhala — jdeme na přímé volání */ }
+        }
+
+        // 2) Přímé volání na histra.net — projde jen pokud Histra CORS pro
+        // volání z prohlížeče povoluje (u API určeného pro appky typu Kodi/Jellyfin
+        // to bývá vypnuté — pak prohlížeč požadavek vůbec neodešle a skončí to
+        // chybou "Failed to fetch", ne HTTP chybovým kódem).
+        try {
+            const res = await fetchWithRetry(targetUrl, { headers: authHeaders }, { retries: 1, delayMs: 500, timeoutMs: 10000 });
+            const body = await parseBody(res);
+            if (!res.ok) throw new Error((body && (body.error || body.message)) || `HTTP ${res.status}`);
+            return body;
+        } catch (directErr) {
+            throw new Error('CORS zablokoval volání na histra.net z prohlížeče. Potřebuješ přidat malý proxy endpoint na svůj sinator-backend (viz nápověda u tlačítka Synchronizovat) — bez toho nejde Histru z webové appky napojit bezpečně.');
+        }
     }
     // Odpovědi seznamových koncových bodů mohou být buď holé pole, nebo
     // obalené v { data: [...] } / { items: [...] } / { results: [...] } —
