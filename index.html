@@ -2033,6 +2033,25 @@
                 </div>
             </div>
             <div class="settings-divider"></div>
+            <div class="settings-section">
+                <span class="settings-label" style="color:#8b5cf6;">📼 Histra.net</span>
+                <div class="settings-status">
+                    <span class="dot" id="histraStatusDot"></span>
+                    <span id="histraStatusText">Nepřipojeno</span>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin:8px 0;line-height:1.5;">Zadej osobní token z <a href="https://histra.net" target="_blank" style="color:#8b5cf6;">histra.net</a>. Synchronizace stáhne z Histry shlédnuté, watchlist a seznamy a jen doplní do Sinatoru to, co tam ještě není — nic nepřepisuje ani nemaže.</div>
+                <input type="password" id="histraTokenInput" placeholder="Histra token" style="width:100%;margin-bottom:8px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;" autocomplete="off">
+                <div class="settings-actions">
+                    <button class="settings-btn-small" style="border-color:#8b5cf6;color:#8b5cf6;" onclick="saveHistraToken()">🔑 Uložit a otestovat</button>
+                    <button class="settings-btn-small settings-btn-remove" onclick="disconnectHistra()">❌ Odpojit</button>
+                </div>
+                <div class="settings-actions" style="margin-top:8px;">
+                    <button class="settings-btn-small" id="histraSyncBtn" style="width:100%;border-color:#8b5cf6;color:#8b5cf6;" onclick="syncFromHistra(this)">🔄 Synchronizovat nyní</button>
+                </div>
+                <div id="histraSyncStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;line-height:1.5;"></div>
+                <div id="histraLastSync" style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;"></div>
+            </div>
+            <div class="settings-divider" style="display:none;"></div>
             <div class="settings-section" style="display:none;">
                 <span class="settings-label" style="color:#ff9800;">🗃️ MDBList</span>
                 <div class="settings-status">
@@ -2609,6 +2628,214 @@
     const myProgressGet = (type) => myApi(`/progress?type=${(type === 'tv' || type === 'shows') ? 'shows' : 'movies'}`);
     const myProgressSet = (id, type, progress, season, episode) => myApi('/progress', { method: 'POST', body: JSON.stringify({ id, type, progress, season, episode }) });
     const myProgressRemove = (id, type, season, episode) => myApi('/progress', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode }) });
+
+    // ── Histra.net integrace (jednosměrná synchronizace → Sinator backend) ──
+    // Histra API vrací/přijímá externí id (tmdb/imdb/tvdb/trakt) přímo, takže
+    // se dá párovat 1:1 s tmdb id, které používá i vlastní Sinator backend.
+    // Synchronizace je čistě ADITIVNÍ — nikdy nic v Sinatoru nepřepíše ani
+    // nesmaže, jen doplní položky, které v Sinatoru ještě chybí.
+    const HISTRA_BASE = 'https://histra.net';
+    function histraToken() { return _store.getItem('sinator_histra_token') || ''; }
+    function histraReady() { return !!histraToken(); }
+    async function histraApi(path) {
+        if (!histraReady()) throw new Error('Histra token není nastavený.');
+        const res = await fetchWithRetry(`${HISTRA_BASE}${path}`, { headers: { 'Authorization': `Bearer ${histraToken()}` } });
+        let body = null;
+        try { body = await res.json(); } catch (e) {}
+        if (!res.ok) throw new Error((body && (body.error || body.message)) || `HTTP ${res.status}`);
+        return body;
+    }
+    // Odpovědi seznamových koncových bodů mohou být buď holé pole, nebo
+    // obalené v { data: [...] } / { items: [...] } / { results: [...] } —
+    // nemáme jistý přesný tvar, tak zkoušíme všechny běžné varianty.
+    function histraUnwrapList(data) {
+        if (Array.isArray(data)) return data;
+        if (!data || typeof data !== 'object') return [];
+        return data.data || data.items || data.results || data.lists || [];
+    }
+    async function histraFetchAllPaged(basePath, limit, maxPages) {
+        limit = limit || 100; maxPages = maxPages || 200;
+        let all = [];
+        let offset = 0;
+        for (let i = 0; i < maxPages; i++) {
+            const sep = basePath.includes('?') ? '&' : '?';
+            let data;
+            try { data = await histraApi(`${basePath}${sep}limit=${limit}&offset=${offset}`); }
+            catch (e) { break; }
+            const items = histraUnwrapList(data);
+            if (!items.length) break;
+            all = all.concat(items);
+            if (items.length < limit) break;
+            offset += limit;
+        }
+        return all;
+    }
+    // Zkusí z objektu vytáhnout tmdb id z několika běžných tvarů, které se
+    // v odpovědích API objevují (přímé pole, ids.tmdb, external_ids.tmdb...).
+    function histraExtractTmdb(obj) {
+        if (!obj || typeof obj !== 'object') return null;
+        const cands = [obj.tmdb, obj.tmdb_id, obj.ids && obj.ids.tmdb, obj.external_ids && obj.external_ids.tmdb];
+        for (const c of cands) { if (c) return parseInt(c, 10) || null; }
+        return null;
+    }
+    function histraParseHistoryEntry(e) {
+        if (!e || typeof e !== 'object') return null;
+        const isEpisode = !!(e.episode || e.type === 'episode');
+        if (isEpisode) {
+            const showObj = e.show || e;
+            const showTmdb = histraExtractTmdb(showObj) || histraExtractTmdb(e);
+            const season = (e.episode && e.episode.season != null) ? e.episode.season : e.season;
+            const number = (e.episode && e.episode.number != null) ? e.episode.number : e.number;
+            if (!showTmdb || season == null || number == null) return null;
+            return { kind: 'episode', tmdb: showTmdb, season: parseInt(season, 10), number: parseInt(number, 10) };
+        }
+        const movieObj = e.movie || e;
+        const movieTmdb = histraExtractTmdb(movieObj) || histraExtractTmdb(e);
+        if (!movieTmdb) return null;
+        return { kind: 'movie', tmdb: movieTmdb };
+    }
+    // Zjistí, zda je položka watchlistu/seznamu seriál nebo film + vytáhne tmdb id.
+    function histraParseMediaEntry(e) {
+        if (!e || typeof e !== 'object') return null;
+        const isShow = !!(e.show || e.type === 'show' || e.type === 'tv' || e.type === 'series');
+        const src = isShow ? (e.show || e) : (e.movie || e);
+        const tmdb = histraExtractTmdb(src) || histraExtractTmdb(e);
+        if (!tmdb) return null;
+        return { type: isShow ? 'tv' : 'movie', tmdb, title: src.title || e.title || '' };
+    }
+
+    window.saveHistraToken = async function() {
+        const input = $('histraTokenInput');
+        const token = (input && input.value || '').trim();
+        if (!token) { alert('⚠️ Zadej token z histra.net.'); return; }
+        _store.setItem('sinator_histra_token', token);
+        await testHistraConnection();
+    };
+    window.disconnectHistra = function() {
+        if (!confirm('Opravdu odpojit Histra.net? (Data už zesynchronizovaná do Sinatoru zůstanou zachovaná.)')) return;
+        _store.removeItem('sinator_histra_token');
+        _store.removeItem('sinator_histra_last_sync');
+        if ($('histraTokenInput')) $('histraTokenInput').value = '';
+        if ($('histraSyncStatus')) $('histraSyncStatus').textContent = '';
+        updateHistraStatus();
+    };
+    async function testHistraConnection() {
+        const dot = $('histraStatusDot'); const text = $('histraStatusText');
+        if (!histraReady()) { if (text) text.textContent = 'Nepřipojeno'; if (dot) dot.className = 'dot'; return; }
+        if (text) text.textContent = 'Ověřuji…';
+        try {
+            const me = await histraApi('/api/v1/auth/me');
+            const d = (me && me.data) || me || {};
+            const uname = d.username || d.name || d.email || '✅ Připojeno';
+            if (text) text.textContent = uname;
+            if (dot) dot.className = 'dot connected';
+        } catch (e) {
+            if (text) text.textContent = '⚠️ ' + e.message;
+            if (dot) dot.className = 'dot';
+        }
+        updateHistraLastSyncLabel();
+    }
+    function updateHistraLastSyncLabel() {
+        const el = $('histraLastSync');
+        if (!el) return;
+        const ts = parseInt(_store.getItem('sinator_histra_last_sync') || '0', 10);
+        el.textContent = ts ? `Poslední sync: ${new Date(ts).toLocaleString('cs-CZ')}` : '';
+    }
+    function updateHistraStatus() { testHistraConnection(); }
+    function initHistraSettingsInputs() {
+        if ($('histraTokenInput')) $('histraTokenInput').value = histraToken();
+        updateHistraStatus();
+    }
+
+    window.syncFromHistra = async function(btn) {
+        if (!histraReady()) { alert('⚠️ Nejdřív zadej a ulož Histra token výše.'); return; }
+        if (!myBackendReady()) { alert('⚠️ Histra se synchronizuje do vlastního Sinator backendu — nejdřív nastav a ulož jeho klíč výše.'); return; }
+        const statusEl = $('histraSyncStatus');
+        const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Synchronizuji…'; }
+        try {
+            setStatus('Ověřuji token…');
+            await histraApi('/api/v1/auth/me');
+
+            setStatus('Stahuji stávající data ze Sinatoru…');
+            const [existingMovies, existingEpisodes, existingWatchlist, existingLists] = await Promise.all([
+                myHistoryGetAll('movies').catch(() => []),
+                myHistoryGetAll('episodes').catch(() => []),
+                myWatchlistGet().catch(() => []),
+                myListsGet().catch(() => [])
+            ]);
+            const existMovieSet = new Set(existingMovies.map(r => parseInt(r.id, 10)));
+            const existEpSet = new Set(existingEpisodes.map(r => `${r.id}_${r.season}_${r.episode}`));
+            const existWlSet = new Set((existingWatchlist || []).map(r => `${r.type}_${r.id}`));
+
+            setStatus('Stahuji historii sledování z Histra…');
+            const historyRaw = await histraFetchAllPaged('/api/v1/tracking/history?extended=full&lang=cs-CZ', 100);
+            let newMovies = 0, newEpisodes = 0, skipped = 0;
+            for (const raw of historyRaw) {
+                const parsed = histraParseHistoryEntry(raw);
+                if (!parsed) { skipped++; continue; }
+                if (parsed.kind === 'movie') {
+                    if (existMovieSet.has(parsed.tmdb)) continue;
+                    try { await myHistoryAdd(parsed.tmdb, 'movie'); existMovieSet.add(parsed.tmdb); newMovies++; } catch (e) {}
+                } else {
+                    const key = `${parsed.tmdb}_${parsed.season}_${parsed.number}`;
+                    if (existEpSet.has(key)) continue;
+                    try { await myHistoryAdd(parsed.tmdb, 'tv', parsed.season, parsed.number); existEpSet.add(key); newEpisodes++; } catch (e) {}
+                }
+            }
+
+            setStatus(`Filmy +${newMovies}, epizody +${newEpisodes}. Stahuji watchlist z Histra…`);
+            const wlRaw = await histraFetchAllPaged('/api/v1/watchlist?extended=full&lang=cs-CZ', 100).catch(() => []);
+            let newWatchlist = 0;
+            for (const raw of wlRaw) {
+                const parsed = histraParseMediaEntry(raw);
+                if (!parsed) { skipped++; continue; }
+                const key = `${parsed.type}_${parsed.tmdb}`;
+                if (existWlSet.has(key)) continue;
+                try { await myWatchlistAdd(parsed.tmdb, parsed.type, parsed.title, '', null); existWlSet.add(key); newWatchlist++; } catch (e) {}
+            }
+
+            setStatus(`Filmy +${newMovies}, epizody +${newEpisodes}, watchlist +${newWatchlist}. Stahuji seznamy z Histra…`);
+            const histraLists = histraUnwrapList(await histraApi('/api/v1/lists').catch(() => []));
+            let newLists = 0, newListItems = 0;
+            for (const hl of histraLists) {
+                const listApiId = hl.id != null ? hl.id : hl._id;
+                if (listApiId == null) { skipped++; continue; }
+                const name = hl.name || hl.title || 'Histra seznam';
+                let sinList = existingLists.find(l => (l.name || '').trim().toLowerCase() === name.trim().toLowerCase());
+                if (!sinList) {
+                    try { sinList = await myListCreate(name); existingLists.push(sinList); newLists++; }
+                    catch (e) { continue; }
+                }
+                const sinListId = sinList.id != null ? sinList.id : sinList._id;
+                if (sinListId == null) continue;
+                let existingItems = [];
+                try { existingItems = await myListItemsGet(sinListId); } catch (e) {}
+                const existItemSet = new Set((existingItems || []).map(r => `${r.type}_${r.id}`));
+
+                const detailRaw = await histraApi(`/api/v1/lists/${listApiId}?extended=full&lang=cs-CZ`).catch(() => null);
+                const detail = (detailRaw && detailRaw.data) || detailRaw || {};
+                const items = detail.items || detail.results || [];
+                for (const it of items) {
+                    const parsed = histraParseMediaEntry(it);
+                    if (!parsed) { skipped++; continue; }
+                    const key = `${parsed.type}_${parsed.tmdb}`;
+                    if (existItemSet.has(key)) continue;
+                    try { await myListItemAdd(sinListId, parsed.tmdb, parsed.type); existItemSet.add(key); newListItems++; } catch (e) {}
+                }
+            }
+
+            _store.setItem('sinator_histra_last_sync', String(Date.now()));
+            updateHistraLastSyncLabel();
+            const summary = `✅ Hotovo — doplněno: filmy +${newMovies}, epizody +${newEpisodes}, watchlist +${newWatchlist}, seznamy +${newLists} nové (+${newListItems} položek).` + (skipped ? `\n⚠️ ${skipped} položek se nepodařilo přiřadit (neznámý formát odpovědi) — pokud se to týká hodně položek, napiš mi a upravím parsování.` : '');
+            setStatus(summary);
+            try { if (typeof _favToast === 'function') _favToast('✅ Histra sync hotový'); } catch (e) {}
+        } catch (e) {
+            setStatus('❌ Chyba: ' + e.message);
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = '🔄 Synchronizovat nyní'; }
+        }
+    };
 
     // ── Import exportovaných dat z Traktu (ZIP) do vlastního backendu ──────────
     function loadJSZipLib() {
@@ -3848,6 +4075,7 @@
         if($('openRouterKeyInput')) $('openRouterKeyInput').value = openRouterKey;
         if($('omdbApiKeyInput')) $('omdbApiKeyInput').value = omdbApiKey;
         initMyBackendSettingsInputs();
+        initHistraSettingsInputs();
         updateGeminiStatus(); updateGroqStatus(); updateOpenRouterStatus(); updateOmdbStatus();
         updateThemeToggleUI();
         $('settingsModal')?.classList.add('open');
