@@ -11926,6 +11926,23 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         return photos;
     }
 
+    async function fetchWikipediaData(wikipediaUrl, name) {
+        try {
+            const u = new URL(wikipediaUrl);
+            const lang = u.hostname.split('.')[0] || 'cs';
+            const rawTitle = decodeURIComponent(u.pathname.split('/wiki/')[1] || '').replace(/_/g, ' ');
+            const title = rawTitle || name;
+            const res = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, '_'))}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.extract && data.extract.length > 40) {
+                    return { biography: data.extract, image: data.thumbnail?.source || '', lang };
+                }
+            }
+        } catch(e) {}
+        return null;
+    }
+
     async function openArtistDetail(mbid, name) {
         const container = $('musicResultsContainer'); 
         container.innerHTML = '<div class="loading"><div class="spinner"></div>Načítám detail umělce a biografii...</div>';
