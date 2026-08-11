@@ -1346,7 +1346,9 @@
             </select>
             <select id="audioFilter" onchange="handleFilterChange('audio', this.value)" title="Dostupnost českého dabingu / titulků (dle TMDB lokalizace)">
                 <option value="">🎧 Dabing/titulky – vše</option>
-                <option value="cz">🇨🇿 Jen s CZ dabingem/titulky</option>
+                <option value="dab">🗣️ Jen s CZ dabingem</option>
+                <option value="sub">💬 Jen s CZ titulky</option>
+                <option value="any">🇨🇿 S CZ dabingem nebo titulky</option>
             </select>
         </div>
         </div>
@@ -7923,28 +7925,60 @@ EXAMPLES:
         }
     }
 
-    // Zjistí, zda titul má v TMDB dostupnou českou lokalizaci (název/popis přeložený do CZ) —
-    // nejlepší dostupný signál pro pravděpodobnou existenci CZ dabingu/titulků, protože TMDB
-    // sám o sobě neeviduje audio stopy ani titulkové soubory jednotlivých streamů.
-    const _czLocalizationCache = new Map();
-    async function _hasCzLocalization(id, kind) {
+    // Zjišťování dostupnosti CZ dabingu a titulků. TMDB neeviduje konkrétní audio/titulkové
+    // stopy jednotlivých streamů, takže používáme dva nejlepší dostupné proxy signály:
+    //  - DABING: pole spoken_languages v detailu titulu (jazyky, ve kterých bylo dílo namluveno/smícháno)
+    //  - TITULKY: existence CZ překladu názvu/popisu v TMDB (translations) — přítomnost aktivní
+    //    české komunity/distribuce kolem titulu, což typicky koreluje s dostupností CZ titulků
+    const _czDubCache = new Map();
+    const _czSubCache = new Map();
+
+    async function _hasCzDub(id, kind) {
         const cacheKey = `${kind}-${id}`;
-        if (_czLocalizationCache.has(cacheKey)) return _czLocalizationCache.get(cacheKey);
+        if (_czDubCache.has(cacheKey)) return _czDubCache.get(cacheKey);
+        try {
+            const res = await fetch(`${BASE}/${kind}/${id}?api_key=${tmdbApiKey}`);
+            const data = await res.json();
+            const has = Array.isArray(data.spoken_languages) && data.spoken_languages.some(l => l.iso_639_1 === 'cs');
+            _czDubCache.set(cacheKey, has);
+            return has;
+        } catch(e) {
+            _czDubCache.set(cacheKey, false);
+            return false;
+        }
+    }
+
+    async function _hasCzSub(id, kind) {
+        const cacheKey = `${kind}-${id}`;
+        if (_czSubCache.has(cacheKey)) return _czSubCache.get(cacheKey);
         try {
             const res = await fetch(`${BASE}/${kind}/${id}/translations?api_key=${tmdbApiKey}`);
             const data = await res.json();
             const cs = (data.translations || []).find(t => t.iso_639_1 === 'cs' && t.data && (t.data.title || t.data.name || t.data.overview));
             const has = !!cs;
-            _czLocalizationCache.set(cacheKey, has);
+            _czSubCache.set(cacheKey, has);
             return has;
         } catch(e) {
-            _czLocalizationCache.set(cacheKey, false);
+            _czSubCache.set(cacheKey, false);
             return false;
         }
     }
-    async function filterByCzLocalization(results, kind) {
+
+    async function filterByCzLocalization(results, kind, mode) {
         if (!results.length) return results;
-        const flags = await Promise.all(results.map(item => _hasCzLocalization(item.id, kind)));
+        if (mode === 'dab') {
+            const flags = await Promise.all(results.map(item => _hasCzDub(item.id, kind)));
+            return results.filter((item, i) => flags[i]);
+        }
+        if (mode === 'sub') {
+            const flags = await Promise.all(results.map(item => _hasCzSub(item.id, kind)));
+            return results.filter((item, i) => flags[i]);
+        }
+        // 'any' - dabing NEBO titulky
+        const flags = await Promise.all(results.map(async item => {
+            const [dab, sub] = await Promise.all([_hasCzDub(item.id, kind), _hasCzSub(item.id, kind)]);
+            return dab || sub;
+        }));
         return results.filter((item, i) => flags[i]);
     }
 
@@ -8063,9 +8097,9 @@ EXAMPLES:
             }
 
             // Filtr dostupnosti CZ dabingu/titulků (dle TMDB lokalizačních dat)
-            if (audio === 'cz') {
+            if (audio === 'dab' || audio === 'sub' || audio === 'any') {
                 const kind = (state.view === 'tv' || state.view === 'miniseries' || state.view === 'anime') ? 'tv' : 'movie';
-                results = await filterByCzLocalization(results, kind);
+                results = await filterByCzLocalization(results, kind, audio);
             }
 
             // Vyřadit anime ze Seriálů a Minisérií (má vlastní kategorii "Anime"), ale ne když si uživatel
