@@ -2704,17 +2704,30 @@
         if (!data || typeof data !== 'object') return [];
         return data.data || data.items || data.results || data.lists || data.entries || [];
     }
-    async function histraFetchAllPaged(basePath, limit, maxPages) {
+    // Signatura stránky (watched_at prvních pár položek) — pokud API
+    // limit/offset tiše ignoruje, dvě "různé" stránky vrátí identický
+    // obsah; detekcí toho se vyhneme zbytečnému až 200× opakování stejného
+    // požadavku (appka by jinak dlouho vypadala jako zaseklá).
+    function histraPageSignature(items) {
+        try { return items.slice(0, 3).map(e => `${e && (e.watched_at || e.id || e.media_id)}`).join('|'); }
+        catch (e) { return String(Math.random()); }
+    }
+    async function histraFetchAllPaged(basePath, limit, maxPages, onProgress) {
         limit = limit || 100; maxPages = maxPages || 200;
         let all = [];
         let offset = 0;
+        let prevSig = null;
         for (let i = 0; i < maxPages; i++) {
+            if (onProgress) onProgress(all.length, i + 1);
             const sep = basePath.includes('?') ? '&' : '?';
             let data;
             try { data = await histraApi(`${basePath}${sep}limit=${limit}&offset=${offset}`); }
             catch (e) { break; }
             const items = histraUnwrapList(data);
             if (!items.length) break;
+            const sig = histraPageSignature(items);
+            if (sig === prevSig) break; // API offset/limit nefunguje — stejná stránka dokola, končíme
+            prevSig = sig;
             all = all.concat(items);
             if (items.length < limit) break;
             offset += limit;
@@ -2854,7 +2867,10 @@
             const existEpSet = new Set(existingEpisodes.map(r => `${r.id}_${r.season}_${r.episode}`));
 
             setStatus('Stahuji historii sledování z Histra…');
-            const historyRaw = await histraFetchAllPaged('/api/v1/tracking/history?extended=full&lang=cs-CZ', 100);
+            const historyRaw = await histraFetchAllPaged(
+                '/api/v1/tracking/history?extended=full&lang=cs-CZ', 100, 200,
+                (count, page) => setStatus(`Stahuji historii sledování z Histra… (stránka ${page}, zatím ${count} položek)`)
+            );
 
             // Jen historie sledování (filmy + epizody) — watchlist a seznamy se
             // záměrně nesynchronizují (dělaly v appce balast). Nové položky se
