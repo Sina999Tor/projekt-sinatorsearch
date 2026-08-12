@@ -10204,6 +10204,48 @@ EXAMPLES:
         return items;
     }
 
+    // Dotáhne název konkrétní epizody (ne jen seriálu) pro záložku Hist.
+    // epizody — samostatná cache od fetchMyBackendPosters, protože tady se
+    // klíčuje podle show+season+episode, ne jen podle show id.
+    const MY_BACKEND_EP_TITLE_CACHE_KEY = 'sinator_backend_ep_title_cache_v1';
+    function _loadMyBackendEpTitleCache() {
+        try { return JSON.parse(_store.getItem(MY_BACKEND_EP_TITLE_CACHE_KEY) || '{}'); }
+        catch (e) { return {}; }
+    }
+    function _saveMyBackendEpTitleCache(cache) {
+        try { _store.setItem(MY_BACKEND_EP_TITLE_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+    }
+    async function fetchMyBackendEpisodeTitles(items) {
+        const need = items.filter(it => it.id && it.season != null && it.episode != null);
+        if (!need.length || !tmdbApiKey) return items;
+        const cache = _loadMyBackendEpTitleCache();
+        const now = Date.now();
+        const toFetch = [];
+        for (const it of need) {
+            const key = `${it.id}:${it.season}:${it.episode}`;
+            const cached = cache[key];
+            if (cached && (now - cached.ts) < MY_BACKEND_META_TTL) { it.episodeTitle = cached.title || ''; }
+            else { toFetch.push([key, it]); }
+        }
+        let cacheDirty = false;
+        await _runWithConcurrency(toFetch, 15, async ([key, it]) => {
+            try {
+                const res = await _fetchWithTimeout(`https://api.themoviedb.org/3/tv/${it.id}/season/${it.season}/episode/${it.episode}?api_key=${tmdbApiKey}&language=cs-CZ`);
+                if (!res.ok) return;
+                const d = await res.json();
+                let name = d.name || '';
+                // Bez českého názvu TMDB epizody často vrátí "Epizoda N" — v tom
+                // případě radši nezobrazovat nic, než matoucí generický text.
+                if (name && /^(epizoda|episode)\s*\d+$/i.test(name.trim())) name = '';
+                cache[key] = { title: name, ts: now };
+                cacheDirty = true;
+                it.episodeTitle = name;
+            } catch (e) {}
+        });
+        if (cacheDirty) _saveMyBackendEpTitleCache(cache);
+        return items;
+    }
+
     function myBackendCardRemoveArgs(tab, id, type) {
         // Vrátí JS volání pro tlačítko ✕ podle toho, v jaké záložce zrovna jsme
         if (tab === 'watchlist') return `myBackendRemoveItem('watchlist', ${id}, '${type}')`;
@@ -10240,7 +10282,7 @@ EXAMPLES:
                 ${canRemove ? `<button class="card-fav" style="left:auto;right:8px;color:#e07a6f;" onclick="event.stopPropagation();${myBackendCardRemoveArgs(tab, it.id, kind)}">✕</button>` : ''}
                 ${watchedCheck}
                 </div>
-                <div class="card-info"><div class="card-title">${it.title || ('#' + it.id)}</div><div class="card-meta"><span>${it.year || '—'}</span>${it.rating ? `<span>★ ${it.rating}/10</span>` : ''}${it.watchCount > 1 ? `<span>👁 ${it.watchCount}×</span>` : ''}</div></div>
+                <div class="card-info"><div class="card-title">${it.title || ('#' + it.id)}${(it.season != null && it.episode != null) ? ` <span style="color:#6090ff;font-weight:700;">S${it.season}E${it.episode}</span>` : ''}</div>${it.episodeTitle ? `<div style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.episodeTitle}</div>` : ''}<div class="card-meta"><span>${it.year || '—'}</span>${it.rating ? `<span>★ ${it.rating}/10</span>` : ''}${it.watchCount > 1 ? `<span>👁 ${it.watchCount}×</span>` : ''}</div></div>
             </div>`;
         }).join('')}</div>`;
     }
@@ -10307,6 +10349,7 @@ EXAMPLES:
                 }
                 else if (tab.startsWith('list:')) { items = await myListItemsGet(tab.slice(5)); emptyMsg = 'Seznam je prázdný.'; }
                 items = await fetchMyBackendPosters(items);
+                if (tab === 'history-episodes') items = await fetchMyBackendEpisodeTitles(items);
             })();
             await Promise.race([_load, _timeout(120000)]);
             // Mezitím se uživatel mohl přepnout na jiný tab (jiné volání
