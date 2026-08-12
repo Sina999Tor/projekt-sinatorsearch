@@ -9692,6 +9692,20 @@ EXAMPLES:
         return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(t));
     }
 
+    // Trvalá cache názvů/posterů pro položky ze Sinator backendu (historie,
+    // watchlist, hodnocení, seznamy) — bez ní by appka při KAŽDÉM otevření
+    // záložky (Hist. filmy apod.) znovu stahovala z TMDB desítky/stovky
+    // titulů, což na mobilu snadno vede k timeoutu. TTL 14 dní, pak se
+    // v tichosti obnoví na pozadí příštího načtení.
+    const MY_BACKEND_META_CACHE_KEY = 'sinator_backend_meta_cache_v1';
+    const MY_BACKEND_META_TTL = 14 * 24 * 60 * 60 * 1000;
+    function _loadMyBackendMetaCache() {
+        try { return JSON.parse(_store.getItem(MY_BACKEND_META_CACHE_KEY) || '{}'); }
+        catch (e) { return {}; }
+    }
+    function _saveMyBackendMetaCache(cache) {
+        try { _store.setItem(MY_BACKEND_META_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+    }
     async function fetchMyBackendPosters(items) {
         // Dřív se název dotahoval z TMDB jen u položek bez posteru (poster
         // z backendu bývá prázdný, ale title byl uložený - často anglicky,
@@ -9712,7 +9726,24 @@ EXAMPLES:
             if (!byId.has(key)) byId.set(key, []);
             byId.get(key).push(it);
         }
-        await _runWithConcurrency(Array.from(byId.entries()), 15, async ([key, group]) => {
+        const metaCache = _loadMyBackendMetaCache();
+        const now = Date.now();
+        function applyMeta(group, meta) {
+            group.forEach(it => {
+                it.title = meta.title || it.title || `#${it.id}`;
+                it.year = meta.year || it.year;
+                if (meta.poster_path) it.poster_path = meta.poster_path;
+                it.tmdbType = meta.kind;
+            });
+        }
+        const toFetch = [];
+        for (const [key, group] of byId.entries()) {
+            const cached = metaCache[key];
+            if (cached && (now - cached.ts) < MY_BACKEND_META_TTL) { applyMeta(group, cached); }
+            else { toFetch.push([key, group]); }
+        }
+        let cacheDirty = false;
+        await _runWithConcurrency(toFetch, 15, async ([key, group]) => {
             const [kind, id] = key.split(':');
             try {
                 const res = await _fetchWithTimeout(`https://api.themoviedb.org/3/${kind}/${id}?api_key=${tmdbApiKey}&language=cs-CZ`);
@@ -9733,14 +9764,13 @@ EXAMPLES:
                 }
                 const posterUrl = d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : null;
                 const year = (d.release_date || d.first_air_date || '').slice(0, 4);
-                group.forEach(it => {
-                    it.title = csTitle || it.title || `#${it.id}`;
-                    it.year = year || it.year;
-                    if (posterUrl) it.poster_path = posterUrl;
-                    it.tmdbType = kind;
-                });
+                const meta = { title: csTitle, year, poster_path: posterUrl, kind, ts: now };
+                metaCache[key] = meta;
+                cacheDirty = true;
+                applyMeta(group, meta);
             } catch (e) {}
         });
+        if (cacheDirty) _saveMyBackendMetaCache(metaCache);
         return items;
     }
 
@@ -9848,7 +9878,7 @@ EXAMPLES:
                 else if (tab.startsWith('list:')) { items = await myListItemsGet(tab.slice(5)); emptyMsg = 'Seznam je prázdný.'; }
                 items = await fetchMyBackendPosters(items);
             })();
-            await Promise.race([_load, _timeout(60000)]);
+            await Promise.race([_load, _timeout(120000)]);
             // Mezitím se uživatel mohl přepnout na jiný tab (jiné volání
             // renderMyBackendTab už mezitím proběhlo/probíhá) — pokud tenhle
             // běh už není pro aktuálně aktivní tab, výsledek zahodíme, ať
