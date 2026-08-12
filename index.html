@@ -15,36 +15,33 @@
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
-    <!-- Preconnect na externí API pro rychlejší síťové dotazy -->
-    <link rel="preconnect" href="https://api.themoviedb.org">
-    <link rel="dns-prefetch" href="https://api.themoviedb.org">
-    <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
-    <link rel="dns-prefetch" href="https://image.tmdb.org">
-    <link rel="preconnect" href="https://api.trakt.tv">
-    <link rel="dns-prefetch" href="https://api.trakt.tv">
-    <link rel="preconnect" href="https://api.simkl.com">
-    <link rel="dns-prefetch" href="https://api.simkl.com">
-    <link rel="preconnect" href="https://www.omdbapi.com">
-    <link rel="dns-prefetch" href="https://www.omdbapi.com">
+    <!-- Preconnect POUZE pro kritické zdroje potřebné hned při startu (vlastní backend + TMDb + Trakt) -->
     <link rel="preconnect" href="https://sinator-backend.vercel.app">
+    <link rel="preconnect" href="https://api.themoviedb.org">
+    <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
+    <link rel="preconnect" href="https://api.trakt.tv">
+
+    <!-- Ostatní API jen dns-prefetch (levnější, žádné plné TCP/TLS handshake předem) -->
     <link rel="dns-prefetch" href="https://sinator-backend.vercel.app">
-    <link rel="preconnect" href="https://mdblist.com">
+    <link rel="dns-prefetch" href="https://api.themoviedb.org">
+    <link rel="dns-prefetch" href="https://image.tmdb.org">
+    <link rel="dns-prefetch" href="https://api.trakt.tv">
+    <link rel="dns-prefetch" href="https://api.simkl.com">
+    <link rel="dns-prefetch" href="https://www.omdbapi.com">
     <link rel="dns-prefetch" href="https://mdblist.com">
-    <link rel="preconnect" href="https://generativelanguage.googleapis.com">
     <link rel="dns-prefetch" href="https://generativelanguage.googleapis.com">
-    <link rel="preconnect" href="https://api.groq.com">
     <link rel="dns-prefetch" href="https://api.groq.com">
-    <link rel="preconnect" href="https://openrouter.ai">
     <link rel="dns-prefetch" href="https://openrouter.ai">
-    <link rel="preconnect" href="https://musicbrainz.org">
     <link rel="dns-prefetch" href="https://musicbrainz.org">
-    <link rel="preconnect" href="https://epgshare01.online">
     <link rel="dns-prefetch" href="https://epgshare01.online">
+    <link rel="dns-prefetch" href="https://www.hellspy.to">
+
+    <!-- Google Fonts: preconnect na oba servery (CSS i fyzické soubory fontů) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
     <script>(function(){try{var t=localStorage.getItem('sinator_theme')||'dark';document.documentElement.setAttribute('data-theme',t);var m=document.getElementById('theme-color-meta');if(m)m.setAttribute('content', t==='light' ? '#f4f4f6' : '#0a0a0a');}catch(e){}})();</script>
     <title>Sinator Search - Filmové Vyhledávání</title>
-    <link rel="preconnect" href="https://www.hellspy.to">
-    <link rel="dns-prefetch" href="https://www.hellspy.to">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
   <style>#__vercel_toolbar_container, vercel-live-feedback { display: none !important; }</style>
