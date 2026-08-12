@@ -2863,8 +2863,8 @@
                 myHistoryGetAll('movies').catch(() => []),
                 myHistoryGetAll('episodes').catch(() => [])
             ]);
-            const existMovieSet = new Set(existingMovies.map(r => parseInt(r.id, 10)));
-            const existEpSet = new Set(existingEpisodes.map(r => `${r.id}_${r.season}_${r.episode}`));
+            const existMovieSet = new Set(existingMovies.map(r => `${parseInt(r.id, 10)}_${r.watched_at}`));
+            const existEpSet = new Set(existingEpisodes.map(r => `${r.id}_${r.season}_${r.episode}_${r.watched_at}`));
 
             setStatus('Stahuji historii sledování z Histra…');
             const historyRaw = await histraFetchAllPaged(
@@ -2877,6 +2877,12 @@
             // sesbírají a nahrají hromadně přes /import se skutečným časem
             // zhlédnutí z Histry (ne s "teď"), aby v detailu filmu/seriálu
             // seděl čas v sekci "Historie sledování – Sinator".
+            // POZOR: dedup se dělá podle (tmdb + přesný watched_at), ne jen
+            // podle tmdb — takže když je film/epizoda znovu shlédnutá (jiný
+            // watched_at než minule), NEPŘESKOČÍ se, ale přidá se jako další
+            // záznam historie. V "Hist. filmy/epizody" se pak díky
+            // dedupeHistoryItems zobrazí nahoře (řazeno podle nejnovějšího
+            // zhlédnutí) s odznakem "👁 Nx" (kolikrát bylo shlédnuto).
             const newMovieItems = [], newEpisodeItems = [];
             let skipped = 0;
             for (let hi = 0; hi < historyRaw.length; hi++) {
@@ -2885,16 +2891,17 @@
                 const parsed = histraParseHistoryEntry(raw);
                 if (!parsed) { skipped++; continue; }
                 if (parsed.kind === 'movie') {
-                    if (existMovieSet.has(parsed.tmdb)) continue;
-                    existMovieSet.add(parsed.tmdb);
+                    const key = `${parsed.tmdb}_${parsed.watchedAt}`;
+                    if (existMovieSet.has(key)) continue;
+                    existMovieSet.add(key);
                     newMovieItems.push({ id: parsed.tmdb, watched_at: parsed.watchedAt });
-                    log.movies.push(parsed.tmdb);
+                    log.movies.push({ tmdb: parsed.tmdb, watchedAt: parsed.watchedAt });
                 } else {
-                    const key = `${parsed.tmdb}_${parsed.season}_${parsed.number}`;
+                    const key = `${parsed.tmdb}_${parsed.season}_${parsed.number}_${parsed.watchedAt}`;
                     if (existEpSet.has(key)) continue;
                     existEpSet.add(key);
                     newEpisodeItems.push({ id: parsed.tmdb, season: parsed.season, episode: parsed.number, watched_at: parsed.watchedAt });
-                    log.episodes.push({ tmdb: parsed.tmdb, season: parsed.season, number: parsed.number });
+                    log.episodes.push({ tmdb: parsed.tmdb, season: parsed.season, number: parsed.number, watchedAt: parsed.watchedAt });
                 }
             }
 
@@ -3018,21 +3025,20 @@
         try {
             const [movies, episodes] = await Promise.all([myHistoryGetAll('movies').catch(() => []), myHistoryGetAll('episodes').catch(() => [])]);
             print(`Filmy v historii: ${movies.length}, epizody: ${episodes.length}`);
-            const movieById = new Map(movies.map(r => [parseInt(r.id, 10), r]));
-            const epByKey = new Map(episodes.map(r => [`${r.id}_${r.season}_${r.episode}`, r]));
-            print('— Krok 5: match dedup pro vzorek z Kroku 3 —');
+            const movieKeySet = new Set(movies.map(r => `${parseInt(r.id, 10)}_${r.watched_at}`));
+            const epKeySet = new Set(episodes.map(r => `${r.id}_${r.season}_${r.episode}_${r.watched_at}`));
+            print('— Krok 5: match dedup pro vzorek z Kroku 3 (podle tmdb + přesný watched_at) —');
             raw.forEach((e, i) => {
                 const parsed = histraParseHistoryEntry(e);
                 if (!parsed) return;
                 if (parsed.kind === 'movie') {
-                    const hit = movieById.get(parsed.tmdb);
-                    if (hit) print(`🔁 [${i}] tmdb=${parsed.tmdb} → UŽ V SINATORU (watched_at tam: ${hit.watched_at || '?'}). Proto sync tuhle položku nepočítá jako novou.`);
-                    else print(`🆕 [${i}] tmdb=${parsed.tmdb} → v Sinatoru NENÍ, sync by ji měl přidat.`);
+                    const key = `${parsed.tmdb}_${parsed.watchedAt}`;
+                    if (movieKeySet.has(key)) print(`🔁 [${i}] tmdb=${parsed.tmdb} @ ${new Date(parsed.watchedAt).toISOString()} → PŘESNĚ TENHLE watch event už v Sinatoru je (dřívější sync). Přeskočí se.`);
+                    else print(`🆕 [${i}] tmdb=${parsed.tmdb} @ ${new Date(parsed.watchedAt).toISOString()} → nový watch event, sync ho přidá (i když film v historii třeba už jednou je).`);
                 } else {
-                    const key = `${parsed.tmdb}_${parsed.season}_${parsed.number}`;
-                    const hit = epByKey.get(key);
-                    if (hit) print(`🔁 [${i}] ${key} → UŽ V SINATORU (watched_at tam: ${hit.watched_at || '?'}). Proto sync tuhle položku nepočítá jako novou.`);
-                    else print(`🆕 [${i}] ${key} → v Sinatoru NENÍ, sync by ji měl přidat.`);
+                    const key = `${parsed.tmdb}_${parsed.season}_${parsed.number}_${parsed.watchedAt}`;
+                    if (epKeySet.has(key)) print(`🔁 [${i}] ${parsed.tmdb} S${parsed.season}E${parsed.number} @ ${new Date(parsed.watchedAt).toISOString()} → PŘESNĚ TENHLE watch event už v Sinatoru je (dřívější sync). Přeskočí se.`);
+                    else print(`🆕 [${i}] ${parsed.tmdb} S${parsed.season}E${parsed.number} @ ${new Date(parsed.watchedAt).toISOString()} → nový watch event, sync ho přidá (i když epizoda v historii třeba už jednou je).`);
                 }
             });
         } catch (e) {
@@ -3097,12 +3103,25 @@
         const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
         let removedMovies = 0, removedEpisodes = 0, removedWl = 0, removedListItems = 0, removedLists = 0, errors = 0;
         try {
-            for (const tmdb of (log.movies || [])) {
-                try { await myHistoryRemove(tmdb, 'movie'); removedMovies++; } catch (e) { errors++; }
+            for (const m of (log.movies || [])) {
+                // Zpětná kompatibilita: starší log ukládal filmy jako holé tmdb
+                // číslo (bez watchedAt) — u nich smažeme podle id/typu jako dřív.
+                // Nový log má {tmdb, watchedAt} a mažeme přesně JEN ten watch
+                // event, co přidal tenhle sync — jiná zhlédnutí téhož filmu
+                // (rewatch) zůstanou nedotčená.
+                try {
+                    if (m && typeof m === 'object' && m.watchedAt != null) await myHistoryRemoveEntry(m.tmdb, 'movie', m.watchedAt);
+                    else await myHistoryRemove(typeof m === 'object' ? m.tmdb : m, 'movie');
+                    removedMovies++;
+                } catch (e) { errors++; }
             }
             setStatus(`Vracím zpět: filmy hotovo (${removedMovies}). Epizody…`);
             for (const ep of (log.episodes || [])) {
-                try { await myHistoryRemove(ep.tmdb, 'tv', ep.season, ep.number); removedEpisodes++; } catch (e) { errors++; }
+                try {
+                    if (ep.watchedAt != null) await myHistoryRemoveEntry(ep.tmdb, 'tv', ep.watchedAt, ep.season, ep.number);
+                    else await myHistoryRemove(ep.tmdb, 'tv', ep.season, ep.number);
+                    removedEpisodes++;
+                } catch (e) { errors++; }
             }
             setStatus(`Vracím zpět: epizody hotovo (${removedEpisodes}). Watchlist…`);
             for (const w of (log.watchlist || [])) {
