@@ -2058,6 +2058,9 @@
                     <button class="settings-btn-small" id="histraUndoBtn" style="display:none;width:100%;border-color:#f5a623;color:#f5a623;" onclick="undoLastHistraSync(this)"></button>
                 </div>
                 <div class="settings-actions" style="margin-top:8px;">
+                    <button class="settings-btn-small" style="width:100%;border-color:#00bcd4;color:#00bcd4;" onclick="debugHistraSync()">🔍 Diagnostika (proč nesynchronizuje)</button>
+                </div>
+                <div class="settings-actions" style="margin-top:8px;">
                     <button class="settings-btn-small" style="width:100%;border-color:#4caf50;color:#4caf50;" onclick="openHistraCleanupTool()">🧹 Zkontrolovat a vyčistit obsah</button>
                 </div>
                 <div id="histraSyncStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;line-height:1.5;"></div>
@@ -2901,6 +2904,77 @@
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = '🔄 Synchronizovat nyní'; }
         }
+    };
+
+    // ── Diagnostika Histra syncu ──────────────────────────────────────
+    // Ukáže krok za krokem, kde přesně sync vázne: (1) je proxy nasazená a
+    // co vrací, (2) jak vypadá syrová odpověď Histra API na pár posledních
+    // položek historie, (3) jak je parser (histraParseHistoryEntry)
+    // jednotlivě vyhodnotí a proč případně vyřadí, (4) kolik položek už je
+    // v Sinatoru (dedup). Nic neupravuje, jen čte a vypisuje.
+    window.debugHistraSync = async function() {
+        const statusEl = $('histraSyncStatus');
+        const lines = [];
+        const print = (t) => { lines.push(t); if (statusEl) statusEl.textContent = lines.join('\n'); };
+        print('🔍 Diagnostika spuštěna…');
+
+        if (!histraReady()) { print('❌ Histra token není nastavený.'); return; }
+        if (!myBackendReady()) { print('❌ Vlastní Sinator backend není nastavený (bez něj proxy nejde).'); return; }
+
+        // 1) Proxy endpoint — zavoláno přímo (mimo histraApi fallback logiku),
+        // ať je vidět přesný HTTP status a tělo odpovědi.
+        print('— Krok 1: /api/histra-proxy —');
+        try {
+            const proxyUrl = `${myBackendBase()}/histra-proxy?path=${encodeURIComponent('/api/v1/auth/me')}`;
+            const res = await fetch(proxyUrl, { headers: { ...myHeaders(), 'x-histra-token': histraToken() } });
+            const txt = await res.text();
+            print(`Proxy HTTP status: ${res.status}`);
+            print(`Proxy tělo (prvních 300 znaků): ${txt.slice(0, 300)}`);
+            if (res.status === 404) print('⚠️ Proxy vrací 404 → endpoint /api/histra-proxy na backendu neexistuje / špatná cesta v repu (Vercel routing).');
+        } catch (e) {
+            print('❌ Proxy fetch selhal (network/CORS): ' + e.message);
+        }
+
+        // 2) Syrová historie z Histry (přes histraApi, tj. proxy nebo přímé
+        // volání — ať přesně vidíme, co appka opravdu dostává).
+        print('— Krok 2: syrová Histra historie (posledních 5) —');
+        let raw = [];
+        try {
+            const data = await histraApi('/api/v1/tracking/history?extended=full&lang=cs-CZ&limit=5&offset=0');
+            raw = histraUnwrapList(data);
+            print(`Počet položek v odpovědi: ${raw.length} (typ odpovědi: ${Array.isArray(data) ? 'pole' : typeof data})`);
+            if (!raw.length) print('⚠️ Odpověď je prázdná nebo má neočekávaný tvar (viz histraUnwrapList) — zkontroluj konzoli pro plný JSON.');
+            console.log('Histra debug — raw history response:', data);
+        } catch (e) {
+            print('❌ Chyba při stahování historie: ' + e.message);
+            return;
+        }
+
+        // 3) Parsing jednotlivých položek — proč projdou / proč se vyřadí.
+        print('— Krok 3: parsování jednotlivých položek —');
+        raw.forEach((e, i) => {
+            const parsed = histraParseHistoryEntry(e);
+            const title = (e && (e.title || (e.show && e.show.title) || (e.movie && e.movie.title))) || '(bez názvu)';
+            if (parsed) {
+                print(`✅ [${i}] "${title}" → ${parsed.kind}, tmdb=${parsed.tmdb}${parsed.kind === 'episode' ? ` S${parsed.season}E${parsed.number}` : ''}`);
+            } else {
+                const isEpisode = !!(e.episode || e.type === 'episode');
+                const tmdbFound = histraExtractTmdb(isEpisode ? (e.show || e) : (e.movie || e));
+                print(`❌ [${i}] "${title}" → NEPROŠLO parsováním (isEpisode=${isEpisode}, tmdb nalezeno=${tmdbFound || 'ne'}). Klíče objektu: ${Object.keys(e || {}).join(', ')}`);
+            }
+        });
+        if (raw.length) console.log('Histra debug — first raw entry (plný tvar pro kontrolu polí):', raw[0]);
+
+        // 4) Kolik toho už Sinator má (dedup kontext).
+        print('— Krok 4: existující historie v Sinatoru —');
+        try {
+            const [movies, episodes] = await Promise.all([myHistoryGetAll('movies').catch(() => []), myHistoryGetAll('episodes').catch(() => [])]);
+            print(`Filmy v historii: ${movies.length}, epizody: ${episodes.length}`);
+        } catch (e) {
+            print('⚠️ Nepodařilo se načíst existující historii ze Sinatoru: ' + e.message);
+        }
+
+        print('— Hotovo. Pošli screenshot tohoto výpisu + konzoli (Krok 2/3 mají detail v console.log). —');
     };
 
     // ── Automatická kontrola nového sledování na Histře při startu appky ──
