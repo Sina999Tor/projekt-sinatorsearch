@@ -2031,6 +2031,11 @@
                     <button class="settings-btn-small" id="myBackendCleanupBtn" style="width:100%;border-color:#e07a6f;color:#e07a6f;" onclick="cleanupMySinatorHistoryDuplicates(this)">🧹 Vyčistit duplicity v historii</button>
                     <div id="myBackendCleanupStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;"></div>
                 </div>
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+                    <div style="font-size:0.72rem;color:#e05a5a;margin-bottom:8px;line-height:1.5;">⚠️ Nevratně smaže VŠECHNA data na tvém Sinator backendu (watchlist, seznamy, hodnocení, historii i rozkoukanost). API klíč a připojení backendu zůstanou zachované. Hodí se před čerstvým importem z Trakt exportu.</div>
+                    <button class="settings-btn-small settings-btn-remove" id="myBackendWipeBtn" style="width:100%;" onclick="wipeMySinatorBackend(this)">💣 Smazat vše na Sinator backendu</button>
+                    <div id="myBackendWipeStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;"></div>
+                </div>
             </div>
             <div class="settings-divider"></div>
             <div class="settings-section">
@@ -3261,6 +3266,100 @@
     function initMyBackendSettingsInputs() {
         if ($('myBackendKeyInput')) $('myBackendKeyInput').value = myBackendKey();
     }
+
+    // Paralelní zpracování pole položek s limitem souběžných requestů (stejný
+    // princip jako _myHistoryGetAllRaw) — u tisíců záznamů (historie) by
+    // sekvenční mazání trvalo příliš dlouho, ale neomezená paralelita by
+    // zas mohla zahltit backend/Redis.
+    async function _mySinatorBatchRun(items, fn, concurrency, onProgress) {
+        let idx = 0, done = 0, errors = 0;
+        async function worker() {
+            while (idx < items.length) {
+                const i = idx++;
+                try { await fn(items[i]); } catch (e) { errors++; }
+                done++;
+                if (onProgress) onProgress(done);
+            }
+        }
+        const workerCount = Math.max(1, Math.min(concurrency, items.length));
+        await Promise.all(Array.from({ length: workerCount }, () => worker()));
+        return errors;
+    }
+
+    // Kompletně vyprázdní vlastní Sinator backend (watchlist, seznamy,
+    // hodnocení, historie, rozkoukanost) — API klíč i nastavení backendu
+    // zůstávají, maže se jen obsah. Určeno hlavně jako příprava na čistý
+    // reimport z Trakt exportu (viz handleTraktExportImport výše).
+    window.wipeMySinatorBackend = async function(btnEl) {
+        if (!myBackendReady()) { alert('⚠️ Nejdřív nastav a ulož Sinator backend (klíč) výše.'); return; }
+        if (!confirm('⚠️ Tohle nevratně smaže VŠECHNA data na tvém Sinator backendu — watchlist, seznamy, hodnocení, historii i rozkoukanost. API klíč zůstane uložený. Opravdu pokračovat?')) return;
+        if (!confirm('Poslední varování: akce je nevratná a u velké historie může trvat i pár minut. Fakt smazat úplně vše?')) return;
+        const statusEl = $('myBackendWipeStatus');
+        const origLabel = btnEl.textContent;
+        btnEl.disabled = true;
+        btnEl.textContent = '⏳ Mažu…';
+        const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
+        try {
+            setStatus('Načítám seznam dat ke smazání…');
+            const [watchlist, lists, ratingsMovies, ratingsShows, histMovies, histEpisodes, histShows, progMovies, progShows] = await Promise.all([
+                myWatchlistGet().catch(() => []),
+                myListsGet().catch(() => []),
+                myRatingsGet('movies').catch(() => []),
+                myRatingsGet('shows').catch(() => []),
+                myHistoryGetAll('movies', true).catch(() => []),
+                myHistoryGetAll('episodes', true).catch(() => []),
+                myHistoryGetAll('shows', true).catch(() => []),
+                myProgressGet('movies').catch(() => []),
+                myProgressGet('shows').catch(() => [])
+            ]);
+
+            // Historie může mít pro jednu položku víc záznamů (přehráno vícekrát) —
+            // mazání jde přes id (+season/episode u epizod), takže stačí smazat
+            // každou unikátní kombinaci jednou.
+            const uniqBy = (arr, keyFn) => { const m = new Map(); (arr || []).forEach(it => m.set(keyFn(it), it)); return Array.from(m.values()); };
+            const uMovies = uniqBy(histMovies, it => it.id);
+            const uEpisodes = uniqBy(histEpisodes, it => `${it.id}:${it.season}:${it.episode}`);
+            const uShows = uniqBy(histShows, it => it.id);
+
+            const totalCount = (watchlist||[]).length + (lists||[]).length + (ratingsMovies||[]).length + (ratingsShows||[]).length
+                + uMovies.length + uEpisodes.length + uShows.length + (progMovies||[]).length + (progShows||[]).length;
+            let totalDone = 0, totalErrors = 0;
+
+            const runBatch = async (label, items, fn, concurrency) => {
+                if (!items || !items.length) return;
+                const errs = await _mySinatorBatchRun(items, fn, concurrency, (d) => {
+                    setStatus(`Mažu ${label}… ${totalDone + d}/${totalCount}`);
+                });
+                totalDone += items.length;
+                totalErrors += errs;
+            };
+
+            await runBatch('watchlist', watchlist, (it) => myWatchlistRemove(it.id, it.type === 'tv' ? 'tv' : 'movie'), 10);
+            await runBatch('vlastní seznamy', lists, (l) => myListDelete(l.id), 5); // smaže seznam i všechny jeho položky
+            await runBatch('hodnocení filmů', ratingsMovies, (r) => myRatingRemove(r.id, 'movie'), 10);
+            await runBatch('hodnocení seriálů', ratingsShows, (r) => myRatingRemove(r.id, 'tv'), 10);
+            await runBatch('historii filmů', uMovies, (it) => myHistoryRemove(it.id, 'movie'), 12);
+            await runBatch('historii epizod', uEpisodes, (it) => myHistoryRemove(it.id, 'tv', it.season, it.episode), 15);
+            await runBatch('historii seriálů', uShows, (it) => myHistoryRemove(it.id, 'tv'), 10);
+            await runBatch('rozkoukanost filmů', progMovies, (it) => myProgressRemove(it.id, 'movie'), 10);
+            await runBatch('rozkoukanost seriálů', progShows, (it) => myProgressRemove(it.id, 'tv', it.season, it.episode), 10);
+
+            // Zneplatni lokální cache/odznaky, ať appka hned ukazuje prázdný stav
+            // a nečeká na další refresh.
+            if (typeof _historyGetAllCache === 'object') { delete _historyGetAllCache.movies; delete _historyGetAllCache.episodes; delete _historyGetAllCache.shows; }
+            if (typeof mySinatorWatchedCache === 'object') { mySinatorWatchedCache.movies = new Set(); mySinatorWatchedCache.shows = new Set(); }
+            if (typeof applyWatchedBordersToAllCards === 'function') applyWatchedBordersToAllCards();
+
+            setStatus(totalErrors
+                ? `⚠️ Hotovo s chybami: smazáno ${totalCount - totalErrors}/${totalCount}. Spusť tlačítko znovu, ať se smaže zbytek.`
+                : `✅ Backend je čistý (smazáno ${totalCount} položek). Teď můžeš spustit Import z Trakt exportu výše.`);
+        } catch (e) {
+            setStatus('❌ ' + (e && e.message ? e.message : e));
+        } finally {
+            btnEl.disabled = false;
+            btnEl.textContent = origLabel;
+        }
+    };
 
     window.myBackendAddWatchlist = async function(id, type, title, year, poster) {
         if (!myBackendReady()) { alert('⚠️ Nejdřív nastav vlastní backend v Nastavení → Ostatní.'); return; }
