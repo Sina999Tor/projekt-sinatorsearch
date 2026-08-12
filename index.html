@@ -2939,11 +2939,18 @@
         // volání — ať přesně vidíme, co appka opravdu dostává).
         print('— Krok 2: syrová Histra historie (posledních 5) —');
         let raw = [];
+        let data;
         try {
-            const data = await histraApi('/api/v1/tracking/history?extended=full&lang=cs-CZ&limit=5&offset=0');
+            data = await histraApi('/api/v1/tracking/history?extended=full&lang=cs-CZ&limit=5&offset=0');
             raw = histraUnwrapList(data);
             print(`Počet položek v odpovědi: ${raw.length} (typ odpovědi: ${Array.isArray(data) ? 'pole' : typeof data})`);
-            if (!raw.length) print('⚠️ Odpověď je prázdná nebo má neočekávaný tvar (viz histraUnwrapList) — zkontroluj konzoli pro plný JSON.');
+            if (!raw.length) {
+                print('⚠️ histraUnwrapList nenašla pole dat. Syrová odpověď (klíče a obsah):');
+                if (data && typeof data === 'object') {
+                    print('Klíče objektu: ' + Object.keys(data).join(', '));
+                }
+                print(JSON.stringify(data, null, 2).slice(0, 1500));
+            }
             console.log('Histra debug — raw history response:', data);
         } catch (e) {
             print('❌ Chyba při stahování historie: ' + e.message);
