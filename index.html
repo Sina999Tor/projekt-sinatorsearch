@@ -2044,7 +2044,7 @@
                     <span class="dot" id="histraStatusDot"></span>
                     <span id="histraStatusText">Nepřipojeno</span>
                 </div>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin:8px 0;line-height:1.5;">Zadej osobní token z <a href="https://histra.net" target="_blank" style="color:#8b5cf6;">histra.net</a>. Synchronizuje se jen historie sledování (filmy a epizody, se skutečným časem zhlédnutí) — watchlist ani seznamy se nestahují. Appka navíc při každém spuštění sama zkontroluje, jestli na Histře nepřibylo něco nového, a pokud ano, potichu to doplní.</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin:8px 0;line-height:1.5;">Zadej osobní token z <a href="https://histra.net" target="_blank" style="color:#8b5cf6;">histra.net</a>. Synchronizuje se historie sledování (filmy a epizody, se skutečným časem zhlédnutí) a nové seznamy — watchlist se nestahuje a existující seznamy se nemění, založí se jen ty, co v Sinatoru ještě nemáš (podle názvu). Appka navíc při každém spuštění sama zkontroluje, jestli na Histře nepřibylo něco nového, a pokud ano, potichu to doplní.</div>
                 <div style="font-size:0.68rem;color:#f5a623;margin-bottom:8px;line-height:1.5;">⚠️ Histra API nepovoluje volání přímo z prohlížeče (CORS) — aby sync fungoval, potřebuješ na svém sinator-backend nasadit malý proxy endpoint <code>/api/histra-proxy</code>. Kód a instrukce od Claude, stačí zkopírovat do repa.</div>
                 <input type="password" id="histraTokenInput" placeholder="Histra token" style="width:100%;margin-bottom:8px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;" autocomplete="off">
                 <div class="settings-actions">
@@ -2797,6 +2797,36 @@
         return { type: isShow ? 'tv' : 'movie', tmdb, title: src.title || e.title || '' };
     }
 
+    // ── Histra "seznamy" (vlastní kolekce uživatele, ne watchlist) ─────────
+    // Na rozdíl od /tracking/history tenhle endpoint nemáme jistě ověřený —
+    // zkoušíme pár rozumných variant cesty za sebou a bereme první, co vrátí
+    // pole. Pokud nesedí, "🔍 Diagnostika" ukáže syrovou odpověď ke každé
+    // vyzkoušené cestě, ať se dá podle screenshotu doladit.
+    const HISTRA_LIST_ENDPOINTS = ['/api/v1/lists', '/api/v1/tracking/lists', '/api/v1/collections', '/api/v1/watchlists'];
+    async function histraFetchLists() {
+        for (const base of HISTRA_LIST_ENDPOINTS) {
+            try {
+                const data = await histraApi(`${base}?limit=200&offset=0`);
+                const arr = histraUnwrapList(data);
+                if (arr.length || Array.isArray(data)) return { endpoint: base, lists: arr };
+            } catch (e) { /* zkus další variantu cesty */ }
+        }
+        return { endpoint: null, lists: [] };
+    }
+    async function histraFetchListItems(listEndpointBase, list) {
+        const id = list && (list.id ?? list.list_id ?? list.slug ?? list.uuid);
+        if (id == null) return [];
+        const candidates = [`${listEndpointBase}/${id}/items`, `${listEndpointBase}/${id}`];
+        for (const path of candidates) {
+            try {
+                const data = await histraApi(`${path}?limit=500&offset=0`);
+                const arr = histraUnwrapList(data);
+                if (arr.length) return arr;
+            } catch (e) { /* zkus další variantu cesty */ }
+        }
+        return [];
+    }
+
     window.saveHistraToken = async function() {
         const input = $('histraTokenInput');
         const token = (input && input.value || '').trim();
@@ -2853,7 +2883,7 @@
         // Log toho, co tenhle běh syncu skutečně přidal — aby šlo případně
         // jedním klikem vrátit zpět (viz undoLastHistraSync), kdyby se
         // parsování netrefilo a přidalo něco špatně.
-        const log = { ts: Date.now(), movies: [], episodes: [] };
+        const log = { ts: Date.now(), movies: [], episodes: [], createdLists: [] };
         try {
             setStatus('Ověřuji token…');
             await histraApi('/api/v1/auth/me');
@@ -2914,6 +2944,41 @@
                 await myImportChunked('history-episodes', newEpisodeItems, silent ? null : statusEl, 'Historie epizod');
             }
 
+            // ── Seznamy: jen NOVÉ (podle názvu), na existující se nesahá ──
+            // Sync seznamy porovná podle názvu (case-insensitive) s tím, co už
+            // Sinator má. Pokud stejnojmenný seznam existuje, přeskočí se
+            // celý (nepřidávají se do něj ani položky) — na existující seznamy
+            // se prostě nesahá. Založí se jen seznamy, co v Sinatoru chybí.
+            let listsCreated = 0, listItemsAdded = 0;
+            try {
+                setStatus('Kontroluji seznamy na Histře…');
+                const [{ endpoint: listEndpoint, lists: histraLists }, sinatorLists] = await Promise.all([
+                    histraFetchLists(),
+                    myListsGet().catch(() => [])
+                ]);
+                if (listEndpoint && histraLists.length) {
+                    const existingNames = new Set(sinatorLists.map(l => (l.name || '').trim().toLocaleLowerCase('cs-CZ')));
+                    for (const hl of histraLists) {
+                        const name = (hl.name || hl.title || '').trim();
+                        if (!name) continue;
+                        if (existingNames.has(name.toLocaleLowerCase('cs-CZ'))) continue; // už mám → nesahat
+                        setStatus(`Stahuji položky nového seznamu „${name}"…`);
+                        const rawItems = await histraFetchListItems(listEndpoint, hl);
+                        const parsedItems = rawItems.map(histraParseMediaEntry).filter(Boolean).map(p => ({ id: p.tmdb, type: p.type }));
+                        existingNames.add(name.toLocaleLowerCase('cs-CZ')); // ať se v rámci téhle synchronizace nezaloží 2×
+                        if (!parsedItems.length) continue;
+                        setStatus(`Vytvářím nový seznam „${name}" (${parsedItems.length} položek)…`);
+                        let listId = null;
+                        for (let i = 0; i < parsedItems.length; i += 300) {
+                            const chunk = parsedItems.slice(i, i + 300);
+                            const resp = await myImportBatch('list', chunk, { name, listId });
+                            listId = resp.listId;
+                        }
+                        if (listId) { log.createdLists.push({ id: listId, name }); listsCreated++; listItemsAdded += parsedItems.length; }
+                    }
+                }
+            } catch (e) { console.error('Histra seznamy sync error:', e); }
+
             _store.setItem('sinator_histra_last_sync', String(Date.now()));
             _store.setItem('sinator_histra_sync_log', JSON.stringify(log));
             updateHistraLastSyncLabel();
@@ -2922,10 +2987,10 @@
             // nově doplněná historie hned projeví napříč appkou.
             if (typeof _historyGetAllCache === 'object') { delete _historyGetAllCache.movies; delete _historyGetAllCache.episodes; delete _historyGetAllCache.shows; }
             if (typeof refreshMySinatorWatchedCache === 'function') await refreshMySinatorWatchedCache();
-            const summary = `✅ Hotovo — doplněno do historie: filmy +${newMovieItems.length}, epizody +${newEpisodeItems.length}.` + (skipped ? `\n⚠️ ${skipped} položek se nepodařilo přiřadit (neznámý formát odpovědi).` : '') + `\nPokud sync přidal něco špatně, použij tlačítko „↩️ Vrátit poslední sync" níž.`;
+            const summary = `✅ Hotovo — doplněno do historie: filmy +${newMovieItems.length}, epizody +${newEpisodeItems.length}.` + (listsCreated ? `\n📁 Nové seznamy: ${listsCreated} (celkem ${listItemsAdded} položek). Existující seznamy zůstaly beze změny.` : '') + (skipped ? `\n⚠️ ${skipped} položek se nepodařilo přiřadit (neznámý formát odpovědi).` : '') + `\nPokud sync přidal něco špatně, použij tlačítko „↩️ Vrátit poslední sync" níž.`;
             setStatus(summary);
-            if (newMovieItems.length || newEpisodeItems.length) {
-                try { if (typeof _favToast === 'function') _favToast(`✅ Histra: doplněno ${newMovieItems.length + newEpisodeItems.length} položek do historie`); } catch (e) {}
+            if (newMovieItems.length || newEpisodeItems.length || listsCreated) {
+                try { if (typeof _favToast === 'function') _favToast(`✅ Histra: doplněno ${newMovieItems.length + newEpisodeItems.length} položek do historie` + (listsCreated ? ` + ${listsCreated} nových seznamů` : '')); } catch (e) {}
             } else if (!silent) {
                 try { if (typeof _favToast === 'function') _favToast('✅ Histra sync hotový — nic nového'); } catch (e) {}
             }
@@ -3043,6 +3108,35 @@
             });
         } catch (e) {
             print('⚠️ Nepodařilo se načíst existující historii ze Sinatoru: ' + e.message);
+        }
+
+        // 6) Seznamy — endpoint pro Histra "seznamy" není jistě ověřený (na
+        // rozdíl od /tracking/history), tak zkusíme všechny varianty a
+        // ukážeme, která zabrala + co vrátila. Pokud žádná nezabere nebo tvar
+        // dat nesedí, pošli tenhle výpis a doladíme cestu/parsing.
+        print('— Krok 6: seznamy (Histra „lists") —');
+        try {
+            const { endpoint, lists } = await histraFetchLists();
+            if (!endpoint) {
+                print(`⚠️ Žádná z vyzkoušených cest nevrátila pole seznamů: ${HISTRA_LIST_ENDPOINTS.join(', ')}`);
+            } else {
+                print(`✅ Funguje endpoint: ${endpoint} → ${lists.length} seznamů`);
+                console.log('Histra lists raw:', lists);
+                const sinatorLists = await myListsGet().catch(() => []);
+                const existingNames = new Set(sinatorLists.map(l => (l.name || '').trim().toLocaleLowerCase('cs-CZ')));
+                for (const hl of lists.slice(0, 10)) {
+                    const name = (hl.name || hl.title || '').trim() || '(bez názvu)';
+                    const already = existingNames.has(name.toLocaleLowerCase('cs-CZ'));
+                    print(`${already ? '🔁 UŽ MÁM (nesahá se)' : '🆕 NOVÝ (sync založí)'} — „${name}"`);
+                }
+                if (lists.length) {
+                    const items = await histraFetchListItems(endpoint, lists[0]);
+                    print(`Ukázka položek prvního seznamu „${(lists[0].name || lists[0].title || '?')}": ${items.length} položek (detail v console.log)`);
+                    console.log('Histra list items sample:', items.slice(0, 5));
+                }
+            }
+        } catch (e) {
+            print('⚠️ Chyba při zjišťování seznamů: ' + e.message);
         }
 
         print('— Hotovo. Pošli screenshot tohoto výpisu + konzoli (Krok 2/3 mají detail v console.log). —');
