@@ -2894,13 +2894,17 @@
             }
         } catch (e) {
             setStatus('❌ Chyba: ' + e.message);
+            console.error('Histra sync error:', e);
+            // I v tichém (automatickém) běhu chceme o chybě vědět — jinak by
+            // selhání proxy/CORS zůstalo neviditelné napořád (viz autoCheckHistraSync).
+            if (silent) { try { if (typeof _favToast === 'function') _favToast('⚠️ Histra auto-sync selhal: ' + (e && e.message ? e.message : e)); } catch (_) {} }
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = '🔄 Synchronizovat nyní'; }
         }
     };
 
     // ── Automatická kontrola nového sledování na Histře při startu appky ──
-    // Lehká kontrola (jen první stránka historie) max. jednou za 10 minut —
+    // Lehká kontrola (posledních ~60 záznamů historie) max. jednou za 10 minut —
     // pokud najde něco novějšího než poslední úspěšný sync, potichu spustí
     // plný (dedup) sync na pozadí. Appka se tak sama drží aktuální bez
     // nutnosti chodit do Nastavení a klikat na Synchronizovat ručně.
@@ -2913,13 +2917,19 @@
             _store.setItem('sinator_histra_last_autocheck', String(Date.now()));
 
             const lastSyncTs = parseInt(_store.getItem('sinator_histra_last_sync') || '0', 10);
-            const recentRaw = await histraFetchAllPaged('/api/v1/tracking/history?extended=full&lang=cs-CZ', 20, 1);
+            // 3 stránky po 20 (~60 posledních záznamů) — pojistka pro dny, kdy
+            // se toho na Histře stihlo naklikat víc, ať se žádná novinka
+            // "neztratí" mezi stránkami kvůli řazení odpovědi z API.
+            const recentRaw = await histraFetchAllPaged('/api/v1/tracking/history?extended=full&lang=cs-CZ', 20, 3);
             const hasNew = (recentRaw || []).some(raw => histraExtractWatchedAt(raw) > lastSyncTs);
             if (hasNew) {
                 console.log('Histra: nalezeno nové sledování, spouštím automatický sync na pozadí…');
                 await window.syncFromHistra(null, true);
             }
-        } catch (e) { console.warn('Histra auto-check error:', e); }
+        } catch (e) {
+            console.warn('Histra auto-check error:', e);
+            try { if (typeof _favToast === 'function') _favToast('⚠️ Histra auto-check selhal: ' + (e && e.message ? e.message : e)); } catch (_) {}
+        }
     };
 
     function histraSyncLog() {
