@@ -1002,6 +1002,17 @@
         .settings-status { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; margin: 4px 0; }
         .settings-status .dot { width: 8px; height: 8px; border-radius: 50%; background: #666; }
         .settings-status .dot.online { background: #1db954; box-shadow: 0 0 6px #1db954; }
+        .connect-service-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:6px; }
+        .connect-service-card { display:flex; align-items:center; gap:8px; padding:14px 12px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; cursor:pointer; transition:border-color 0.15s, transform 0.15s; }
+        .connect-service-card:active { border-color:var(--gold); transform:scale(0.98); }
+        .connect-service-card .connect-service-icon { font-size:1.35rem; line-height:1; flex-shrink:0; }
+        .connect-service-card .connect-service-name { flex:1; font-size:0.82rem; font-weight:600; color:var(--text); line-height:1.25; }
+        .connect-service-card .dot { width:8px; height:8px; border-radius:50%; background:#666; flex-shrink:0; }
+        .connect-service-card .dot.online { background:#1db954; box-shadow:0 0 6px #1db954; }
+        .connect-service-panel { display:none; }
+        .connect-service-panel.active { display:block; }
+        .connect-back-btn { display:flex; align-items:center; gap:6px; width:100%; background:none; border:1px solid var(--border); color:var(--text); padding:9px 14px; border-radius:20px; font-size:0.82rem; font-weight:600; cursor:pointer; margin-bottom:14px; }
+        .connect-back-btn:active { border-color:var(--gold); color:var(--gold); }
         .settings-status .code { font-family: monospace; background: var(--bg-elevated); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; }
         .settings-divider { height: 1px; background: var(--border); margin: 8px 0; }
         .settings-full-btn { width: 100%; padding: 10px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text); cursor: pointer; margin-bottom: 8px; transition: 0.2s; }
@@ -1972,6 +1983,36 @@
             </div>
             <!-- --- SUBTAB: PROPOJENÍ --- -->
             <div class="settings-subtab-content" id="settingsSubtabContentConnect">
+            <div class="connect-service-grid" id="connectServicePicker">
+                <div class="connect-service-card" onclick="switchConnectService('trakt')">
+                    <span class="connect-service-icon">🔺</span>
+                    <span class="connect-service-name">Trakt.tv</span>
+                    <span class="dot" id="traktStatusDotMini"></span>
+                </div>
+                <div class="connect-service-card" onclick="switchConnectService('simkl')">
+                    <span class="connect-service-icon" style="color:#1cb99a;">🎯</span>
+                    <span class="connect-service-name">Simkl</span>
+                    <span class="dot" id="simklStatusDotMini"></span>
+                </div>
+                <div class="connect-service-card" onclick="switchConnectService('sinator')">
+                    <span class="connect-service-icon" style="color:#6090ff;">🧩</span>
+                    <span class="connect-service-name">Sinator backend</span>
+                    <span class="dot" id="sinatorStatusDotMini"></span>
+                </div>
+                <div class="connect-service-card" onclick="switchConnectService('histra')">
+                    <span class="connect-service-icon" style="color:#8b5cf6;">📼</span>
+                    <span class="connect-service-name">Histra.net</span>
+                    <span class="dot" id="histraStatusDotMini"></span>
+                </div>
+                <div class="connect-service-card" onclick="switchConnectService('ivysilani')">
+                    <span class="connect-service-icon" style="color:#60b0ff;">📡</span>
+                    <span class="connect-service-name">iVysílání ČT</span>
+                    <span class="dot" id="ivysilaniStatusDotMini"></span>
+                </div>
+            </div>
+
+            <div class="connect-service-panel" id="connectPanelTrakt">
+                <button class="connect-back-btn" onclick="switchConnectService(null)">← Zpět na služby</button>
             <div class="settings-section">
                 <span class="settings-label">Trakt.tv</span>
                 <div class="settings-status">
@@ -1994,7 +2035,11 @@
                 </div>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">Stáhne aktuální stav z Traktu a opraví seriály, které se dřív omylem označily jako "Shlédnuto", i když ještě neměly odvysílané/shlédnuté všechny díly.</div>
             </div>
-            <div class="settings-divider"></div>
+            </div>
+            <!-- /connectPanelTrakt -->
+
+            <div class="connect-service-panel" id="connectPanelSimkl">
+                <button class="connect-back-btn" onclick="switchConnectService(null)">← Zpět na služby</button>
             <div class="settings-section">
                 <span class="settings-label" style="color:#1cb99a;">🎯 Simkl</span>
                 <div class="settings-status">
@@ -2010,7 +2055,11 @@
                     <button class="settings-btn-small settings-btn-remove" onclick="disconnectSimkl()">❌ Odhlásit</button>
                 </div>
             </div>
-            <div class="settings-divider"></div>
+            </div>
+            <!-- /connectPanelSimkl -->
+
+            <div class="connect-service-panel" id="connectPanelSinator">
+                <button class="connect-back-btn" onclick="switchConnectService(null)">← Zpět na služby</button>
             <div class="settings-section">
                 <span class="settings-label" style="color:#6090ff;">🧩 Sinator backend</span>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Vlastní náhrada za Trakt — watchlist, seznamy, hodnocení, historie.</div>
@@ -2037,7 +2086,11 @@
                     <div id="myBackendWipeStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;"></div>
                 </div>
             </div>
-            <div class="settings-divider"></div>
+            </div>
+            <!-- /connectPanelSinator -->
+
+            <div class="connect-service-panel" id="connectPanelHistra">
+                <button class="connect-back-btn" onclick="switchConnectService(null)">← Zpět na služby</button>
             <div class="settings-section">
                 <span class="settings-label" style="color:#8b5cf6;">📼 Histra.net</span>
                 <div class="settings-status">
@@ -2066,6 +2119,8 @@
                 <div id="histraSyncStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;line-height:1.5;"></div>
                 <div id="histraLastSync" style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;"></div>
             </div>
+            </div>
+            <!-- /connectPanelHistra -->
             <div class="settings-divider" style="display:none;"></div>
             <div class="settings-section" style="display:none;">
                 <span class="settings-label" style="color:#ff9800;">🗃️ MDBList</span>
@@ -2084,7 +2139,9 @@
                 </div>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Vaše uživatelské jméno z profilu na <a href="https://mdblist.com/" target="_blank" style="color:#ff9800;">mdblist.com</a></div>
             </div>
-            <div class="settings-divider" style="display:none;"></div>
+
+            <div class="connect-service-panel" id="connectPanelIvysilani">
+                <button class="connect-back-btn" onclick="switchConnectService(null)">← Zpět na služby</button>
             <div class="settings-section">
                 <span class="settings-label" style="color:#60b0ff;">📡 iVysílání ČT</span>
                 <div class="settings-status">
@@ -2102,6 +2159,8 @@
                     Přihlašovací údaje do <a href="https://www.ivysilani.cz" target="_blank" style="color:#60b0ff;">ivysilani.cz</a>. Po synchronizaci se zobrazí vaše oblíbené pořady a seznamy přímo v aplikaci. Přehrávání se spustí v přehrávači iVysílání.
                 </div>
             </div>
+            </div>
+            <!-- /connectPanelIvysilani -->
             </div>
             </div>
             <!-- ============ TAB: VZHLED ============ -->
@@ -2844,7 +2903,7 @@
     };
     async function testHistraConnection() {
         const dot = $('histraStatusDot'); const text = $('histraStatusText');
-        if (!histraReady()) { if (text) text.textContent = 'Nepřipojeno'; if (dot) dot.className = 'dot'; return; }
+        if (!histraReady()) { if (text) text.textContent = 'Nepřipojeno'; if (dot) dot.className = 'dot'; if (typeof syncConnectServiceDots === 'function') syncConnectServiceDots(); return; }
         if (text) text.textContent = 'Ověřuji…';
         try {
             const me = await histraApi('/api/v1/auth/me');
@@ -2857,6 +2916,7 @@
             if (dot) dot.className = 'dot';
         }
         updateHistraLastSyncLabel();
+        if (typeof syncConnectServiceDots === 'function') syncConnectServiceDots();
     }
     function updateHistraLastSyncLabel() {
         const el = $('histraLastSync');
@@ -3533,6 +3593,7 @@
         } catch (e) {
             if (statusEl) statusEl.innerHTML = '<span style="color:#e07a6f;">❌ ' + (e && e.message ? e.message : e) + '</span>';
         }
+        if (typeof syncConnectServiceDots === 'function') syncConnectServiceDots();
     };
     window.disconnectMyBackend = function() {
         if (!confirm('Odebrat klíč k vlastnímu backendu?')) return;
@@ -3540,6 +3601,7 @@
         _store.removeItem('sinator_mybackend');
         if ($('myBackendKeyInput')) $('myBackendKeyInput').value = '';
         if ($('myBackendStatus')) $('myBackendStatus').innerHTML = '';
+        if (typeof syncConnectServiceDots === 'function') syncConnectServiceDots();
     };
     function initMyBackendSettingsInputs() {
         if ($('myBackendKeyInput')) $('myBackendKeyInput').value = myBackendKey();
@@ -4661,8 +4723,40 @@
             if(content) content.classList.toggle('active', key === tab);
             if(btn) btn.classList.toggle('active', key === tab);
         });
+        if (tab === 'connect') switchConnectService(null);
     }
     window.switchKeysSubTab = switchKeysSubTab;
+
+    // ── Propojení: jednotlivé služby (Trakt/Simkl/Sinator/Histra/iVysílání) mají
+    // vlastní obrazovku místo jednoho dlouhého scrollu. switchConnectService(null)
+    // ukáže dlaždice se službami; s ID konkrétní služby přepne na její panel.
+    const CONNECT_SERVICE_PANELS = { trakt: 'connectPanelTrakt', simkl: 'connectPanelSimkl', sinator: 'connectPanelSinator', histra: 'connectPanelHistra', ivysilani: 'connectPanelIvysilani' };
+    function switchConnectService(service) {
+        const picker = $('connectServicePicker');
+        if (picker) picker.style.display = service ? 'none' : 'grid';
+        Object.keys(CONNECT_SERVICE_PANELS).forEach(function(key) {
+            const panel = $(CONNECT_SERVICE_PANELS[key]);
+            if (panel) panel.classList.toggle('active', key === service);
+        });
+        if (!service) syncConnectServiceDots();
+    }
+    window.switchConnectService = switchConnectService;
+
+    // Dlaždice v pickeru mají vlastní (mini) indikátor stavu, nezávislý na
+    // dot/textu uvnitř panelu dané služby — po každé změně stavu je potřeba
+    // je zrcadlit. Sinator backend nemá vlastní "connected" dot (jen textový
+    // status), tak se u něj bere přímo myBackendReady().
+    function syncConnectServiceDots() {
+        [['traktStatusDot', 'traktStatusDotMini'], ['simklStatusDot', 'simklStatusDotMini'], ['histraStatusDot', 'histraStatusDotMini']].forEach(function(pair) {
+            const main = $(pair[0]), mini = $(pair[1]);
+            if (main && mini) mini.className = main.className;
+        });
+        const ivysMain = $('ivysilaniStatusDot'), ivysMini = $('ivysilaniStatusDotMini');
+        if (ivysMain && ivysMini) { ivysMini.className = 'dot'; ivysMini.style.background = ivysMain.style.background || ''; }
+        const sinDot = $('sinatorStatusDotMini');
+        if (sinDot) sinDot.className = (typeof myBackendReady === 'function' && myBackendReady()) ? 'dot online' : 'dot';
+    }
+    window.syncConnectServiceDots = syncConnectServiceDots;
 
     function switchSettingsTab(tab) {
         const tabs = { keys: 'Keys', appearance: 'Appearance', other: 'Other', admin: 'Admin' };
@@ -4686,6 +4780,7 @@
         initMyBackendSettingsInputs();
         initHistraSettingsInputs();
         updateGeminiStatus(); updateGroqStatus(); updateOpenRouterStatus(); updateOmdbStatus();
+        syncConnectServiceDots();
         updateThemeToggleUI();
         $('settingsModal')?.classList.add('open');
         if(window.updatePwaBtn) updatePwaBtn();
@@ -6508,6 +6603,7 @@
             if (isConnected) { dot.className = 'dot online'; text.textContent = 'Připojeno'; if (codeDisplay && codeValue) { codeDisplay.style.display = 'block'; codeValue.textContent = state.trakt.username || 'Uživatel'; } }
             else { dot.className = 'dot'; text.textContent = 'Nepřipojeno'; if (codeDisplay) codeDisplay.style.display = 'none'; }
         }
+        if (typeof syncConnectServiceDots === 'function') syncConnectServiceDots();
     }
     window.diagnoseTraktUser = async function() {
         if (!state.trakt.accessToken) { alert('⚠️ Nejsi připojen k Traktu.'); return; }
@@ -6826,6 +6922,7 @@
                 if (codeDisplay) codeDisplay.style.display = 'none';
             }
         }
+        if (typeof syncConnectServiceDots === 'function') syncConnectServiceDots();
     }
 
     function disconnectSimkl() {
@@ -31132,6 +31229,7 @@ function updateIvysilaniStatus() {
     if (badge){ badge.style.display = count > 0 ? 'grid' : 'none'; badge.textContent = count > 99 ? '99+' : count; }
     const uInput = document.getElementById('ivysilaniUserInput');
     if (uInput && !uInput.value) uInput.value = user || '';
+    if (typeof syncConnectServiceDots === 'function') syncConnectServiceDots();
 }
 
 function saveIvysilaniLogin() {
