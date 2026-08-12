@@ -3009,11 +3009,32 @@
         }
         if (raw.length) console.log('Histra debug — first raw entry (plný tvar pro kontrolu polí):', raw[0]);
 
-        // 4) Kolik toho už Sinator má (dedup kontext).
-        print('— Krok 4: existující historie v Sinatoru —');
+        // 4) Kolik toho už Sinator má (dedup kontext) + přesně u KAŽDÉ ze
+        // vzorkových 15 položek z Kroku 3 ukázat, jestli ji dedup v tuhle
+        // chvíli považuje za "už mám" nebo "nová" — a pokud "už mám", tak
+        // podle čeho (jiný watched_at v Sinatoru = jiný zdroj/watch event,
+        // ne nutně tahle konkrétní přehrání z Histry).
+        print('— Krok 4: existující historie v Sinatoru (dedup kontext) —');
         try {
             const [movies, episodes] = await Promise.all([myHistoryGetAll('movies').catch(() => []), myHistoryGetAll('episodes').catch(() => [])]);
             print(`Filmy v historii: ${movies.length}, epizody: ${episodes.length}`);
+            const movieById = new Map(movies.map(r => [parseInt(r.id, 10), r]));
+            const epByKey = new Map(episodes.map(r => [`${r.id}_${r.season}_${r.episode}`, r]));
+            print('— Krok 5: match dedup pro vzorek z Kroku 3 —');
+            raw.forEach((e, i) => {
+                const parsed = histraParseHistoryEntry(e);
+                if (!parsed) return;
+                if (parsed.kind === 'movie') {
+                    const hit = movieById.get(parsed.tmdb);
+                    if (hit) print(`🔁 [${i}] tmdb=${parsed.tmdb} → UŽ V SINATORU (watched_at tam: ${hit.watched_at || '?'}). Proto sync tuhle položku nepočítá jako novou.`);
+                    else print(`🆕 [${i}] tmdb=${parsed.tmdb} → v Sinatoru NENÍ, sync by ji měl přidat.`);
+                } else {
+                    const key = `${parsed.tmdb}_${parsed.season}_${parsed.number}`;
+                    const hit = epByKey.get(key);
+                    if (hit) print(`🔁 [${i}] ${key} → UŽ V SINATORU (watched_at tam: ${hit.watched_at || '?'}). Proto sync tuhle položku nepočítá jako novou.`);
+                    else print(`🆕 [${i}] ${key} → v Sinatoru NENÍ, sync by ji měl přidat.`);
+                }
+            });
         } catch (e) {
             print('⚠️ Nepodařilo se načíst existující historii ze Sinatoru: ' + e.message);
         }
