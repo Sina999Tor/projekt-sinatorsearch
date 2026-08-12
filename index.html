@@ -115,7 +115,7 @@
             <span class="btn-icon">❤️</span><span class="btn-label">Oblíbené</span>
             <span class="badge fav" id="favBadge" style="display:none">0</span>
         </button>
-        <button class="action-btn icon" onclick="try{ if(typeof openSlozkyModal!=='function'){ alert('DIAGNOSTIKA: openSlozkyModal neexistuje jako funkce! typeof='+typeof openSlozkyModal); } else { openSlozkyModal(); } }catch(e){ alert('DIAGNOSTIKA CHYBA: '+e.message+'\n'+(e.stack||'')); }" title="Moje složky">
+        <button class="action-btn icon" onclick="openSlozkyModal()" title="Moje složky">
             <span class="btn-icon">📁</span><span class="btn-label">Složky</span>
         </button>
         <button class="action-btn icon" id="btnListsToggle" onclick="openListsModal()" title="Seznamy — Trakt, Simkl, Shlédnuté…">
