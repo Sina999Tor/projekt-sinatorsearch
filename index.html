@@ -2702,7 +2702,7 @@
     function histraUnwrapList(data) {
         if (Array.isArray(data)) return data;
         if (!data || typeof data !== 'object') return [];
-        return data.data || data.items || data.results || data.lists || [];
+        return data.data || data.items || data.results || data.lists || data.entries || [];
     }
     async function histraFetchAllPaged(basePath, limit, maxPages) {
         limit = limit || 100; maxPages = maxPages || 200;
@@ -2746,15 +2746,26 @@
         }
         return Date.now();
     }
+    // Histra API vrací plochou strukturu s polem "kind" ("movie"/"episode"),
+    // ne vnořené objekty jako Trakt. Podporujeme obojí: pokud je e.episode
+    // objekt (Trakt-styl), bereme season/number z něj; jinak zkoušíme ploché
+    // varianty (e.season/e.episode_number/e.number) přímo na top-level entry.
     function histraParseHistoryEntry(e) {
         if (!e || typeof e !== 'object') return null;
-        const isEpisode = !!(e.episode || e.type === 'episode');
+        const kind = e.kind || e.type;
+        const isEpisode = kind === 'episode' || (e.episode && typeof e.episode === 'object');
         const watchedAt = histraExtractWatchedAt(e);
         if (isEpisode) {
+            let season, number;
             const showObj = e.show || e;
+            if (e.episode && typeof e.episode === 'object') {
+                season = e.episode.season != null ? e.episode.season : e.season;
+                number = e.episode.number != null ? e.episode.number : e.number;
+            } else {
+                season = e.season != null ? e.season : e.season_number;
+                number = e.episode_number != null ? e.episode_number : (e.number != null ? e.number : e.episode);
+            }
             const showTmdb = histraExtractTmdb(showObj);
-            const season = (e.episode && e.episode.season != null) ? e.episode.season : e.season;
-            const number = (e.episode && e.episode.number != null) ? e.episode.number : e.number;
             if (!showTmdb || season == null || number == null) return null;
             return { kind: 'episode', tmdb: showTmdb, season: parseInt(season, 10), number: parseInt(number, 10), watchedAt };
         }
@@ -2937,11 +2948,11 @@
 
         // 2) Syrová historie z Histry (přes histraApi, tj. proxy nebo přímé
         // volání — ať přesně vidíme, co appka opravdu dostává).
-        print('— Krok 2: syrová Histra historie (posledních 5) —');
+        print('— Krok 2: syrová Histra historie (posledních 15) —');
         let raw = [];
         let data;
         try {
-            data = await histraApi('/api/v1/tracking/history?extended=full&lang=cs-CZ&limit=5&offset=0');
+            data = await histraApi('/api/v1/tracking/history?extended=full&lang=cs-CZ&limit=15&offset=0');
             raw = histraUnwrapList(data);
             print(`Počet položek v odpovědi: ${raw.length} (typ odpovědi: ${Array.isArray(data) ? 'pole' : typeof data})`);
             if (!raw.length) {
@@ -2965,11 +2976,21 @@
             if (parsed) {
                 print(`✅ [${i}] "${title}" → ${parsed.kind}, tmdb=${parsed.tmdb}${parsed.kind === 'episode' ? ` S${parsed.season}E${parsed.number}` : ''}`);
             } else {
-                const isEpisode = !!(e.episode || e.type === 'episode');
+                const isEpisode = (e.kind || e.type) === 'episode' || (e.episode && typeof e.episode === 'object');
                 const tmdbFound = histraExtractTmdb(isEpisode ? (e.show || e) : (e.movie || e));
                 print(`❌ [${i}] "${title}" → NEPROŠLO parsováním (isEpisode=${isEpisode}, tmdb nalezeno=${tmdbFound || 'ne'}). Klíče objektu: ${Object.keys(e || {}).join(', ')}`);
             }
         });
+        // Speciálně dohledat a vypsat první epizodu, ať vidíme přesný tvar
+        // (dosud jsme ověřili jen film — epizoda může mít jiná pole pro
+        // season/number, a bez vzorku bychom to jen odhadovali).
+        const epSample = raw.find(e => (e.kind || e.type) === 'episode' || (e.episode && typeof e.episode === 'object'));
+        if (epSample) {
+            print('— Vzorek epizody (syrový JSON) —');
+            print(JSON.stringify(epSample, null, 2).slice(0, 1500));
+        } else {
+            print('ℹ️ V tomto vzorku nebyla žádná epizoda (jen filmy) — pokud epizody taky nesynchronizují, spusť diagnostiku znovu poté, co něco z epizody na Histře přehraješ.');
+        }
         if (raw.length) console.log('Histra debug — first raw entry (plný tvar pro kontrolu polí):', raw[0]);
 
         // 4) Kolik toho už Sinator má (dedup kontext).
