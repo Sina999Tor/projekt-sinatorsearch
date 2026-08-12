@@ -2049,6 +2049,12 @@
                 <div class="settings-actions" style="margin-top:8px;">
                     <button class="settings-btn-small" id="histraSyncBtn" style="width:100%;border-color:#8b5cf6;color:#8b5cf6;" onclick="syncFromHistra(this)">🔄 Synchronizovat nyní</button>
                 </div>
+                <div class="settings-actions" style="margin-top:8px;">
+                    <button class="settings-btn-small" id="histraUndoBtn" style="display:none;width:100%;border-color:#f5a623;color:#f5a623;" onclick="undoLastHistraSync(this)"></button>
+                </div>
+                <div class="settings-actions" style="margin-top:8px;">
+                    <button class="settings-btn-small" style="width:100%;border-color:#4caf50;color:#4caf50;" onclick="openHistraCleanupTool()">🧹 Zkontrolovat a vyčistit obsah</button>
+                </div>
                 <div id="histraSyncStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;line-height:1.5;"></div>
                 <div id="histraLastSync" style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;"></div>
             </div>
@@ -2720,14 +2726,14 @@
         const isEpisode = !!(e.episode || e.type === 'episode');
         if (isEpisode) {
             const showObj = e.show || e;
-            const showTmdb = histraExtractTmdb(showObj) || histraExtractTmdb(e);
+            const showTmdb = histraExtractTmdb(showObj);
             const season = (e.episode && e.episode.season != null) ? e.episode.season : e.season;
             const number = (e.episode && e.episode.number != null) ? e.episode.number : e.number;
             if (!showTmdb || season == null || number == null) return null;
             return { kind: 'episode', tmdb: showTmdb, season: parseInt(season, 10), number: parseInt(number, 10) };
         }
         const movieObj = e.movie || e;
-        const movieTmdb = histraExtractTmdb(movieObj) || histraExtractTmdb(e);
+        const movieTmdb = histraExtractTmdb(movieObj);
         if (!movieTmdb) return null;
         return { kind: 'movie', tmdb: movieTmdb };
     }
@@ -2736,7 +2742,7 @@
         if (!e || typeof e !== 'object') return null;
         const isShow = !!(e.show || e.type === 'show' || e.type === 'tv' || e.type === 'series');
         const src = isShow ? (e.show || e) : (e.movie || e);
-        const tmdb = histraExtractTmdb(src) || histraExtractTmdb(e);
+        const tmdb = histraExtractTmdb(src);
         if (!tmdb) return null;
         return { type: isShow ? 'tv' : 'movie', tmdb, title: src.title || e.title || '' };
     }
@@ -2782,6 +2788,7 @@
     function initHistraSettingsInputs() {
         if ($('histraTokenInput')) $('histraTokenInput').value = histraToken();
         updateHistraStatus();
+        updateHistraUndoBtn();
     }
 
     window.syncFromHistra = async function(btn) {
@@ -2790,6 +2797,10 @@
         const statusEl = $('histraSyncStatus');
         const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
         if (btn) { btn.disabled = true; btn.textContent = '⏳ Synchronizuji…'; }
+        // Log toho, co tenhle běh syncu skutečně přidal — aby šlo případně
+        // jedním klikem vrátit zpět (viz undoLastHistraSync), kdyby se
+        // parsování netrefilo a přidalo něco špatně.
+        const log = { ts: Date.now(), movies: [], episodes: [], watchlist: [], listItems: [], createdLists: [] };
         try {
             setStatus('Ověřuji token…');
             await histraApi('/api/v1/auth/me');
@@ -2815,11 +2826,11 @@
                 if (!parsed) { skipped++; continue; }
                 if (parsed.kind === 'movie') {
                     if (existMovieSet.has(parsed.tmdb)) continue;
-                    try { await myHistoryAdd(parsed.tmdb, 'movie'); existMovieSet.add(parsed.tmdb); newMovies++; } catch (e) {}
+                    try { await myHistoryAdd(parsed.tmdb, 'movie'); existMovieSet.add(parsed.tmdb); newMovies++; log.movies.push(parsed.tmdb); } catch (e) {}
                 } else {
                     const key = `${parsed.tmdb}_${parsed.season}_${parsed.number}`;
                     if (existEpSet.has(key)) continue;
-                    try { await myHistoryAdd(parsed.tmdb, 'tv', parsed.season, parsed.number); existEpSet.add(key); newEpisodes++; } catch (e) {}
+                    try { await myHistoryAdd(parsed.tmdb, 'tv', parsed.season, parsed.number); existEpSet.add(key); newEpisodes++; log.episodes.push({ tmdb: parsed.tmdb, season: parsed.season, number: parsed.number }); } catch (e) {}
                 }
             }
 
@@ -2833,7 +2844,7 @@
                 if (!parsed) { skipped++; continue; }
                 const key = `${parsed.type}_${parsed.tmdb}`;
                 if (existWlSet.has(key)) continue;
-                try { await myWatchlistAdd(parsed.tmdb, parsed.type, parsed.title, '', null); existWlSet.add(key); newWatchlist++; } catch (e) {}
+                try { await myWatchlistAdd(parsed.tmdb, parsed.type, parsed.title, '', null); existWlSet.add(key); newWatchlist++; log.watchlist.push({ tmdb: parsed.tmdb, type: parsed.type }); } catch (e) {}
             }
 
             setStatus(`Filmy +${newMovies}, epizody +${newEpisodes}, watchlist +${newWatchlist}. Stahuji seznamy z Histra…`);
@@ -2846,12 +2857,14 @@
                 const name = hl.name || hl.title || 'Histra seznam';
                 setStatus(`Seznamy (${li + 1}/${histraLists.length}): "${name}"…`);
                 let sinList = existingLists.find(l => (l.name || '').trim().toLowerCase() === name.trim().toLowerCase());
+                let wasCreatedNow = false;
                 if (!sinList) {
-                    try { sinList = await myListCreate(name); existingLists.push(sinList); newLists++; }
+                    try { sinList = await myListCreate(name); existingLists.push(sinList); newLists++; wasCreatedNow = true; }
                     catch (e) { continue; }
                 }
                 const sinListId = sinList.id != null ? sinList.id : sinList._id;
                 if (sinListId == null) continue;
+                if (wasCreatedNow) log.createdLists.push({ id: sinListId, name });
                 let existingItems = [];
                 try { existingItems = await myListItemsGet(sinListId); } catch (e) {}
                 const existItemSet = new Set((existingItems || []).map(r => `${r.type}_${r.id}`));
@@ -2866,13 +2879,19 @@
                     if (!parsed) { skipped++; continue; }
                     const key = `${parsed.type}_${parsed.tmdb}`;
                     if (existItemSet.has(key)) continue;
-                    try { await myListItemAdd(sinListId, parsed.tmdb, parsed.type); existItemSet.add(key); newListItems++; } catch (e) {}
+                    try {
+                        await myListItemAdd(sinListId, parsed.tmdb, parsed.type);
+                        existItemSet.add(key); newListItems++;
+                        if (!wasCreatedNow) log.listItems.push({ listId: sinListId, tmdb: parsed.tmdb, type: parsed.type });
+                    } catch (e) {}
                 }
             }
 
             _store.setItem('sinator_histra_last_sync', String(Date.now()));
+            _store.setItem('sinator_histra_sync_log', JSON.stringify(log));
             updateHistraLastSyncLabel();
-            const summary = `✅ Hotovo — doplněno: filmy +${newMovies}, epizody +${newEpisodes}, watchlist +${newWatchlist}, seznamy +${newLists} nové (+${newListItems} položek).` + (skipped ? `\n⚠️ ${skipped} položek se nepodařilo přiřadit (neznámý formát odpovědi) — pokud se to týká hodně položek, napiš mi a upravím parsování.` : '');
+            updateHistraUndoBtn();
+            const summary = `✅ Hotovo — doplněno: filmy +${newMovies}, epizody +${newEpisodes}, watchlist +${newWatchlist}, seznamy +${newLists} nové (+${newListItems} položek).` + (skipped ? `\n⚠️ ${skipped} položek se nepodařilo přiřadit (neznámý formát odpovědi) — pokud se to týká hodně položek, napiš mi a upravím parsování.` : '') + `\nPokud sync přidal něco špatně, použij tlačítko „↩️ Vrátit poslední sync" níž.`;
             setStatus(summary);
             try { if (typeof _favToast === 'function') _favToast('✅ Histra sync hotový'); } catch (e) {}
         } catch (e) {
@@ -2880,6 +2899,174 @@
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = '🔄 Synchronizovat nyní'; }
         }
+    };
+
+    function histraSyncLog() {
+        try { return JSON.parse(_store.getItem('sinator_histra_sync_log') || 'null'); } catch (e) { return null; }
+    }
+    function updateHistraUndoBtn() {
+        const btn = $('histraUndoBtn');
+        if (!btn) return;
+        const log = histraSyncLog();
+        btn.style.display = log ? 'block' : 'none';
+        if (log) {
+            const count = (log.movies || []).length + (log.episodes || []).length + (log.watchlist || []).length + (log.listItems || []).length + (log.createdLists || []).length;
+            btn.textContent = `↩️ Vrátit poslední sync (${count} položek, ${new Date(log.ts).toLocaleString('cs-CZ')})`;
+        }
+    }
+    // Smaže přesně to, co poslední spuštění syncFromHistra přidalo (podle
+    // logu uloženého při tom běhu) — nic víc. Pokud sync přidal něco
+    // špatně napárované, tohle to bezpečně vrátí zpátky.
+    window.undoLastHistraSync = async function(btn) {
+        const log = histraSyncLog();
+        if (!log) { alert('Není co vracet — žádný záznam o posledním syncu.'); return; }
+        if (!myBackendReady()) { alert('⚠️ Vlastní backend není nastavený.'); return; }
+        if (!confirm(`Opravdu smazat vše, co poslední Histra sync přidal (${new Date(log.ts).toLocaleString('cs-CZ')})? Tahle akce je nevratná.`)) return;
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Vracím zpět…'; }
+        const statusEl = $('histraSyncStatus');
+        const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
+        let removedMovies = 0, removedEpisodes = 0, removedWl = 0, removedListItems = 0, removedLists = 0, errors = 0;
+        try {
+            for (const tmdb of (log.movies || [])) {
+                try { await myHistoryRemove(tmdb, 'movie'); removedMovies++; } catch (e) { errors++; }
+            }
+            setStatus(`Vracím zpět: filmy hotovo (${removedMovies}). Epizody…`);
+            for (const ep of (log.episodes || [])) {
+                try { await myHistoryRemove(ep.tmdb, 'tv', ep.season, ep.number); removedEpisodes++; } catch (e) { errors++; }
+            }
+            setStatus(`Vracím zpět: epizody hotovo (${removedEpisodes}). Watchlist…`);
+            for (const w of (log.watchlist || [])) {
+                try { await myWatchlistRemove(w.tmdb, w.type); removedWl++; } catch (e) { errors++; }
+            }
+            setStatus(`Vracím zpět: watchlist hotovo (${removedWl}). Položky v seznamech…`);
+            // Položky přidané do JIŽ EXISTUJÍCÍCH seznamů (ne nově založených) —
+            // ty smažeme jednotlivě, celý seznam zůstane zachovaný.
+            for (const li of (log.listItems || [])) {
+                try { await myListItemRemove(li.listId, li.tmdb, li.type); removedListItems++; } catch (e) { errors++; }
+            }
+            setStatus(`Vracím zpět: položky hotovo (${removedListItems}). Nově založené seznamy…`);
+            // Celé seznamy, které sync sám založil — ty smažeme kompletně
+            // (obsahovaly jen to, co přidal tenhle sync).
+            for (const cl of (log.createdLists || [])) {
+                try { await myListDelete(cl.id); removedLists++; } catch (e) { errors++; }
+            }
+            _store.removeItem('sinator_histra_sync_log');
+            updateHistraUndoBtn();
+            window._myBackendListsCache = null;
+            const summary = `✅ Vráceno zpět: filmy -${removedMovies}, epizody -${removedEpisodes}, watchlist -${removedWl}, položky v seznamech -${removedListItems}, smazané seznamy -${removedLists}.` + (errors ? `\n⚠️ ${errors} položek se nepodařilo smazat (možná už byly odstraněné jinde).` : '');
+            setStatus(summary);
+            try { if (typeof _favToast === 'function') _favToast('↩️ Poslední sync vrácen zpět'); } catch (e) {}
+        } catch (e) {
+            setStatus('❌ Chyba při vracení zpět: ' + e.message);
+        } finally {
+            if (btn) { btn.disabled = false; updateHistraUndoBtn(); }
+        }
+    };
+
+    // ── Nástroj na hromadnou kontrolu obsahu (watchlist/historie/seznamy) ──
+    // Pro syncy, co proběhly ještě před zavedením undo logu (nebo pro
+    // jakoukoliv jinou ruční kontrolu) — ukáže úplně všechno na jedné
+    // obrazovce se zaškrtávátky, ať se dá rychle prohlédnout a smazat víc
+    // najednou, místo klikání křížků záložku po záložce.
+    window.openHistraCleanupTool = async function() {
+        if (!myBackendReady()) { alert('⚠️ Vlastní backend není nastavený.'); return; }
+        try { closeHelperModals(); } catch (e) {}
+        let overlay = document.getElementById('histraCleanupOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'histraCleanupOverlay';
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal" style="max-width:700px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;">
+                        <span style="font-weight:700;font-size:1rem;">🧹 Kontrola obsahu</span>
+                        <button onclick="document.getElementById('histraCleanupOverlay').classList.remove('open')" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;">✕</button>
+                    </div>
+                    <div style="padding:10px 18px 0;font-size:0.75rem;color:var(--text-muted);flex-shrink:0;">Watchlist, historie i všechny vlastní seznamy na jednom místě. Zaškrtni, co tam nepatří, a smaž najednou — u každé položky vidíš, kde všude se nachází.</div>
+                    <div style="padding:10px 18px;flex-shrink:0;">
+                        <input id="histraCleanupFilter" placeholder="Filtrovat podle názvu…" style="width:100%;padding:8px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;" oninput="renderHistraCleanupList()">
+                    </div>
+                    <div id="histraCleanupList" style="flex:1;overflow-y:auto;padding:0 18px 12px;"></div>
+                    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;">
+                        <button class="settings-btn-small settings-btn-remove" style="flex:1;" onclick="deleteSelectedHistraCleanupItems(this)">🗑️ Smazat vybrané</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+        }
+        overlay.classList.add('open');
+        const listEl = document.getElementById('histraCleanupList');
+        listEl.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">Načítám…</div>`;
+        try {
+            const [watchlist, movies, episodes, shows, lists] = await Promise.all([
+                myWatchlistGet().catch(() => []),
+                myHistoryGetAll('movies').catch(() => []),
+                myHistoryGetAll('episodes').catch(() => []),
+                myHistoryGetAll('shows').catch(() => []),
+                myListsGet().catch(() => [])
+            ]);
+            const byKey = new Map();
+            function addBucket(it, label, removeFn) {
+                const type = (it.type === 'tv' || it.type === 'shows' || it.type === 'episodes') ? 'tv' : 'movie';
+                const key = `${type}_${it.id}`;
+                let entry = byKey.get(key);
+                if (!entry) { entry = { id: it.id, type, title: it.title || `#${it.id}`, year: it.year || '', poster_path: it.poster_path || '', buckets: [] }; byKey.set(key, entry); }
+                entry.buckets.push({ label, removeFn });
+            }
+            watchlist.forEach(it => addBucket(it, '🔖 Watchlist', () => myWatchlistRemove(it.id, (it.type === 'tv' ? 'tv' : 'movie'))));
+            movies.forEach(it => addBucket(it, '🕓 Historie', () => myHistoryRemove(it.id, 'movie')));
+            episodes.forEach(it => addBucket(it, `🕓 Historie S${it.season}E${it.episode}`, () => myHistoryRemove(it.id, 'tv', it.season, it.episode)));
+            shows.forEach(it => addBucket(it, '🕓 Historie (celý seriál)', () => myHistoryRemove(it.id, 'tv')));
+            for (const l of lists) {
+                let items = [];
+                try { items = await myListItemsGet(l.id); } catch (e) {}
+                (items || []).forEach(it => addBucket(it, `📁 ${l.name}`, () => myListItemRemove(l.id, it.id, (it.type === 'tv' ? 'tv' : 'movie'))));
+            }
+            let flat = Array.from(byKey.values());
+            flat = await fetchMyBackendPosters(flat);
+            flat.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'cs'));
+            window._histraCleanupItems = flat;
+            renderHistraCleanupList();
+        } catch (e) {
+            listEl.innerHTML = `<div class="empty" style="padding:20px;text-align:center;">⚠️ ${e && e.message ? e.message : e}</div>`;
+        }
+    };
+    window.renderHistraCleanupList = function() {
+        const c = document.getElementById('histraCleanupList');
+        if (!c) return;
+        const filterEl = document.getElementById('histraCleanupFilter');
+        const filter = (filterEl && filterEl.value || '').trim().toLowerCase();
+        const items = (window._histraCleanupItems || []).filter(it => !filter || (it.title || '').toLowerCase().includes(filter));
+        if (!items.length) { c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">Nic nenalezeno.</div>`; return; }
+        c.innerHTML = items.map(it => `
+            <label style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+                <input type="checkbox" class="histra-cleanup-check" data-key="${it.type}_${it.id}" style="width:18px;height:18px;flex-shrink:0;">
+                <img src="${it.poster_path || ''}" onerror="this.style.visibility='hidden'" style="width:36px;height:54px;object-fit:cover;border-radius:4px;background:var(--bg-elevated);flex-shrink:0;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${jsq(it.title)}${it.year ? ` (${it.year})` : ''}</div>
+                    <div style="font-size:0.68rem;color:var(--text-muted);">${it.buckets.map(b => b.label).join(' · ')}</div>
+                </div>
+            </label>
+        `).join('');
+    };
+    window.deleteSelectedHistraCleanupItems = async function(btn) {
+        const checks = document.querySelectorAll('.histra-cleanup-check:checked');
+        if (!checks.length) { alert('Nic není vybráno.'); return; }
+        if (!confirm(`Smazat ${checks.length} vybraných položek ze všech míst, kde se nachází? Tahle akce je nevratná.`)) return;
+        btn.disabled = true; btn.textContent = '⏳ Mažu…';
+        let done = 0, errors = 0;
+        for (const chk of checks) {
+            const key = chk.dataset.key;
+            const item = (window._histraCleanupItems || []).find(it => `${it.type}_${it.id}` === key);
+            if (!item) continue;
+            for (const b of item.buckets) {
+                try { await b.removeFn(); } catch (e) { errors++; }
+            }
+            done++;
+        }
+        window._myBackendListsCache = null;
+        btn.disabled = false; btn.textContent = '🗑️ Smazat vybrané';
+        try { if (typeof _favToast === 'function') _favToast(`🗑️ Smazáno ${done} položek` + (errors ? ` (${errors} chyb)` : '')); } catch (e) {}
+        window.openHistraCleanupTool();
     };
 
     // ── Import exportovaných dat z Traktu (ZIP) do vlastního backendu ──────────
