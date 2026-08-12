@@ -10303,17 +10303,11 @@ EXAMPLES:
     // Historie může obsahovat víc záznamů pro stejný film/epizodu (přehráno vícekrát) —
     // sloučíme je do jedné karty a připočítáme počet zhlédnutí. U "Hist. seriály"
     // (isEpisodes=false, klíčováno jen podle show id) se season/episode přepíší na
-    // nejnovější sledovanou epizodu. Primárně podle watched_at — ale při hromadném
-    // označení "shlédnuto" (cascade marking) mívají všechny epizody stejný nebo
-    // skoro stejný timestamp, takže při shodě rozhodne vyšší season/episode (v
-    // binge-watch pořadí logicky "dál" = novější).
-    function isLaterEpisode(a, b) {
-        const ta = a.watched_at || 0, tb = b.watched_at || 0;
-        if (ta !== tb) return ta > tb;
-        const sa = a.season != null ? a.season : -1, sb = b.season != null ? b.season : -1;
-        if (sa !== sb) return sa > sb;
-        return (a.episode != null ? a.episode : -1) > (b.episode != null ? b.episode : -1);
-    }
+    // NEJVYŠŠÍ nalezený pár (season,episode) — ne podle watched_at, protože při
+    // hromadném označení "shlédnuto" (cascade marking) backend nemusí zapisovat
+    // časy v pořadí epizod, takže "nejnovější watched_at" nemusí být "nejdál
+    // sledovaný díl". Nejvyšší S/E pár odpovídá tomu, jak daleko v seriálu
+    // uživatel reálně je.
     function dedupeHistoryItems(items, isEpisodes) {
         const map = new Map();
         for (const it of items) {
@@ -10321,14 +10315,11 @@ EXAMPLES:
             const existing = map.get(key);
             if (existing) {
                 existing.watchCount = (existing.watchCount || 1) + 1;
+                if ((it.watched_at || 0) > (existing.watched_at || 0)) existing.watched_at = it.watched_at;
                 if (!isEpisodes) {
-                    if (isLaterEpisode(it, existing)) {
-                        existing.watched_at = it.watched_at;
-                        existing.season = it.season;
-                        existing.episode = it.episode;
-                    }
-                } else if ((it.watched_at || 0) > (existing.watched_at || 0)) {
-                    existing.watched_at = it.watched_at;
+                    const curRank = existing.season != null ? (existing.season * 100000 + (existing.episode || 0)) : -1;
+                    const itRank = it.season != null ? (it.season * 100000 + (it.episode || 0)) : -1;
+                    if (itRank > curRank) { existing.season = it.season; existing.episode = it.episode; }
                 }
             } else {
                 map.set(key, { ...it, watchCount: 1 });
