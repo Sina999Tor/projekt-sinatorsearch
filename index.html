@@ -10301,7 +10301,11 @@ EXAMPLES:
 
 
     // Historie může obsahovat víc záznamů pro stejný film/epizodu (přehráno vícekrát) —
-    // sloučíme je do jedné karty a připočítáme počet zhlédnutí.
+    // sloučíme je do jedné karty a připočítáme počet zhlédnutí. U "Hist. seriály"
+    // (isEpisodes=false, klíčováno jen podle show id) se navíc season/episode
+    // vždy přepíší na tu NEJNOVĚJI sledovanou epizodu (podle watched_at), ne
+    // na tu první, na kterou appka při skládání pole narazí — jinak by se na
+    // kartě zobrazoval de facto náhodný díl.
     function dedupeHistoryItems(items, isEpisodes) {
         const map = new Map();
         for (const it of items) {
@@ -10309,7 +10313,10 @@ EXAMPLES:
             const existing = map.get(key);
             if (existing) {
                 existing.watchCount = (existing.watchCount || 1) + 1;
-                if ((it.watched_at || 0) > (existing.watched_at || 0)) existing.watched_at = it.watched_at;
+                if ((it.watched_at || 0) > (existing.watched_at || 0)) {
+                    existing.watched_at = it.watched_at;
+                    if (!isEpisodes) { existing.season = it.season; existing.episode = it.episode; }
+                }
             } else {
                 map.set(key, { ...it, watchCount: 1 });
             }
@@ -10437,7 +10444,6 @@ EXAMPLES:
             { key: 'ratings-movies', label: '⭐ Hodnoc. filmy' },
             { key: 'ratings-shows', label: '⭐ Hodnoc. seriály' },
             { key: 'history-movies', label: '🕓 Hist. filmy' },
-            { key: 'history-episodes', label: '🕓 Hist. epizody' },
             { key: 'history-shows', label: '🕓 Hist. seriály' },
         ];
         const listTabs = lists.map(l => ({ key: `list:${l.id}`, label: `📁 ${l.name} (${l.item_count || 0})`, id: l.id }));
