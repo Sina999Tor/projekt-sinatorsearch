@@ -2765,7 +2765,7 @@
             const d = (me && me.data) || me || {};
             const uname = d.username || d.name || d.email || '✅ Připojeno';
             if (text) text.textContent = uname;
-            if (dot) dot.className = 'dot connected';
+            if (dot) dot.className = 'dot online';
         } catch (e) {
             if (text) text.textContent = '⚠️ ' + e.message;
             if (dot) dot.className = 'dot';
@@ -2808,7 +2808,9 @@
             setStatus('Stahuji historii sledování z Histra…');
             const historyRaw = await histraFetchAllPaged('/api/v1/tracking/history?extended=full&lang=cs-CZ', 100);
             let newMovies = 0, newEpisodes = 0, skipped = 0;
-            for (const raw of historyRaw) {
+            for (let hi = 0; hi < historyRaw.length; hi++) {
+                const raw = historyRaw[hi];
+                if (historyRaw.length > 20 && hi % 10 === 0) setStatus(`Historie: ${hi + 1}/${historyRaw.length}… (filmy +${newMovies}, epizody +${newEpisodes})`);
                 const parsed = histraParseHistoryEntry(raw);
                 if (!parsed) { skipped++; continue; }
                 if (parsed.kind === 'movie') {
@@ -2824,7 +2826,9 @@
             setStatus(`Filmy +${newMovies}, epizody +${newEpisodes}. Stahuji watchlist z Histra…`);
             const wlRaw = await histraFetchAllPaged('/api/v1/watchlist?extended=full&lang=cs-CZ', 100).catch(() => []);
             let newWatchlist = 0;
-            for (const raw of wlRaw) {
+            for (let wi = 0; wi < wlRaw.length; wi++) {
+                const raw = wlRaw[wi];
+                if (wlRaw.length > 20 && wi % 10 === 0) setStatus(`Watchlist: ${wi + 1}/${wlRaw.length}… (nových +${newWatchlist})`);
                 const parsed = histraParseMediaEntry(raw);
                 if (!parsed) { skipped++; continue; }
                 const key = `${parsed.type}_${parsed.tmdb}`;
@@ -2835,10 +2839,12 @@
             setStatus(`Filmy +${newMovies}, epizody +${newEpisodes}, watchlist +${newWatchlist}. Stahuji seznamy z Histra…`);
             const histraLists = histraUnwrapList(await histraApi('/api/v1/lists').catch(() => []));
             let newLists = 0, newListItems = 0;
-            for (const hl of histraLists) {
+            for (let li = 0; li < histraLists.length; li++) {
+                const hl = histraLists[li];
                 const listApiId = hl.id != null ? hl.id : hl._id;
                 if (listApiId == null) { skipped++; continue; }
                 const name = hl.name || hl.title || 'Histra seznam';
+                setStatus(`Seznamy (${li + 1}/${histraLists.length}): "${name}"…`);
                 let sinList = existingLists.find(l => (l.name || '').trim().toLowerCase() === name.trim().toLowerCase());
                 if (!sinList) {
                     try { sinList = await myListCreate(name); existingLists.push(sinList); newLists++; }
@@ -2853,7 +2859,9 @@
                 const detailRaw = await histraApi(`/api/v1/lists/${listApiId}?extended=full&lang=cs-CZ`).catch(() => null);
                 const detail = (detailRaw && detailRaw.data) || detailRaw || {};
                 const items = detail.items || detail.results || [];
-                for (const it of items) {
+                for (let ii = 0; ii < items.length; ii++) {
+                    const it = items[ii];
+                    if (items.length > 5) setStatus(`Seznamy (${li + 1}/${histraLists.length}): "${name}" — položka ${ii + 1}/${items.length}…`);
                     const parsed = histraParseMediaEntry(it);
                     if (!parsed) { skipped++; continue; }
                     const key = `${parsed.type}_${parsed.tmdb}`;
