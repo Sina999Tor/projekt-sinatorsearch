@@ -951,6 +951,7 @@
                 <div style="font-size:0.68rem;color:#f5a623;margin-bottom:8px;line-height:1.5;">⚠️ Histra API nepovoluje volání přímo z prohlížeče (CORS) — aby sync fungoval, potřebuješ na svém sinator-backend nasadit malý proxy endpoint <code>/api/histra-proxy</code>. Kód a instrukce od Claude, stačí zkopírovat do repa.</div>
                 <input type="password" id="histraTokenInput" placeholder="Histra token" style="width:100%;margin-bottom:8px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;" autocomplete="off">
                 <div class="settings-actions">
+                    <button class="settings-btn-small show-key-btn" onclick="toggleHistraKeyVisibility()">👁️ Zobrazit</button>
                     <button class="settings-btn-small" style="border-color:#8b5cf6;color:#8b5cf6;" onclick="saveHistraToken()">🔑 Uložit a otestovat</button>
                     <button class="settings-btn-small settings-btn-remove" onclick="disconnectHistra()">❌ Odpojit</button>
                 </div>
@@ -5035,6 +5036,7 @@
     window.updateAdultToggleUI = updateAdultToggleUI;
 
     function toggleApiKeyVisibility() { const input = $('tmdbApiKeyInput'); if (input) input.type = input.type === 'password' ? 'text' : 'password'; }
+    function toggleHistraKeyVisibility() { const input = $('histraTokenInput'); if (input) input.type = input.type === 'password' ? 'text' : 'password'; }
     function toggleGeminiKeyVisibility() { const input = $('geminiApiKeyInput'); if (input) input.type = input.type === 'password' ? 'text' : 'password'; }
     function toggleGroqKeyVisibility() { const input = $('groqApiKeyInput'); if (input) input.type = input.type === 'password' ? 'text' : 'password'; }
     function toggleOpenRouterKeyVisibility() { const input = $('openRouterKeyInput'); if (input) input.type = input.type === 'password' ? 'text' : 'password'; }
