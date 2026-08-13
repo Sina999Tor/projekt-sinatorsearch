@@ -1916,6 +1916,14 @@
                             const isComplete = totalEps > 0 && watchedEps >= totalEps && !nextEpisode && !(totalSeasons > maxWatchedSeason && totalSeasons > 0);
                             if (isComplete) {
                                 state.watched[k] = { id: tmdbId, type: 'tv', title: d.name || d.title || '', year: (d.first_air_date || '').slice(0, 4), posterPath: '', addedAt: Date.now() };
+                                // Rozsvítit i badge "🧩 Shlédnuto (Sinator)" — bez tohohle by
+                                // backend ukazoval jen jednotlivé epizody, ne celý seriál.
+                                if (typeof myBackendReady === 'function' && myBackendReady()) {
+                                    try {
+                                        const existingShow = await myHistoryGetForId('shows', tmdbId).catch(() => []);
+                                        if (!Array.isArray(existingShow) || existingShow.length === 0) await myHistoryAdd(tmdbId, 'tv');
+                                    } catch (e) { /* nekritické, badge se dorovná při dalším otevření detailu */ }
+                                }
                             }
                         } catch (e) { /* při chybě necháme seriál jako jen rozkoukaný */ }
                     }));
@@ -10383,6 +10391,9 @@ EXAMPLES:
                     else await myHistoryRemove(tvId, 'tv', seasonNumber, epNumber);
                     if (typeof refreshMySinatorWatchedCache === 'function') refreshMySinatorWatchedCache();
                     if (typeof initMySinatorWatchedBadge === 'function') initMySinatorWatchedBadge(tvId, 'tv');
+                    // Pokud tahle epizoda byla poslední chybějící, zkusí se rovnou
+                    // založit i show-level záznam (rozsvítí badge "🧩 Shlédnuto (Sinator)").
+                    if (!wasWatched && typeof maybeMarkShowCompleteOnBackend === 'function') maybeMarkShowCompleteOnBackend(tvId);
                 } catch (e) { console.warn('Sinator episode sync error:', e); }
             })();
         }
@@ -11064,6 +11075,15 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             const list = await myHistoryGetForId(histType, id);
             const watched = Array.isArray(list) && list.length > 0;
             applyMySinatorWatchedBadgeStyle(btn, watched);
+            // Sebeopravný mechanismus pro seriály: pokud badge ukazuje
+            // "neshlédnuto", ale lokálně je odškrtnutá poslední epizoda a
+            // seriál je tím pádem kompletně dokoukaný (viz maybeMarkShowCompleteOnBackend),
+            // potichu na pozadí dorovnáme i show-level záznam na backendu —
+            // řeší i starší tituly odsledované přes Histra sync/ručně epizodu
+            // po epizodě předtím, než appka tohle uměla.
+            if (!watched && type === 'tv' && typeof maybeMarkShowCompleteOnBackend === 'function') {
+                maybeMarkShowCompleteOnBackend(id);
+            }
             // Sebeopravný mechanismus: kdyby něco jiného (např. duplicitní
             // vykreslení) mezitím přepsalo pilulku zpět na výchozí stav,
             // ještě párkrát v krátkých intervalech znovu vynutíme správný
@@ -12766,6 +12786,38 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             saveWatched();
             await fetchMissingPosters();
         } catch(e) { console.warn('Trakt watched sync error:', e); }
+    }
+
+    // ── AUTOMATICKÉ OZNAČENÍ CELÉHO SERIÁLU JAKO SHLÉDNUTÉHO NA SINATOR BACKENDU ──
+    // Tlačítko "🧩 Shlédnuto (Sinator)" v detailu seriálu čte samostatný
+    // "show-level" záznam v backendové historii (history-shows) — ten je
+    // koncepčně oddělený od jednotlivých epizod v history-episodes, protože
+    // appka umožňuje označit starý/neseriózně trackovaný seriál jako
+    // shlédnutý i bez rozepisování epizod. Problém: když někdo naopak
+    // odsleduje seriál epizodu po epizodě (ručně nebo přes Histra sync),
+    // show-level záznam se sám nezaloží a badge zůstane prázdný, i když je
+    // ve skutečnosti vše odškrtnuté. Tahle funkce to po každé nově
+    // odškrtnuté epizodě zkontroluje a v tichosti dorovná.
+    async function maybeMarkShowCompleteOnBackend(tvId) {
+        if (!tmdbApiKey) return;
+        if (typeof myBackendReady !== 'function' || !myBackendReady()) return;
+        try {
+            const d = await (await fetch(`${BASE}/tv/${tvId}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
+            const totalEps = d.number_of_episodes || 0;
+            const totalSeasons = d.number_of_seasons || 0;
+            const nextEpisode = d.next_episode_to_air;
+            const epKeys = Object.keys(state.watched).filter(x => x.startsWith(`ep_${tvId}_`));
+            const watchedEps = epKeys.length;
+            const watchedSeasonNums = epKeys.map(x => Number(x.split('_')[2]));
+            const maxWatchedSeason = watchedSeasonNums.length ? Math.max(...watchedSeasonNums) : 0;
+            const isComplete = totalEps > 0 && watchedEps >= totalEps && !nextEpisode && !(totalSeasons > maxWatchedSeason && totalSeasons > 0);
+            if (!isComplete) return;
+            const existing = await myHistoryGetForId('shows', tvId).catch(() => []);
+            if (Array.isArray(existing) && existing.length > 0) return; // už tam je, nic nedělat
+            await myHistoryAdd(tvId, 'tv');
+            if (typeof refreshMySinatorWatchedCache === 'function') refreshMySinatorWatchedCache();
+            if (typeof initMySinatorWatchedBadge === 'function') initMySinatorWatchedBadge(tvId, 'tv');
+        } catch (e) { console.warn('maybeMarkShowCompleteOnBackend error:', e); }
     }
 
     // ── PŘEPOČET/OPRAVA JIŽ ULOŽENÝCH "Shlédnuto" PŘÍZNAKŮ U SERIÁLŮ ──────────
