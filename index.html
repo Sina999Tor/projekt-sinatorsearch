@@ -1672,6 +1672,15 @@
     // ne vnořené objekty jako Trakt. Podporujeme obojí: pokud je e.episode
     // objekt (Trakt-styl), bereme season/number z něj; jinak zkoušíme ploché
     // varianty (e.season/e.episode_number/e.number) přímo na top-level entry.
+    // Zkusí z objektu vytáhnout rok (release_date/first_air_date/year) — jen
+    // pro hezčí popisek v lokálním "state.watched", není kritické.
+    function histraExtractYear(obj) {
+        if (!obj || typeof obj !== 'object') return '';
+        const src = obj.release_date || obj.first_air_date || obj.year || obj.aired;
+        if (!src) return '';
+        const m = String(src).match(/\d{4}/);
+        return m ? m[0] : '';
+    }
     function histraParseHistoryEntry(e) {
         if (!e || typeof e !== 'object') return null;
         const kind = e.kind || e.type;
@@ -1689,12 +1698,14 @@
             }
             const showTmdb = histraExtractTmdb(showObj);
             if (!showTmdb || season == null || number == null) return null;
-            return { kind: 'episode', tmdb: showTmdb, season: parseInt(season, 10), number: parseInt(number, 10), watchedAt };
+            const showTitle = showObj.title || showObj.name || '';
+            return { kind: 'episode', tmdb: showTmdb, season: parseInt(season, 10), number: parseInt(number, 10), watchedAt, title: showTitle, year: histraExtractYear(showObj) };
         }
         const movieObj = e.movie || e;
         const movieTmdb = histraExtractTmdb(movieObj);
         if (!movieTmdb) return null;
-        return { kind: 'movie', tmdb: movieTmdb, watchedAt };
+        const movieTitle = movieObj.title || movieObj.name || '';
+        return { kind: 'movie', tmdb: movieTmdb, watchedAt, title: movieTitle, year: histraExtractYear(movieObj) };
     }
     // Zjistí, zda je položka watchlistu/seznamu seriál nebo film + vytáhne tmdb id.
     function histraParseMediaEntry(e) {
@@ -1825,24 +1836,49 @@
             // zhlédnutí) s odznakem "👁 Nx" (kolikrát bylo shlédnuto).
             const newMovieItems = [], newEpisodeItems = [];
             let skipped = 0;
+            let locallyMarkedMovies = 0, locallyMarkedEpisodes = 0;
+            const touchedTvIds = new Set();
             for (let hi = 0; hi < historyRaw.length; hi++) {
                 const raw = historyRaw[hi];
                 if (historyRaw.length > 20 && hi % 25 === 0) setStatus(`Historie: ${hi + 1}/${historyRaw.length}… (filmy +${newMovieItems.length}, epizody +${newEpisodeItems.length})`);
                 const parsed = histraParseHistoryEntry(raw);
                 if (!parsed) { skipped++; continue; }
                 if (parsed.kind === 'movie') {
+                    // Lokální příznak "Shlédnuto" (checkbox/zelený rámeček v appce) —
+                    // nastaví se vždy, nezávisle na tom, jestli byl záznam v
+                    // backendové historii už dřív; appka totiž ukazuje checkbox
+                    // podle state.watched, ne podle historie.
+                    const wKey = `movie_${parsed.tmdb}`;
+                    if (!state.watched[wKey]) {
+                        state.watched[wKey] = { id: parsed.tmdb, type: 'movie', title: parsed.title || '', year: parsed.year || '', posterPath: '', addedAt: Date.now() };
+                        locallyMarkedMovies++;
+                    }
                     const key = `${parsed.tmdb}_${parsed.watchedAt}`;
                     if (existMovieSet.has(key)) continue;
                     existMovieSet.add(key);
                     newMovieItems.push({ id: parsed.tmdb, watched_at: parsed.watchedAt });
                     log.movies.push({ tmdb: parsed.tmdb, watchedAt: parsed.watchedAt });
                 } else {
+                    const wKey = `ep_${parsed.tmdb}_${parsed.season}_${parsed.number}`;
+                    if (!state.watched[wKey]) {
+                        state.watched[wKey] = { id: wKey, type: 'episode', title: parsed.title ? `${parsed.title} S${parsed.season}E${parsed.number}` : '', year: parsed.year || '', posterPath: '', addedAt: Date.now(), tvId: parsed.tmdb, seasonNumber: parsed.season, epNumber: parsed.number };
+                        locallyMarkedEpisodes++;
+                        touchedTvIds.add(parsed.tmdb);
+                    }
                     const key = `${parsed.tmdb}_${parsed.season}_${parsed.number}_${parsed.watchedAt}`;
                     if (existEpSet.has(key)) continue;
                     existEpSet.add(key);
                     newEpisodeItems.push({ id: parsed.tmdb, season: parsed.season, episode: parsed.number, watched_at: parsed.watchedAt });
                     log.episodes.push({ tmdb: parsed.tmdb, season: parsed.season, number: parsed.number, watchedAt: parsed.watchedAt });
                 }
+            }
+
+            // Uložit lokální watched příznaky hned — i kdyby dál něco selhalo
+            // (např. upload do backend historie), checkboxy v appce už budou sedět.
+            if (locallyMarkedMovies || locallyMarkedEpisodes) {
+                saveWatched();
+                if (typeof updateWatchedCount === 'function') updateWatchedCount();
+                if (typeof applyWatchedBordersToAllCards === 'function') applyWatchedBordersToAllCards();
             }
 
             if (newMovieItems.length) {
@@ -1852,6 +1888,40 @@
             if (newEpisodeItems.length) {
                 setStatus(`Nahrávám ${newEpisodeItems.length} nových epizod do historie…`);
                 await myImportChunked('history-episodes', newEpisodeItems, silent ? null : statusEl, 'Historie epizod');
+            }
+
+            // Pro seriály, kde Histra přidala nové shlédnuté epizody, zkusíme
+            // dopočítat, jestli je tím pádem celý seriál (odvysílaný a celý
+            // shlédnutý) — stejná logika jako u Trakt syncu (syncWatchedFromTrakt).
+            // Bez tmdbApiKey se přeskočí (epizody zůstanou "jen" rozkoukané).
+            if (touchedTvIds.size && tmdbApiKey) {
+                setStatus('Dopočítávám kompletně shlédnuté seriály…');
+                const tvIdList = Array.from(touchedTvIds);
+                const batchSize = 6;
+                for (let i = 0; i < tvIdList.length; i += batchSize) {
+                    const batch = tvIdList.slice(i, i + batchSize);
+                    await Promise.all(batch.map(async tmdbId => {
+                        const k = `tv_${tmdbId}`;
+                        if (state.watched[k]) return;
+                        try {
+                            const d = await (await fetch(`${BASE}/tv/${tmdbId}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
+                            const totalEps = d.number_of_episodes || 0;
+                            const totalSeasons = d.number_of_seasons || 0;
+                            const nextEpisode = d.next_episode_to_air;
+                            const epKeys = Object.keys(state.watched).filter(x => x.startsWith(`ep_${tmdbId}_`));
+                            const watchedEps = epKeys.length;
+                            const watchedSeasonNums = epKeys.map(x => Number(x.split('_')[2]));
+                            const maxWatchedSeason = watchedSeasonNums.length ? Math.max(...watchedSeasonNums) : 0;
+                            const isComplete = totalEps > 0 && watchedEps >= totalEps && !nextEpisode && !(totalSeasons > maxWatchedSeason && totalSeasons > 0);
+                            if (isComplete) {
+                                state.watched[k] = { id: tmdbId, type: 'tv', title: d.name || d.title || '', year: (d.first_air_date || '').slice(0, 4), posterPath: '', addedAt: Date.now() };
+                            }
+                        } catch (e) { /* při chybě necháme seriál jako jen rozkoukaný */ }
+                    }));
+                }
+                saveWatched();
+                if (typeof updateWatchedCount === 'function') updateWatchedCount();
+                if (typeof applyWatchedBordersToAllCards === 'function') applyWatchedBordersToAllCards();
             }
 
             // ── Seznamy: jen NOVÉ (podle názvu), na existující se nesahá ──
@@ -1897,10 +1967,24 @@
             // nově doplněná historie hned projeví napříč appkou.
             if (typeof _historyGetAllCache === 'object') { delete _historyGetAllCache.movies; delete _historyGetAllCache.episodes; delete _historyGetAllCache.shows; }
             if (typeof refreshMySinatorWatchedCache === 'function') await refreshMySinatorWatchedCache();
-            const summary = `✅ Hotovo — doplněno do historie: filmy +${newMovieItems.length}, epizody +${newEpisodeItems.length}.` + (listsCreated ? `\n📁 Nové seznamy: ${listsCreated} (celkem ${listItemsAdded} položek). Existující seznamy zůstaly beze změny.` : '') + (skipped ? `\n⚠️ ${skipped} položek se nepodařilo přiřadit (neznámý formát odpovědi).` : '') + `\nPokud sync přidal něco špatně, použij tlačítko „↩️ Vrátit poslední sync" níž.`;
+            // Pokud je zrovna otevřený seznam epizod (uživatel se dívá na
+            // sezónu/epizody v detailu seriálu), překreslíme ho, ať se nově
+            // doplněné zaškrtávátka "Shlédnuto" objeví hned, ne až po zavření modalu.
+            try {
+                const seasonsContainer = document.getElementById('seasons-container');
+                if (seasonsContainer && seasonsContainer.dataset && seasonsContainer.dataset.seasons && seasonsContainer.dataset.tvid) {
+                    const tvIdOpen = Number(seasonsContainer.dataset.tvid);
+                    const seasonsData = JSON.parse(seasonsContainer.dataset.seasons);
+                    seasonsContainer.innerHTML = renderSeasons(seasonsData, tvIdOpen);
+                    seasonsContainer.dataset.tvid = tvIdOpen;
+                    seasonsContainer.dataset.seasons = JSON.stringify(seasonsData);
+                }
+            } catch (e) { /* modal zrovna není otevřený nebo má jiný tvar dat — v pořádku */ }
+            const locallyMarked = locallyMarkedMovies + locallyMarkedEpisodes;
+            const summary = `✅ Hotovo — doplněno do historie: filmy +${newMovieItems.length}, epizody +${newEpisodeItems.length}.` + (locallyMarked ? `\n☑️ Označeno jako shlédnuto přímo v appce: filmy +${locallyMarkedMovies}, epizody +${locallyMarkedEpisodes}.` : '') + (listsCreated ? `\n📁 Nové seznamy: ${listsCreated} (celkem ${listItemsAdded} položek). Existující seznamy zůstaly beze změny.` : '') + (skipped ? `\n⚠️ ${skipped} položek se nepodařilo přiřadit (neznámý formát odpovědi).` : '') + `\nPokud sync přidal něco špatně, použij tlačítko „↩️ Vrátit poslední sync" níž.`;
             setStatus(summary);
-            if (newMovieItems.length || newEpisodeItems.length || listsCreated) {
-                try { if (typeof _favToast === 'function') _favToast(`✅ Histra: doplněno ${newMovieItems.length + newEpisodeItems.length} položek do historie` + (listsCreated ? ` + ${listsCreated} nových seznamů` : '')); } catch (e) {}
+            if (newMovieItems.length || newEpisodeItems.length || listsCreated || locallyMarked) {
+                try { if (typeof _favToast === 'function') _favToast(`✅ Histra: doplněno ${newMovieItems.length + newEpisodeItems.length} položek do historie` + (locallyMarked ? `, označeno ${locallyMarked} jako shlédnuto` : '') + (listsCreated ? ` + ${listsCreated} nových seznamů` : '')); } catch (e) {}
             } else if (!silent) {
                 try { if (typeof _favToast === 'function') _favToast('✅ Histra sync hotový — nic nového'); } catch (e) {}
             }
@@ -2128,6 +2212,25 @@
                 } catch (e) { errors++; }
             }
             setStatus(`Vracím zpět: epizody hotovo (${removedEpisodes}). Watchlist…`);
+            // Zrušit i lokální "Shlédnuto" příznaky (checkboxy/zelené rámečky),
+            // co tenhle sync nastavil — jinak by po smazání z historie appka
+            // pořád ukazovala titul jako shlédnutý.
+            let unmarkedLocal = 0;
+            for (const m of (log.movies || [])) {
+                const tmdbId = typeof m === 'object' ? m.tmdb : m;
+                const wKey = `movie_${tmdbId}`;
+                if (state.watched[wKey]) { delete state.watched[wKey]; unmarkedLocal++; }
+            }
+            for (const ep of (log.episodes || [])) {
+                const wKey = `ep_${ep.tmdb}_${ep.season}_${ep.number}`;
+                if (state.watched[wKey]) { delete state.watched[wKey]; unmarkedLocal++; }
+            }
+            if (unmarkedLocal) {
+                saveWatched();
+                if (typeof updateWatchedCount === 'function') updateWatchedCount();
+                if (typeof applyWatchedBordersToAllCards === 'function') applyWatchedBordersToAllCards();
+                if (typeof reconcileWatchedShows === 'function') await reconcileWatchedShows();
+            }
             for (const w of (log.watchlist || [])) {
                 try { await myWatchlistRemove(w.tmdb, w.type); removedWl++; } catch (e) { errors++; }
             }
