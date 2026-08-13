@@ -4925,6 +4925,11 @@
         const m = $('listsModal');
         if(m) { m.style.display = 'flex'; }
         $('btnListsToggle')?.classList.add('active');
+        // "Rozkoukané" čte data přímo z Traktu (sync/watched/shows) — bez
+        // připojeného Traktu by po kliknutí jen skončilo hláškou "Vyžaduje
+        // Trakt přihlášení", tak tlačítko v menu radši rovnou schováme.
+        const rozkBtn = $('listsMenuRozkoukaneBtn');
+        if (rozkBtn) rozkBtn.style.display = (state.trakt && state.trakt.accessToken) ? '' : 'none';
     }
     function closeListsModal() {
         const m = $('listsModal');
@@ -14327,7 +14332,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             <span style="font-size:1.6rem;">✅</span>
             <div><div style="color:#1db954;font-weight:700;">Shlédnuté</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmy a seriály které jsi viděl/a</div></div>
         </button>
-        <button onclick="closeListsModal();openRozkoukaneModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+        <button onclick="closeListsModal();openRozkoukaneModal()" class="menu-row-btn" id="listsMenuRozkoukaneBtn" style="display:none;" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎭</span>
             <div><div style="font-weight:700;"><span style="color:#00b4d8;">Rozkoukané</span></div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Seriály i filmy, které sleduješ</div></div>
         </button>
