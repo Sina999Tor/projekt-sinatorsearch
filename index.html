@@ -2174,6 +2174,44 @@
         }
     };
 
+    // ── Automatická kontrola Histra syncu při otevření Hist. filmy/seriály/epizody ──
+    // Na rozdíl od autoCheckHistraSync (jen při startu appky, throttle 10 min) tahle
+    // verze reaguje na explicitní akci uživatele — otevření historie v přehledu.
+    // Vlastní kratší throttle (60 s), ať se při rychlém přepínání tabů/návratech
+    // do appky nezasypává Histra API opakovanými dotazy. Kontrola i případný sync
+    // běží na pozadí (nic neblokuje) — pokud najde nové sledování, potichu
+    // dosynchronizuje a tab, pokud je pořád otevřený, se sám znovu vykreslí.
+    window._histraTabCheckInProgress = false;
+    async function checkHistraSyncOnHistoryTab(tab) {
+        try {
+            if (window._histraTabCheckInProgress) return;
+            if (typeof histraReady !== 'function' || !histraReady()) return;
+            if (typeof myBackendReady !== 'function' || !myBackendReady()) return;
+            const lastCheck = parseInt(_store.getItem('sinator_histra_last_tabcheck') || '0', 10);
+            if (Date.now() - lastCheck < 60 * 1000) return;
+            _store.setItem('sinator_histra_last_tabcheck', String(Date.now()));
+            window._histraTabCheckInProgress = true;
+
+            const lastSyncTs = parseInt(_store.getItem('sinator_histra_last_sync') || '0', 10);
+            const recentRaw = await histraFetchAllPaged('/api/v1/tracking/history?extended=full&lang=cs-CZ', 20, 3);
+            const hasNew = (recentRaw || []).some(raw => histraExtractWatchedAt(raw) > lastSyncTs);
+            if (hasNew) {
+                console.log('Histra: nalezeno nové sledování při otevření historie, spouštím sync…');
+                await window.syncFromHistra(null, true);
+                // Uživatel mohl mezitím tab zavřít/přepnout — dosynchronizovaná
+                // data znovu vykreslíme, jen pokud je pořád na stejném tabu.
+                if (window._myBackendActiveTab === tab && typeof renderMyBackendTab === 'function') {
+                    renderMyBackendTab(tab);
+                }
+            }
+        } catch (e) {
+            console.warn('Histra tab-check error:', e);
+        } finally {
+            window._histraTabCheckInProgress = false;
+        }
+    }
+    window.checkHistraSyncOnHistoryTab = checkHistraSyncOnHistoryTab;
+
     function histraSyncLog() {
         try { return JSON.parse(_store.getItem('sinator_histra_sync_log') || 'null'); } catch (e) { return null; }
     }
@@ -9593,6 +9631,12 @@ EXAMPLES:
             const letterInput = $('myBackendLetterFilter');
             if (letterInput) letterInput.value = '';
             renderMyBackendGrid(items, emptyMsg, tab);
+            // Otevření historie = dobrá příležitost potichu zkontrolovat, jestli
+            // na Histře nepřibylo něco nového (viz checkHistraSyncOnHistoryTab).
+            // Neblokující — tab se vykreslí hned, případný dosync přijde na pozadí.
+            if (tab === 'history-movies' || tab === 'history-episodes' || tab === 'history-shows') {
+                checkHistraSyncOnHistoryTab(tab);
+            }
         } catch (e) {
             if (window._myBackendActiveTab !== tab) return;
             if ($('myBackendSortBarWrap')) $('myBackendSortBarWrap').style.display = 'none';
@@ -9686,6 +9730,9 @@ EXAMPLES:
             const sortBar = $('myBackendSortBarWrap');
             if (sortBar) sortBar.style.display = items.length ? 'flex' : 'none';
             renderMyBackendGrid(items, window._myBackendCurrentEmptyMsg || 'Žádné položky.', tab);
+            if (tab === 'history-movies' || tab === 'history-episodes' || tab === 'history-shows') {
+                checkHistraSyncOnHistoryTab(tab);
+            }
             return;
         }
         renderMyBackendTab(tab);
