@@ -4920,6 +4920,20 @@
         $('btnZabavaToggle')?.classList.add('active');
         if(window.updatePwaBtn) updatePwaBtn();
     };
+    // Popisek "Trakt / Simkl / 🧩 Sinator" v menu Seznamy — zobrazí jen ty
+    // služby, co jsou skutečně připojené (aby to neplašilo lidi, co mají
+    // připojený třeba jen Sinator backend, textem "Trakt / Simkl").
+    function updateListsMenuTraktLabel() {
+        const el = $('listsMenuTraktLabel');
+        if (!el) return;
+        const parts = [];
+        if (state.trakt && state.trakt.accessToken) parts.push('<span style="color:#ed2224;">Trakt</span>');
+        if (state.simkl && state.simkl.accessToken) parts.push('<span style="color:#1cb99a;">Simkl</span>');
+        if (typeof myBackendReady === 'function' && myBackendReady()) parts.push('<span style="color:#8bc34a;">🧩 Sinator</span>');
+        el.innerHTML = parts.length
+            ? parts.join('<span style="color:var(--text-muted);"> / </span>')
+            : '<span style="color:#ed2224;">Trakt</span><span style="color:var(--text-muted);"> / </span><span style="color:#1cb99a;">Simkl</span><span style="color:var(--text-muted);"> / </span><span style="color:#8bc34a;">🧩 Sinator</span>';
+    }
     function openListsModal() {
         closeHelperModals();
         const m = $('listsModal');
@@ -4930,6 +4944,7 @@
         // Trakt přihlášení", tak tlačítko v menu radši rovnou schováme.
         const rozkBtn = $('listsMenuRozkoukaneBtn');
         if (rozkBtn) rozkBtn.style.display = (state.trakt && state.trakt.accessToken) ? '' : 'none';
+        updateListsMenuTraktLabel();
     }
     function closeListsModal() {
         const m = $('listsModal');
@@ -14322,7 +14337,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
         <button onclick="closeListsModal();openTraktModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📋</span>
-            <div><div style="font-weight:700;"><span style="color:#ed2224;">Trakt</span><span style="color:var(--text-muted);"> / </span><span style="color:#1cb99a;">Simkl</span><span style="color:var(--text-muted);"> / </span><span style="color:#8bc34a;">🧩 Sinator</span></div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Sledované, watchlist, hodnocení</div></div>
+            <div><div style="font-weight:700;" id="listsMenuTraktLabel"><span style="color:#ed2224;">Trakt</span><span style="color:var(--text-muted);"> / </span><span style="color:#1cb99a;">Simkl</span><span style="color:var(--text-muted);"> / </span><span style="color:#8bc34a;">🧩 Sinator</span></div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Sledované, watchlist, hodnocení</div></div>
         </button>
         <button onclick="pushModalAndOpen('listsModal', openListsModal, openCollectionsModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📦</span>
