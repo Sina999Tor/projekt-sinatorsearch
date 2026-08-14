@@ -3541,6 +3541,20 @@
 
     // ── TRAKT/SIMKL sjednocený modal ──────────────────────────────
     window._tsSource = window._tsSource || 'trakt';
+    // Nadpis modalu ("Trakt / Simkl / 🧩 Sinator") sestavíme jen ze skutečně
+    // propojených služeb (stejná logika jako updateListsMenuTraktLabel) — ať
+    // někomu s jen Sinator backendem nesvítí navíc odpojený Trakt a Simkl.
+    // Aktivní zdroj je barevně zvýrazněný, ostatní propojené jen ztlumené.
+    function buildTsModalHeading(activeSrc) {
+        const hasTrakt = !!(state.trakt && state.trakt.accessToken);
+        const hasSimkl = !!(state.simkl && state.simkl.accessToken);
+        const hasOwn = typeof myBackendReady === 'function' && myBackendReady();
+        const parts = [];
+        if (hasTrakt) parts.push(activeSrc === 'trakt' ? '📋 <span style="color:#ed2224;">TRAKT</span>' : '<span style="opacity:.5;">TRAKT</span>');
+        if (hasSimkl) parts.push(activeSrc === 'simkl' ? '🎯 <span style="color:#1cb99a;">SIMKL</span>' : '<span style="opacity:.5;">SIMKL</span>');
+        if (hasOwn) parts.push(activeSrc === 'own' ? '🧩 <span style="color:#6090ff;">SINATOR</span>' : '<span style="opacity:.5;">SINATOR</span>');
+        return parts.join('<span style="opacity:.4;"> / </span>') || '📋 Seznamy';
+    }
     function switchTsSource(src) {
         window._tsSource = src;
         const isTrakt = src === 'trakt';
@@ -3550,11 +3564,7 @@
         $('tsSrcBtnSimkl')?.classList.toggle('active', isSimkl);
         $('tsSrcBtnOwn')?.classList.toggle('active', isOwn);
         const heading = $('tsModalHeading');
-        if (heading) {
-            if (isTrakt) heading.innerHTML = '📋 <span style="color:#ed2224;">TRAKT</span><span style="opacity:.4;"> / </span><span style="opacity:.5;">SIMKL / SINATOR</span>';
-            else if (isSimkl) heading.innerHTML = '<span style="opacity:.5;">TRAKT</span><span style="opacity:.4;"> / </span>🎯 <span style="color:#1cb99a;">SIMKL</span><span style="opacity:.4;"> / </span><span style="opacity:.5;">SINATOR</span>';
-            else heading.innerHTML = '<span style="opacity:.5;">TRAKT / SIMKL</span><span style="opacity:.4;"> / </span>🧩 <span style="color:#6090ff;">SINATOR</span>';
-        }
+        if (heading) heading.innerHTML = buildTsModalHeading(src);
         if ($('traktResultsContainer')) $('traktResultsContainer').style.display = isTrakt ? '' : 'none';
         if ($('simklResultsContainer')) $('simklResultsContainer').style.display = isSimkl ? '' : 'none';
         if ($('myBackendResultsContainer')) $('myBackendResultsContainer').style.display = isOwn ? '' : 'none';
