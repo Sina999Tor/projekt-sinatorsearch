@@ -33392,24 +33392,24 @@ window.changeUserNickname = function() {
 };
 
 function initNickGate() {
-  function tryShow() {
-    if (document.body.classList.contains('app-locked')) { setTimeout(tryShow, 400); return; }
-    let nick = '';
-    try { nick = localStorage.getItem(USER_NICK_KEY) || localStorage.getItem('sinator_d_nick') || ''; } catch(e) {}
-    if (!nick) {
-      const overlay = document.getElementById('nickSetupOverlay');
-      if (overlay) {
-        overlay.style.display = 'flex';
-        setTimeout(() => document.getElementById('nickSetupInput')?.focus(), 200);
-      }
-    } else {
-      try { localStorage.setItem(USER_NICK_KEY, nick); } catch(e) {}
-      const disp = document.getElementById('currentUserNickDisplay');
-      if (disp) disp.textContent = nick;
-      _startUserPresenceHeartbeat(nick);
+  // Kontrola přezdívky proběhne VŽDY jako úplně první krok startu appky —
+  // nečeká se na odemčení heslem, modal (z-index 999999) se zobrazí nad
+  // vším ostatním včetně lockscreenu. Až je jméno vyplněné, appka
+  // pokračuje ve zbytku startu (lockscreen/appka se odemkne pod ním).
+  let nick = '';
+  try { nick = localStorage.getItem(USER_NICK_KEY) || localStorage.getItem('sinator_d_nick') || ''; } catch(e) {}
+  if (!nick) {
+    const overlay = document.getElementById('nickSetupOverlay');
+    if (overlay) {
+      overlay.style.display = 'flex';
+      setTimeout(() => document.getElementById('nickSetupInput')?.focus(), 200);
     }
+  } else {
+    try { localStorage.setItem(USER_NICK_KEY, nick); } catch(e) {}
+    const disp = document.getElementById('currentUserNickDisplay');
+    if (disp) disp.textContent = nick;
+    _startUserPresenceHeartbeat(nick);
   }
-  tryShow();
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initNickGate);
