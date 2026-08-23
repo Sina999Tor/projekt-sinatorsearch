@@ -89,6 +89,21 @@
 </div>
 <!-- ════════════════════════════════════════════════════════════════════ -->
 
+<!-- ═══ POVINNÉ NASTAVENÍ JMÉNA / PŘEZDÍVKY ══════════════════════════════ -->
+<div id="nickSetupOverlay" style="display:none;position:fixed;inset:0;z-index:999999;background:rgba(6,6,10,0.97);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:24px;">
+  <div style="max-width:380px;width:100%;background:#141414;border:1px solid rgba(255,215,0,0.3);border-radius:16px;padding:30px 22px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.6);">
+    <div style="font-size:2.4rem;margin-bottom:10px;">👋</div>
+    <h2 style="font-family:'Playfair Display',serif;color:#ffd700;font-size:1.3rem;margin-bottom:8px;">Vítej v Sinatoru!</h2>
+    <p style="color:#aaa;font-size:0.88rem;line-height:1.55;margin-bottom:18px;">Než budeš pokračovat, zadej si jméno nebo přezdívku. Uvidí ji ostatní uživatelé aplikace (např. u doporučení).</p>
+    <input type="text" id="nickSetupInput" maxlength="24" placeholder="Tvoje jméno / přezdívka…" autocomplete="off"
+           style="width:100%;padding:13px 14px;border-radius:10px;border:1px solid #333;background:#1c1c1c;color:#fff;font-size:1rem;text-align:center;box-sizing:border-box;"
+           onkeydown="if(event.key==='Enter')submitUserNickname()">
+    <div id="nickSetupError" style="color:#ff6b6b;font-size:0.8rem;margin-top:8px;min-height:16px;"></div>
+    <button onclick="submitUserNickname()" style="width:100%;margin-top:14px;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,#ffd700,#e5a800);color:#1a1a1a;font-weight:800;font-size:1rem;cursor:pointer;">Pokračovat</button>
+  </div>
+</div>
+<!-- ════════════════════════════════════════════════════════════════════ -->
+
 <div class="bg-animation"></div>
 
 <header>
@@ -1097,6 +1112,15 @@
             </div>
             <!-- ============ TAB: OSTATNÍ ============ -->
             <div class="settings-tab-content" id="settingsTabContentOther">
+            <div class="settings-section" style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.2);border-radius:12px;padding:14px 16px;">
+                <span class="settings-label" style="color:var(--gold,#ffd700);">👤 Tvoje jméno / přezdívka</span>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:6px;">
+                    <span id="currentUserNickDisplay" style="flex:1;font-weight:700;color:#eee;font-size:0.95rem;">—</span>
+                    <button class="settings-btn-small" onclick="changeUserNickname()">✏️ Změnit</button>
+                </div>
+                <div style="font-size:0.7rem;color:var(--text-muted);opacity:0.7;margin-top:4px;">Toto jméno vidí ostatní uživatelé aplikace (např. u doporučení).</div>
+            </div>
+            <div class="settings-divider"></div>
             <div class="settings-section" style="background:rgba(229,9,20,0.07);border:1px solid rgba(229,9,20,0.25);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:#ff6b6b;">🔐 Přístupové heslo aplikace</span>
                 <input type="password" class="settings-input" id="settingsPwdInput" placeholder="Zadejte nové heslo…" autocomplete="off">
@@ -1166,6 +1190,16 @@
                 </div>
                 <div style="font-size:0.75rem;margin-top:6px;" id="adminModeStatus">
                     <span style="color:#888;">Admin: <span id="adminModeLabel">Neaktivní</span></span>
+                </div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section" style="background:rgba(0,180,255,0.06);border:1px solid rgba(0,180,255,0.2);border-radius:12px;padding:14px 16px;">
+                <span class="settings-label" style="color:#4fc3f7;">👥 Registrovaní uživatelé</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 10px;line-height:1.4;">
+                    Přehled všech jmen/přezdívek nastavených v appce a jejich aktuální online stav (aktualizuje se v reálném čase).
+                </div>
+                <div id="adminUsersList" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;">
+                    <div style="color:#888;font-size:0.8rem;">Načítám…</div>
                 </div>
             </div>
             </div>
@@ -33140,13 +33174,163 @@ function updateAdminStatus() {
   });
   // Adult toggle – disabled bez admina
   if (typeof updateAdultToggleUI === 'function') updateAdultToggleUI();
+  // Seznam registrovaných uživatelů — jen pro admina
+  if (active && typeof attachAdminUsersListener === 'function') attachAdminUsersListener();
 }
 
 // Init admin status on settings open
 const _origOpenSettings = window.openSettingsModal;
 if (_origOpenSettings) {
-  window.openSettingsModal = function(...a) { _origOpenSettings(...a); updateAdminStatus(); setTimeout(updateAdminStatus, 200); };
+  window.openSettingsModal = function(...a) {
+    _origOpenSettings(...a);
+    updateAdminStatus();
+    setTimeout(updateAdminStatus, 200);
+    try {
+      const disp = document.getElementById('currentUserNickDisplay');
+      if (disp) disp.textContent = localStorage.getItem(USER_NICK_KEY) || '—';
+    } catch(e) {}
+  };
 }
+
+// =========================================================
+// 👤 POVINNÁ PŘEZDÍVKA + PŘÍTOMNOST (online/offline) UŽIVATELŮ
+// =========================================================
+const USER_NICK_KEY = 'sinator_user_nick';
+const USER_STALE_MS = 3 * 60 * 1000; // po 3 min bez heartbeatu = offline
+let _userHeartbeatTimer = null;
+
+function _sanitizeNickKey(nick) {
+  return String(nick).trim().toLowerCase()
+    .replace(/[.#$\[\]\/]/g, '_')
+    .replace(/\s+/g, '_')
+    .slice(0, 40);
+}
+
+function _escapeHtmlU(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function _formatLastSeen(ts) {
+  if (!ts) return 'offline';
+  const diffMin = Math.floor((Date.now() - ts) / 60000);
+  if (diffMin < 1) return 'právě teď';
+  if (diffMin < 60) return `před ${diffMin} min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `před ${diffH} h`;
+  return `před ${Math.floor(diffH / 24)} d`;
+}
+
+// Pravidelně zapisuje "jsem tu" do Firebase pro danou přezdívku
+function _startUserPresenceHeartbeat(nick) {
+  const key = _sanitizeNickKey(nick);
+  if (!key) return;
+  const userRef = ref(rtdb, 'users/' + key);
+  function beat() {
+    set(userRef, { nick: nick, lastSeen: Date.now() }).catch(()=>{});
+  }
+  beat();
+  try { rtdbOnDisconnect(userRef).update({ lastSeen: 0 }); } catch(e) {}
+  if (_userHeartbeatTimer) clearInterval(_userHeartbeatTimer);
+  _userHeartbeatTimer = setInterval(beat, 2 * 60 * 1000);
+}
+
+// Přejmenování — smaže starý záznam a vytvoří nový
+function _renameUserPresence(oldNick, newNick) {
+  try {
+    const oldKey = _sanitizeNickKey(oldNick);
+    const newKey = _sanitizeNickKey(newNick);
+    if (oldKey && oldKey !== newKey) remove(ref(rtdb, 'users/' + oldKey)).catch(()=>{});
+  } catch(e) {}
+  _startUserPresenceHeartbeat(newNick);
+}
+
+window.submitUserNickname = function() {
+  const input = document.getElementById('nickSetupInput');
+  const err = document.getElementById('nickSetupError');
+  const val = (input?.value || '').trim();
+  if (val.length < 2) { if (err) err.textContent = '⚠️ Zadej alespoň 2 znaky.'; return; }
+  if (val.length > 24) { if (err) err.textContent = '⚠️ Max. 24 znaků.'; return; }
+  try { localStorage.setItem(USER_NICK_KEY, val); } catch(e) {}
+  try { localStorage.setItem('sinator_d_nick', val); } catch(e) {} // sdílené s "Doporučuji"
+  const overlay = document.getElementById('nickSetupOverlay');
+  if (overlay) overlay.style.display = 'none';
+  _startUserPresenceHeartbeat(val);
+};
+
+// Volitelná pozdější změna jména (např. z Nastavení → Ostatní)
+window.changeUserNickname = function() {
+  let current = '';
+  try { current = localStorage.getItem(USER_NICK_KEY) || ''; } catch(e) {}
+  const nv = prompt('Změnit jméno / přezdívku:', current);
+  if (nv === null) return;
+  const val = nv.trim();
+  if (val.length < 2 || val.length > 24) { alert('⚠️ Jméno musí mít 2–24 znaků.'); return; }
+  try { localStorage.setItem(USER_NICK_KEY, val); } catch(e) {}
+  try { localStorage.setItem('sinator_d_nick', val); } catch(e) {}
+  _renameUserPresence(current, val);
+  const disp = document.getElementById('currentUserNickDisplay');
+  if (disp) disp.textContent = val;
+  alert('✅ Jméno změněno na: ' + val);
+};
+
+function initNickGate() {
+  function tryShow() {
+    if (document.body.classList.contains('app-locked')) { setTimeout(tryShow, 400); return; }
+    let nick = '';
+    try { nick = localStorage.getItem(USER_NICK_KEY) || localStorage.getItem('sinator_d_nick') || ''; } catch(e) {}
+    if (!nick) {
+      const overlay = document.getElementById('nickSetupOverlay');
+      if (overlay) {
+        overlay.style.display = 'flex';
+        setTimeout(() => document.getElementById('nickSetupInput')?.focus(), 200);
+      }
+    } else {
+      try { localStorage.setItem(USER_NICK_KEY, nick); } catch(e) {}
+      const disp = document.getElementById('currentUserNickDisplay');
+      if (disp) disp.textContent = nick;
+      _startUserPresenceHeartbeat(nick);
+    }
+  }
+  tryShow();
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initNickGate);
+} else {
+  initNickGate();
+}
+
+// ---- ADMIN: přehled registrovaných uživatelů (online/offline) ----
+let _adminUsersListenerAttached = false;
+
+function attachAdminUsersListener() {
+  if (_adminUsersListenerAttached) return;
+  _adminUsersListenerAttached = true;
+  const usersRef = ref(rtdb, 'users');
+  onValue(usersRef, (snap) => {
+    const wrap = document.getElementById('adminUsersList');
+    if (!wrap) return;
+    if (!snap.exists()) {
+      wrap.innerHTML = '<div style="color:#888;font-size:0.8rem;">Zatím žádní registrovaní uživatelé.</div>';
+      return;
+    }
+    const now = Date.now();
+    const users = Object.values(snap.val()).map(u => ({
+      nick: u.nick || '?',
+      lastSeen: u.lastSeen || 0,
+      online: (now - (u.lastSeen || 0)) < USER_STALE_MS
+    }));
+    users.sort((a, b) => (b.online - a.online) || a.nick.localeCompare(b.nick, 'cs'));
+    const onlineCount = users.filter(u => u.online).length;
+    wrap.innerHTML = `<div style="font-size:0.72rem;color:#888;margin-bottom:2px;">Celkem: ${users.length} · 🟢 online: ${onlineCount}</div>` +
+      users.map(u => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-elevated);border-radius:8px;">
+          <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:${u.online ? '#22c55e' : '#555'};box-shadow:${u.online ? '0 0 6px #22c55e' : 'none'};"></span>
+          <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">${_escapeHtmlU(u.nick)}</span>
+          <span style="font-size:0.7rem;color:#888;">${u.online ? 'online' : _formatLastSeen(u.lastSeen)}</span>
+        </div>`).join('');
+  });
+}
+window.attachAdminUsersListener = attachAdminUsersListener;
 </script>
 
 <!-- =====================================================
