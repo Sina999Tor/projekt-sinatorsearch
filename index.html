@@ -1150,6 +1150,16 @@
                         <div id="pwdAlwaysToggleLabel" style="font-size:0.72rem;color:#888;">Vypnuto — appka si tě po odemčení pamatuje</div>
                     </div>
                 </div>
+                <div class="settings-divider" style="margin:12px 0;"></div>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div onclick="togglePwdNeverRequired()" id="pwdNeverToggle" style="width:44px;height:24px;border-radius:12px;background:#333;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
+                        <div id="pwdNeverToggleKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;pointer-events:none;"></div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.88rem;color:#eee;font-weight:600;">Nikdy nevyžadovat heslo</div>
+                        <div id="pwdNeverToggleLabel" style="font-size:0.72rem;color:#888;">Vypnuto — heslo se ptá podle nastavení výše</div>
+                    </div>
+                </div>
             </div>
             <div class="settings-divider"></div>
             <div class="settings-section">
@@ -32684,6 +32694,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ── Vždy vyžadovat heslo při spuštění (přepínatelné, dostupné všem) ──
     var _AK = 'sinator_pwd_always_required';
+    // ── Nikdy nevyžadovat heslo — úplné vypnutí zámku appky (dostupné všem) ──
+    var _NK = 'sinator_pwd_never_required';
 
     function _updatePwdAlwaysToggleUI() {
         var on = localStorage.getItem(_AK) === '1';
@@ -32698,10 +32710,50 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     window._updatePwdAlwaysToggleUI = _updatePwdAlwaysToggleUI;
 
+    function _updatePwdNeverToggleUI() {
+        var on = localStorage.getItem(_NK) === '1';
+        var toggle = document.getElementById('pwdNeverToggle');
+        var knob = document.getElementById('pwdNeverToggleKnob');
+        var lbl = document.getElementById('pwdNeverToggleLabel');
+        if (toggle) toggle.style.background = on ? '#ff6b6b' : '#333';
+        if (knob) knob.style.left = on ? '22px' : '2px';
+        if (lbl) lbl.textContent = on
+            ? '⚠️ Zapnuto — appka se nikdy nezamkne, ani po vypnutí'
+            : 'Vypnuto — heslo se ptá podle nastavení výše';
+    }
+    window._updatePwdNeverToggleUI = _updatePwdNeverToggleUI;
+
     window.togglePwdAlwaysRequired = function() {
         var on = localStorage.getItem(_AK) === '1';
-        if (on) { localStorage.removeItem(_AK); } else { localStorage.setItem(_AK, '1'); }
+        if (on) {
+            localStorage.removeItem(_AK);
+        } else {
+            localStorage.setItem(_AK, '1');
+            // Vzájemně se vylučuje s "Nikdy nevyžadovat heslo"
+            localStorage.removeItem(_NK);
+            _updatePwdNeverToggleUI();
+        }
         _updatePwdAlwaysToggleUI();
+    };
+
+    window.togglePwdNeverRequired = function() {
+        var on = localStorage.getItem(_NK) === '1';
+        if (on) {
+            localStorage.removeItem(_NK);
+            _updatePwdNeverToggleUI();
+            // Po vypnutí hned zkontroluj, jestli appku nemá zamknout znovu
+            if (localStorage.getItem(_AK) === '1' || localStorage.getItem(_SK) !== '1') {
+                _showLock();
+            }
+        } else {
+            if (!confirm('Appka se pak nezamkne heslem už nikdy, ani po zavření a znovuotevření. Opravdu chceš heslo úplně vypnout?')) return;
+            localStorage.setItem(_NK, '1');
+            // Vzájemně se vylučuje s "Vždy vyžadovat heslo"
+            localStorage.removeItem(_AK);
+            _updatePwdAlwaysToggleUI();
+            _updatePwdNeverToggleUI();
+            _unlock();
+        }
     };
 
     // ── Zobrazení / skrytí správy hesla podle Admin režimu ──
@@ -32716,8 +32768,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Init: zkontroluj při spuštění
     document.addEventListener('DOMContentLoaded', function() {
         var storedHash = localStorage.getItem(_PK) || _H;
-        // Pokud je zapnuto "vždy vyžadovat heslo", ignoruj uloženou session
-        if (localStorage.getItem(_AK) === '1') {
+        if (localStorage.getItem(_NK) === '1') {
+            // Heslo je úplně vypnuté — pusť dál bez ptaní
+            _unlock();
+        } else if (localStorage.getItem(_AK) === '1') {
+            // Pokud je zapnuto "vždy vyžadovat heslo", ignoruj uloženou session
             _showLock();
         } else if (localStorage.getItem(_SK) === '1') {
             // Pokud je session stále odemčena (reload bez zavření tabu), pustit dál
@@ -32726,6 +32781,7 @@ document.addEventListener('DOMContentLoaded', function() {
             _showLock();
         }
         _updatePwdAlwaysToggleUI();
+        _updatePwdNeverToggleUI();
     });
 })();
 </script>
@@ -33227,6 +33283,7 @@ function updateAdminStatus() {
   // Správa hesla – dostupná jen pro admina
   if (typeof window._updateAppPwdSectionVisibility === 'function') window._updateAppPwdSectionVisibility();
   if (typeof window._updatePwdAlwaysToggleUI === 'function') window._updatePwdAlwaysToggleUI();
+  if (typeof window._updatePwdNeverToggleUI === 'function') window._updatePwdNeverToggleUI();
   // Seznam registrovaných uživatelů — jen pro admina
   if (active && typeof attachAdminUsersListener === 'function') attachAdminUsersListener();
 }
