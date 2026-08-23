@@ -1114,6 +1114,14 @@
                     </label>
                 </div>
             </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section">
+                <span class="settings-label">Instalace do externí aplikace</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">
+                    Odkazy pro připojení Sinator katalogů a doplňků do Stremia / Nuvia.
+                </div>
+                <button class="settings-btn-small" onclick="openExternalInstallModal()" style="width:100%;background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;font-weight:600;padding:10px;">🧩 Instalace do externí aplikace</button>
+            </div>
             </div>
             <!-- ============ TAB: ADMIN ============ -->
             <div class="settings-tab-content" id="settingsTabContentAdmin">
@@ -5033,6 +5041,37 @@
         if(tvIdx !== -1) { _openTvRadioModalDirect(); }
     }
     window.closeLiveOfficialModal = closeLiveOfficialModal;
+
+    function openExternalInstallModal() {
+        const m = $('externalInstallModal');
+        if(m) m.style.display = 'flex';
+        $('settingsModal')?.classList.remove('open');
+    }
+    window.openExternalInstallModal = openExternalInstallModal;
+
+    function closeExternalInstallModal() {
+        const m = $('externalInstallModal');
+        if(m) m.style.display = 'none';
+        if(typeof openSettingsModal === 'function') openSettingsModal();
+        if(typeof switchSettingsTab === 'function') switchSettingsTab('other');
+    }
+    window.closeExternalInstallModal = closeExternalInstallModal;
+
+    function copyExternalInstallLink(url, btn) {
+        const done = ok => { if(!btn) return; const old = btn.textContent; btn.textContent = ok ? '✅ Zkopírováno' : '⚠️ Chyba'; setTimeout(() => { btn.textContent = old; }, 1600); };
+        if(navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(() => done(true)).catch(() => done(false));
+        } else {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.select();
+                document.execCommand('copy'); document.body.removeChild(ta);
+                done(true);
+            } catch(e) { done(false); }
+        }
+    }
+    window.copyExternalInstallLink = copyExternalInstallLink;
 
     function closeHelperModals() {
         $('musicModal')?.classList.remove('open');
@@ -14735,6 +14774,50 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             <span style="font-size:1.6rem;">🗓️</span>
             <div><div style="font-weight:700;color:#63cab7;">Tento den v historii</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co vyšlo přesně dnes před lety</div></div>
         </button>
+    </div>
+</div>
+
+<!-- INSTALACE DO EXTERNÍ APLIKACE MODAL -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" id="externalInstallModal" onclick="if(event.target===this)closeExternalInstallModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">🧩 Instalace do externí aplikace</h3>
+        <button onclick="closeExternalInstallModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;">
+        <p style="color:var(--text-muted);font-size:0.82rem;margin:0 0 16px;line-height:1.5;">Odkazy pro připojení Sinator katalogů a doplňků do Stremia / Nuvia. Klepnutím zkopíruješ odkaz, dlouhým podržením ho otevřeš v prohlížeči.</p>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+
+            <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:14px;">
+                <div style="font-weight:700;color:#fff;margin-bottom:4px;">🇨🇿🇸🇰 CZ/SK filmy a seriály</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">TMDB katalog českého a slovenského obsahu pro Stremio</div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input readonly value="https://cz-tv-archiv-addon.vercel.app/" onclick="this.select()" style="flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-dark);color:var(--text-muted);font-size:0.75rem;">
+                    <button onclick="copyExternalInstallLink('https://cz-tv-archiv-addon.vercel.app/', this)" style="flex-shrink:0;background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;font-weight:600;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;">📋 Kopírovat</button>
+                </div>
+                <a href="https://cz-tv-archiv-addon.vercel.app/" target="_blank" style="display:block;margin-top:8px;font-size:0.75rem;color:#00b4d8;text-decoration:none;">→ Otevřít v prohlížeči</a>
+            </div>
+
+            <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:14px;">
+                <div style="font-weight:700;color:#fff;margin-bottom:4px;">📦 Sinator katalog</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">Katalog propojený se Sinator backendem pro Nuvio</div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input readonly value="https://nuvio-catalog-sinator2.vercel.app/" onclick="this.select()" style="flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-dark);color:var(--text-muted);font-size:0.75rem;">
+                    <button onclick="copyExternalInstallLink('https://nuvio-catalog-sinator2.vercel.app/', this)" style="flex-shrink:0;background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;font-weight:600;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;">📋 Kopírovat</button>
+                </div>
+                <a href="https://nuvio-catalog-sinator2.vercel.app/" target="_blank" style="display:block;margin-top:8px;font-size:0.75rem;color:#00b4d8;text-decoration:none;">→ Otevřít v prohlížeči</a>
+            </div>
+
+            <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:14px;">
+                <div style="font-weight:700;color:#fff;margin-bottom:4px;">🧩 Sinator Nuvio doplněk</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">Nutno ručně zkopírovat jako instalaci doplňku v Nuviu</div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input readonly value="https://sinator-nuvio-addon.vercel.app/" onclick="this.select()" style="flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-dark);color:var(--text-muted);font-size:0.75rem;">
+                    <button onclick="copyExternalInstallLink('https://sinator-nuvio-addon.vercel.app/', this)" style="flex-shrink:0;background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;font-weight:600;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;">📋 Kopírovat</button>
+                </div>
+                <a href="https://sinator-nuvio-addon.vercel.app/" target="_blank" style="display:block;margin-top:8px;font-size:0.75rem;color:#00b4d8;text-decoration:none;">→ Otevřít v prohlížeči</a>
+            </div>
+
+        </div>
     </div>
 </div>
 
@@ -28650,6 +28733,15 @@ function playAltChannel(idx) {
 }
 
 function switchTvTab(tab) {
+    // Při přepnutí na jakoukoliv nabídku (i opětovném kliknutí na stejnou) vždy vymaž vyhledávací pole
+    ['tvChannelSearchInput','tvAltSearchInput','tvAlt2SearchInput','tvAlt3SearchInput'].forEach(id => {
+        const el = document.getElementById(id);
+        if(el && el.value) el.value = '';
+    });
+    if(typeof filterTvChannels === 'function') filterTvChannels('');
+    if(typeof filterAltChannels === 'function') filterAltChannels('');
+    if(typeof filterAlt2Channels === 'function') filterAlt2Channels('');
+    if(typeof filterAlt3Channels === 'function') filterAlt3Channels('');
     const isEpg = tab === 'epg';
     const isAlt = tab === 'alt';
     const isAlt2 = tab === 'alt2';
@@ -32211,6 +32303,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'listsModal':     function() { if(typeof closeListsModal==='function') closeListsModal(); },
         'tvRadioModal':   function() { if(typeof closeTvRadioModal==='function') closeTvRadioModal(); },
         'slozkyModal':    function() { if(typeof closeSlozkyModal==='function') closeSlozkyModal(); },
+        'externalInstallModal': function() { if(typeof closeExternalInstallModal==='function') closeExternalInstallModal(); },
         'slozkyPicker':   function() { if(typeof closeSlozkyPicker==='function') closeSlozkyPicker(); },
     };
     window.MODAL_CLOSE_MAP = MODAL_CLOSE_MAP;
@@ -32293,7 +32386,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'porovnaniModal','moodModal','myStatsModal','tentodenModal','koukatSModal','uzByloVKineModal',
             'tvRadioModal','zabavaModal','listsModal','musicModal',
             'slozkyModal','slozkyPickerModal','doporucujiOverlay','addDoporuceniOverlay',
-            'settingsModal'
+            'settingsModal','externalInstallModal'
         ];
         var anyModalOpen = fullscreenModalIds.some(function(id) {
             var el = document.getElementById(id);
