@@ -125,6 +125,9 @@
         <button class="action-btn icon" id="btnDoporucujiToggle" onclick="openDoporucujiModal()" title="Doporučuji — sdílená doporučení">
             <span class="btn-icon">⭐</span><span class="btn-label">Top tipy</span>
         </button>
+        <button class="action-btn icon" id="btnCoDnesToggle" onclick="window._ntOpenedFromMain=true;openNahodnyTipModal()" title="Co dnes sledovat? — Náhodný tip">
+            <span class="btn-icon">🎲</span><span class="btn-label">Co dnes?</span>
+        </button>
         <button class="action-btn icon" id="btnZabavaToggle" onclick="openZabavaModal()" title="Zábava — Weby, AI…">
             <span class="btn-icon">🎲</span><span class="btn-label">Zábava</span>
         </button>
@@ -14509,6 +14512,9 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             <button onclick="window.open('https://www.iprima.cz/zive/star','_blank')" class="live-official-btn" style="border-left-color:#e30613;">
                 <span class="lob-logo">STAR</span><span class="lob-name">Prima STAR</span><span class="lob-arrow">→</span>
             </button>
+            <button onclick="window.open('https://www.iprima.cz/zive/sport','_blank')" class="live-official-btn" style="border-left-color:#e30613;">
+                <span class="lob-logo" style="font-size:0.6rem;">SPORT</span><span class="lob-name">Prima SPORT</span><span class="lob-arrow">→</span>
+            </button>
             <button onclick="window.open('https://cnn.iprima.cz/vysilani','_blank')" class="live-official-btn" style="border-left-color:#cc0000;">
                 <span class="lob-logo" style="font-size:0.65rem;">CNN</span><span class="lob-name">CNN Prima NEWS</span><span class="lob-arrow">→</span>
             </button>
@@ -14814,13 +14820,17 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         </div>
     </div>
 
-    <!-- Navigace: Kanály / Program / Alternativa -->
-    <div style="flex-shrink:0;display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--bg-dark);">
+    <!-- Program: samostatné velké tlačítko nad nabídkou kanálů -->
+    <div style="flex-shrink:0;padding:8px 12px 0;background:var(--bg-dark);">
+        <button id="tvTabEpg" onclick="switchTvTab('epg')" style="width:100%;padding:11px 6px;background:transparent;border:1px solid var(--accent);color:var(--accent);font-size:0.9rem;font-weight:700;cursor:pointer;border-radius:10px;">📅 Program</button>
+    </div>
+
+    <!-- Navigace: Kanály / Kanály 2 / Kanály 3 / Kanály 4 -->
+    <div style="flex-shrink:0;display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--bg-dark);margin-top:8px;">
         <button id="tvTabChannels" onclick="switchTvTab('channels')" style="flex:1;padding:8px 6px;background:var(--accent);border:none;color:#fff;font-size:0.8rem;font-weight:700;cursor:pointer;border-radius:0;">📺 Kanály</button>
-        <button id="tvTabEpg" onclick="switchTvTab('epg')" style="flex:1;padding:8px 6px;background:transparent;border:none;color:var(--text-muted);font-size:0.8rem;font-weight:600;cursor:pointer;border-radius:0;">📅 Program</button>
-        <button id="tvTabAlt" onclick="switchTvTab('alt')" style="flex:1;padding:8px 6px;background:transparent;border:none;color:var(--text-muted);font-size:0.8rem;font-weight:600;cursor:pointer;border-radius:0;">🌐 Alternativa</button>
-        <button id="tvTabAlt2" onclick="switchTvTab('alt2')" style="flex:1;padding:8px 6px;background:transparent;border:none;color:var(--text-muted);font-size:0.8rem;font-weight:600;cursor:pointer;border-radius:0;">🗂️ Alternativa 2</button>
-        <button id="tvTabAlt3" onclick="switchTvTab('alt3')" style="flex:1;padding:8px 6px;background:transparent;border:none;color:var(--text-muted);font-size:0.8rem;font-weight:600;cursor:pointer;border-radius:0;">📂 Alternativa 3</button>
+        <button id="tvTabAlt" onclick="switchTvTab('alt')" style="flex:1;padding:8px 6px;background:transparent;border:none;color:var(--text-muted);font-size:0.8rem;font-weight:600;cursor:pointer;border-radius:0;">📺 Kanály 2</button>
+        <button id="tvTabAlt2" onclick="switchTvTab('alt2')" style="flex:1;padding:8px 6px;background:transparent;border:none;color:var(--text-muted);font-size:0.8rem;font-weight:600;cursor:pointer;border-radius:0;">📺 Kanály 3</button>
+        <button id="tvTabAlt3" onclick="switchTvTab('alt3')" style="flex:1;padding:8px 6px;background:transparent;border:none;color:var(--text-muted);font-size:0.8rem;font-weight:600;cursor:pointer;border-radius:0;">📺 Kanály 4</button>
     </div>
 
     <!-- Tabs: skupiny kanálů -->
@@ -28659,7 +28669,7 @@ function switchTvTab(tab) {
     const btnAlt2 = document.getElementById('tvTabAlt2');
     const btnAlt3 = document.getElementById('tvTabAlt3');
     if(btnCh) { btnCh.style.background = isAnyAlt ? 'transparent' : 'var(--accent)'; btnCh.style.color = isAnyAlt ? 'var(--text-muted)' : '#fff'; }
-    if(btnEpg) { btnEpg.style.background = isEpg ? 'var(--accent)' : 'transparent'; btnEpg.style.color = isEpg ? '#fff' : 'var(--text-muted)'; }
+    if(btnEpg) { btnEpg.style.background = isEpg ? 'var(--accent)' : 'transparent'; btnEpg.style.color = isEpg ? '#fff' : 'var(--accent)'; }
     if(btnAlt) { btnAlt.style.background = isAlt ? 'var(--accent)' : 'transparent'; btnAlt.style.color = isAlt ? '#fff' : 'var(--text-muted)'; }
     if(btnAlt2) { btnAlt2.style.background = isAlt2 ? 'var(--accent)' : 'transparent'; btnAlt2.style.color = isAlt2 ? '#fff' : 'var(--text-muted)'; }
     if(btnAlt3) { btnAlt3.style.background = isAlt3 ? 'var(--accent)' : 'transparent'; btnAlt3.style.color = isAlt3 ? '#fff' : 'var(--text-muted)'; }
@@ -33214,6 +33224,7 @@ function closeNahodnyTipModal() {
   const m = document.getElementById('nahodnyTipModal');
   if (m) m.style.display = 'none';
   if(window._clearLastZabavaList) window._clearLastZabavaList();
+  if(window._ntOpenedFromMain) { window._ntOpenedFromMain = false; return; }
   if(window._returnToZabava) _returnToZabava();
 }
 function ntSetFilter(f) {
