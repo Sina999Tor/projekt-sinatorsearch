@@ -1061,8 +1061,39 @@
             </div>
             <div class="settings-divider"></div>
             <button class="settings-full-btn" onclick="toggleFullscreen()" id="settingsFullscreenBtn">🔒 Fullscreen (zapnuto)</button>
-            <button class="settings-full-btn" id="pwaInstallBtn" onclick="installPWA()" style="display:none;">📲 Instalovat aplikaci</button>
-            <div id="pwaInstallInfo" style="font-size:0.7rem; color:var(--text-muted); text-align:center; margin-top:4px; display:none;">Dostupné v Chrome/Edge na Androidu přes HTTPS</div>
+            <div class="settings-divider"></div>
+            <div class="settings-section" id="installAppSection">
+                <span class="settings-label">📲 Instalace aplikace</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">
+                    Nainstaluj Sinator Search jako plnohodnotnou appku na plochu — spouští se samostatně, bez adresního řádku prohlížeče.
+                </div>
+
+                <!-- Stav: již nainstalováno -->
+                <div id="pwaAlreadyInstalledInfo" style="display:none;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.35);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:0.8rem;color:#4ade80;">
+                    ✅ Aplikace je nainstalovaná a běží samostatně.
+                </div>
+
+                <!-- Android / desktop Chrome: nativní instalace -->
+                <button class="settings-full-btn" id="pwaInstallBtn" onclick="installPWA()" style="display:none;margin-top:10px;">📲 Instalovat aplikaci (Android)</button>
+                <div id="pwaInstallInfo" style="font-size:0.7rem; color:var(--text-muted); text-align:center; margin-top:4px; display:none;">Dostupné v Chrome/Edge na Androidu přes HTTPS</div>
+
+                <!-- Android, ale prohlížeč ještě nenabídl instalaci automaticky -->
+                <div id="androidManualInstallInfo" style="display:none;background:rgba(0,180,216,0.08);border:1px solid rgba(0,180,216,0.25);border-radius:10px;padding:12px;margin-top:10px;font-size:0.8rem;line-height:1.7;color:var(--text-main);">
+                    <b>🤖 Instalace na Androidu (ručně):</b><br>
+                    1️⃣ Klepni na menu prohlížeče (⋮ vpravo nahoře)<br>
+                    2️⃣ Vyber <b>„Instalovat aplikaci"</b> nebo <b>„Přidat na plochu"</b><br>
+                    3️⃣ Potvrď instalaci
+                </div>
+
+                <!-- iOS: instrukce pro sdílení na plochu -->
+                <div id="iosInstallInfo" style="display:none;background:rgba(0,180,216,0.08);border:1px solid rgba(0,180,216,0.25);border-radius:10px;padding:12px;margin-top:10px;font-size:0.8rem;line-height:1.7;color:var(--text-main);">
+                    <b>🍎 Instalace na iPhone/iPad (Safari):</b><br>
+                    1️⃣ Klepni na ikonu <b>Sdílet</b> ⬆️ dole na obrazovce<br>
+                    2️⃣ V nabídce vyber <b>„Přidat na plochu"</b><br>
+                    3️⃣ Potvrď tlačítkem <b>„Přidat"</b> vpravo nahoře<br>
+                    <span style="color:var(--text-muted);">⚠️ Instalace funguje pouze v prohlížeči Safari (v Chrome/jiných na iOS není podporovaná).</span>
+                </div>
+            </div>
             </div>
             <!-- ============ TAB: OSTATNÍ ============ -->
             <div class="settings-tab-content" id="settingsTabContentOther">
@@ -3313,33 +3344,81 @@
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            const installBtn = $('pwaInstallBtn');
-            const installInfo = $('pwaInstallInfo');
-            if (installBtn && installInfo) {
-                installBtn.style.display = 'block';
-                installInfo.style.display = 'block';
-                installBtn.classList.add('install-ready');
-            }
+            updateInstallSectionUI();
             console.log('PWA instalace dostupná');
         });
 
         // Po úspěšné instalaci
         window.addEventListener('appinstalled', () => {
             console.log('✅ Aplikace nainstalována');
-            const installBtn = $('pwaInstallBtn');
-            const installInfo = $('pwaInstallInfo');
-            if (installBtn && installInfo) {
-                installBtn.style.display = 'none';
-                installInfo.style.display = 'none';
-            }
             deferredPrompt = null;
+            updateInstallSectionUI();
         });
+
+        // Reaguj i na přepnutí do/z standalone režimu (např. po instalaci)
+        try {
+            window.matchMedia('(display-mode: standalone)').addEventListener('change', updateInstallSectionUI);
+        } catch(_e) {}
+
+        updateInstallSectionUI();
     }
+
+    // ── Detekce platformy a stavu instalace ─────────────────────────
+    function _isIOSDevice() {
+        return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+    function _isAndroidDevice() {
+        return /android/i.test(navigator.userAgent);
+    }
+    function _isStandaloneMode() {
+        return window.matchMedia('(display-mode: standalone)').matches ||
+               window.navigator.standalone === true;
+    }
+    window._isIOSDevice = _isIOSDevice;
+    window._isStandaloneMode = _isStandaloneMode;
+
+    // Aktualizuje sekci "Instalace aplikace" v Nastavení podle platformy a stavu
+    function updateInstallSectionUI() {
+        const already = $('pwaAlreadyInstalledInfo');
+        const androidBtn = $('pwaInstallBtn');
+        const androidInfo = $('pwaInstallInfo');
+        const androidManual = $('androidManualInstallInfo');
+        const iosInfo = $('iosInstallInfo');
+        if (!already) return; // sekce ještě není v DOM (např. při prvním startu)
+
+        // Reset
+        [already, androidBtn, androidInfo, androidManual, iosInfo].forEach(el => { if (el) el.style.display = 'none'; });
+
+        if (_isStandaloneMode()) {
+            already.style.display = 'block';
+            return;
+        }
+
+        if (_isIOSDevice()) {
+            iosInfo.style.display = 'block';
+            return;
+        }
+
+        if (deferredPrompt) {
+            // Prohlížeč nabízí nativní instalaci (Android Chrome/Edge, desktop Chrome…)
+            androidBtn.style.display = 'block';
+            androidInfo.style.display = 'block';
+            androidBtn.classList.add('install-ready');
+        } else if (_isAndroidDevice()) {
+            // Android, ale beforeinstallprompt zatím nepřišel (Brave, nebo appka byla nedávno zavřená)
+            androidManual.style.display = 'block';
+        } else {
+            // Desktop bez podpory beforeinstallprompt
+            androidManual.style.display = 'block';
+        }
+    }
+    window.updateInstallSectionUI = updateInstallSectionUI;
 
     async function installPWA() {
         if (!deferredPrompt) {
-            // Fallback pro iOS nebo pokud není beforeinstallprompt
-            alert('📲 Pro instalaci aplikace:\n\n1. Otevřete stránku v Chrome/Edge na Androidu\n2. Klikněte na menu (⋮)\n3. Vyberte "Přidat na plochu" nebo "Instalovat aplikaci"\n\n🍎 Na iOS: Sdílet → "Přidat na plochu"\n\n⚠️ Funkce vyžaduje HTTPS připojení.');
+            // Prompt zatím není k dispozici — přepni na ruční instrukce
+            updateInstallSectionUI();
             return;
         }
         
@@ -3357,14 +3436,7 @@
         
         // Vyčistit deferred prompt
         deferredPrompt = null;
-        
-        // Skrýt instalační tlačítko
-        const installBtn = $('pwaInstallBtn');
-        const installInfo = $('pwaInstallInfo');
-        if (installBtn && installInfo) {
-            installBtn.style.display = 'none';
-            installInfo.style.display = 'none';
-        }
+        updateInstallSectionUI();
     }
 
     function toggleSearchOverlay() {
@@ -3805,6 +3877,7 @@
         updateThemeToggleUI();
         $('settingsModal')?.classList.add('open');
         if(window.updatePwaBtn) updatePwaBtn();
+        if(window.updateInstallSectionUI) updateInstallSectionUI();
         // sync toggle state
         const colored = localStorage.getItem('coloredIcons') === '1';
         const tog = $('coloredIconsToggle');
