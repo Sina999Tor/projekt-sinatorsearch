@@ -1123,17 +1123,32 @@
             <div class="settings-divider"></div>
             <div class="settings-section" style="background:rgba(229,9,20,0.07);border:1px solid rgba(229,9,20,0.25);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:#ff6b6b;">🔐 Přístupové heslo aplikace</span>
-                <input type="password" class="settings-input" id="settingsPwdInput" placeholder="Zadejte nové heslo…" autocomplete="off">
-                <div class="settings-actions">
-                    <button class="settings-btn-small show-key-btn" onclick="toggleSettingsPwdVisibility()">👁️ Zobrazit</button>
-                    <button class="settings-btn-small" onclick="saveAppPassword()" style="background:rgba(229,9,20,0.3);">💾 Uložit heslo</button>
-                    <button class="settings-btn-small settings-btn-remove" onclick="clearAppPassword()">🗑️ Odebrat heslo</button>
+                <div id="appPwdManageBox" style="display:none;">
+                    <input type="password" class="settings-input" id="settingsPwdInput" placeholder="Zadejte nové heslo…" autocomplete="off">
+                    <div class="settings-actions">
+                        <button class="settings-btn-small show-key-btn" onclick="toggleSettingsPwdVisibility()">👁️ Zobrazit</button>
+                        <button class="settings-btn-small" onclick="saveAppPassword()" style="background:rgba(229,9,20,0.3);">💾 Uložit heslo</button>
+                        <button class="settings-btn-small settings-btn-remove" onclick="clearAppPassword()">🗑️ Odebrat heslo</button>
+                    </div>
+                </div>
+                <div id="appPwdNoAdminMsg" style="font-size:0.78rem;color:#888;margin-top:8px;padding:10px;background:rgba(0,0,0,0.25);border-radius:8px;">
+                    🔒 Nastavení, zobrazení nebo odebrání hesla je dostupné pouze v přihlášeném Admin režimu.
                 </div>
                 <div style="margin-top:10px;">
                     <button class="settings-btn-small" onclick="logoutApp()" style="width:100%;background:rgba(229,9,20,0.18);border:1px solid rgba(229,9,20,0.4);color:#ff6b6b;font-weight:600;padding:10px;">🔒 Odhlásit se (zamknout aplikaci)</button>
                 </div>
                 <div style="font-size:0.75rem;color:#888;margin-top:6px;" id="settingsPwdStatus">
                     Heslo chrání přístup do aplikace. Po uložení bude vyžadováno při každém spuštění.
+                </div>
+                <div class="settings-divider" style="margin:12px 0;"></div>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div onclick="togglePwdAlwaysRequired()" id="pwdAlwaysToggle" style="width:44px;height:24px;border-radius:12px;background:#333;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
+                        <div id="pwdAlwaysToggleKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;pointer-events:none;"></div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.88rem;color:#eee;font-weight:600;">Vždy vyžadovat heslo při spuštění</div>
+                        <div id="pwdAlwaysToggleLabel" style="font-size:0.72rem;color:#888;">Vypnuto — appka si tě po odemčení pamatuje</div>
+                    </div>
                 </div>
             </div>
             <div class="settings-divider"></div>
@@ -32667,15 +32682,50 @@ document.addEventListener('DOMContentLoaded', function() {
         window.location.reload();
     };
 
+    // ── Vždy vyžadovat heslo při spuštění (přepínatelné, dostupné všem) ──
+    var _AK = 'sinator_pwd_always_required';
+
+    function _updatePwdAlwaysToggleUI() {
+        var on = localStorage.getItem(_AK) === '1';
+        var toggle = document.getElementById('pwdAlwaysToggle');
+        var knob = document.getElementById('pwdAlwaysToggleKnob');
+        var lbl = document.getElementById('pwdAlwaysToggleLabel');
+        if (toggle) toggle.style.background = on ? '#ff6b6b' : '#333';
+        if (knob) knob.style.left = on ? '22px' : '2px';
+        if (lbl) lbl.textContent = on
+            ? 'Zapnuto — heslo se bude vyžadovat při každém spuštění'
+            : 'Vypnuto — appka si tě po odemčení pamatuje';
+    }
+    window._updatePwdAlwaysToggleUI = _updatePwdAlwaysToggleUI;
+
+    window.togglePwdAlwaysRequired = function() {
+        var on = localStorage.getItem(_AK) === '1';
+        if (on) { localStorage.removeItem(_AK); } else { localStorage.setItem(_AK, '1'); }
+        _updatePwdAlwaysToggleUI();
+    };
+
+    // ── Zobrazení / skrytí správy hesla podle Admin režimu ──
+    window._updateAppPwdSectionVisibility = function() {
+        var active = localStorage.getItem('sinator_admin_mode') === '1';
+        var box = document.getElementById('appPwdManageBox');
+        var msg = document.getElementById('appPwdNoAdminMsg');
+        if (box) box.style.display = active ? 'block' : 'none';
+        if (msg) msg.style.display = active ? 'none' : 'block';
+    };
+
     // Init: zkontroluj při spuštění
     document.addEventListener('DOMContentLoaded', function() {
         var storedHash = localStorage.getItem(_PK) || _H;
-        // Pokud je session stále odemčena (reload bez zavření tabu), pustit dál
-        if (localStorage.getItem(_SK) === '1') {
+        // Pokud je zapnuto "vždy vyžadovat heslo", ignoruj uloženou session
+        if (localStorage.getItem(_AK) === '1') {
+            _showLock();
+        } else if (localStorage.getItem(_SK) === '1') {
+            // Pokud je session stále odemčena (reload bez zavření tabu), pustit dál
             _unlock();
         } else {
             _showLock();
         }
+        _updatePwdAlwaysToggleUI();
     });
 })();
 </script>
@@ -33174,6 +33224,9 @@ function updateAdminStatus() {
   });
   // Adult toggle – disabled bez admina
   if (typeof updateAdultToggleUI === 'function') updateAdultToggleUI();
+  // Správa hesla – dostupná jen pro admina
+  if (typeof window._updateAppPwdSectionVisibility === 'function') window._updateAppPwdSectionVisibility();
+  if (typeof window._updatePwdAlwaysToggleUI === 'function') window._updatePwdAlwaysToggleUI();
   // Seznam registrovaných uživatelů — jen pro admina
   if (active && typeof attachAdminUsersListener === 'function') attachAdminUsersListener();
 }
@@ -33195,12 +33248,17 @@ if (_origOpenSettings) {
 // =========================================================
 // 👤 POVINNÁ PŘEZDÍVKA + PŘÍTOMNOST (online/offline) UŽIVATELŮ
 // =========================================================
+// Poznámka: záznamy registrovaných uživatelů se ukládají do stejné
+// větve "presence/" jako anonymní online-počítadlo (ta už má v pravidlech
+// Firebase povolený zápis/čtení), jen pod klíčem odvozeným od přezdívky
+// místo náhodného session ID. Díky tomu funguje spolehlivě i bez úprav
+// bezpečnostních pravidel databáze.
 const USER_NICK_KEY = 'sinator_user_nick';
-const USER_STALE_MS = 3 * 60 * 1000; // po 3 min bez heartbeatu = offline
+const USER_STALE_MS = 5 * 60 * 1000; // po 5 min bez heartbeatu = offline
 let _userHeartbeatTimer = null;
 
 function _sanitizeNickKey(nick) {
-  return String(nick).trim().toLowerCase()
+  return 'u_' + String(nick).trim().toLowerCase()
     .replace(/[.#$\[\]\/]/g, '_')
     .replace(/\s+/g, '_')
     .slice(0, 40);
@@ -33220,26 +33278,29 @@ function _formatLastSeen(ts) {
   return `před ${Math.floor(diffH / 24)} d`;
 }
 
-// Pravidelně zapisuje "jsem tu" do Firebase pro danou přezdívku
+// Pravidelně zapisuje "jsem tu" do Firebase pro danou přezdívku (v presence/)
 function _startUserPresenceHeartbeat(nick) {
   const key = _sanitizeNickKey(nick);
   if (!key) return;
-  const userRef = ref(rtdb, 'users/' + key);
+  const userRef = ref(rtdb, 'presence/' + key);
   function beat() {
-    set(userRef, { nick: nick, lastSeen: Date.now() }).catch(()=>{});
+    const isAdmin = localStorage.getItem('sinator_admin_mode') === '1';
+    set(userRef, { t: Date.now(), nick: nick, admin: isAdmin }).catch(() => {});
   }
   beat();
-  try { rtdbOnDisconnect(userRef).update({ lastSeen: 0 }); } catch(e) {}
+  // Na rozdíl od anonymních session záznamů tenhle při odpojení NEmažeme —
+  // zůstane v seznamu jako "offline" registrovaný uživatel.
   if (_userHeartbeatTimer) clearInterval(_userHeartbeatTimer);
   _userHeartbeatTimer = setInterval(beat, 2 * 60 * 1000);
 }
+window._startUserPresenceHeartbeat = _startUserPresenceHeartbeat;
 
 // Přejmenování — smaže starý záznam a vytvoří nový
 function _renameUserPresence(oldNick, newNick) {
   try {
     const oldKey = _sanitizeNickKey(oldNick);
     const newKey = _sanitizeNickKey(newNick);
-    if (oldKey && oldKey !== newKey) remove(ref(rtdb, 'users/' + oldKey)).catch(()=>{});
+    if (oldKey && oldKey !== newKey) remove(ref(rtdb, 'presence/' + oldKey)).catch(() => {});
   } catch(e) {}
   _startUserPresenceHeartbeat(newNick);
 }
@@ -33299,13 +33360,13 @@ if (document.readyState === 'loading') {
   initNickGate();
 }
 
-// ---- ADMIN: přehled registrovaných uživatelů (online/offline) ----
+// ---- ADMIN: přehled registrovaných uživatelů (online/offline + ⭐ admin) ----
 let _adminUsersListenerAttached = false;
 
 function attachAdminUsersListener() {
   if (_adminUsersListenerAttached) return;
   _adminUsersListenerAttached = true;
-  const usersRef = ref(rtdb, 'users');
+  const usersRef = ref(rtdb, 'presence');
   onValue(usersRef, (snap) => {
     const wrap = document.getElementById('adminUsersList');
     if (!wrap) return;
@@ -33314,23 +33375,50 @@ function attachAdminUsersListener() {
       return;
     }
     const now = Date.now();
-    const users = Object.values(snap.val()).map(u => ({
-      nick: u.nick || '?',
-      lastSeen: u.lastSeen || 0,
-      online: (now - (u.lastSeen || 0)) < USER_STALE_MS
-    }));
+    const all = snap.val();
+    // Vezmeme jen záznamy s vyplněnou přezdívkou (anonymní online-počítadlo je bez "nick")
+    const users = Object.values(all)
+      .filter(u => u && u.nick)
+      .map(u => ({
+        nick: u.nick,
+        lastSeen: u.t || 0,
+        isAdmin: !!u.admin,
+        online: (now - (u.t || 0)) < USER_STALE_MS
+      }));
+    if (!users.length) {
+      wrap.innerHTML = '<div style="color:#888;font-size:0.8rem;">Zatím žádní registrovaní uživatelé.</div>';
+      return;
+    }
     users.sort((a, b) => (b.online - a.online) || a.nick.localeCompare(b.nick, 'cs'));
     const onlineCount = users.filter(u => u.online).length;
     wrap.innerHTML = `<div style="font-size:0.72rem;color:#888;margin-bottom:2px;">Celkem: ${users.length} · 🟢 online: ${onlineCount}</div>` +
       users.map(u => `
         <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-elevated);border-radius:8px;">
           <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:${u.online ? '#22c55e' : '#555'};box-shadow:${u.online ? '0 0 6px #22c55e' : 'none'};"></span>
-          <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">${_escapeHtmlU(u.nick)}</span>
+          <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">${u.isAdmin ? '⭐ ' : ''}${_escapeHtmlU(u.nick)}</span>
           <span style="font-size:0.7rem;color:#888;">${u.online ? 'online' : _formatLastSeen(u.lastSeen)}</span>
         </div>`).join('');
+  }, (err) => {
+    const wrap = document.getElementById('adminUsersList');
+    if (wrap) wrap.innerHTML = `<div style="color:#ff6b6b;font-size:0.8rem;">⚠️ Chyba načtení seznamu: ${_escapeHtmlU(err.message || err)}</div>`;
   });
 }
 window.attachAdminUsersListener = attachAdminUsersListener;
+
+// Když se aktivuje/deaktivuje admin režim, ihned aktualizuj vlastní ⭐ příznak v presence
+window.addEventListener('storage', () => {}); // no-op, jen pro jistotu existence event systému
+const _origActivateAdminMode = window.activateAdminMode;
+window.activateAdminMode = async function(...a) {
+  await _origActivateAdminMode.apply(this, a);
+  const nick = localStorage.getItem(USER_NICK_KEY);
+  if (nick) _startUserPresenceHeartbeat(nick);
+};
+const _origDeactivateAdminMode = window.deactivateAdminMode;
+window.deactivateAdminMode = function(...a) {
+  _origDeactivateAdminMode.apply(this, a);
+  const nick = localStorage.getItem(USER_NICK_KEY);
+  if (nick) _startUserPresenceHeartbeat(nick);
+};
 </script>
 
 <!-- =====================================================
