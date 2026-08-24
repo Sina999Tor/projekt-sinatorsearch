@@ -15089,10 +15089,17 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     <!-- EPG tab -->
     <div id="tvEpgWrap" style="display:none;flex:1;display:none;flex-direction:column;min-height:0;overflow:hidden;">
         <!-- Hlavička s datem a obnovit -->
-        <div style="flex-shrink:0;padding:6px 12px 4px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
-            <span id="tvProgramDateLabel" style="font-size:0.72rem;color:var(--text-muted);font-weight:600;"></span>
-            <button onclick="loadEpgData()" style="background:none;border:1px solid var(--border);color:var(--text-muted);font-size:0.7rem;padding:3px 8px;border-radius:6px;cursor:pointer;">↻ Obnovit</button>
-            <button onclick="(function(){const epg=tvState.epgData||{};const chs=tvState.channels||[];const firstKey=Object.keys(epg)[0];const progs=epg[firstKey]||[];const allProgs=Object.values(epg).flat();const dates=allProgs.map(p=>p.start).filter(Boolean).sort((a,b)=>a-b);const minD=dates[0];const maxD=dates[dates.length-1];const now=new Date();alert('Dnes: '+now.toLocaleDateString('cs-CZ')+' '+now.toLocaleTimeString('cs-CZ')+'\nEPG od: '+(minD?minD.toLocaleString('cs-CZ'):'?')+'\nEPG do: '+(maxD?maxD.toLocaleString('cs-CZ'):'?')+'\nCelkem porizadu: '+allProgs.length);})();" style="background:none;border:1px solid #ff9800;color:#ff9800;font-size:0.7rem;padding:3px 8px;border-radius:6px;cursor:pointer;">🔍 Debug</button>
+        <div style="flex-shrink:0;padding:6px 12px 4px;display:flex;align-items:center;justify-content:space-between;gap:6px;border-bottom:1px solid var(--border);">
+            <div style="display:flex;align-items:center;gap:3px;min-width:0;">
+                <button onclick="shiftEpgDay(-1)" style="flex-shrink:0;background:none;border:1px solid var(--border);color:var(--text-muted);font-size:0.75rem;padding:3px 7px;border-radius:6px;cursor:pointer;">◀</button>
+                <span id="tvProgramDateLabel" style="font-size:0.7rem;color:var(--text-muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+                <button onclick="shiftEpgDay(1)" style="flex-shrink:0;background:none;border:1px solid var(--border);color:var(--text-muted);font-size:0.75rem;padding:3px 7px;border-radius:6px;cursor:pointer;">▶</button>
+            </div>
+            <div style="flex-shrink:0;display:flex;align-items:center;gap:5px;">
+                <button id="tvEpgTodayBtn" onclick="shiftEpgDay(0,true)" style="display:none;background:none;border:1px solid var(--accent);color:var(--accent);font-size:0.66rem;padding:3px 7px;border-radius:6px;cursor:pointer;white-space:nowrap;">Dnes</button>
+                <button onclick="loadEpgData()" style="background:none;border:1px solid var(--border);color:var(--text-muted);font-size:0.7rem;padding:3px 8px;border-radius:6px;cursor:pointer;">↻</button>
+                <button onclick="(function(){const epg=tvState.epgData||{};const chs=tvState.channels||[];const firstKey=Object.keys(epg)[0];const progs=epg[firstKey]||[];const allProgs=Object.values(epg).flat();const dates=allProgs.map(p=>p.start).filter(Boolean).sort((a,b)=>a-b);const minD=dates[0];const maxD=dates[dates.length-1];const now=new Date();alert('Dnes: '+now.toLocaleDateString('cs-CZ')+' '+now.toLocaleTimeString('cs-CZ')+'\nEPG od: '+(minD?minD.toLocaleString('cs-CZ'):'?')+'\nEPG do: '+(maxD?maxD.toLocaleString('cs-CZ'):'?')+'\nCelkem porizadu: '+allProgs.length);})();" style="background:none;border:1px solid #ff9800;color:#ff9800;font-size:0.7rem;padding:3px 8px;border-radius:6px;cursor:pointer;">🔍</button>
+            </div>
         </div>
         <!-- Bubliny kanálů -->
         <div id="tvEpgChannelBubbles" style="flex-shrink:0;display:flex;gap:6px;padding:7px 10px;overflow-x:auto;overflow-y:hidden;border-bottom:1px solid var(--border);scrollbar-width:none;background:var(--bg-dark);"></div>
@@ -29551,11 +29558,25 @@ function getSeznamTvUrl(ch) {
     return 'https://tv.seznam.cz/';
 }
 
+function epgStartOfDay(d) {
+    const x = new Date(d);
+    x.setHours(0,0,0,0);
+    return x;
+}
+
+function shiftEpgDay(delta, resetToday) {
+    if(resetToday) {
+        tvState._epgSelectedDate = epgStartOfDay(new Date());
+    } else {
+        const base = tvState._epgSelectedDate || epgStartOfDay(new Date());
+        tvState._epgSelectedDate = new Date(base.getTime() + delta*24*60*60*1000);
+    }
+    // Při přepnutí dne zruš filtr na konkrétní kanál, ať je hned vidět celý den
+    buildEpgView();
+}
+
 async function loadEpgData() {
-    const now = new Date();
-    const dateLabel = now.toLocaleDateString('cs-CZ', {weekday:'long', day:'numeric', month:'long'});
-    const el = document.getElementById('tvProgramDateLabel');
-    if(el) el.textContent = dateLabel;
+    if(!tvState._epgSelectedDate) tvState._epgSelectedDate = epgStartOfDay(new Date());
 
     const listEl = document.getElementById('tvProgramList');
     if(!listEl) return;
@@ -29564,6 +29585,28 @@ async function loadEpgData() {
     if(!tvState.xmlEpgLoaded) {
         await loadLocalXmlEpg();
     }
+
+    buildEpgView();
+}
+
+function buildEpgView() {
+    const selDate = tvState._epgSelectedDate || epgStartOfDay(new Date());
+    const now = new Date();
+    const isToday = epgStartOfDay(now).getTime() === selDate.getTime();
+    tvState._epgIsToday = isToday;
+
+    // Popisek data + tlačítko "Dnes"
+    const el = document.getElementById('tvProgramDateLabel');
+    if(el) {
+        const diffDays = Math.round((selDate.getTime() - epgStartOfDay(now).getTime()) / (24*60*60*1000));
+        let prefix = '';
+        if(diffDays === 0) prefix = 'Dnes, ';
+        else if(diffDays === -1) prefix = 'Včera, ';
+        else if(diffDays === 1) prefix = 'Zítra, ';
+        el.textContent = prefix + selDate.toLocaleDateString('cs-CZ', {weekday:'long', day:'numeric', month:'long'});
+    }
+    const todayBtn = document.getElementById('tvEpgTodayBtn');
+    if(todayBtn) todayBtn.style.display = isToday ? 'none' : 'inline-block';
 
     // EPG záložka zobrazuje VŠECHNY kanály z playlistu (ne jen aktuální skupinu)
     const filtered = tvState.channels || [];
@@ -29579,8 +29622,14 @@ async function loadEpgData() {
         .replace(/\s*(hd|fhd|4k|hevc)\s*$/i,'').replace(/[.\s]/g,'').trim();
 
     const epg = tvState.epgData || {};
-    const windowStart = new Date(now.getTime() - 2*60*60*1000);
-    const windowEnd   = new Date(now.getTime() + 12*60*60*1000);
+    let windowStart, windowEnd;
+    if(isToday) {
+        windowStart = new Date(now.getTime() - 2*60*60*1000);
+        windowEnd   = new Date(now.getTime() + 12*60*60*1000);
+    } else {
+        windowStart = selDate;
+        windowEnd   = new Date(selDate.getTime() + 24*60*60*1000);
+    }
 
     // Sestav seznam kanálů s EPG daty
     const channelItems = {};  // chName -> [{...}]
@@ -29598,17 +29647,17 @@ async function loadEpgData() {
         }
         if(!progs || !progs.length) continue;
 
-        const todayProgs = progs.filter(p => p.end > windowStart && p.start < windowEnd);
-        if(!todayProgs.length) continue;
+        const dayProgs = progs.filter(p => p.end > windowStart && p.start < windowEnd);
+        if(!dayProgs.length) continue;
 
-        channelItems[ch.name] = todayProgs.map(p => ({
+        channelItems[ch.name] = dayProgs.map(p => ({
             channel: ch.name,
             url: ch.url || '',
             time: fmt(p.start),
             endTime: fmt(p.end),
             title: p.title,
             desc: p.desc || '',
-            isNow: p.start <= now && p.end > now,
+            isNow: isToday && p.start <= now && p.end > now,
             startMs: p.start.getTime(),
             endMs: p.end.getTime(),
         }));
@@ -29621,8 +29670,19 @@ async function loadEpgData() {
     // Renderuj bubliny kanálů
     renderEpgChannelBubbles(Object.keys(channelItems));
 
-    // Renderuj program (všechny nebo filtrovaný)
-    renderEpgFiltered(now);
+    if(Object.keys(channelItems).length === 0) {
+        const listEl2 = document.getElementById('tvProgramList');
+        if(listEl2) listEl2.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;text-align:center;padding:20px;">'
+            + '⚠️ Pro tento den nejsou v lokálních XML datech žádná data.'
+            + (isToday ? '' : '<br><span style="font-size:0.72rem;">Zdroj obvykle obsahuje jen dnešek a pár dní dopředu, zpětně data typicky nejsou.</span>')
+            + '<br><br>'
+            + '<a href="https://tv.seznam.cz" target="_blank" style="color:#00b4d8;">📋 tv.seznam.cz</a> &nbsp;'
+            + '<a href="https://mujtvprogram.cz" target="_blank" style="color:#00b4d8;">📋 mujtvprogram.cz</a>'
+            + '</div>';
+    } else {
+        // Renderuj program (všechny nebo filtrovaný)
+        renderEpgFiltered(now);
+    }
     tvState.epgLoaded = true;
 }
 
@@ -29672,7 +29732,7 @@ function selectEpgChannel(name) {
 function renderEpgFiltered(now) {
     const allChannels = tvState._epgAllChannels || {};
     const active = tvState._epgActiveChannel;
-    const isAllMode = !active;
+    const isAllMode = !active && tvState._epgIsToday;
     const toShow = active
         ? (allChannels[active] ? { [active]: allChannels[active] } : {})
         : allChannels;
@@ -29716,8 +29776,8 @@ function renderTvProgram(items, now) {
 
     const fmt = (timeStr) => timeStr || '';
 
-    // Zjisti zda jsme v "Vše" módu (každý kanál má max 2 položky: now + next)
-    const isAllMode = !tvState._epgActiveChannel;
+    // Zjisti zda jsme v "Vše" módu (každý kanál má max 2 položky: now + next) — jen pro dnešek
+    const isAllMode = !tvState._epgActiveChannel && tvState._epgIsToday;
 
     let html = '';
     for(const [chName, progs] of Object.entries(byChannel)) {
@@ -29789,7 +29849,7 @@ function renderTvProgram(items, now) {
 
             for(const p of progs) {
                 const isNow = p.isNow === true;
-                const isPast = !isNow && p.endTime && p.endTime < now.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'});
+                const isPast = tvState._epgIsToday && !isNow && p.endTime && p.endTime < now.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'});
                 const safeTitle = (p.title||'').replace(/'/g,"\\'");
                 const safeDesc  = (p.desc||'').replace(/'/g,"\\'");
                 const safeTime  = (p.time||'').replace(/'/g,"\\'");
