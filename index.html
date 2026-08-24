@@ -32938,7 +32938,7 @@ if (location.search.indexOf('debug=1') !== -1) {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getDatabase, ref, onValue, set, remove, onDisconnect as rtdbOnDisconnect, serverTimestamp as rtdbServerTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, onValue, get, set, remove, onDisconnect as rtdbOnDisconnect, serverTimestamp as rtdbServerTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCGnf9SlyOW2M5jXU2qOVUJ2sVMedTIBxo",
@@ -33291,18 +33291,33 @@ window._prefillAndOpenAdd = prefillAndOpenAdd;
 
 // ---- ADMIN MODE ----
 const _ADMIN_HASH = '781813bb37eab22353b8a69c29a5cac43df0e1efb8b3a112d2528a3c3b59f4d2';
+// Admin level 2 (superadmin) — může mazat uživatele a odhlašovat admin level 1
+const _ADMIN2_HASH = '047a9a6cf044ed6a2881675f4ab69a8db3c3fb40dbbeb6d48af89ce6eca5d769';
 
 async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
+window._isAdminLevel2 = function() {
+  return localStorage.getItem('sinator_admin_mode') === '1' && localStorage.getItem('sinator_admin_level') === '2';
+};
+
 window.activateAdminMode = async function() {
   const pwd = document.getElementById('adminPwdInput')?.value || '';
   if (!pwd) return;
   const hash = await sha256(pwd);
-  if (hash === _ADMIN_HASH) {
+  if (hash === _ADMIN2_HASH) {
     localStorage.setItem('sinator_admin_mode', '1');
+    localStorage.setItem('sinator_admin_level', '2');
+    document.getElementById('adminPwdInput').value = '';
+    updateAdminStatus();
+    const badge = document.getElementById('onlineBadge');
+    if (badge) badge.style.display = 'block';
+    alert('✅ Admin level 2 aktivován.');
+  } else if (hash === _ADMIN_HASH) {
+    localStorage.setItem('sinator_admin_mode', '1');
+    localStorage.removeItem('sinator_admin_level');
     document.getElementById('adminPwdInput').value = '';
     updateAdminStatus();
     // Zobrazit online badge
@@ -33316,6 +33331,7 @@ window.activateAdminMode = async function() {
 
 window.deactivateAdminMode = function() {
   localStorage.removeItem('sinator_admin_mode');
+  localStorage.removeItem('sinator_admin_level');
   localStorage.setItem('sinator_adult_content', 'false');
   adultContent = false;
   if (typeof updateAdultToggleUI === 'function') updateAdultToggleUI();
@@ -33333,7 +33349,8 @@ function updateAdminStatus() {
   const lbl = document.getElementById('adminModeLabel');
   if (!lbl) return;
   const active = localStorage.getItem('sinator_admin_mode') === '1';
-  lbl.textContent = active ? '✅ Aktivní' : 'Neaktivní';
+  const isLvl2 = window._isAdminLevel2();
+  lbl.textContent = active ? (isLvl2 ? '✅ Aktivní (level 2)' : '✅ Aktivní') : 'Neaktivní';
   lbl.style.color = active ? '#1db954' : '#888';
   // Zobrazit/skrýt tlačítka "Zobrazit klíč" jen pro admin
   document.querySelectorAll('.show-key-btn').forEach(btn => {
@@ -33374,6 +33391,8 @@ if (_origOpenSettings) {
 const USER_NICK_KEY = 'sinator_user_nick';
 const USER_STALE_MS = 5 * 60 * 1000; // po 5 min bez heartbeatu = offline
 let _userHeartbeatTimer = null;
+let _ownPresenceUnsub = null;
+let _ownCommandsUnsub = null;
 
 function _sanitizeNickKey(nick) {
   return 'u_' + String(nick).trim().toLowerCase()
@@ -33403,15 +33422,68 @@ function _startUserPresenceHeartbeat(nick) {
   const userRef = ref(rtdb, 'presence/' + key);
   function beat() {
     const isAdmin = localStorage.getItem('sinator_admin_mode') === '1';
-    set(userRef, { t: Date.now(), nick: nick, admin: isAdmin }).catch(() => {});
+    const adminLevel = isAdmin ? (window._isAdminLevel2() ? 2 : 1) : 0;
+    return set(userRef, { t: Date.now(), nick: nick, admin: isAdmin, adminLevel: adminLevel }).catch(() => {});
   }
-  beat();
+  beat().then(() => {
+    // Sleduj vlastní záznam: pokud ho admin level 2 smaže, appka si vynutí
+    // nové zadání jména (viz _forceNicknameReset). Ignorujeme první snapshot
+    // (ten odpovídá zápisu, který jsme právě provedli výše).
+    if (_ownPresenceUnsub) { _ownPresenceUnsub(); _ownPresenceUnsub = null; }
+    let firstSnap = true;
+    _ownPresenceUnsub = onValue(userRef, (snap) => {
+      if (firstSnap) { firstSnap = false; return; }
+      if (!snap.exists()) { _forceNicknameReset(); }
+    });
+    // Sleduj příkazy od admin level 2 (např. odhlášení z admin režimu)
+    if (_ownCommandsUnsub) { _ownCommandsUnsub(); _ownCommandsUnsub = null; }
+    const cmdRef = ref(rtdb, 'adminCommands/' + key);
+    _ownCommandsUnsub = onValue(cmdRef, (snap) => {
+      if (!snap.exists()) return;
+      const cmd = snap.val();
+      if (cmd && cmd.kickAdmin && localStorage.getItem('sinator_admin_mode') === '1') {
+        window.deactivateAdminMode();
+        alert('🚪 Byl(a) jste odhlášen(a) z Admin režimu správcem.');
+      }
+      if (cmd && cmd.grantAdmin && localStorage.getItem('sinator_admin_mode') !== '1') {
+        localStorage.setItem('sinator_admin_mode', '1');
+        localStorage.removeItem('sinator_admin_level'); // level 1
+        if (typeof updateAdminStatus === 'function') updateAdminStatus();
+        const badge = document.getElementById('onlineBadge');
+        if (badge) badge.style.display = 'block';
+        beat(); // ihned promítnout novou admin úroveň do presence
+        alert('🛡️ Byl(a) vám vzdáleně udělen Admin level 1 přístup správcem.');
+      }
+      remove(cmdRef).catch(() => {});
+    });
+  });
   // Na rozdíl od anonymních session záznamů tenhle při odpojení NEmažeme —
   // zůstane v seznamu jako "offline" registrovaný uživatel.
   if (_userHeartbeatTimer) clearInterval(_userHeartbeatTimer);
   _userHeartbeatTimer = setInterval(beat, 2 * 60 * 1000);
 }
 window._startUserPresenceHeartbeat = _startUserPresenceHeartbeat;
+
+// Vynucené smazání jména — zavolá se, když admin level 2 smaže uživatele
+// (jeho záznam v presence/ zmizí). Uživatel bude muset zadat jméno znovu.
+function _forceNicknameReset() {
+  try { localStorage.removeItem(USER_NICK_KEY); } catch(e) {}
+  try { localStorage.removeItem('sinator_d_nick'); } catch(e) {}
+  if (_userHeartbeatTimer) { clearInterval(_userHeartbeatTimer); _userHeartbeatTimer = null; }
+  if (_ownPresenceUnsub) { _ownPresenceUnsub(); _ownPresenceUnsub = null; }
+  if (_ownCommandsUnsub) { _ownCommandsUnsub(); _ownCommandsUnsub = null; }
+  _nickGateChecked = false;
+  const overlay = document.getElementById('nickSetupOverlay');
+  if (overlay) {
+    const input = document.getElementById('nickSetupInput');
+    if (input) input.value = '';
+    const err = document.getElementById('nickSetupError');
+    if (err) err.textContent = '';
+    overlay.style.display = 'flex';
+    setTimeout(() => document.getElementById('nickSetupInput')?.focus(), 200);
+  }
+}
+window._forceNicknameReset = _forceNicknameReset;
 
 // Přejmenování — smaže starý záznam a vytvoří nový
 function _renameUserPresence(oldNick, newNick) {
@@ -33487,6 +33559,41 @@ function attachAdminUsersListener() {
   if (_adminUsersListenerAttached) return;
   _adminUsersListenerAttached = true;
   const usersRef = ref(rtdb, 'presence');
+  const wrapEl = document.getElementById('adminUsersList');
+  // Delegovaný listener na tlačítka v řádcích (přidá se jednou, přežije překreslení innerHTML)
+  if (wrapEl && !wrapEl.dataset.adminActionsBound) {
+    wrapEl.dataset.adminActionsBound = '1';
+    wrapEl.addEventListener('click', function(e) {
+      const delBtn = e.target.closest('.admin-del-user-btn');
+      const kickBtn = e.target.closest('.admin-kick-user-btn');
+      if (delBtn) {
+        if (!window._isAdminLevel2()) return;
+        const key = delBtn.getAttribute('data-key');
+        const nick = delBtn.getAttribute('data-nick');
+        if (!confirm(`Opravdu smazat uživatele "${nick}"? Při dalším spuštění appky (nebo hned, pokud ji má otevřenou) si bude muset znovu zadat jméno.`)) return;
+        remove(ref(rtdb, 'presence/' + key)).catch(err => alert('❌ Smazání se nezdařilo: ' + (err && err.message || err)));
+        return;
+      }
+      if (kickBtn) {
+        if (!window._isAdminLevel2()) return;
+        const key = kickBtn.getAttribute('data-key');
+        const nick = kickBtn.getAttribute('data-nick');
+        if (!confirm(`Odhlásit uživatele "${nick}" z Admin režimu?`)) return;
+        set(ref(rtdb, 'adminCommands/' + key), { kickAdmin: true, ts: Date.now() })
+          .catch(err => alert('❌ Odhlášení se nezdařilo: ' + (err && err.message || err)));
+        return;
+      }
+      const grantBtn = e.target.closest('.admin-grant-user-btn');
+      if (grantBtn) {
+        if (!window._isAdminLevel2()) return;
+        const key = grantBtn.getAttribute('data-key');
+        const nick = grantBtn.getAttribute('data-nick');
+        if (!confirm(`Udělit uživateli "${nick}" Admin level 1 přístup na dálku?`)) return;
+        set(ref(rtdb, 'adminCommands/' + key), { grantAdmin: true, ts: Date.now() })
+          .catch(err => alert('❌ Udělení admin přístupu se nezdařilo: ' + (err && err.message || err)));
+      }
+    });
+  }
   onValue(usersRef, (snap) => {
     const wrap = document.getElementById('adminUsersList');
     if (!wrap) return;
@@ -33496,13 +33603,17 @@ function attachAdminUsersListener() {
     }
     const now = Date.now();
     const all = snap.val();
+    const myKey = _sanitizeNickKey(localStorage.getItem(USER_NICK_KEY) || '');
+    const isLvl2 = window._isAdminLevel2();
     // Vezmeme jen záznamy s vyplněnou přezdívkou (anonymní online-počítadlo je bez "nick")
-    const users = Object.values(all)
-      .filter(u => u && u.nick)
-      .map(u => ({
+    const users = Object.entries(all)
+      .filter(([k, u]) => u && u.nick)
+      .map(([k, u]) => ({
+        key: k,
         nick: u.nick,
         lastSeen: u.t || 0,
         isAdmin: !!u.admin,
+        adminLevel: u.adminLevel || (u.admin ? 1 : 0),
         online: (now - (u.t || 0)) < USER_STALE_MS
       }));
     if (!users.length) {
@@ -33512,12 +33623,26 @@ function attachAdminUsersListener() {
     users.sort((a, b) => (b.online - a.online) || a.nick.localeCompare(b.nick, 'cs'));
     const onlineCount = users.filter(u => u.online).length;
     wrap.innerHTML = `<div style="font-size:0.72rem;color:#888;margin-bottom:2px;">Celkem: ${users.length} · 🟢 online: ${onlineCount}</div>` +
-      users.map(u => `
+      users.map(u => {
+        const star = u.adminLevel === 2 ? '⭐⭐ ' : (u.adminLevel === 1 ? '⭐ ' : '');
+        const isSelf = u.key === myKey;
+        const delBtn = (isLvl2 && !isSelf)
+          ? `<button class="admin-del-user-btn" data-key="${_escapeHtmlU(u.key)}" data-nick="${_escapeHtmlU(u.nick)}" title="Smazat uživatele (bude si muset znovu zadat jméno)" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:1rem;padding:2px 6px;">🗑️</button>`
+          : '';
+        const kickBtn = (isLvl2 && !isSelf && u.adminLevel === 1)
+          ? `<button class="admin-kick-user-btn" data-key="${_escapeHtmlU(u.key)}" data-nick="${_escapeHtmlU(u.nick)}" title="Odhlásit z Admin režimu" style="background:none;border:none;color:#ffaa00;cursor:pointer;font-size:1rem;padding:2px 6px;">🚪</button>`
+          : '';
+        const grantBtn = (isLvl2 && !isSelf && u.adminLevel === 0)
+          ? `<button class="admin-grant-user-btn" data-key="${_escapeHtmlU(u.key)}" data-nick="${_escapeHtmlU(u.nick)}" title="Udělit Admin level 1 na dálku" style="background:none;border:none;color:#4fc3f7;cursor:pointer;font-size:1rem;padding:2px 6px;">🛡️➕</button>`
+          : '';
+        return `
         <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-elevated);border-radius:8px;">
           <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:${u.online ? '#22c55e' : '#555'};box-shadow:${u.online ? '0 0 6px #22c55e' : 'none'};"></span>
-          <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">${u.isAdmin ? '⭐ ' : ''}${_escapeHtmlU(u.nick)}</span>
+          <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">${star}${_escapeHtmlU(u.nick)}</span>
           <span style="font-size:0.7rem;color:#888;">${u.online ? 'online' : _formatLastSeen(u.lastSeen)}</span>
-        </div>`).join('');
+          ${grantBtn}${kickBtn}${delBtn}
+        </div>`;
+      }).join('');
   }, (err) => {
     const wrap = document.getElementById('adminUsersList');
     if (wrap) wrap.innerHTML = `<div style="color:#ff6b6b;font-size:0.8rem;">⚠️ Chyba načtení seznamu: ${_escapeHtmlU(err.message || err)}</div>`;
