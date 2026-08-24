@@ -32691,6 +32691,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Po odemčení synchronizuj adultContent proměnnou z localStorage (mohlo být resetováno při zamčení)
         adultContent = window._store.getItem('sinator_adult_content') === 'true';
         if (typeof updateAdultToggleUI === 'function') updateAdultToggleUI();
+        // ✅ OPRAVA: přezdívka se teď ptá až PO odemčení heslem, ne nad zamykací obrazovkou
+        if (typeof window._checkNickGate === 'function') window._checkNickGate();
     }
 
     function _showLock() {
@@ -32855,8 +32857,7 @@ if (location.search.indexOf('debug=1') !== -1) {
     document.body.appendChild(_erudaScript);
 }
 </script>
-</body>
-</html><!-- ════════ DOPORUČUJI MODAL ════════ -->
+<!-- ════════ DOPORUČUJI MODAL ════════ -->
 <div id="doporucujiOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.97);backdrop-filter:blur(16px);z-index:10000;flex-direction:column;overflow:hidden;" onclick="if(event.target===this)closeDoporucujiModal()">
   <div style="display:flex;flex-direction:column;width:100%;height:100%;max-width:100%;margin:0;">
     <!-- Header -->
@@ -33451,11 +33452,14 @@ window.changeUserNickname = function() {
   alert('✅ Jméno změněno na: ' + val);
 };
 
+let _nickGateChecked = false;
 function initNickGate() {
-  // Kontrola přezdívky proběhne VŽDY jako úplně první krok startu appky —
-  // nečeká se na odemčení heslem, modal (z-index 999999) se zobrazí nad
-  // vším ostatním včetně lockscreenu. Až je jméno vyplněné, appka
-  // pokračuje ve zbytku startu (lockscreen/appka se odemkne pod ním).
+  // ✅ OPRAVA: kontrola přezdívky se teď volá až PO odemčení heslem
+  // (viz volání window._checkNickGate() uvnitř _unlock() v LOCK SCREEN LOGIC),
+  // takže se overlay na jméno už nezobrazuje nad zamykací obrazovkou
+  // a nebrání psaní hesla / nepůsobí rozmazaně přes lock screen.
+  if (_nickGateChecked) return;
+  _nickGateChecked = true;
   let nick = '';
   try { nick = localStorage.getItem(USER_NICK_KEY) || localStorage.getItem('sinator_d_nick') || ''; } catch(e) {}
   if (!nick) {
@@ -33471,11 +33475,10 @@ function initNickGate() {
     _startUserPresenceHeartbeat(nick);
   }
 }
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initNickGate);
-} else {
-  initNickGate();
-}
+// ✅ OPRAVA: už se nevolá automaticky při načtení stránky (to způsobovalo
+// zobrazení nad lock screenem). Zpřístupňujeme funkci, aby ji mohl zavolat
+// _unlock() poté, co je appka odemčena (heslem nebo bez hesla).
+window._checkNickGate = initNickGate;
 
 // ---- ADMIN: přehled registrovaných uživatelů (online/offline + ⭐ admin) ----
 let _adminUsersListenerAttached = false;
@@ -34921,3 +34924,5 @@ window.addEventListener('load', function() {
     }, 400);
 });
 </script>
+</body>
+</html>
