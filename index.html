@@ -32744,6 +32744,22 @@ document.addEventListener('DOMContentLoaded', function() {
         window.location.reload();
     };
 
+    // Vynucené resetování zámku appky na dálku (např. po odebrání Admin
+    // režimu správcem). Na rozdíl od logoutApp() nedělá reload — zamkne
+    // appku okamžitě v aktuální session — a hlavně PŘEBIJE i "Nikdy
+    // nevyžadovat heslo" (_NK), aby appka opravdu chtěla heslo znovu,
+    // i kdyby ho měl uživatel úplně vypnuté.
+    window._forceRelockApp = function() {
+        localStorage.removeItem(_SK);
+        localStorage.removeItem(_NK);
+        localStorage.setItem('sinator_adult_content', 'false');
+        _showLock();
+        _updatePwdAlwaysToggleUI();
+        _updatePwdNeverToggleUI();
+        var input = document.getElementById('lockPwdInput');
+        if (input) { input.value = ''; setTimeout(() => input.focus(), 150); }
+    };
+
     // ── Vždy vyžadovat heslo při spuštění (přepínatelné, dostupné všem) ──
     var _AK = 'sinator_pwd_always_required';
     // ── Nikdy nevyžadovat heslo — úplné vypnutí zámku appky (dostupné všem) ──
@@ -33425,15 +33441,32 @@ function _startUserPresenceHeartbeat(nick) {
       if (firstSnap) { firstSnap = false; return; }
       if (!snap.exists()) { _forceNicknameReset(); }
     });
-    // Sleduj příkazy od admin level 2 (např. odhlášení z admin režimu)
+    // Sleduj příkazy od admin level 2 (např. odhlášení z admin režimu).
+    // Pozn.: příkazy se ukládají do "presence/_cmd_<key>", protože jen větev
+    // "presence" má v pravidlech Firebase povolený zápis na dálku (viz výše) —
+    // samostatná větev "adminCommands" v pravidlech není, proto tam zápis
+    // dřív padal na PERMISSION_DENIED.
     if (_ownCommandsUnsub) { _ownCommandsUnsub(); _ownCommandsUnsub = null; }
-    const cmdRef = ref(rtdb, 'adminCommands/' + key);
+    const cmdRef = ref(rtdb, 'presence/_cmd_' + key);
     _ownCommandsUnsub = onValue(cmdRef, (snap) => {
       if (!snap.exists()) return;
       const cmd = snap.val();
-      if (cmd && cmd.kickAdmin && localStorage.getItem('sinator_admin_mode') === '1') {
+      if (cmd && cmd.revokeAdmin && localStorage.getItem('sinator_admin_mode') === '1') {
         window.deactivateAdminMode();
         alert('🚪 Byl(a) jste odhlášen(a) z Admin režimu správcem.');
+      }
+      if (cmd && cmd.resetApp) {
+        // Plný reset appky na dálku: smazat jméno + zamknout appku
+        // (i kdyby měl uživatel zapnuté "Nikdy nevyžadovat heslo").
+        // Nezávislé na Admin režimu — jen resetuje session, admin práva nemění.
+        try { localStorage.removeItem(USER_NICK_KEY); } catch(e) {}
+        try { localStorage.removeItem('sinator_d_nick'); } catch(e) {}
+        if (_userHeartbeatTimer) { clearInterval(_userHeartbeatTimer); _userHeartbeatTimer = null; }
+        if (_ownPresenceUnsub) { _ownPresenceUnsub(); _ownPresenceUnsub = null; }
+        _nickGateChecked = false;
+        if (typeof window._forceRelockApp === 'function') window._forceRelockApp();
+        if (_ownCommandsUnsub) { _ownCommandsUnsub(); _ownCommandsUnsub = null; }
+        alert('🔄 Aplikace byla resetována správcem — zadejte prosím heslo a jméno znovu.');
       }
       if (cmd && cmd.grantAdmin && localStorage.getItem('sinator_admin_mode') !== '1') {
         localStorage.setItem('sinator_admin_mode', '1');
@@ -33555,7 +33588,8 @@ function attachAdminUsersListener() {
     wrapEl.dataset.adminActionsBound = '1';
     wrapEl.addEventListener('click', function(e) {
       const delBtn = e.target.closest('.admin-del-user-btn');
-      const kickBtn = e.target.closest('.admin-kick-user-btn');
+      const revokeBtn = e.target.closest('.admin-revoke-user-btn');
+      const resetBtn = e.target.closest('.admin-reset-user-btn');
       if (delBtn) {
         if (!window._isAdminLevel2()) return;
         const key = delBtn.getAttribute('data-key');
@@ -33564,13 +33598,22 @@ function attachAdminUsersListener() {
         remove(ref(rtdb, 'presence/' + key)).catch(err => alert('❌ Smazání se nezdařilo: ' + (err && err.message || err)));
         return;
       }
-      if (kickBtn) {
+      if (revokeBtn) {
         if (!window._isAdminLevel2()) return;
-        const key = kickBtn.getAttribute('data-key');
-        const nick = kickBtn.getAttribute('data-nick');
-        if (!confirm(`Odhlásit uživatele "${nick}" z Admin režimu?`)) return;
-        set(ref(rtdb, 'adminCommands/' + key), { kickAdmin: true, ts: Date.now() })
-          .catch(err => alert('❌ Odhlášení se nezdařilo: ' + (err && err.message || err)));
+        const key = revokeBtn.getAttribute('data-key');
+        const nick = revokeBtn.getAttribute('data-nick');
+        if (!confirm(`Odebrat uživateli "${nick}" Admin level 1 přístup?`)) return;
+        set(ref(rtdb, 'presence/_cmd_' + key), { revokeAdmin: true, ts: Date.now() })
+          .catch(err => alert('❌ Odebrání admin přístupu se nezdařilo: ' + (err && err.message || err)));
+        return;
+      }
+      if (resetBtn) {
+        if (!window._isAdminLevel2()) return;
+        const key = resetBtn.getAttribute('data-key');
+        const nick = resetBtn.getAttribute('data-nick');
+        if (!confirm(`Resetovat appku uživatele "${nick}" na dálku? Zamkne se heslem (i kdyby ho měl vypnuté) a bude si muset znovu zadat jméno. Admin práva zůstanou beze změny.`)) return;
+        set(ref(rtdb, 'presence/_cmd_' + key), { resetApp: true, ts: Date.now() })
+          .catch(err => alert('❌ Reset se nezdařil: ' + (err && err.message || err)));
         return;
       }
       const grantBtn = e.target.closest('.admin-grant-user-btn');
@@ -33579,7 +33622,7 @@ function attachAdminUsersListener() {
         const key = grantBtn.getAttribute('data-key');
         const nick = grantBtn.getAttribute('data-nick');
         if (!confirm(`Udělit uživateli "${nick}" Admin level 1 přístup na dálku?`)) return;
-        set(ref(rtdb, 'adminCommands/' + key), { grantAdmin: true, ts: Date.now() })
+        set(ref(rtdb, 'presence/_cmd_' + key), { grantAdmin: true, ts: Date.now() })
           .catch(err => alert('❌ Udělení admin přístupu se nezdařilo: ' + (err && err.message || err)));
       }
     });
@@ -33619,8 +33662,11 @@ function attachAdminUsersListener() {
         const delBtn = (isLvl2 && !isSelf)
           ? `<button class="admin-del-user-btn" data-key="${_escapeHtmlU(u.key)}" data-nick="${_escapeHtmlU(u.nick)}" title="Smazat uživatele (bude si muset znovu zadat jméno)" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:1rem;padding:2px 6px;">🗑️</button>`
           : '';
-        const kickBtn = (isLvl2 && !isSelf && u.adminLevel === 1)
-          ? `<button class="admin-kick-user-btn" data-key="${_escapeHtmlU(u.key)}" data-nick="${_escapeHtmlU(u.nick)}" title="Odhlásit z Admin režimu" style="background:none;border:none;color:#ffaa00;cursor:pointer;font-size:1rem;padding:2px 6px;">🚪</button>`
+        const resetBtn = (isLvl2 && !isSelf)
+          ? `<button class="admin-reset-user-btn" data-key="${_escapeHtmlU(u.key)}" data-nick="${_escapeHtmlU(u.nick)}" title="Resetovat appku na dálku (heslo + jméno znovu, admin práva beze změny)" style="background:none;border:none;color:#ffaa00;cursor:pointer;font-size:1rem;padding:2px 6px;">🔄</button>`
+          : '';
+        const revokeBtn = (isLvl2 && !isSelf && u.adminLevel === 1)
+          ? `<button class="admin-revoke-user-btn" data-key="${_escapeHtmlU(u.key)}" data-nick="${_escapeHtmlU(u.nick)}" title="Odebrat Admin level 1" style="background:none;border:none;color:#ff9f43;cursor:pointer;font-size:1rem;padding:2px 6px;">🛡️➖</button>`
           : '';
         const grantBtn = (isLvl2 && !isSelf && u.adminLevel === 0)
           ? `<button class="admin-grant-user-btn" data-key="${_escapeHtmlU(u.key)}" data-nick="${_escapeHtmlU(u.nick)}" title="Udělit Admin level 1 na dálku" style="background:none;border:none;color:#4fc3f7;cursor:pointer;font-size:1rem;padding:2px 6px;">🛡️➕</button>`
@@ -33630,7 +33676,7 @@ function attachAdminUsersListener() {
           <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:${u.online ? '#22c55e' : '#555'};box-shadow:${u.online ? '0 0 6px #22c55e' : 'none'};"></span>
           <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">${star}${_escapeHtmlU(u.nick)}</span>
           <span style="font-size:0.7rem;color:#888;">${u.online ? 'online' : _formatLastSeen(u.lastSeen)}</span>
-          ${grantBtn}${kickBtn}${delBtn}
+          ${grantBtn}${revokeBtn}${resetBtn}${delBtn}
         </div>`;
       }).join('');
   }, (err) => {
