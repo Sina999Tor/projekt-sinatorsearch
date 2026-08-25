@@ -777,9 +777,9 @@
                 </div>
                 <input type="password" class="settings-input" id="tmdbApiKeyInput" placeholder="Zadejte TMDB API klíč" value="">
                 <div class="settings-actions">
-                    <button class="settings-btn-small show-key-btn" onclick="toggleApiKeyVisibility()">👁️ Zobrazit</button>
+                    <button class="settings-btn-small show-key-btn apikey-lvl2-btn" onclick="toggleApiKeyVisibility()">👁️ Zobrazit</button>
                     <button class="settings-btn-small" onclick="saveApiKey()">💾 Uložit</button>
-                    <button class="settings-btn-small settings-btn-remove" onclick="clearApiKey()">🗑️ Smazat</button>
+                    <button class="settings-btn-small settings-btn-remove apikey-lvl2-btn" style="display:none;" onclick="clearApiKey()">🗑️ Smazat</button>
                 </div>
                 <div class="settings-status">
                     <span class="dot" id="tmdbStatusDot"></span>
@@ -791,9 +791,9 @@
                 <span class="settings-label" style="color:#f5c518;">🎬 OMDb API Klíč (pro OMDb hledání)</span>
                 <input type="password" class="settings-input" id="omdbApiKeyInput" placeholder="Zadejte OMDb API klíč (zdarma z omdbapi.com)" value="">
                 <div class="settings-actions">
-                    <button class="settings-btn-small show-key-btn" onclick="toggleOmdbKeyVisibility()">👁️ Zobrazit</button>
+                    <button class="settings-btn-small show-key-btn apikey-lvl2-btn" onclick="toggleOmdbKeyVisibility()">👁️ Zobrazit</button>
                     <button class="settings-btn-small" onclick="saveOmdbApiKey()">💾 Uložit</button>
-                    <button class="settings-btn-small settings-btn-remove" onclick="clearOmdbApiKey()">🗑️ Smazat</button>
+                    <button class="settings-btn-small settings-btn-remove apikey-lvl2-btn" style="display:none;" onclick="clearOmdbApiKey()">🗑️ Smazat</button>
                 </div>
                 <div class="settings-status">
                     <span class="dot" id="omdbStatusDot"></span>
@@ -808,9 +808,9 @@
                 <span class="settings-label" style="color:#a78bfa;">🤖 Gemini API Klíč (pro AI vyhledávání)</span>
                 <input type="password" class="settings-input" id="geminiApiKeyInput" placeholder="Zadejte Gemini API klíč (zdarma z AI Studio)" value="">
                 <div class="settings-actions">
-                    <button class="settings-btn-small show-key-btn" onclick="toggleGeminiKeyVisibility()">👁️ Zobrazit</button>
+                    <button class="settings-btn-small show-key-btn apikey-lvl2-btn" onclick="toggleGeminiKeyVisibility()">👁️ Zobrazit</button>
                     <button class="settings-btn-small" onclick="saveGeminiApiKey()">💾 Uložit</button>
-                    <button class="settings-btn-small settings-btn-remove" onclick="clearGeminiApiKey()">🗑️ Smazat</button>
+                    <button class="settings-btn-small settings-btn-remove apikey-lvl2-btn" style="display:none;" onclick="clearGeminiApiKey()">🗑️ Smazat</button>
                 </div>
                 <div class="settings-status">
                     <span class="dot" id="geminiStatusDot"></span>
@@ -823,9 +823,9 @@
                 <span class="settings-label" style="color:#f97316;">⚡ Groq API Klíč (rychlý fallback)</span>
                 <input type="password" class="settings-input" id="groqApiKeyInput" placeholder="gsk_..." value="">
                 <div class="settings-actions">
-                    <button class="settings-btn-small show-key-btn" onclick="toggleGroqKeyVisibility()">👁️ Zobrazit</button>
+                    <button class="settings-btn-small show-key-btn apikey-lvl2-btn" onclick="toggleGroqKeyVisibility()">👁️ Zobrazit</button>
                     <button class="settings-btn-small" onclick="saveGroqApiKey()">💾 Uložit</button>
-                    <button class="settings-btn-small settings-btn-remove" onclick="clearGroqApiKey()">🗑️ Smazat</button>
+                    <button class="settings-btn-small settings-btn-remove apikey-lvl2-btn" style="display:none;" onclick="clearGroqApiKey()">🗑️ Smazat</button>
                 </div>
                 <div class="settings-status">
                     <span class="dot" id="groqStatusDot"></span>
@@ -838,9 +838,9 @@
                 <span class="settings-label" style="color:#38bdf8;">🌐 OpenRouter API Klíč (záloha)</span>
                 <input type="password" class="settings-input" id="openRouterKeyInput" placeholder="sk-or-..." value="">
                 <div class="settings-actions">
-                    <button class="settings-btn-small show-key-btn" onclick="toggleOpenRouterKeyVisibility()">👁️ Zobrazit</button>
+                    <button class="settings-btn-small show-key-btn apikey-lvl2-btn" onclick="toggleOpenRouterKeyVisibility()">👁️ Zobrazit</button>
                     <button class="settings-btn-small" onclick="saveOpenRouterKey()">💾 Uložit</button>
-                    <button class="settings-btn-small settings-btn-remove" onclick="clearOpenRouterKey()">🗑️ Smazat</button>
+                    <button class="settings-btn-small settings-btn-remove apikey-lvl2-btn" style="display:none;" onclick="clearOpenRouterKey()">🗑️ Smazat</button>
                 </div>
                 <div class="settings-status">
                     <span class="dot" id="openRouterStatusDot"></span>
@@ -1218,7 +1218,7 @@
                 </div>
             </div>
             <div class="settings-divider"></div>
-            <div class="settings-section" style="background:rgba(0,180,255,0.06);border:1px solid rgba(0,180,255,0.2);border-radius:12px;padding:14px 16px;">
+            <div class="settings-section" id="adminUsersSectionBox" style="display:none;background:rgba(0,180,255,0.06);border:1px solid rgba(0,180,255,0.2);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:#4fc3f7;">👥 Registrovaní uživatelé</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 10px;line-height:1.4;">
                     Přehled všech jmen/přezdívek nastavených v appce a jejich aktuální online stav (aktualizuje se v reálném čase).
@@ -1226,6 +1226,9 @@
                 <div id="adminUsersList" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;">
                     <div style="color:#888;font-size:0.8rem;">Načítám…</div>
                 </div>
+            </div>
+            <div class="settings-section" id="adminUsersNoLvl2Msg" style="display:none;font-size:0.78rem;color:#888;margin-top:8px;padding:10px;background:rgba(0,0,0,0.25);border-radius:8px;">
+                Přehled a správa uživatelů (zobrazení, úpravy, mazání) jsou dostupné jen pro Admin level 2.
             </div>
             </div>
         </div>
@@ -33362,14 +33365,22 @@ function updateAdminStatus() {
   document.querySelectorAll('.show-key-btn').forEach(btn => {
     btn.style.display = active ? 'inline-block' : 'none';
   });
+  // TMDB/OMDb/Gemini/Groq/OpenRouter klíče — Zobrazit i Smazat jen pro Admin level 2
+  document.querySelectorAll('.apikey-lvl2-btn').forEach(btn => {
+    btn.style.display = isLvl2 ? 'inline-block' : 'none';
+  });
   // Adult toggle – disabled bez admina
   if (typeof updateAdultToggleUI === 'function') updateAdultToggleUI();
   // Správa hesla – dostupná jen pro admina
   if (typeof window._updateAppPwdSectionVisibility === 'function') window._updateAppPwdSectionVisibility();
   if (typeof window._updatePwdAlwaysToggleUI === 'function') window._updatePwdAlwaysToggleUI();
   if (typeof window._updatePwdNeverToggleUI === 'function') window._updatePwdNeverToggleUI();
-  // Seznam registrovaných uživatelů — jen pro admina
-  if (active && typeof attachAdminUsersListener === 'function') attachAdminUsersListener();
+  // Seznam registrovaných uživatelů (zobrazení + úpravy/mazání/kliky) — jen pro Admin level 2
+  const usersBox = document.getElementById('adminUsersSectionBox');
+  const usersMsg = document.getElementById('adminUsersNoLvl2Msg');
+  if (usersBox) usersBox.style.display = isLvl2 ? 'block' : 'none';
+  if (usersMsg) usersMsg.style.display = (active && !isLvl2) ? 'block' : 'none';
+  if (isLvl2 && typeof attachAdminUsersListener === 'function') attachAdminUsersListener();
 }
 
 // Init admin status on settings open
@@ -33579,6 +33590,7 @@ window._checkNickGate = initNickGate;
 let _adminUsersListenerAttached = false;
 
 function attachAdminUsersListener() {
+  if (!window._isAdminLevel2()) return; // zobrazení + správa uživatelů jen pro Admin level 2
   if (_adminUsersListenerAttached) return;
   _adminUsersListenerAttached = true;
   const usersRef = ref(rtdb, 'presence');
