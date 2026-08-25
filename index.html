@@ -5309,21 +5309,33 @@
         try {
             if (!screen.orientation) return;
             if (allowRotation) {
-                // Povolit otáčení podle systémového nastavení zařízení (i na ležato)
-                if (typeof screen.orientation.unlock === 'function') {
+                // Povolit otáčení podle systémového nastavení zařízení (i na ležato).
+                // Poznámka: screen.orientation.unlock() je v mnoha nainstalovaných
+                // PWA/WebView kontextech no-op nebo tiše selže (vyžaduje fullscreen).
+                // Explicitní lock('any') funguje spolehlivěji jako "povol vše".
+                if (typeof screen.orientation.lock === 'function') {
+                    screen.orientation.lock('any').catch((err) => {
+                        console.warn('screen.orientation.lock("any") selhal, zkouším unlock():', err);
+                        if (typeof screen.orientation.unlock === 'function') {
+                            try { screen.orientation.unlock(); } catch (e2) { console.warn('unlock() selhal:', e2); }
+                        }
+                    });
+                } else if (typeof screen.orientation.unlock === 'function') {
                     screen.orientation.unlock();
                 }
             } else {
                 // Výchozí chování — appka zůstává napevno na výšku
                 if (typeof screen.orientation.lock === 'function') {
-                    screen.orientation.lock('portrait').catch(() => {
+                    screen.orientation.lock('portrait').catch((err) => {
                         // Lock může selhat mimo standalone/fullscreen režim — to je v pořádku,
-                        // manifest orientation ("portrait") pak zajistí chování při instalaci.
+                        // manifest orientation ("any") pak zajistí chování při instalaci.
+                        console.warn('screen.orientation.lock("portrait") selhal:', err);
                     });
                 }
             }
         } catch (e) {
             // Screen Orientation API nemusí být v daném prohlížeči podporováno — ignorovat
+            console.warn('applyScreenRotationLock() chyba:', e);
         }
     }
 
@@ -5334,6 +5346,14 @@
         applyScreenRotationLock();
     }
     window.toggleScreenRotation = toggleScreenRotation;
+
+    // Nastavení otáčení se u některých zařízení/WebView po návratu z pozadí
+    // nebo po změně fullscreen stavu resetuje — znovu ho vynutíme.
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) applyScreenRotationLock();
+    });
+    window.addEventListener('pageshow', () => applyScreenRotationLock());
+    document.addEventListener('fullscreenchange', () => applyScreenRotationLock());
 
     function updateRotationToggleUI() {
         const toggle = $('rotationToggle');
