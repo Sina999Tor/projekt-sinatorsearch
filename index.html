@@ -7004,7 +7004,7 @@ EXAMPLES:
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, ...(hdrs||{}) },
-                    body: JSON.stringify({ model, messages, tools: aiTools, tool_choice: 'auto', max_tokens: 2048, temperature: 0.1 }),
+                    body: JSON.stringify({ model, messages, tools: aiTools, tool_choice: {type:'function', function:{name:'smart_movie_search'}}, max_tokens: 2048, temperature: 0.1 }),
                     signal
                 }).catch(() => null);
                 if (!res || !res.ok) return null;
@@ -7098,6 +7098,7 @@ EXAMPLES:
                           system_instruction:{parts:[{text: systemPrompt}]},
                           contents:[{role:'user',parts:[{text:queryWithYear}]}],
                           tools:[{functionDeclarations: geminiFunctions}],
+                          tool_config:{function_calling_config:{mode:'ANY', allowed_function_names:['smart_movie_search']}},
                           generationConfig:{temperature:0.1, maxOutputTokens:2048}
                       }),
                       signal }
