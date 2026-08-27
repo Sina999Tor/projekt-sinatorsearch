@@ -6658,10 +6658,25 @@
         return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
 
+    // Naivní český "stem" — odřeže koncovku, aby "drogy/drog/drogami/drogám" atd. našly stejné slovo
+    function _wordStem(w) {
+        if (w.length > 6) return w.slice(0, w.length - 3);
+        if (w.length > 4) return w.slice(0, w.length - 2);
+        if (w.length > 3) return w.slice(0, w.length - 1);
+        return w;
+    }
+
+    // Rozpozná téma i přes české skloňování (1.-7. pád) — porovnává kořeny slov, ne celé přesné tvary.
     function _getThemePreset(query) {
-        const q = _stripDiacritics(query.replace(/filmy.*téma[:\s]*/i, '').trim());
+        const cleaned = query.replace(/filmy.*téma[:\s]*/i, '').trim();
+        const qWords = _stripDiacritics(cleaned).split(/[^a-z0-9]+/).filter(Boolean);
         for (const [key, val] of Object.entries(_THEME_PRESETS)) {
-            if (q.includes(_stripDiacritics(key))) return { ...val, _key: key };
+            const keyWords = _stripDiacritics(key).split(/\s+/).filter(Boolean);
+            const allKeyWordsMatch = keyWords.every(kw => {
+                const stem = _wordStem(kw);
+                return qWords.some(qw => qw.startsWith(stem) || stem.startsWith(qw));
+            });
+            if (allKeyWordsMatch) return { ...val, _key: key };
         }
         return null;
     }
