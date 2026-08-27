@@ -1123,22 +1123,14 @@
             <div class="settings-divider"></div>
             <div class="settings-section" style="background:rgba(229,9,20,0.07);border:1px solid rgba(229,9,20,0.25);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:#ff6b6b;">🔐 Přístupové heslo aplikace</span>
-                <div id="appPwdManageBox" style="display:none;">
-                    <input type="password" class="settings-input" id="settingsPwdInput" placeholder="Zadejte nové heslo…" autocomplete="off">
-                    <div class="settings-actions">
-                        <button class="settings-btn-small show-key-btn" onclick="toggleSettingsPwdVisibility()">👁️ Zobrazit</button>
-                        <button class="settings-btn-small" onclick="saveAppPassword()" style="background:rgba(229,9,20,0.3);">💾 Uložit heslo</button>
-                        <button class="settings-btn-small settings-btn-remove" onclick="clearAppPassword()">🗑️ Odebrat heslo</button>
-                    </div>
+                <div id="appPwdManageBox" style="display:none;font-size:0.78rem;color:#888;margin-top:8px;padding:10px;background:rgba(0,0,0,0.25);border-radius:8px;line-height:1.5;">
+                    🔒 Heslo se ověřuje na serveru (Vercel serverless funkce) a nikde v appce ani v repozitáři nefiguruje. Změna hesla: Vercel → Project Settings → Environment Variables → <strong>APP_PASSWORD</strong>, poté projekt znovu nasadit.
                 </div>
                 <div id="appPwdNoAdminMsg" style="font-size:0.78rem;color:#888;margin-top:8px;padding:10px;background:rgba(0,0,0,0.25);border-radius:8px;">
-                    🔒 Nastavení, zobrazení nebo odebrání hesla je dostupné pouze v přihlášeném Admin režimu.
+                    🔒 Informace o přístupovém heslu jsou dostupné pouze v přihlášeném Admin režimu.
                 </div>
                 <div style="margin-top:10px;">
                     <button class="settings-btn-small" onclick="logoutApp()" style="width:100%;background:rgba(229,9,20,0.18);border:1px solid rgba(229,9,20,0.4);color:#ff6b6b;font-weight:600;padding:10px;">🔒 Odhlásit se (zamknout aplikaci)</button>
-                </div>
-                <div style="font-size:0.75rem;color:#888;margin-top:6px;" id="settingsPwdStatus">
-                    Heslo chrání přístup do aplikace. Po uložení bude vyžadováno při každém spuštění.
                 </div>
                 <div class="settings-divider" style="margin:12px 0;"></div>
                 <div style="display:flex;align-items:center;gap:12px;">
@@ -32733,16 +32725,11 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- ═══ LOCK SCREEN LOGIC ════════════════════════════════════════════ -->
 <script>
 (function() {
-    // SHA-256 hash hesla "PETRs" — heslo v kódu NENÍ v čitelné podobě
-    var _H = 'bdc4e505c03dfd2263de2fcc83cebb91da631cc670fd42ff538d03a584aa875d';
+    // Heslo samotné NIKDY nefiguruje v tomto souboru ani v žádném klientském
+    // JS — ověřuje ho serverless funkce api/login.js proti proměnné prostředí
+    // APP_PASSWORD na Vercelu (viz Project Settings → Environment Variables).
     var _SK = 'sinator_app_unlocked';
-    var _PK = 'sinator_app_pwd_hash';
-
-    async function _sha256(str) {
-        const buf = new TextEncoder().encode(str);
-        const hash = await crypto.subtle.digest('SHA-256', buf);
-        return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
-    }
+    var _TK = 'sinator_auth_token';
 
     function _getLockEl() { return document.getElementById('lockScreen'); }
 
@@ -32763,56 +32750,49 @@ document.addEventListener('DOMContentLoaded', function() {
         if (el) el.classList.remove('hidden');
         document.body.classList.add('app-locked');
         localStorage.removeItem(_SK);
+        sessionStorage.removeItem(_TK);
         localStorage.setItem('sinator_adult_content', 'false');
     }
 
     window.checkLockPassword = async function() {
         var input = document.getElementById('lockPwdInput');
         var errEl = document.getElementById('lockError');
+        var btn = document.getElementById('lockSubmitBtn');
         if (!input) return;
         var val = input.value;
         if (!val) { if(errEl) errEl.textContent = 'Zadejte heslo.'; return; }
-        var h = await _sha256(val);
-        // Použij uložený hash nebo výchozí
-        var stored = localStorage.getItem(_PK) || _H;
-        if (h === stored) {
-            if(errEl) errEl.textContent = '';
-            _unlock();
-        } else {
-            if(errEl) errEl.textContent = '❌ Nesprávné heslo.';
-            input.value = '';
-            input.focus();
+
+        if (errEl) errEl.textContent = '';
+        if (btn) btn.disabled = true;
+
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: val })
+            });
+            const data = await response.json().catch(() => null);
+
+            if (data && data.success) {
+                sessionStorage.setItem(_TK, data.token);
+                _unlock();
+            } else {
+                if(errEl) errEl.textContent = '❌ ' + ((data && data.error) || 'Nesprávné heslo.');
+                input.value = '';
+                input.focus();
+            }
+        } catch (e) {
+            console.error('[lock] Chyba při komunikaci s /api/login:', e);
+            if(errEl) errEl.textContent = '⚠️ Server nedostupný, zkuste to znovu.';
+        } finally {
+            if (btn) btn.disabled = false;
         }
-    };
-
-    window.toggleSettingsPwdVisibility = function() {
-        var i = document.getElementById('settingsPwdInput');
-        if (i) i.type = i.type === 'password' ? 'text' : 'password';
-    };
-
-    window.saveAppPassword = async function() {
-        var input = document.getElementById('settingsPwdInput');
-        var status = document.getElementById('settingsPwdStatus');
-        if (!input) return;
-        var val = input.value.trim();
-        if (val.length < 3) { alert('⚠️ Heslo musí mít alespoň 3 znaky.'); return; }
-        var h = await _sha256(val);
-        localStorage.setItem(_PK, h);
-        input.value = '';
-        if (status) status.textContent = '✅ Heslo uloženo. Aktivuje se při příštím spuštění.';
-        setTimeout(()=>{ if(status) status.textContent = 'Heslo chrání přístup do aplikace.'; }, 3000);
-    };
-
-    window.clearAppPassword = function() {
-        if (!confirm('Odebrat ochranu heslem? Aplikace bude přístupná bez hesla.')) return;
-        localStorage.removeItem(_PK);
-        var status = document.getElementById('settingsPwdStatus');
-        if (status) status.textContent = '🔓 Heslo odebráno. Aplikace je nyní bez ochrany.';
     };
 
     window.logoutApp = function() {
         if (!confirm('Odhlásit se? Aplikace bude znovu vyžadovat heslo.')) return;
         localStorage.removeItem(_SK);
+        sessionStorage.removeItem(_TK);
         localStorage.setItem('sinator_adult_content', 'false');
         window.location.reload();
     };
@@ -32908,7 +32888,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Init: zkontroluj při spuštění
     document.addEventListener('DOMContentLoaded', function() {
-        var storedHash = localStorage.getItem(_PK) || _H;
         if (localStorage.getItem(_NK) === '1') {
             // Heslo je úplně vypnuté — pusť dál bez ptaní
             _unlock();
