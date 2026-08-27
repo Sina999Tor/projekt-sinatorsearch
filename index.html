@@ -6865,6 +6865,7 @@
         if (_aiAbortController) _aiAbortController.abort();
         _aiAbortController = new AbortController();
         const signal = _aiAbortController.signal;
+        window._lastAiError = ''; // reset, ať se neukáže chyba ze starého hledání
 
         if(btn) btn.disabled = true;
         if(status) status.innerHTML = '<span class="ai-spin">⟳</span> AI analyzuje dotaz...';
@@ -7029,7 +7030,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 if (!res.ok) {
                     const errTxt = await res.text().catch(()=>'');
                     console.warn(`[AI] ${model} HTTP ${res.status}:`, errTxt.slice(0,300));
-                    window._lastAiError = `${model}: HTTP ${res.status}`;
+                    if (!window._lastAiError) window._lastAiError = `${model}: HTTP ${res.status}`;
                     return null;
                 }
                 const j = await res.json().catch(() => null);
@@ -7159,7 +7160,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 }
                 if (!data && geminiErrInfo) {
                     console.warn('[AI] Gemini volání selhalo —', geminiErrInfo);
-                    window._lastAiError = 'Gemini: ' + geminiErrInfo;
+                    if (!window._lastAiError) window._lastAiError = 'Gemini: ' + geminiErrInfo;
                 }
             }
 
