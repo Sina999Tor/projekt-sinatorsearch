@@ -4847,11 +4847,11 @@
                 }
             };
 
-            const tryFetch = async (u, timeoutMs) => {
+            const tryFetch = async (u, timeoutMs, headers) => {
                 const controller = new AbortController();
                 const timeout = setTimeout(()=>controller.abort(), timeoutMs);
                 try {
-                    const res = await fetch(u, { signal: controller.signal });
+                    const res = await fetch(u, { signal: controller.signal, headers: headers || undefined });
                     clearTimeout(timeout);
                     return res;
                 } catch(e) {
@@ -4862,7 +4862,7 @@
 
             // 1) Vlastní serverless endpoint (/api/check-source) — žádné CORS, žádný veřejný rate-limit
             try {
-                const apiRes = await tryFetch(`/api/check-source?url=${encodeURIComponent(url)}`, 10000);
+                const apiRes = await tryFetch(`/api/check-source?url=${encodeURIComponent(url)}`, 10000, { ...window._authHeader() });
                 if(apiRes && apiRes.ok) {
                     const data = await apiRes.json();
                     if(data && typeof data.text === 'string') {
@@ -32730,6 +32730,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // APP_PASSWORD na Vercelu (viz Project Settings → Environment Variables).
     var _SK = 'sinator_app_unlocked';
     var _TK = 'sinator_auth_token';
+
+    // Vrátí hlavičku Authorization s Bearer tokenem, pokud appka má token
+    // z /api/login uložený v této session — jinak prázdný objekt (spread
+    // do fetch({headers: {...}}) se pak chová jako no-op).
+    window._authHeader = function() {
+        var t = sessionStorage.getItem(_TK);
+        return t ? { 'Authorization': 'Bearer ' + t } : {};
+    };
 
     function _getLockEl() { return document.getElementById('lockScreen'); }
 
