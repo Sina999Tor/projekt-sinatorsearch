@@ -1,4 +1,7 @@
+import { requireAuth } from './_auth.js';
+
 export default async function handler(req, res) {
+    if (!requireAuth(req, res)) return;
     res.setHeader('Access-Control-Allow-Origin', '*');
 
     const { url } = req.query;

@@ -1,9 +1,11 @@
 // Soubor: api/login.js
-// Vercel serverless funkce — ověří heslo proti proměnné prostředí APP_PASSWORD.
+// Vercel serverless funkce — ověří heslo proti proměnné prostředí APP_PASSWORD
+// a vydá podepsaný token pro následné volání chráněných endpointů.
 // Heslo samotné se NIKDY neposílá klientovi ani nefiguruje v žádném souboru
 // v repozitáři — žije jen na serveru (Vercel → Project Settings → Environment Variables).
 
 import crypto from 'crypto';
+import { issueToken } from './_auth.js';
 
 export default function handler(req, res) {
   if (req.method !== 'POST') {
@@ -35,9 +37,9 @@ export default function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Nesprávné heslo' });
   }
 
-  // Náhodný token pro tuto session (žádná perzistence na serveru není
-  // potřeba — appka je jednouživatelská, token slouží jen jako lokální
-  // "vstupenka" pro sessionStorage, ne jako plnohodnotná autentizace).
-  const token = crypto.randomBytes(24).toString('hex');
+  // Podepsaný, bezstavový token s expirací (viz api/_auth.js) — jakýkoliv
+  // další endpoint v /api ho dokáže ověřit bez databáze, jen se stejným
+  // tajným klíčem na serveru.
+  const token = issueToken();
   return res.status(200).json({ success: true, token });
 }
