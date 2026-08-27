@@ -7172,7 +7172,10 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 const raw = await _callWithTools(
                     'https://api.groq.com/openai/v1/chat/completions',
                     groqApiKey,
-                    'llama-3.3-70b-versatile',
+                    // Groq od 17.6.2026 vyřadil llama-3.3-70b-versatile z free/developer tieru
+                    // (přesunut mezi Enterprise-only modely, volání vracelo HTTP 404).
+                    // Náhrada dle oficiálního doporučení Groq: openai/gpt-oss-120b.
+                    'openai/gpt-oss-120b',
                     [{role:'system',content:systemPrompt},{role:'user',content:queryWithYear}]
                 );
                 data = _normalizeAiResponse(raw, queryWithYear);
@@ -31749,7 +31752,7 @@ async function _aiAskForTitles(prompt) {
 
     // 2) Groq
     if (groqKey) {
-        const t = await _oaiTitles('https://api.groq.com/openai/v1/chat/completions', groqKey, 'llama-3.3-70b-versatile');
+        const t = await _oaiTitles('https://api.groq.com/openai/v1/chat/completions', groqKey, 'openai/gpt-oss-120b');
         if (t.length) return t;
     }
 
@@ -34990,7 +34993,7 @@ async function _zabavaAiCall(prompt) {
   if (geminiKey) {
     try { return await _oai('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', geminiKey, 'gemini-2.5-flash'); } catch(e) {}
   }
-  if (groqKey) { try { return await _oai('https://api.groq.com/openai/v1/chat/completions',groqKey,'llama-3.3-70b-versatile'); } catch(e) {} }
+  if (groqKey) { try { return await _oai('https://api.groq.com/openai/v1/chat/completions',groqKey,'openai/gpt-oss-120b'); } catch(e) {} }
   if (orKey) { try { return await _oai('https://openrouter.ai/api/v1/chat/completions',orKey,'meta-llama/llama-3.3-70b-instruct:free',{'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}); } catch(e) {} }
   // Poslední záchranná varianta bez vlastního klíče
   try { return await _oai('https://openrouter.ai/api/v1/chat/completions','sk-or-free','meta-llama/llama-3.3-8b-instruct:free',{'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}); } catch(e) {}
