@@ -6661,7 +6661,9 @@
     // Rozpozná téma i přes české skloňování (1.-7. pád) — porovnává kořeny slov, ne celé přesné tvary.
     function _getThemePreset(query) {
         const cleaned = query.replace(/filmy.*téma[:\s]*/i, '').trim();
-        const qWords = _stripDiacritics(cleaned).split(/[^a-z0-9]+/).filter(Boolean);
+        // Slova kratší než 3 znaky (předložky "s", "k", "v", "z", "o", "u"...) vyřadit —
+        // jinak např. "s hulkem" omylem trefí stem "spor" (téma sport), protože "spor".startsWith("s").
+        const qWords = _stripDiacritics(cleaned).split(/[^a-z0-9]+/).filter(w => w.length >= 3);
         for (const [key, val] of Object.entries(_THEME_PRESETS)) {
             const keyWords = _stripDiacritics(key).split(/\s+/).filter(Boolean);
             const allKeyWordsMatch = keyWords.every(kw => {
