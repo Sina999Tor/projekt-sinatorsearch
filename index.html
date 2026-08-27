@@ -7020,11 +7020,17 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             ];
 
             // ── HELPER: Function Calling pro OpenAI-compatible endpointy ──────
-            async function _callWithTools(url, apiKey, model, messages, hdrs, temp) {
+            // gpt-oss modely na Groq mají známou slabinu: při vynuceném tool_choice
+            // občas vygenerují argumenty neodpovídající schématu → Groq vrátí HTTP 400
+            // "tool_use_failed". Groq proto sám doporučuje na tuhle chybu zkusit retry
+            // se zvýšenou teplotou (viz jejich docs k Local Tool Calling).
+            async function _callWithTools(url, apiKey, model, messages, hdrs, temp, _retryCount) {
+                const attempt = _retryCount || 0;
+                const useTemp = typeof temp === 'number' ? temp + (attempt * 0.2) : 0.1 + (attempt * 0.2);
                 const res = await _withAiTimeout(fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, ...(hdrs||{}) },
-                    body: JSON.stringify({ model, messages, tools: aiTools, tool_choice: {type:'function', function:{name:'smart_movie_search'}}, max_tokens: 2048, temperature: (typeof temp === 'number' ? temp : 0.1) }),
+                    body: JSON.stringify({ model, messages, tools: aiTools, tool_choice: {type:'function', function:{name:'smart_movie_search'}}, max_tokens: 2048, temperature: useTemp }),
                     signal
                 }), 20000).catch((e) => { console.warn('[AI] '+model+' network chyba:', e?.message||e); return null; });
                 if (signal.aborted) return null;
@@ -7032,6 +7038,11 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 if (!res.ok) {
                     const errTxt = await res.text().catch(()=>'');
                     console.warn(`[AI] ${model} HTTP ${res.status}:`, errTxt.slice(0,300));
+                    // Retry (max 2×) na typický gpt-oss glitch "tool_use_failed" se zvýšenou teplotou
+                    if (res.status === 400 && errTxt.includes('tool_use_failed') && attempt < 2) {
+                        console.warn(`[AI] ${model} tool_use_failed — zkouším znovu s vyšší teplotou (pokus ${attempt+2})`);
+                        return _callWithTools(url, apiKey, model, messages, hdrs, temp, attempt + 1);
+                    }
                     if (!window._lastAiError) window._lastAiError = `${model}: HTTP ${res.status}`;
                     return null;
                 }
