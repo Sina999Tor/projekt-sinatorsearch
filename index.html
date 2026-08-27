@@ -6687,8 +6687,10 @@
         }
     }
 
-    // Přímé vyhledávání tématu bez AI — používá hardcoded TMDB keyword IDs + žánry
-    async function _runThemePreset(label, preset) {
+    // Přímé vyhledávání tématu bez AI — ID keywordů se vždy ověří živě přes TMDB (ne napevno, aby se zamezilo
+    // špatným/zastaralým hardcoded ID, která uměla přimíchat úplně nesouvisející výsledky, např. MCU filmy).
+    // forceMt: 'movie'|'tv'|null — pokud je zadané, přebije preset.mt (např. když uživatel v dotazu napsal "filmy", ne "seriály")
+    async function _runThemePreset(label, preset, forceMt) {
         const status = $('aiSearchStatus');
         const btn = $('aiSearchBtn');
         const aiYear = ($('aiYearSelect')?.value || '').trim();
@@ -6706,9 +6708,22 @@
         if(resultsEl2) resultsEl2.innerHTML = `<div class="loading"><div class="spinner"></div>Hledám téma: ${label}...</div>`;
         hideMainAzBar();
 
-        const discTypes = preset.mt === 'tv' ? ['tv'] : preset.mt === 'movie' ? ['movie'] : ['movie','tv'];
+        const effectiveMt = forceMt || preset.mt;
+        const discTypes = effectiveMt === 'tv' ? ['tv'] : effectiveMt === 'movie' ? ['movie'] : ['movie','tv'];
         const seen = new Set();
         const found = [];
+
+        // Vždy ověřit ID klíčových slov živě přes TMDB (text → ID), aby se zabránilo nesprávným výsledkům
+        let resolvedKwIds = '';
+        if (preset.kw) {
+            const kwTerms = preset.kw.split(',').map(s=>s.trim()).filter(Boolean).slice(0,5);
+            const kwResults = await Promise.all(kwTerms.map(kw =>
+                fetch(`${BASE}/search/keyword?api_key=${tmdbApiKey}&query=${encodeURIComponent(kw)}&page=1`).then(r=>r.json()).catch(()=>({results:[]}))
+            ));
+            const ids = [];
+            for (const kr of kwResults) { if (kr.results?.[0]) ids.push(kr.results[0].id); }
+            resolvedKwIds = ids.slice(0,4).join('|');
+        }
 
         for (const discType of discTypes) {
             const vf = discType === 'movie' ? '&vote_count.gte=10' : '&vote_count.gte=5';
@@ -6716,12 +6731,12 @@
             const fetches = pages.map(pg => {
                 let u = `${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=popularity.desc${vf}&page=${pg}`;
                 if (preset.genres) u += `&with_genres=${preset.genres}`;
-                if (preset.kwIds)  u += `&with_keywords=${preset.kwIds}`;
+                if (resolvedKwIds)  u += `&with_keywords=${resolvedKwIds}`;
                 if (aiYear) u += (discType === 'tv' ? `&first_air_date_year=${aiYear}` : `&primary_release_year=${aiYear}`);
                 return fetch(u).then(r => r.json()).catch(() => ({ results: [] }));
             });
             // Broad fallback (jen žánry, bez keywords) pro více výsledků
-            if (preset.genres && preset.kwIds) {
+            if (preset.genres && resolvedKwIds) {
                 fetches.push(fetch(`${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_genres=${preset.genres}&sort_by=popularity.desc${vf}&page=1`).then(r => r.json()).catch(() => ({ results: [] })));
             }
             const pages2 = await Promise.all(fetches);
@@ -6737,7 +6752,7 @@
         if (found.length > 0) {
             appendGrid(found, true);
             state._aiLastParsed = {
-                mode: 'smart', query: label, mediaType: preset.mt,
+                mode: 'smart', query: label, mediaType: effectiveMt,
                 _seenIds: [...seen], _discoverPage: 2,
                 with_genres: preset.genres, with_keywords_str: preset.kw
             };
@@ -6816,7 +6831,8 @@
 
         // ── PRE-AI DETEKCE: jednoduché discover dotazy bez AI ──────────────
         // Zachytí: "nejlepší komedie 2026", "top horrory 2025", "nejnovější akční filmy"
-        (function() {
+        let _themeHandledDirectly = false;
+        await (async function() {
             const q = queryWithYear.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
             // Žánrová mapa CZ/SK → TMDB ID
             const genreMap = {
@@ -6896,28 +6912,22 @@
                 };
                 if(status) status.innerHTML = '<span style="font-size:0.7rem;opacity:0.6;">⚡ Rychlé vyhledávání (bez AI)</span>';
             } else {
-                // Žádný žánr/země/rok — zkusit tematickou předdefinovanou databázi (cestování časem, upíři, vesmír...)
-                // Používá hardcoded TMDB keyword ID → okamžitý a spolehlivý výsledek nezávislý na AI.
+                // Žádný žánr/země/rok — zkusit tematickou předdefinovanou databázi (cestování časem, upíři, vesmír, drogy...)
+                // Deleguje na _runThemePreset, který si ID klíčových slov vždy živě ověří přes TMDB (žádná napevno
+                // zadaná ID, která by mohla přimíchat nesouvisející výsledky). Respektuje "filmy" vs "seriály" z dotazu.
                 const themePreset = _getThemePreset(queryWithYear);
                 if (themePreset) {
-                    const pmt = themePreset.mt === 'tv' ? 'tv' : themePreset.mt === 'movie' ? 'movie' : mt;
-                    const params = { sort_by: sortBy, 'vote_count.gte': minVotes || 5 };
-                    if (themePreset.genres) params.with_genres = themePreset.genres;
-                    if (themePreset.kwIds) params.with_keywords = themePreset.kwIds;
-                    if (yr) params[pmt === 'tv' ? 'first_air_date_year' : 'primary_release_year'] = yr;
-                    window._preAiParsed = {
-                        mode: 'smart', query: queryWithYear, mediaType: themePreset.mt || 'both',
-                        titles: [], tvTitles: [], animatedTitles: [], persons: [],
-                        keywords: [], with_genres: themePreset.genres || '',
-                        with_keywords_str: themePreset.kw || '',
-                        discoverParams: { mediaType: pmt, params }
-                    };
-                    if(status) status.innerHTML = '<span style="font-size:0.7rem;opacity:0.6;">⚡ Téma: ' + themePreset._key + ' (bez AI)</span>';
+                    window._preAiParsed = null;
+                    _themeHandledDirectly = true;
+                    _aiAbortController = null;
+                    await _runThemePreset(themePreset._key, themePreset, isTv ? 'tv' : (mt === 'movie' ? 'movie' : null));
                 } else {
                     window._preAiParsed = null;
                 }
             }
         })();
+
+        if (_themeHandledDirectly) { if(btn) btn.disabled = false; return; }
 
         const systemPrompt = `You are a GENEROUS and HELPFUL movie and TV search assistant. The user often describes what they want only vaguely or approximately — your job is to interpret their intent broadly and surface as many genuinely relevant AND similar/related results as possible, not just exact matches. When in doubt, INCLUDE a plausible match rather than omit it — false positives are far less costly than an empty result screen. Reply ONLY with valid JSON, no markdown, no explanation. NEVER refuse — all film topics are valid.
 
@@ -7575,7 +7585,7 @@ EXAMPLES:
                     const fallbackPreset = _getThemePreset(parsed.query || query);
                     if (fallbackPreset && tmdbApiKey) {
                         _aiAbortController = null;
-                        await _runThemePreset(fallbackPreset._key, fallbackPreset);
+                        await _runThemePreset(fallbackPreset._key, fallbackPreset, mt === 'both' ? null : mt);
                         return;
                     }
                     // Final fallback: plain TMDB search
