@@ -6702,13 +6702,28 @@
         }
     }
 
+    // Rozpozná rok a řazení ("nejlepší"→hodnocení, "nejnovější"→datum) přímo z textu dotazu —
+    // sdílená logika mezi pre-AI detekcí a _runThemePreset, aby se rok/řazení nikdy neignorovaly.
+    function _parseQueryHints(rawQuery) {
+        const q = _stripDiacritics(rawQuery);
+        const yearMatch = q.match(/\b(19[5-9]\d|20[0-3]\d)\b/);
+        const yr = yearMatch ? parseInt(yearMatch[1]) : null;
+        const isTv = /serial|serie|seri[aá]l|show|epizod/.test(q);
+        const isTop = /nejlepsi|nejl[eé]p|top |best|nejkvali/.test(q);
+        const isNew = /nejnovej|nejnov[eě]|nov[eě] |latest|recent|letosni|letošni/.test(q);
+        const sortBy = isTop ? 'vote_average.desc' : isNew ? 'release_date.desc' : 'popularity.desc';
+        return { yr, isTv, sortBy };
+    }
+
     // Přímé vyhledávání tématu bez AI — ID keywordů se vždy ověří živě přes TMDB (ne napevno, aby se zamezilo
     // špatným/zastaralým hardcoded ID, která uměla přimíchat úplně nesouvisející výsledky, např. MCU filmy).
     // forceMt: 'movie'|'tv'|null — pokud je zadané, přebije preset.mt (např. když uživatel v dotazu napsal "filmy", ne "seriály")
-    async function _runThemePreset(label, preset, forceMt) {
+    // forceYear/forceSort: rok a řazení rozpoznané z textu dotazu (viz _parseQueryHints) — mají přednost před dropdownem roku
+    async function _runThemePreset(label, preset, forceMt, forceYear, forceSort) {
         const status = $('aiSearchStatus');
         const btn = $('aiSearchBtn');
-        const aiYear = ($('aiYearSelect')?.value || '').trim();
+        const aiYear = forceYear || ($('aiYearSelect')?.value || '').trim();
+        const sortBy = forceSort || 'popularity.desc';
 
         if(btn) btn.disabled = true;
         if(status) status.innerHTML = '<span class="ai-spin">⟳</span> Hledám téma...';
@@ -6740,11 +6755,16 @@
             resolvedKwIds = ids.slice(0,4).join('|');
         }
 
+        // U starších/konkrétních let je počet hlasů přirozeně nižší → nižší práh, jinak by "nejlepší komedie 2000" nic nenašlo
+        const isSpecificOldYear = !!(aiYear && parseInt(aiYear) < new Date().getFullYear());
+
         for (const discType of discTypes) {
-            const vf = discType === 'movie' ? '&vote_count.gte=10' : '&vote_count.gte=5';
+            const vf = discType === 'movie'
+                ? (isSpecificOldYear ? '&vote_count.gte=20' : '&vote_count.gte=10')
+                : (isSpecificOldYear ? '&vote_count.gte=10' : '&vote_count.gte=5');
             const pages = [1, 2, 3];
             const fetches = pages.map(pg => {
-                let u = `${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=popularity.desc${vf}&page=${pg}`;
+                let u = `${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=${sortBy}${vf}&page=${pg}`;
                 if (preset.genres) u += `&with_genres=${preset.genres}`;
                 if (resolvedKwIds)  u += `&with_keywords=${resolvedKwIds}`;
                 if (aiYear) u += (discType === 'tv' ? `&first_air_date_year=${aiYear}` : `&primary_release_year=${aiYear}`);
@@ -6752,7 +6772,9 @@
             });
             // Broad fallback (jen žánry, bez keywords) pro více výsledků
             if (preset.genres && resolvedKwIds) {
-                fetches.push(fetch(`${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_genres=${preset.genres}&sort_by=popularity.desc${vf}&page=1`).then(r => r.json()).catch(() => ({ results: [] })));
+                let broadU = `${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_genres=${preset.genres}&sort_by=${sortBy}${vf}&page=1`;
+                if (aiYear) broadU += (discType === 'tv' ? `&first_air_date_year=${aiYear}` : `&primary_release_year=${aiYear}`);
+                fetches.push(fetch(broadU).then(r => r.json()).catch(() => ({ results: [] })));
             }
             const pages2 = await Promise.all(fetches);
             for (const pr of pages2) {
@@ -6935,7 +6957,8 @@
                     window._preAiParsed = null;
                     _themeHandledDirectly = true;
                     _aiAbortController = null;
-                    await _runThemePreset(themePreset._key, themePreset, isTv ? 'tv' : (mt === 'movie' ? 'movie' : null));
+                    const hints = _parseQueryHints(queryWithYear);
+                    await _runThemePreset(themePreset._key, themePreset, isTv ? 'tv' : (mt === 'movie' ? 'movie' : null), hints.yr ? String(hints.yr) : '', hints.sortBy);
                 } else {
                     window._preAiParsed = null;
                 }
@@ -7600,7 +7623,8 @@ EXAMPLES:
                     const fallbackPreset = _getThemePreset(parsed.query || query);
                     if (fallbackPreset && tmdbApiKey) {
                         _aiAbortController = null;
-                        await _runThemePreset(fallbackPreset._key, fallbackPreset, mt === 'both' ? null : mt);
+                        const hints = _parseQueryHints(parsed.query || query);
+                        await _runThemePreset(fallbackPreset._key, fallbackPreset, mt === 'both' ? null : mt, hints.yr ? String(hints.yr) : '', hints.sortBy);
                         return;
                     }
                     // Final fallback: plain TMDB search
