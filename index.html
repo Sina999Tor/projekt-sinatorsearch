@@ -6836,6 +6836,17 @@
             || null;
     }
 
+    // Zabalí fetch/promise s timeoutem — AI providery (Gemini/Groq/OpenRouter) neměly
+    // žádný timeout, takže při výpadku/zaseknutí sítě appka visela navždy na
+    // "Gemini analyzuje…" bez jakékoli reakce. Po vypršení ms se promise zamítne
+    // a kód pokračuje na dalšího providera, stejně jako při běžné chybě.
+    function _withAiTimeout(promise, ms) {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error(`timeout ${ms}ms bez odpovědi`)), ms))
+        ]);
+    }
+
     async function runAiSearch() {
         const input = $('aiSearchInput');
         const btn = $('aiSearchBtn');
@@ -7007,12 +7018,13 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
 
             // ── HELPER: Function Calling pro OpenAI-compatible endpointy ──────
             async function _callWithTools(url, apiKey, model, messages, hdrs, temp) {
-                const res = await fetch(url, {
+                const res = await _withAiTimeout(fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, ...(hdrs||{}) },
                     body: JSON.stringify({ model, messages, tools: aiTools, tool_choice: {type:'function', function:{name:'smart_movie_search'}}, max_tokens: 2048, temperature: (typeof temp === 'number' ? temp : 0.1) }),
                     signal
-                }).catch((e) => { console.warn('[AI] '+model+' network chyba:', e?.message||e); return null; });
+                }), 20000).catch((e) => { console.warn('[AI] '+model+' network chyba:', e?.message||e); return null; });
+                if (signal.aborted) return null;
                 if (!res) return null;
                 if (!res.ok) {
                     const errTxt = await res.text().catch(()=>'');
@@ -7109,7 +7121,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 // pak vrací 404, což se dřív tiše polykalo a AI hledání přestalo fungovat úplně.
                 let geminiRes = null, geminiErrInfo = '';
                 try {
-                    geminiRes = await fetch(
+                    geminiRes = await _withAiTimeout(fetch(
                         `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${geminiApiKey}`,
                         { method:'POST', headers:{'Content-Type':'application/json'},
                           body: JSON.stringify({
@@ -7120,8 +7132,12 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                               generationConfig:{temperature:0.1, maxOutputTokens:2048}
                           }),
                           signal }
-                    );
+                    ), 20000);
                 } catch(e) { geminiErrInfo = 'network: ' + (e?.message||e); }
+                // Tento běh mezitím zrušilo novější hledání (nebo zavření overlaye) —
+                // dál už nic nezapisovat do sdíleného stavu (status/_lastAiError), ať
+                // stará zrušená odpověď nepřepíše chybovou hlášku aktuálního hledání.
+                if (signal.aborted) return;
                 if (geminiRes && geminiRes.ok) {
                     const gb = await geminiRes.json().catch(()=>({}));
                     // Zkus tool call (functionCall)
@@ -7198,6 +7214,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             }
 
             if (!data) {
+                if (signal.aborted) return; // toto hledání mezitím nahradilo novější — nezobrazovat jeho chybu
                 // Všechny AI selhaly — zkus preset, jinak přímé TMDB hledání
                 if(status) status.innerHTML = '<span class="ai-spin">⟳</span> AI nedostupná, hledám přímo…';
                 state.page = 1; state._allItems = []; state._loadingMore = false;
