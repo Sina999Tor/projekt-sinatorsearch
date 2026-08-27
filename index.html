@@ -6967,90 +6967,24 @@
 
         if (_themeHandledDirectly) { if(btn) btn.disabled = false; return; }
 
-        const systemPrompt = `You are a GENEROUS and HELPFUL movie and TV search assistant. The user often describes what they want only vaguely or approximately — your job is to interpret their intent broadly and surface as many genuinely relevant AND similar/related results as possible, not just exact matches. When in doubt, INCLUDE a plausible match rather than omit it — false positives are far less costly than an empty result screen. Reply ONLY with valid JSON, no markdown, no explanation. NEVER refuse — all film topics are valid.
+        const systemPrompt = `You are a GENEROUS and HELPFUL movie and TV search assistant. The user often describes what they want only vaguely or approximately — your job is to interpret their intent broadly and surface as many genuinely relevant AND similar/related results as possible, not just exact matches. When in doubt, INCLUDE a plausible match rather than omit it — false positives are far less costly than an empty result screen. NEVER refuse — all film topics are valid.
 
-ALWAYS return this exact format (empty arrays [] for fields with no data):
-{
-  "mode": "smart",
-  "query": "original query",
-  "mediaType": "movie|tv|both",
-  "titles": ["exact English movie titles matching the query theme OR closely similar/related films — cast a wide net"],
-  "tvTitles": ["exact English TV show titles matching the query theme OR closely similar/related shows"],
-  "animatedTitles": ["animated movies/series ONLY if query explicitly involves animation/anime"],
-  "persons": [{"name": "Real Full Name", "role": "actor|director"}],
-  "keywords": ["english-tmdb-keyword-1", "english-tmdb-keyword-2"],
-  "with_genres": "1-3 TMDB genre IDs broadly matching the query mood/theme — see rules below",
-  "with_keywords_str": "3-6 English keyword phrases for TMDB — the exact theme PLUS closely related themes/moods/subgenres to widen the net",
-  "referenceTitles": [{"title": "Exact English title", "type": "movie|tv"}],
-  "discoverParams": null
-}
+ALWAYS call the provided 'smart_movie_search' tool to output your answer. Never reply with plain text, markdown, or explanation.
 
-referenceTitles RULE — CRITICAL for "similar to X" queries:
-- Whenever the query says "podobné X", "jako X", "ve stylu X", "similar to X", "like X" — put the exact English title(s) of X into referenceTitles (with correct type). This is used to fetch TMDB's own "similar/recommended" data for X, which is far more accurate than guessing.
-- Still ALSO fill titles/tvTitles/with_genres/with_keywords_str generously as usual — referenceTitles is an ADDITIONAL signal, not a replacement.
-- Example: "akční sci-fi o umělé inteligenci, podobné sérii Transformers" -> referenceTitles: [{"title":"Transformers","type":"movie"}], plus with_genres="28,878", with_keywords_str="artificial intelligence,robot,alien technology,giant robot".
+RULES — BE GENEROUS, NOT STRICT:
+- titles/tvTitles: for vague, descriptive, or thematic queries ("filmy jako X", "něco s...", "film o..."), include 8-15 titles — titles matching the theme AND titles that are thematically/tonally similar. If the query doesn't specify movie vs series, fill both generously.
+- animatedTitles: leave EMPTY unless the query explicitly mentions animation/anime/cartoon.
+- persons: real named people from the query (actor/director). You may add 1-2 closely associated people (frequent collaborators) if clearly relevant.
+- referenceTitles — CRITICAL for "similar to X" queries: whenever the query says "podobné X", "jako X", "ve stylu X", "similar to X", "like X", put the exact English title(s) of X here (with correct type). This fetches TMDB's own similar/recommended data for X, which is far more accurate than guessing. Still ALSO fill titles/tvTitles/with_genres/with_keywords_str generously as usual — referenceTitles is an ADDITIONAL signal, not a replacement.
+- with_genres: 1-3 TMDB genre IDs (Akční=28, Dobrodružný=12, Animovaný=16, Komedie=35, Krimi=80, Dokument=99, Drama=18, Rodinný=10751, Fantasy=14, Historický=36, Horor=27, Hudební=10402, Mysteriózní=9648, Romantický=10749, Sci-Fi=878, Thriller=53, Válečný=10752, Western=37). If the user explicitly named a genre, always include it. For vague/mood-based descriptions, infer the 1-2 genres that best fit the vibe — don't leave it empty just because it wasn't spelled out. A topic like "filmy o vaření" is NOT a genre — leave with_genres empty and rely on with_keywords_str instead.
+- with_keywords_str: 3-6 English phrases — the exact theme PLUS closely related themes/moods/subgenres, so TMDB discover finds similar (not just exact) titles too. E.g. "filmy o vaření" -> "cooking,chef,culinary,restaurant,food"; "filmy o fotbale" -> "football,soccer,sports team,championship" (not generic "sport,competition"); "filmy o válce" -> "war,battle,military,combat" (not generic "history,drama,action").
+- keywords: 3-6 precise English TMDB keywords for the exact theme.
+- discoverParams (filterYear, filterDecadeStart/End, filterOriginCountry, filterOriginalLanguage, sortBy): fill ONLY for explicit filter queries (country/language/year/genre/sort combos, e.g. "nejlepší komedie 2026", "české filmy"). Otherwise leave these empty. sortBy: "nejlepší/top/best" -> vote_average.desc, "nejnovější/nové/letošní" -> release_date.desc, otherwise popularity.desc.
+- mediaType: "movie" for "filmy/movies", "tv" for "seriály/series/shows", "both" if ambiguous OR if the query is a loose/approximate description (prefer "both" over guessing wrong).
+- If the query starts with "filmy a seriály na téma:" / "filmy na téma:" or similar, extract ONLY the theme word and autocomplete partial/incomplete words intelligently (e.g. "Hist" -> "History", "Vamp" -> "Vampire", "Drak" -> "Dragon") — never include the "na téma:" prefix itself in with_keywords_str.
 
-FIELD RULES — BE GENEROUS, NOT STRICT:
-- titles: Include titles that match the query theme, AND titles that are thematically/tonally similar even if not a perfect match. Aim for 8-15 titles when the query is a description or vague theme ("filmy jako X", "něco s...", "film o..."). Only leave nearly empty for extremely specific unanswerable queries.
-- tvTitles: Same generous approach — if the query doesn't specify movie vs series, include good matches from both.
-- animatedTitles: Leave EMPTY unless query explicitly mentions animation, anime, cartoon, animated.
-- persons: Real named people from query. You may also add 1-2 closely associated people (e.g. frequent collaborators) if clearly relevant.
-- keywords: 3-6 specific English TMDB keywords covering the exact theme AND adjacent/related themes, to help TMDB discover surface similar titles too.
-- discoverParams: ONLY for explicit filter queries (country/language/year/genre combos). Otherwise null.
-- mediaType: "movie" if "filmy/movies", "tv" if "seriály/series/shows", "both" if ambiguous OR if the query is a loose/approximate description (prefer "both" over guessing wrong).
-
-with_genres RULES — favor breadth over precision when the query is vague:
-- Use 1-3 genre IDs. If the user explicitly named a genre, always include it.
-- For vague/mood-based descriptions (not a named genre), infer the 1-2 genres that best fit the overall vibe, plus with_keywords_str for nuance — do NOT leave with_genres empty just because it wasn't spelled out.
-- "hudební filmy" → "10402" (add 18 only if the description also implies serious drama).
-- "akční komedie" → "28,35" (both explicitly stated).
-- "hororové thrillery" → "27,53" (both explicitly stated).
-- "filmy o vaření" → with_genres="" (cooking is NOT a genre — use with_keywords_str instead: "cooking,chef,culinary,food").
-- RULE: For a loose, descriptive, or approximate query, prefer BROADER with_genres/with_keywords_str over an empty result — the goal is to always return something reasonably close.
-
-with_keywords_str RULES:
-- 3-6 English phrases: the exact theme PLUS related/adjacent themes, moods or subgenres so TMDB discover finds not just exact matches but similar titles too.
-- "filmy o vaření" → "cooking,chef,culinary,restaurant,food"
-
-- "filmy o fotbale" → "football,soccer,sports team,championship" (not "sport,competition")
-- "filmy o válce" → "war,battle,military,combat" (not "history,drama,action")
-
-TOPIC QUERY RULE — CRITICAL:
-- If query starts with "filmy a seriály na téma:" or "filmy na téma:" or similar, extract ONLY the theme word.
-- Example: "filmy a seriály na téma: Hist" → topic is "Historický" (autocomplete the partial word).
-- Example: "filmy a seriály na téma: Vesmír" → use with_keywords_str="space,universe,cosmos,astronaut", with_genres="878".
-- NEVER include "filmy na téma:" prefix in with_keywords_str. Only the clean theme keywords.
-- For partial/incomplete theme words: autocomplete intelligently (Hist→History, Vamp→Vampire, Drak→Dragon, etc.).
-
-Genre IDs: 28=Action,12=Adventure,16=Animation,35=Comedy,80=Crime,99=Documentary,18=Drama,10751=Family,14=Fantasy,36=History,27=Horror,10402=Music/Musical,9648=Mystery,10749=Romance,878=Sci-Fi,10770=TV Movie,53=Thriller,10752=War,37=Western
-Languages: cs=Czech,sk=Slovak,en=English,de=German,fr=French,ja=Japanese,ko=Korean,zh=Chinese,ru=Russian,pl=Polish
-Countries (use with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Británie,DE=Německo,FR=Francie,JP=Japonsko,KR=Korea,IT=Itálie,ES=Španělsko,PL=Polsko,RU=Rusko,HU=Maďarsko,AT=Rakousko,AU=Austrálie,CA=Kanada,SE=Švédsko,DK=Dánsko,TR=Turecko,BR=Brazílie
-
-EXAMPLES:
-"terminator" -> {"mode":"smart","query":"terminator","mediaType":"both","titles":["The Terminator","Terminator 2: Judgment Day","Terminator 3: Rise of the Machines","Terminator Salvation","Terminator Genisys","Terminator: Dark Fate"],"tvTitles":["Terminator: The Sarah Connor Chronicles"],"animatedTitles":[],"persons":[{"name":"Arnold Schwarzenegger","role":"actor"},{"name":"Linda Hamilton","role":"actor"},{"name":"James Cameron","role":"director"}],"keywords":["terminator","cyborg","skynet","time-travel"],"with_genres":"878,28","with_keywords_str":"cyborg,time travel,artificial intelligence,robot","referenceTitles":[],"discoverParams":null}
-"batman" -> {"mode":"smart","query":"batman","mediaType":"both","titles":["Batman","Batman Returns","Batman Begins","The Dark Knight","The Dark Knight Rises","The Batman"],"tvTitles":["Gotham","Pennyworth"],"animatedTitles":[],"persons":[{"name":"Michael Keaton","role":"actor"},{"name":"Christian Bale","role":"actor"},{"name":"Robert Pattinson","role":"actor"}],"keywords":["batman","superhero","gotham-city","dc-comics"],"with_genres":"28","with_keywords_str":"batman,superhero,dc comics,gotham","referenceTitles":[],"discoverParams":null}
-"Arnold Schwarzenegger" -> {"mode":"smart","query":"Arnold Schwarzenegger","mediaType":"both","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[{"name":"Arnold Schwarzenegger","role":"actor"}],"keywords":[],"with_genres":"","with_keywords_str":"","referenceTitles":[],"discoverParams":null}
-"film kde hrdina cestuje casem" -> {"mode":"smart","query":"film kde hrdina cestuje casem","mediaType":"movie","titles":["Back to the Future","Back to the Future Part II","Looper","Primer","Edge of Tomorrow","About Time","12 Monkeys","Predestination","Palm Springs","Tenet"],"tvTitles":["Dark","Quantum Leap","Travelers"],"animatedTitles":[],"persons":[],"keywords":["time-travel","time-loop","parallel-universe"],"with_genres":"878","with_keywords_str":"time travel,time machine,alternate timeline","referenceTitles":[],"discoverParams":null}
-"nejlepsi komedie 2025" -> {"mode":"smart","query":"nejlepsi komedie 2025","mediaType":"movie","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":{"mediaType":"movie","params":{"sort_by":"vote_average.desc","with_genres":"35","primary_release_year":2025,"vote_count.gte":30}}}
-"nejlepší komedie roku 2026" -> {"mode":"smart","query":"nejlepší komedie roku 2026","mediaType":"movie","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":{"mediaType":"movie","params":{"sort_by":"vote_average.desc","with_genres":"35","primary_release_year":2026,"vote_count.gte":10}}}
-"top horrory 2024" -> {"mode":"smart","query":"top horrory 2024","mediaType":"movie","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":{"mediaType":"movie","params":{"sort_by":"vote_average.desc","with_genres":"27","primary_release_year":2024,"vote_count.gte":20}}}
-"nejnovejsi akcni filmy" -> {"mode":"smart","query":"nejnovejsi akcni filmy","mediaType":"movie","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":{"mediaType":"movie","params":{"sort_by":"release_date.desc","with_genres":"28","vote_count.gte":5}}}
-"ceske filmy" -> {"mode":"smart","query":"ceske filmy","mediaType":"movie","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":{"mediaType":"movie","params":{"sort_by":"popularity.desc","with_original_language":"cs","with_origin_country":"CZ","vote_count.gte":5}}}
-"ceske komedie 2020" -> {"mode":"smart","query":"ceske komedie 2020","mediaType":"movie","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":[],"with_genres":"","with_keywords_str":"","discoverParams":{"mediaType":"movie","params":{"sort_by":"popularity.desc","with_genres":"35","with_origin_country":"CZ","primary_release_year":2020,"vote_count.gte":3}}}
-"filmy o dinosaurech" -> {"mode":"smart","query":"filmy o dinosaurech","mediaType":"movie","titles":["Jurassic Park","The Lost World: Jurassic Park","Jurassic World","Jurassic World: Fallen Kingdom","Jurassic World Dominion"],"tvTitles":["Prehistoric Planet"],"animatedTitles":[],"persons":[],"keywords":["dinosaur","prehistoric","paleontology"],"with_genres":"","with_keywords_str":"dinosaur,prehistoric animal,paleontology","referenceTitles":[],"discoverParams":null}
-"filmy o vaření" -> {"mode":"smart","query":"filmy o vaření","mediaType":"movie","titles":["Julie & Julia","Ratatouille","Chef","Burnt","The Hundred-Foot Journey","Jiro Dreams of Sushi"],"tvTitles":["The Bear","Chef's Table","MasterChef"],"animatedTitles":[],"persons":[],"keywords":["cooking","chef","culinary"],"with_genres":"","with_keywords_str":"cooking,chef,culinary,restaurant kitchen","referenceTitles":[],"discoverParams":null}
-"filmy o sportu" -> {"mode":"smart","query":"filmy o sportu","mediaType":"movie","titles":["Rocky","Raging Bull","Moneyball","The Blind Side","Rush","Ford v Ferrari","Creed"],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":["sports","athlete","competition"],"with_genres":"","with_keywords_str":"sports,athlete,competition,underdog","referenceTitles":[],"discoverParams":null}
-"star wars" -> {"mode":"smart","query":"star wars","mediaType":"both","titles":["Star Wars: A New Hope","The Empire Strikes Back","Return of the Jedi","The Phantom Menace","Attack of the Clones","Revenge of the Sith","The Force Awakens","The Last Jedi","The Rise of Skywalker","Rogue One","Solo: A Star Wars Story"],"tvTitles":["The Mandalorian","Andor","Obi-Wan Kenobi","Ahsoka"],"animatedTitles":[],"persons":[{"name":"Mark Hamill","role":"actor"},{"name":"Harrison Ford","role":"actor"},{"name":"George Lucas","role":"director"}],"keywords":["star-wars","jedi","space-opera","lightsaber"],"with_genres":"878,28","with_keywords_str":"star wars,space opera,jedi,lightsaber","referenceTitles":[],"discoverParams":null}
-"filmy jako inception" -> {"mode":"smart","query":"filmy jako inception","mediaType":"movie","titles":["Inception","The Matrix","Shutter Island","Memento","Tenet","Predestination","Source Code","Coherence","Dark City"],"tvTitles":["Dark","Westworld","Severance"],"animatedTitles":[],"persons":[{"name":"Christopher Nolan","role":"director"}],"keywords":["mind-bending","dream","psychological-thriller","parallel-reality"],"with_genres":"53,878","with_keywords_str":"mind bending,dream,psychological thriller,parallel universe","referenceTitles":[],"discoverParams":null}
-"serialy o lekarích" -> {"mode":"smart","query":"serialy o lekarích","mediaType":"tv","titles":[],"tvTitles":["Grey's Anatomy","House M.D.","ER","Scrubs","The Good Doctor","New Amsterdam","Chicago Med"],"animatedTitles":[],"persons":[],"keywords":["doctor","hospital","medical","surgery"],"with_genres":"18","with_keywords_str":"doctor,hospital,medical drama,surgery","referenceTitles":[],"discoverParams":null}
-"Marvel" -> {"mode":"smart","query":"Marvel","mediaType":"both","titles":["Iron Man","The Avengers","Guardians of the Galaxy","Avengers: Infinity War","Avengers: Endgame","Black Panther","Thor: Ragnarok","Spider-Man: No Way Home","Deadpool & Wolverine"],"tvTitles":["WandaVision","Loki","Daredevil: Born Again"],"animatedTitles":[],"persons":[],"keywords":["marvel","superhero","mcu","avengers"],"with_genres":"28","with_keywords_str":"marvel,superhero,mcu,avengers","referenceTitles":[],"discoverParams":null}
-"filmy o holokaustu" -> {"mode":"smart","query":"filmy o holokaustu","mediaType":"movie","titles":["Schindler's List","The Boy in the Striped Pyjamas","Life is Beautiful","The Pianist","Son of Saul","The Zookeeper's Wife"],"tvTitles":["Band of Brothers"],"animatedTitles":[],"persons":[],"keywords":["holocaust","world-war-ii","nazi","concentration-camp"],"with_genres":"36,18","with_keywords_str":"holocaust,nazi,concentration camp,world war ii","referenceTitles":[],"discoverParams":null}
-"James Bond" -> {"mode":"smart","query":"James Bond","mediaType":"movie","titles":["Dr. No","Goldfinger","The Spy Who Loved Me","GoldenEye","Casino Royale","Skyfall","Spectre","No Time to Die"],"tvTitles":[],"animatedTitles":[],"persons":[{"name":"Sean Connery","role":"actor"},{"name":"Roger Moore","role":"actor"},{"name":"Daniel Craig","role":"actor"}],"keywords":["james-bond","spy","secret-agent","mi6"],"with_genres":"28,53","with_keywords_str":"secret agent,spy,mi6,espionage","referenceTitles":[],"discoverParams":null}
-"hudebni filmy" -> {"mode":"smart","query":"hudebni filmy","mediaType":"movie","titles":["Bohemian Rhapsody","Rocketman","Yesterday","Walk the Line","Ray","La La Land","Whiplash","8 Mile"],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":["music","rock-band","musician","concert"],"with_genres":"10402","with_keywords_str":"music,rock band,musician,concert","referenceTitles":[],"discoverParams":null}
-"akčni komedie" -> {"mode":"smart","query":"akčni komedie","mediaType":"both","titles":[],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":["action-comedy","buddy-film"],"with_genres":"28,35","with_keywords_str":"action comedy,buddy film","referenceTitles":[],"discoverParams":null}
-"dokumentarni filmy o prirode" -> {"mode":"smart","query":"dokumentarni filmy o prirode","mediaType":"movie","titles":[],"tvTitles":["Planet Earth","Our Planet","Blue Planet","Life","Wild Isles"],"animatedTitles":[],"persons":[],"keywords":["nature","wildlife","documentary"],"with_genres":"99","with_keywords_str":"nature documentary,wildlife,animals,ecosystem","referenceTitles":[],"discoverParams":null}
-"romantické filmy" -> {"mode":"smart","query":"romantické filmy","mediaType":"movie","titles":["The Notebook","Pride & Prejudice","Crazy Rich Asians","La La Land","Before Sunrise","500 Days of Summer"],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":["romance","love-story"],"with_genres":"10749","with_keywords_str":"romance,love story,romantic relationship","referenceTitles":[],"discoverParams":null}
-"najdi mi akční sci-fi o umělé inteligenci, podobné sérii Transformers" -> {"mode":"smart","query":"najdi mi akční sci-fi o umělé inteligenci, podobné sérii Transformers","mediaType":"movie","titles":["Transformers","I, Robot","Chappie","Ex Machina","Real Steel","Pacific Rim"],"tvTitles":[],"animatedTitles":[],"persons":[],"keywords":["artificial-intelligence","robot","giant-robot"],"with_genres":"28,878","with_keywords_str":"artificial intelligence,robot,giant robot,alien technology,machine uprising","referenceTitles":[{"title":"Transformers","type":"movie"}],"discoverParams":null}`;
+Languages (with_original_language): cs=Czech,sk=Slovak,en=English,de=German,fr=French,ja=Japanese,ko=Korean,zh=Chinese,ru=Russian,pl=Polish
+Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Británie,DE=Německo,FR=Francie,JP=Japonsko,KR=Korea,IT=Itálie,ES=Španělsko,PL=Polsko,RU=Rusko,HU=Maďarsko,AT=Rakousko,AU=Austrálie,CA=Kanada,SE=Švédsko,DK=Dánsko,TR=Turecko,BR=Brazílie`;
 
 
         try {
@@ -7080,11 +7014,11 @@ EXAMPLES:
             ];
 
             // ── HELPER: Function Calling pro OpenAI-compatible endpointy ──────
-            async function _callWithTools(url, apiKey, model, messages, hdrs) {
+            async function _callWithTools(url, apiKey, model, messages, hdrs, temp) {
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, ...(hdrs||{}) },
-                    body: JSON.stringify({ model, messages, tools: aiTools, tool_choice: {type:'function', function:{name:'smart_movie_search'}}, max_tokens: 2048, temperature: 0.1 }),
+                    body: JSON.stringify({ model, messages, tools: aiTools, tool_choice: {type:'function', function:{name:'smart_movie_search'}}, max_tokens: 2048, temperature: (typeof temp === 'number' ? temp : 0.1) }),
                     signal
                 }).catch((e) => { console.warn('[AI] '+model+' network chyba:', e?.message||e); return null; });
                 if (!res) return null;
@@ -7227,7 +7161,7 @@ EXAMPLES:
                 const raw = await _callWithTools(
                     'https://api.groq.com/openai/v1/chat/completions',
                     groqApiKey,
-                    'openai/gpt-oss-120b',
+                    'llama-3.3-70b-versatile',
                     [{role:'system',content:systemPrompt},{role:'user',content:queryWithYear}]
                 );
                 data = _normalizeAiResponse(raw, queryWithYear);
@@ -7242,7 +7176,8 @@ EXAMPLES:
                     openRouterKey,
                     'meta-llama/llama-3.3-70b-instruct:free',
                     [{role:'system',content:systemPrompt},{role:'user',content:queryWithYear}],
-                    {'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}
+                    {'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'},
+                    0.0
                 );
                 data = _normalizeAiResponse(raw, queryWithYear);
                 if (data) usedProvider = 'OpenRouter';
@@ -7262,7 +7197,8 @@ EXAMPLES:
                         'sk-or-free',
                         model,
                         [{role:'system',content:systemPrompt},{role:'user',content:queryWithYear}],
-                        {'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}
+                        {'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'},
+                        0.0
                     );
                     data = _normalizeAiResponse(raw, queryWithYear);
                     if (data) { usedProvider = 'Free AI'; break; }
@@ -31801,7 +31737,7 @@ async function _aiAskForTitles(prompt) {
 
     // 2) Groq
     if (groqKey) {
-        const t = await _oaiTitles('https://api.groq.com/openai/v1/chat/completions', groqKey, 'openai/gpt-oss-120b');
+        const t = await _oaiTitles('https://api.groq.com/openai/v1/chat/completions', groqKey, 'llama-3.3-70b-versatile');
         if (t.length) return t;
     }
 
@@ -35047,7 +34983,7 @@ async function _zabavaAiCall(prompt) {
   if (geminiKey) {
     try { return await _oai('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', geminiKey, 'gemini-2.5-flash'); } catch(e) {}
   }
-  if (groqKey) { try { return await _oai('https://api.groq.com/openai/v1/chat/completions',groqKey,'openai/gpt-oss-120b'); } catch(e) {} }
+  if (groqKey) { try { return await _oai('https://api.groq.com/openai/v1/chat/completions',groqKey,'llama-3.3-70b-versatile'); } catch(e) {} }
   if (orKey) { try { return await _oai('https://openrouter.ai/api/v1/chat/completions',orKey,'meta-llama/llama-3.3-70b-instruct:free',{'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}); } catch(e) {} }
   // Poslední záchranná varianta bez vlastního klíče
   try { return await _oai('https://openrouter.ai/api/v1/chat/completions','sk-or-free','meta-llama/llama-3.3-8b-instruct:free',{'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}); } catch(e) {}
