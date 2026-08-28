@@ -7528,13 +7528,13 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
 
                 // 7. Hybridní discover: with_genres + with_keywords_str z AI (vždy, až 3 stránky)
                 const hasExplicitTitles = (parsed.titles||[]).length + (parsed.tvTitles||[]).length + (parsed.animatedTitles||[]).length > 0;
-                // Bezpečnostní pojistka: u FICTIONAL CHARACTER dotazů (characterActor vyplněný)
-                // ignorovat with_genres/with_keywords_str i kdyby je AI navzdory instrukci přesto
-                // vrátila (slabší free modely instrukce občas nedodrží) — characterActor + backup
-                // tituly už samy dávají přesné výsledky, žánrový/keyword discover jen zaplaví
-                // výsledky nesouvisejícími blockbustery se stejným obecným žánrem.
-                const aiGenres = parsed.characterActor ? '' : (parsed.with_genres || '').trim();
-                const aiKwStr  = parsed.characterActor ? '' : (parsed.with_keywords_str || '').trim();
+                // Bezpečnostní pojistka: u FICTIONAL CHARACTER dotazů (characterActor vyplněný) NEBO
+                // pokud už krok 6 (discoverParams) běžel — to je přesně určené pro explicitní filtrové
+                // dotazy typu "nejlepší komedie 2026" a už samo přesně filtruje rok/žánr/řazení podle
+                // vote_average. Kdyby vedle toho běžel i tento nefiltrovaný (popularity.desc, bez roku)
+                // genre discover, přimíchal by výsledky z jiných let / bez ohledu na "nejlepší" řazení.
+                const aiGenres = (parsed.characterActor || parsed.discoverParams) ? '' : (parsed.with_genres || '').trim();
+                const aiKwStr  = (parsed.characterActor || parsed.discoverParams) ? '' : (parsed.with_keywords_str || '').trim();
                 const discTypes_h = mt === 'tv' ? ['tv'] : mt === 'movie' ? ['movie'] : ['movie','tv'];
 
                 // 7a. Genre-based nebo keyword-only discover (vždy když AI vrátila žánry NEBO keywords)
@@ -7581,8 +7581,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 }
 
                 // 7b. Keyword discover (fallback nebo doplněk — bez žánrů nebo pokud stále málo výsledků)
-                // Stejná pojistka jako u 7a: u FICTIONAL CHARACTER dotazů ignorovat keywords.
-                const kws_s = parsed.characterActor ? [] : (parsed.keywords || []);
+                // Stejná pojistka jako u 7a: u FICTIONAL CHARACTER a explicitních filtrových dotazů (discoverParams) ignorovat keywords.
+                const kws_s = (parsed.characterActor || parsed.discoverParams) ? [] : (parsed.keywords || []);
                 const mediaCount_s = found_s.filter(x=>x.media_type!=='actor'&&x.media_type!=='director').length;
                 if (kws_s.length && mediaCount_s < 40) {
                     const kwIds_s = [];
@@ -7678,10 +7678,13 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     return;
                 }
 
-                // Sort: persons first, then by popularity
+                // Sort: persons first, then by popularity — ALE pokud šlo o explicitní filtrový dotaz
+                // (discoverParams, např. "nejlepší komedie 2026" -> sortBy vote_average.desc), zachovej
+                // pořadí tak, jak ho vrátil TMDB discover — přetřídění podle popularity by jinak zahodilo
+                // právě to řazení "nejlepší", kvůli kterému byl discoverParams vůbec použit.
                 const persons_s = found_s.filter(x => x.media_type === 'actor' || x.media_type === 'director');
-                const media_s = found_s.filter(x => x.media_type !== 'actor' && x.media_type !== 'director')
-                    .sort((a,b) => (b.popularity||0) - (a.popularity||0));
+                const mediaRaw_s = found_s.filter(x => x.media_type !== 'actor' && x.media_type !== 'director');
+                const media_s = parsed.discoverParams ? mediaRaw_s : mediaRaw_s.sort((a,b) => (b.popularity||0) - (a.popularity||0));
                 appendGrid([...persons_s, ...media_s], true);
                 state._aiLastParsed = {...parsed, _seenIds: [...seenIds_s], _discoverPage: 2};
                 _showAiLoadMore(parsed.query || query);
