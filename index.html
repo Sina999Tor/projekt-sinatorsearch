@@ -7412,11 +7412,17 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 // 2. If only persons and no titles — show filmography (person detail mode)
                 const hasTitles = (parsed.titles||[]).length + (parsed.tvTitles||[]).length + (parsed.animatedTitles||[]).length;
                 if (found_s.length > 0 && !hasTitles && parsed.keywords?.length === 0) {
-                    // Pure person search — redirect to person detail
+                    // Pure person search — render the actor card(s) into the background grid
+                    // FIRST (same as the normal end-of-search rendering below), so that when the
+                    // user closes the filmography detail modal they land on real results instead
+                    // of the "Hledám…" spinner stuck forever (resultsEl was never filled otherwise).
+                    appendGrid([...found_s], true);
+                    state._aiLastParsed = {...parsed, _seenIds: [...seenIds_s], _discoverPage: 2};
+                    _showAiLoadMore(parsed.query || query);
+                    if(status) status.textContent = '';
                     const firstPerson = found_s[0];
                     if (firstPerson?.id) {
                         _aiAbortController = null;
-                        if(status) status.textContent = '';
                         openPersonDetail(firstPerson.id);
                         if(btn) btn.disabled = false;
                         return;
