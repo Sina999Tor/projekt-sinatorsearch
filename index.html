@@ -6868,6 +6868,7 @@
         _aiAbortController = new AbortController();
         const signal = _aiAbortController.signal;
         window._lastAiError = ''; // reset, ať se neukáže chyba ze starého hledání
+        window._lastAiErrors = []; // sbírá chybu z KAŽDÉHO poskytovatele (Gemini/Groq/OpenRouter/Free), ne jen první
 
         if(btn) btn.disabled = true;
         if(status) status.innerHTML = '<span class="ai-spin">⟳</span> AI analyzuje dotaz...';
@@ -7048,13 +7049,16 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                         console.warn(`[AI] ${model} tool_use_failed — zkouším znovu s vyšší teplotou (pokus ${attempt+2})`);
                         return _callWithTools(url, apiKey, model, messages, hdrs, temp, attempt + 1);
                     }
-                    // Vytáhni skutečnou příčinu z JSON těla odpovědi (message/type), ať víme co se opravdu děje
+                    // Vytáhni skutečnou příčinu z JSON těla odpovědi (message/type), ať víme co se opravdu děje.
+                    // Delší limit (400 znaků) — u 429 chyb Groq posílá "Limit X, Used Y, Please try again in Zs",
+                    // což se dřív useklo uprostřed čísla a vypadalo to jako nesmyslně nízký limit.
                     let detail = '';
                     try {
                         const j = JSON.parse(errTxt);
-                        detail = (j?.error?.message || j?.error?.code || j?.error?.type || '').toString().slice(0,160);
-                    } catch(e) { detail = errTxt.slice(0,160); }
+                        detail = (j?.error?.message || j?.error?.code || j?.error?.type || '').toString().slice(0,400);
+                    } catch(e) { detail = errTxt.slice(0,400); }
                     if (!window._lastAiError) window._lastAiError = `${model}: HTTP ${res.status}${detail ? ' — ' + detail : ''}`;
+                    (window._lastAiErrors = window._lastAiErrors || []).push(`${model}: HTTP ${res.status}${detail ? ' — ' + detail : ''}`);
                     return null;
                 }
                 const j = await res.json().catch(() => null);
@@ -7188,6 +7192,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 if (!data && geminiErrInfo) {
                     console.warn('[AI] Gemini volání selhalo —', geminiErrInfo);
                     if (!window._lastAiError) window._lastAiError = 'Gemini: ' + geminiErrInfo;
+                    (window._lastAiErrors = window._lastAiErrors || []).push('Gemini: ' + geminiErrInfo);
                 }
             }
 
@@ -7311,7 +7316,10 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 state.searchQuery = query;
                 closeFiltersOverlay();
                 await searchMedia(query);
-                const errSuffix = window._lastAiError ? ` (${window._lastAiError})` : '';
+                // Ukázat chyby ze VŠECH poskytovatelů, co se zkusili (ne jen prvního) — ať je jasné,
+                // jestli např. OpenRouter vůbec proběhl a proč případně selhal taky.
+                const allErrs = (window._lastAiErrors && window._lastAiErrors.length) ? window._lastAiErrors : (window._lastAiError ? [window._lastAiError] : []);
+                const errSuffix = allErrs.length ? ` (${allErrs.join(' | ')})` : '';
                 if(status) status.innerHTML = '<span style="font-size:0.7rem;opacity:0.6;" title="'+errSuffix.replace(/"/g,'')+'">🔍 Přímé hledání — AI selhala'+errSuffix+'. Zkontrolujte klíč v <button onclick="openSettingsModal()" style="background:none;border:none;color:#a78bfa;text-decoration:underline;cursor:pointer;font-size:inherit;padding:0;">Nastavení</button></span>';
                 if(btn) btn.disabled = false;
                 return;
