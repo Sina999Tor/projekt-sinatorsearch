@@ -7213,12 +7213,15 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             }
 
             // 3) OpenRouter s vlastním klíčem + Function Calling
+            // Použit 'openrouter/free' auto-router (ne pevný model) — OpenRouter průběžně ruší
+            // free varianty konkrétních modelů (stejný problém jako dřív u Groq s llama-3.3-70b-versatile),
+            // auto-router si sám vybere aktuálně dostupný free model s podporou tool-calling.
             if (!data && openRouterKey) {
                 if(status) status.innerHTML = '<span class="ai-spin">⟳</span> OpenRouter analyzuje…';
                 const raw = await _callWithTools(
                     'https://openrouter.ai/api/v1/chat/completions',
                     openRouterKey,
-                    'meta-llama/llama-3.3-70b-instruct:free',
+                    'openrouter/free',
                     [{role:'system',content:systemPrompt},{role:'user',content:queryWithYear}],
                     {'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'},
                     0.0
@@ -31834,7 +31837,7 @@ async function _aiAskForTitles(prompt) {
 
     // 3) OpenRouter vlastní klíč
     if (orKey) {
-        const t = await _oaiTitles('https://openrouter.ai/api/v1/chat/completions', orKey, 'meta-llama/llama-3.3-70b-instruct:free',
+        const t = await _oaiTitles('https://openrouter.ai/api/v1/chat/completions', orKey, 'openrouter/free',
             {'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'});
         if (t.length) return t;
     }
@@ -35070,7 +35073,7 @@ async function _zabavaAiCall(prompt) {
     try { return await _oai('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', geminiKey, 'gemini-2.5-flash'); } catch(e) {}
   }
   if (groqKey) { try { return await _oai('https://api.groq.com/openai/v1/chat/completions',groqKey,'openai/gpt-oss-120b'); } catch(e) {} }
-  if (orKey) { try { return await _oai('https://openrouter.ai/api/v1/chat/completions',orKey,'meta-llama/llama-3.3-70b-instruct:free',{'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}); } catch(e) {} }
+  if (orKey) { try { return await _oai('https://openrouter.ai/api/v1/chat/completions',orKey,'openrouter/free',{'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}); } catch(e) {} }
   // Poslední záchranná varianta bez vlastního klíče
   try { return await _oai('https://openrouter.ai/api/v1/chat/completions','sk-or-free','meta-llama/llama-3.3-8b-instruct:free',{'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}); } catch(e) {}
   throw new Error('Žádný AI klíč nebo selhání.');
