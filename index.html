@@ -7044,7 +7044,13 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                         console.warn(`[AI] ${model} tool_use_failed — zkouším znovu s vyšší teplotou (pokus ${attempt+2})`);
                         return _callWithTools(url, apiKey, model, messages, hdrs, temp, attempt + 1);
                     }
-                    if (!window._lastAiError) window._lastAiError = `${model}: HTTP ${res.status}`;
+                    // Vytáhni skutečnou příčinu z JSON těla odpovědi (message/type), ať víme co se opravdu děje
+                    let detail = '';
+                    try {
+                        const j = JSON.parse(errTxt);
+                        detail = (j?.error?.message || j?.error?.code || j?.error?.type || '').toString().slice(0,160);
+                    } catch(e) { detail = errTxt.slice(0,160); }
+                    if (!window._lastAiError) window._lastAiError = `${model}: HTTP ${res.status}${detail ? ' — ' + detail : ''}`;
                     return null;
                 }
                 const j = await res.json().catch(() => null);
