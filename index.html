@@ -7386,7 +7386,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 // Helper: search title on TMDB
                 async function _smartAddTitle(title, type) {
                     try {
-                        const r = await fetch(`${BASE}/search/${type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&query=${encodeURIComponent(title)}&page=1`);
+                        const r = await _fetchWithTimeout(`${BASE}/search/${type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&query=${encodeURIComponent(title)}&page=1`);
                         const d = await r.json();
                         const match = _bestTmdbMatch(d.results, title);
                         if (match && !seenIds_s.has(match.id)) {
@@ -7399,7 +7399,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 // 1. Persons first (shown as actor cards)
                 for (const p of (parsed.persons || [])) {
                     try {
-                        const pr = await fetch(`${BASE}/search/person?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&query=${encodeURIComponent(p.name)}&page=1`);
+                        const pr = await _fetchWithTimeout(`${BASE}/search/person?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&query=${encodeURIComponent(p.name)}&page=1`);
                         const pd = await pr.json();
                         if (pd.results?.[0]) {
                             const person = pd.results[0];
@@ -7439,14 +7439,14 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 // filmy/seriály s tou postavou včetně vedlejších rolí (Avengers, Spider-Man: Homecoming...).
                 if (parsed.characterActor) {
                     try {
-                        const pr = await fetch(`${BASE}/search/person?api_key=${tmdbApiKey}&language=cs-CZ&query=${encodeURIComponent(parsed.characterActor)}&page=1`);
+                        const pr = await _fetchWithTimeout(`${BASE}/search/person?api_key=${tmdbApiKey}&language=cs-CZ&query=${encodeURIComponent(parsed.characterActor)}&page=1`);
                         const pd = await pr.json();
                         const person = (pd.results || [])[0];
                         if (person) {
                             const charNeedle = (parsed.characterName || '').toLowerCase();
                             const [movCred, tvCred] = await Promise.all([
-                                fetch(`${BASE}/person/${person.id}/movie_credits?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({cast:[]})),
-                                fetch(`${BASE}/person/${person.id}/tv_credits?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({cast:[]}))
+                                _fetchWithTimeout(`${BASE}/person/${person.id}/movie_credits?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({cast:[]})),
+                                _fetchWithTimeout(`${BASE}/person/${person.id}/tv_credits?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({cast:[]}))
                             ]);
                             const matchesChar = (c) => {
                                 if (!charNeedle) return true; // bez characterName přidej celou filmografii herce
@@ -7467,7 +7467,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 // 5b. Reference titles ("podobné X", "jako X") — skutečná TMDB similar/recommendations data
                 async function _smartAddReference(title, type, refLimit) {
                     try {
-                        const r = await fetch(`${BASE}/search/${type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&query=${encodeURIComponent(title)}&page=1`);
+                        const r = await _fetchWithTimeout(`${BASE}/search/${type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&query=${encodeURIComponent(title)}&page=1`);
                         const d = await r.json();
                         const match = _bestTmdbMatch(d.results, title);
                         if (!match) return;
@@ -7480,8 +7480,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                         // je limit úsporný; pro "podobné X"/"jako X" (referenceBroad=true) je širší.
                         const REF_LIMIT = refLimit;
                         const [simRes, recRes] = await Promise.all([
-                            fetch(`${BASE}/${type}/${match.id}/similar?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`).then(r=>r.json()).catch(()=>({results:[]})),
-                            fetch(`${BASE}/${type}/${match.id}/recommendations?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`).then(r=>r.json()).catch(()=>({results:[]}))
+                            _fetchWithTimeout(`${BASE}/${type}/${match.id}/similar?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`).then(r=>r.json()).catch(()=>({results:[]})),
+                            _fetchWithTimeout(`${BASE}/${type}/${match.id}/recommendations?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`).then(r=>r.json()).catch(()=>({results:[]}))
                         ]);
                         let added = 0;
                         // recommendations bývají relevantnější než similar, takže jdou první
@@ -7510,7 +7510,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     try {
                         // Načíst až 3 stránky, aby se u úzkých filtrů (země/rok) neztratily další výsledky
                         for (let dpPage = 1; dpPage <= 3; dpPage++) {
-                            const d = await (await fetch(`${dpBaseUrl}&page=${dpPage}`)).json();
+                            const d = await (await _fetchWithTimeout(`${dpBaseUrl}&page=${dpPage}`)).json();
                             const results = d.results || [];
                             for (const item of results) {
                                 if (!seenIds_s.has(item.id)) { seenIds_s.add(item.id); found_s.push({...item, media_type: discType}); }
@@ -7533,7 +7533,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     if (aiKwStr) {
                         const kwTerms = aiKwStr.split(',').map(s=>s.trim()).filter(Boolean).slice(0,4);
                         const kwFetches = kwTerms.map(kw =>
-                            fetch(`${BASE}/search/keyword?api_key=${tmdbApiKey}&query=${encodeURIComponent(kw)}&page=1`)
+                            _fetchWithTimeout(`${BASE}/search/keyword?api_key=${tmdbApiKey}&query=${encodeURIComponent(kw)}&page=1`)
                                 .then(r=>r.json()).catch(()=>({results:[]}))
                         );
                         const kwResults = await Promise.all(kwFetches);
@@ -7551,14 +7551,14 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                             if (aiGenres) u += `&with_genres=${aiGenres}`;
                             if (kwIdsForGenre.length) u += `&with_keywords=${kwIdsForGenre.slice(0,3).join('|')}`;
                             if (aiYear) u += (discType==='tv' ? `&first_air_date_year=${aiYear}` : `&primary_release_year=${aiYear}`);
-                            return fetch(u).then(r=>r.json()).catch(()=>({results:[]}));
+                            return _fetchWithTimeout(u).then(r=>r.json()).catch(()=>({results:[]}));
                         });
                         // Also fetch without keywords (broader) for page 1 — jen pokud jsou žánry
                         let broadFetch = null;
                         if (kwIdsForGenre.length && aiGenres) {
                             let broadUrl = `${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_genres=${aiGenres}&sort_by=popularity.desc${vf}&page=1`;
                             if (aiYear) broadUrl += (discType==='tv' ? `&first_air_date_year=${aiYear}` : `&primary_release_year=${aiYear}`);
-                            broadFetch = fetch(broadUrl).then(r=>r.json()).catch(()=>({results:[]}));
+                            broadFetch = _fetchWithTimeout(broadUrl).then(r=>r.json()).catch(()=>({results:[]}));
                         }
                         const pageResults = await Promise.all(broadFetch ? [...pageFetches, broadFetch] : pageFetches);
                         for (const pr of pageResults) {
@@ -7575,7 +7575,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 if (kws_s.length && mediaCount_s < 40) {
                     const kwIds_s = [];
                     const kwSearches = kws_s.map(kw =>
-                        fetch(`${BASE}/search/keyword?api_key=${tmdbApiKey}&query=${encodeURIComponent(kw)}&page=1`)
+                        _fetchWithTimeout(`${BASE}/search/keyword?api_key=${tmdbApiKey}&query=${encodeURIComponent(kw)}&page=1`)
                             .then(r=>r.json()).catch(()=>({results:[]}))
                     );
                     const kwResArr = await Promise.all(kwSearches);
@@ -7591,7 +7591,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                                 const vf = discType === 'movie' ? '&vote_count.gte=15' : '&vote_count.gte=8';
                                 const pages = [1,2];
                                 const kwPageFetches = pages.map(pg =>
-                                    fetch(`${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_keywords=${kwParam_s}&sort_by=popularity.desc${vf}&page=${pg}`)
+                                    _fetchWithTimeout(`${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_keywords=${kwParam_s}&sort_by=popularity.desc${vf}&page=${pg}`)
                                         .then(r=>r.json()).catch(()=>({results:[]}))
                                 );
                                 const kwPageResults = await Promise.all(kwPageFetches);
@@ -7609,7 +7609,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 if (aiKwStr && !aiGenres && mediaCount_s < 40) {
                     const kwTerms2 = aiKwStr.split(',').map(s=>s.trim()).filter(Boolean).slice(0,5);
                     const kwFetches2 = kwTerms2.map(kw =>
-                        fetch(`${BASE}/search/keyword?api_key=${tmdbApiKey}&query=${encodeURIComponent(kw)}&page=1`)
+                        _fetchWithTimeout(`${BASE}/search/keyword?api_key=${tmdbApiKey}&query=${encodeURIComponent(kw)}&page=1`)
                             .then(r=>r.json()).catch(()=>({results:[]}))
                     );
                     const kwResults2 = await Promise.all(kwFetches2);
@@ -7620,7 +7620,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                         for (const discType of discTypes_h) {
                             try {
                                 const vf = discType === 'movie' ? '&vote_count.gte=10' : '&vote_count.gte=5';
-                                const d = await fetch(`${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_keywords=${kwParam2}&sort_by=popularity.desc${vf}&page=1`)
+                                const d = await _fetchWithTimeout(`${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_keywords=${kwParam2}&sort_by=popularity.desc${vf}&page=1`)
                                     .then(r=>r.json()).catch(()=>({results:[]}));
                                 for (const item of (d.results || [])) {
                                     if (!seenIds_s.has(item.id)) { seenIds_s.add(item.id); found_s.push({...item, media_type: discType}); }
@@ -7637,7 +7637,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                         const seedItems = found_s.filter(x=>x.media_type==='movie'||x.media_type==='tv')
                             .sort((a,b)=>(b.popularity||0)-(a.popularity||0)).slice(0,3);
                         const simFetches = seedItems.map(seed =>
-                            fetch(`${BASE}/${seed.media_type}/${seed.id}/similar?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`)
+                            _fetchWithTimeout(`${BASE}/${seed.media_type}/${seed.id}/similar?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`)
                                 .then(r=>r.json()).catch(()=>({results:[]}))
                         );
                         const simResults = await Promise.all(simFetches);
@@ -11805,7 +11805,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     function openYouTube(q) { window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(q+' trailer')}`, '_blank'); }
 
     function calculateAge(b) { if(!b) return ''; const bd = new Date(b), t = new Date(); let age = t.getFullYear() - bd.getFullYear(); const m = t.getMonth() - bd.getMonth(); if(m < 0 || (m === 0 && t.getDate() < bd.getDate())) age--; return age > 0 ? `(${age} let)` : ''; }
-    async function fetchBiography(id) { for(const lang of ['cs-CZ', 'sk-SK', 'en-US']) { try { const d = await (await fetch(`${BASE}/person/${id}?api_key=${tmdbApiKey}&language=${lang}`)).json(); if(d.biography?.trim()) return { bio: d.biography, lang }; } catch {} } return { bio: null, lang: 'none' }; }
+    async function fetchBiography(id) { for(const lang of ['cs-CZ', 'sk-SK', 'en-US']) { try { const d = await (await _fetchWithTimeout(`${BASE}/person/${id}?api_key=${tmdbApiKey}&language=${lang}`)).json(); if(d.biography?.trim()) return { bio: d.biography, lang }; } catch {} } return { bio: null, lang: 'none' }; }
 
     async function openPersonDetail(id) {
         if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
@@ -11825,9 +11825,9 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         setTimeout(() => { const sb = $('modalContent')?.querySelector('.modal-scroll-body'); if(sb) sb.scrollTop = 0; }, 100);
         try {
             const [p, c, img] = await Promise.all([
-                fetch(`${BASE}/person/${id}?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()),
-                fetch(`${BASE}/person/${id}/combined_credits?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()),
-                fetch(`${BASE}/person/${id}/images?api_key=${tmdbApiKey}`).then(r=>r.json())
+                _fetchWithTimeout(`${BASE}/person/${id}?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()),
+                _fetchWithTimeout(`${BASE}/person/${id}/combined_credits?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()),
+                _fetchWithTimeout(`${BASE}/person/${id}/images?api_key=${tmdbApiKey}`).then(r=>r.json())
             ]);
             const name = p.name; const isLiked = state.actorFavs.some(f => Number(f.id) === Number(id));
             const portraitUrl = p.profile_path ? `${IMG}w342${p.profile_path}` : null;
