@@ -15523,6 +15523,14 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         ℹ️ Pro spuštění TV je nutný <a href="https://play.google.com/store/apps/details?id=org.videolan.vlc" target="_blank" style="color:#f60;text-decoration:none;font-weight:700;">VLC</a> (<a href="https://apps.apple.com/app/vlc-for-mobile/id650377962" target="_blank" style="color:#f60;text-decoration:none;font-weight:700;">App Store</a>)
     </div>
 
+    <!-- Rychlé přepnutí zdroje: po spuštění kanálu se sem doplní stejnojmenné
+         kanály z ostatních 3 seznamů (Kanály/2/3/4) — jedno klepnutí znovu
+         otevře VLC s jiným zdrojem, bez nutnosti ručně přepínat záložky. -->
+    <div id="tvQuickAltRow" style="display:none;flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:5px;">🔁 Seká se to? Zkus jiný zdroj:</div>
+        <div id="tvQuickAltChips" style="display:flex;gap:6px;overflow-x:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;"></div>
+    </div>
+
     <!-- Kanály: mřížka ikon –  Kanály tab -->
     <div id="tvSearchWrap" style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
         <input type="text" id="tvChannelSearchInput" oninput="filterTvChannels(this.value)" placeholder="🔍 Hledat ve všech kanálech…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
@@ -29298,6 +29306,7 @@ function playAltChannelDirect(encoded) {
         const nameEl = document.getElementById('tvNowName');
         if(nameEl) nameEl.textContent = ch.name;
         openInVlcUrl(ch.url);
+        updateTvQuickAltRow(ch.name, ch.url);
     } catch(e) {}
 }
 window.playAltChannelDirect = playAltChannelDirect;
@@ -29336,6 +29345,7 @@ function playAltChannel(idx) {
     const nameEl = document.getElementById('tvNowName');
     if(nameEl) nameEl.textContent = ch.name;
     openInVlcUrl(ch.url);
+    updateTvQuickAltRow(ch.name, ch.url);
 }
 
 function switchTvTab(tab) {
@@ -29469,6 +29479,7 @@ function playAlt2Channel(idx) {
     alt2State.currentChannel = ch;
     renderAlt2ChannelList();
     openInVlcUrl(ch.url);
+    updateTvQuickAltRow(ch.name, ch.url);
 }
 window.playAlt2Channel = playAlt2Channel;
 
@@ -29569,6 +29580,7 @@ function playAlt3Channel(idx) {
     alt3State.currentChannel = ch;
     renderAlt3ChannelList();
     openInVlcUrl(ch.url);
+    updateTvQuickAltRow(ch.name, ch.url);
 }
 window.playAlt3Channel = playAlt3Channel;
 
@@ -29676,6 +29688,7 @@ function playTvChannel(idx) {
     if(nameEl) nameEl.textContent = ch.name;
     // === NETLIFY MODE: okamžitě otevřít ve VLC / externím přehrávači ===
     showTvLaunchPanel(ch.name, url);
+    updateTvQuickAltRow(ch.name, url);
 }
 
 function showTvLaunchPanel(name, url) {
@@ -29709,6 +29722,70 @@ function openInVlcUrl(url) {
         window.location.href = `intent://${urlNoScheme}#Intent;scheme=${scheme};package=org.videolan.vlc;action=android.intent.action.VIEW;category=android.intent.category.DEFAULT;type=video/*;end`;
     }
 }
+
+// Normalizace názvu kanálu pro porovnání napříč seznamy — "ČT Sport HD",
+// "ČT Sport (1080p)" a "ČT sport" mají po normalizaci stejný klíč.
+function _tvNormalizeName(name) {
+    return (name || '')
+        .toLowerCase()
+        .replace(/\(?\d{3,4}p\)?/g, '')
+        .replace(/\[[^\]]*\]/g, '')
+        .replace(/\b(hd|fhd|4k|uhd|hevc|sd)\b/gi, '')
+        .replace(/[^a-z0-9čćřšžýáíéůúňďťěóü ]/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+// Najde stejnojmenné kanály napříč VŠEMI 4 zdroji (Kanály / Kanály 2 —
+// všechny země / Kanály 3 / Kanály 4), kromě právě přehrávaného URL.
+// Kanály 2 se parsují lazy (a cachují do altState.parsedCache), protože
+// tam je desítky zemí a nemá smysl je parsovat, dokud nejsou potřeba.
+function findTvAltSources(name, excludeUrl) {
+    const norm = _tvNormalizeName(name);
+    if (!norm) return [];
+    const results = [];
+    const seen = new Set();
+    const addFrom = (list, sourceLabel) => {
+        if (!Array.isArray(list)) return;
+        for (const ch of list) {
+            if (!ch || !ch.url || ch.url === excludeUrl) continue;
+            if (_tvNormalizeName(ch.name) !== norm) continue;
+            const dupKey = ch.url;
+            if (seen.has(dupKey)) continue;
+            seen.add(dupKey);
+            results.push({ url: ch.url, name: ch.name, source: sourceLabel });
+        }
+    };
+    addFrom(tvState.channels, '📺 Kanály');
+    if (typeof ALT_PLAYLISTS === 'object') {
+        Object.keys(ALT_PLAYLISTS).forEach(code => {
+            if (code === 'alt2' || code === 'alt3') return; // ty patří Kanály 3/4, řeší se zvlášť níže
+            try {
+                if (!altState.parsedCache[code]) altState.parsedCache[code] = parseM3U(ALT_PLAYLISTS[code].m3u);
+                addFrom(altState.parsedCache[code], '📺 K2 · ' + (ALT_PLAYLISTS[code].label || code));
+            } catch(e) {}
+        });
+    }
+    addFrom(typeof alt2State !== 'undefined' ? alt2State.channels : null, '📺 Kanály 3');
+    addFrom(typeof alt3State !== 'undefined' ? alt3State.channels : null, '📺 Kanály 4');
+    return results.slice(0, 10);
+}
+
+// Vykreslí (nebo skryje) řádek s rychlými alternativními zdroji pro právě
+// spuštěný kanál — viz komentář u #tvQuickAltRow v HTML.
+function updateTvQuickAltRow(name, currentUrl) {
+    const wrap = document.getElementById('tvQuickAltRow');
+    const chipsEl = document.getElementById('tvQuickAltChips');
+    if (!wrap || !chipsEl) return;
+    let alts = [];
+    try { alts = findTvAltSources(name, currentUrl); } catch(e) { alts = []; }
+    if (!alts.length) { wrap.style.display = 'none'; chipsEl.innerHTML = ''; return; }
+    wrap.style.display = 'block';
+    chipsEl.innerHTML = alts.map(ch =>
+        `<button onclick="openInVlcUrl(decodeURIComponent('${encodeURIComponent(ch.url)}'))" style="flex-shrink:0;padding:7px 11px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.72rem;font-weight:600;white-space:nowrap;cursor:pointer;">${ch.source}</button>`
+    ).join('');
+}
+window.updateTvQuickAltRow = updateTvQuickAltRow;
 
 function showTvError(name, url) {
     const panel = document.getElementById('tvPlayerPanel');
