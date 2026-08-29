@@ -6896,8 +6896,7 @@
             };
             // Rok v dotazu
             const yearMatch = q.match(/\b(19[5-9]\d|20[0-3]\d)\b/);
-            const yr = yearMatch ? parseInt(yearMatch[1]) : (aiYear ? parseInt(aiYear) : null);
-            // Dekáda: "filmy z 90. let", "osmdesatych" atd.
+            const yr = yearMatch ? parseInt(yearMatch[1]) : (aiYear ? parseInt(aiYear) : null);            // Dekáda: "filmy z 90. let", "osmdesatych" atd.
             let decadeGte = null, decadeLte = null;
             const _decNum = q.match(/(?:z |v )?(\d0)[. -]*let/);
             const _decWordMap = {devadesatych:90,devadesatek:90,osmdesatych:80,osmdesatek:80,sedmdesatych:70,sedmdesatek:70,sedesatych:60,padesatych:50};
@@ -6908,6 +6907,19 @@
             let foundGenre = null;
             for (const [kw, id] of Object.entries(genreMap)) {
                 if (q.includes(kw)) { foundGenre = id; break; }
+            }
+            // DĚTSKÉ/RODINNÉ dotazy ("pro děti", "pro děti do 10 let", "dětský film", "pohádka"...) —
+            // KRITICKÉ: bez tohle by se tento rychlý pre-AI fast-path (spuštěný jen díky detekci roku
+            // "2026" v dotazu) vůbec nedozvěděl, že jde o dětský dotaz, úplně by přeskočil AI
+            // (a s ním i CHILDREN/FAMILY pravidlo s filterCertification) a vrátil by obecné populární
+            // filmy roku 2026 bez ohledu na vhodnost pro děti.
+            const isKidsQuery = /\bd[eě]t[ei]|\bd[ií]t[eě]|d[eě]tsk|pro d[eě]ti|poh[aá]dk|rodinn/.test(q);
+            let kidsCertification = null;
+            if (isKidsQuery) {
+                if (!foundGenre) foundGenre = 10751; // Rodinný, pokud nebyl zachycen jiný explicitní žánr
+                const ageMatch = q.match(/do (\d{1,2}) let/);
+                const age = ageMatch ? parseInt(ageMatch[1]) : null;
+                kidsCertification = (age && age <= 8) ? 'G' : 'PG';
             }
             // Země/národnost → TMDB origin_country + original_language (zachytí "české filmy 2026", "slovenské komedie" atd.)
             const countryMap = {
@@ -6939,13 +6951,19 @@
             const _curYear = new Date().getFullYear();
             if (yr && yr >= _curYear) minVotes = 0;
 
-            // Pokud máme aspoň žánr, zemi, rok nebo dekádu → přeskočit AI, použít discover přímo
-            if (foundGenre || foundCountry || yr || decadeGte) {
+            // Pokud máme aspoň žánr, zemi, rok, dekádu NEBO dětský dotaz → přeskočit AI, použít discover přímo
+            if (foundGenre || foundCountry || yr || decadeGte || isKidsQuery) {
                 const params = { sort_by: sortBy, 'vote_count.gte': minVotes };
                 if (foundGenre) params.with_genres = String(foundGenre);
                 if (foundCountry) { params.with_origin_country = foundCountry.country; params.with_original_language = foundCountry.lang; }
                 if (yr) params[mt === 'tv' ? 'first_air_date_year' : 'primary_release_year'] = yr;
                 if (decadeGte) { params['release_date.gte'] = decadeGte; params['release_date.lte'] = decadeLte; }
+                // Dětské/rodinné dotazy — jen u filmů (TV certifikace mají jiné kódy TV-Y/TV-G/TV-PG...),
+                // certification.lte zahrne i mírnější stupně pod nastaveným (G je pod PG).
+                if (kidsCertification && mt === 'movie') {
+                    params.certification_country = 'US';
+                    params['certification.lte'] = kidsCertification;
+                }
                 // Naplnit parsed objekt jako by to vrátila AI
                 window._preAiParsed = {
                     mode: 'smart', query: queryWithYear, mediaType: mt,
@@ -6989,7 +7007,8 @@ RULES — BE GENEROUS, NOT STRICT:
 - with_genres: 1-3 TMDB genre IDs (Akční=28, Dobrodružný=12, Animovaný=16, Komedie=35, Krimi=80, Dokument=99, Drama=18, Rodinný=10751, Fantasy=14, Historický=36, Horor=27, Hudební=10402, Mysteriózní=9648, Romantický=10749, Sci-Fi=878, Thriller=53, Válečný=10752, Western=37). If the user explicitly named a genre, always include it. For vague/mood-based descriptions, infer the 1-2 genres that best fit the vibe — don't leave it empty just because it wasn't spelled out. A topic like "filmy o vaření" is NOT a genre — leave with_genres empty and rely on with_keywords_str instead. For a named fictional character/franchise query, leave with_genres COMPLETELY EMPTY (see FICTIONAL CHARACTER rule above) — titles/characterActor/referenceTitles must carry the precision, genres only dilute it.
 - with_keywords_str: 3-6 English phrases — the exact theme PLUS closely related themes/moods/subgenres, so TMDB discover finds similar (not just exact) titles too. E.g. "filmy o vaření" -> "cooking,chef,culinary,restaurant,food"; "filmy o fotbale" -> "football,soccer,sports team,championship" (not generic "sport,competition"); "filmy o válce" -> "war,battle,military,combat" (not generic "history,drama,action").
 - keywords: 3-6 precise English TMDB keywords for the exact theme.
-- discoverParams (filterYear, filterDecadeStart/End, filterOriginCountry, filterOriginalLanguage, sortBy): fill ONLY for explicit filter queries (country/language/year/genre/sort combos, e.g. "nejlepší komedie 2026", "české filmy"). Otherwise leave these empty. sortBy: "nejlepší/top/best" -> vote_average.desc, "nejnovější/nové/letošní" -> release_date.desc, otherwise popularity.desc.
+- discoverParams (filterYear, filterDecadeStart/End, filterOriginCountry, filterOriginalLanguage, filterCertification, sortBy): fill ONLY for explicit filter queries (country/language/year/genre/sort/age combos, e.g. "nejlepší komedie 2026", "české filmy"). Otherwise leave these empty. sortBy: "nejlepší/top/best" -> vote_average.desc, "nejnovější/nové/letošní" -> release_date.desc, otherwise popularity.desc.
+- CHILDREN / FAMILY queries — CRITICAL: whenever the query mentions children/kids or a kid age limit ("pro děti", "pro děti do X let", "rodinný film", "pohádka", "dětský film"): (1) fill with_genres with 10751 (Rodinný), plus 16 (Animovaný) if the query implies a cartoon/fairy-tale. (2) CRITICAL — also fill filterCertification with "G" (very young kids, roughly up to 7-8) or "PG" (older kids / general family viewing, e.g. "pro děti do 10 let"). Without filterCertification, TMDB discover happily returns generic popular/top-rated titles for that year regardless of suitability — action, war, or romance films can and will slip into "movies for kids" results just because they match the year/genre loosely. Genre alone is NOT enough — always pair it with filterCertification for these queries.
 - mediaType: "movie" for "filmy/movies", "tv" for "seriály/series/shows", "both" if ambiguous OR if the query is a loose/approximate description (prefer "both" over guessing wrong).
 - If the query starts with "filmy a seriály na téma:" / "filmy na téma:" or similar, extract ONLY the theme word and autocomplete partial/incomplete words intelligently (e.g. "Hist" -> "History", "Vamp" -> "Vampire", "Drak" -> "Dragon") — never include the "na téma:" prefix itself in with_keywords_str.
 
@@ -7021,7 +7040,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                   filterDecadeEnd:{ type:'string', description:'Konec dekády pro filtr, formát YYYY-12-31 (např. "1999-12-31" pro 90. léta).' },
                   filterOriginCountry:{ type:'string', description:'ISO kód země původu, pokud dotaz zmiňuje národnost/zemi (CZ, SK, US, GB, DE, FR, JP, KR, IT, ES, PL, RU, HU, AT, AU...).' },
                   filterOriginalLanguage:{ type:'string', description:'ISO kód jazyka odpovídající filterOriginCountry (cs, sk, en, de, fr, ja, ko, it, es, pl, ru, hu...).' },
-                  sortBy:{ type:'string', enum:['popularity.desc','vote_average.desc','release_date.desc'], description:'"nejlepší/top/best"→vote_average.desc, "nejnovější/nové/letošní"→release_date.desc, jinak→popularity.desc. Vyplň jen pokud je řazení relevantní k dotazu.' }
+                  sortBy:{ type:'string', enum:['popularity.desc','vote_average.desc','release_date.desc'], description:'"nejlepší/top/best"→vote_average.desc, "nejnovější/nové/letošní"→release_date.desc, jinak→popularity.desc. Vyplň jen pokud je řazení relevantní k dotazu.' },
+                  filterCertification:{ type:'string', enum:['G','PG','PG-13','R','NC-17'], description:'KRITICKÉ pro dětské/rodinné dotazy — když dotaz zmiňuje děti, "pro děti", "pro děti do X let", "rodinný film", "pohádka pro nejmenší" apod. Nastav "G" pro velmi malé děti (zhruba do 7-8 let) nebo "PG" pro starší děti/rodinné sledování obecně (typicky "pro děti do 10 let" a podobné). Bez tohoto pole TMDB discover vrátí obecně populární/nejlépe hodnocené filmy daného roku BEZ OHLEDU na vhodnost pro děti — akční/drsné tituly by se tak mohly namíchat mezi "dětské" výsledky. Nech prázdné pro dotazy, které o dětech/rodině vůbec nemluví.' }
                 }, required:[] }
               }}
             ];
@@ -7080,7 +7100,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 if (fn !== 'smart_movie_search') return null;
 
                 const mt = args.mediaType || 'both';
-                const hasFilter = !!(args.filterYear || args.filterDecadeStart || args.filterOriginCountry || args.sortBy);
+                const hasFilter = !!(args.filterYear || args.filterDecadeStart || args.filterOriginCountry || args.sortBy || args.filterCertification);
                 let discoverParams = null;
                 if (hasFilter) {
                     const dMt = mt === 'both' ? 'movie' : mt;
@@ -7092,6 +7112,14 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     if (args.filterDecadeEnd) params['release_date.lte'] = args.filterDecadeEnd;
                     if (args.filterOriginCountry) params.with_origin_country = args.filterOriginCountry;
                     if (args.filterOriginalLanguage) params.with_original_language = args.filterOriginalLanguage;
+                    // Dětské/rodinné dotazy ("pro děti", "pro děti do X let") — US certifikace jako horní
+                    // hranice (G/PG/...), ať se do "filmy pro děti" nenamíchají akční/drsné tituly jen
+                    // proto, že sedí rok/popularita. certification.lte = zahrne i mírnější stupně pod ním.
+                    // Jen pro filmy — TV certifikace mají jiné kódy (TV-Y/TV-G/TV-PG...), G/PG by u seriálů tiše nesedělo.
+                    if (args.filterCertification && dMt === 'movie') {
+                        params.certification_country = 'US';
+                        params['certification.lte'] = args.filterCertification;
+                    }
                     discoverParams = { mediaType: dMt, params };
                 }
                 return {
