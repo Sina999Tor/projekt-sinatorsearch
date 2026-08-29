@@ -10666,8 +10666,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     }
 
     // Swipe doleva/doprava na backdropu v detailu = procházení dalších fotek (banerů) titulu bez
-    // nutnosti otevírat celou Galerii. Backdropy se dotahují až tady (lazy), aby se nezatěžoval
-    // hlavní Promise.all v _openDetailNoStack — u titulů s jen 1 obrázkem se nic neděje (bez teček).
+    // nutnosti otevírat celou Galerii. Klik na backdrop otevře stejné pořadí obrázků na celou
+    // obrazovku (openFullscreen), kde jde dál listovat swipem/šipkami. Backdropy se dotahují až
+    // tady (lazy), aby se nezatěžoval hlavní Promise.all v _openDetailNoStack.
     async function initModalBackdropSwipe(id, type) {
         const wrap = document.getElementById(`modalBackdropWrap_${id}`);
         const img = document.getElementById(`modalBackdropImg_${id}`);
@@ -10678,17 +10679,29 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const res = await _fetchWithTimeout(`${BASE}/${type}/${id}/images?api_key=${tmdbApiKey}`);
             const data = await res.json();
             images = (data.backdrops || []).slice(0, 12).map(b => b.file_path).filter(Boolean);
-        } catch(e) { return; }
-        if (images.length <= 1) return; // nic k procházení
+        } catch(e) { /* fallback níže na aktuálně zobrazený obrázek */ }
 
-        // Aktuálně zobrazený backdrop (z d.backdrop_path) ať zůstane jako první, ať swipe nezpůsobí
-        // "skok" na jiný obrázek hned na začátku.
-        const curSrc = img.getAttribute('src') || '';
-        const curIdx = images.findIndex(p => curSrc.includes(p));
-        if (curIdx > 0) { images.splice(curIdx, 1); images.unshift(images[curIdx] || ''); }
-        if (curIdx === -1 && curSrc) { /* aktuální backdrop není v listu images (jiný jazyk apod.) — necháme jak je, jen se přidá na konec při swipu doprava */ }
+        // Aktuálně zobrazený backdrop (z d.backdrop_path) ať zůstane jako první, ať swipe/klik
+        // nezpůsobí "skok" na jiný obrázek hned na začátku.
+        const curSrcFull = img.getAttribute('src') || '';
+        const curPath = curSrcFull.replace(`${IMG}original`, '');
+        if (images.length === 0 && curPath) images = [curPath];
+        else {
+            const curIdx = images.findIndex(p => curSrcFull.includes(p));
+            if (curIdx > 0) { images.splice(curIdx, 1); images.unshift(images[curIdx] || curPath); }
+            else if (curIdx === -1 && curPath) images.unshift(curPath);
+        }
+        if (images.length === 0) return;
 
         let idx = 0;
+        img.style.cursor = 'pointer';
+        img.addEventListener('click', () => {
+            currentGalleryImages = images.map(p => ({ file_path: p }));
+            openFullscreen(idx);
+        });
+
+        if (images.length <= 1) return; // nic k procházení swipem, jen klik do fullscreenu
+
         dotsEl.innerHTML = images.map((_, i) =>
             `<span style="width:6px;height:6px;border-radius:50%;background:${i===idx?'#fff':'rgba(255,255,255,0.45)'};transition:background 0.2s;box-shadow:0 0 3px rgba(0,0,0,0.6);"></span>`
         ).join('');
@@ -12101,6 +12114,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:11000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;';
         overlay.innerHTML = `
             <button onclick="closeFullscreen()" style="position:absolute;top:20px;right:20px;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,0.85);border:2px solid var(--border);color:#fff;font-size:1.4rem;cursor:pointer;z-index:10;">✕</button>
+            <div id="fullscreenCounter" style="position:absolute;top:24px;left:20px;color:#fff;font-size:0.85rem;font-weight:600;background:rgba(0,0,0,0.6);padding:5px 10px;border-radius:20px;"></div>
             <div style="display:flex;align-items:center;gap:12px;">
                 <button onclick="prevImage()" style="padding:10px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;font-size:1.2rem;">←</button>
                 <button onclick="nextImage()" style="padding:10px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;cursor:pointer;font-size:1.2rem;">→</button>
@@ -12110,6 +12124,21 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         updateFullscreenCounter();
         document.body.style.overflow = 'hidden';
         document.addEventListener('keydown', handleFullscreenKeys);
+        // Swipe doleva/doprava = předchozí/další obrázek (stejně jako šipky/klávesy)
+        let _fsStartX = 0, _fsStartY = 0, _fsDragging = false;
+        overlay.addEventListener('touchstart', (e) => {
+            if (!e.touches || !e.touches[0]) return;
+            _fsStartX = e.touches[0].clientX; _fsStartY = e.touches[0].clientY; _fsDragging = true;
+        }, {passive:true});
+        overlay.addEventListener('touchend', (e) => {
+            if (!_fsDragging || !e.changedTouches || !e.changedTouches[0]) return;
+            _fsDragging = false;
+            const dx = e.changedTouches[0].clientX - _fsStartX;
+            const dy = e.changedTouches[0].clientY - _fsStartY;
+            if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                dx < 0 ? nextImage() : prevImage();
+            }
+        }, {passive:true});
     }
     
     function handleFullscreenKeys(e) {
