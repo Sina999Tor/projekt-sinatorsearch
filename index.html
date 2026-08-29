@@ -9851,6 +9851,113 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         return items;
     }
 
+    // Synchronní varianta výše — aplikuje JEN to, co je už v lokální cache
+    // (žádný network fetch, takže je okamžitá). Používá se pro první,
+    // NEBLOKUJÍCÍ vykreslení seznamu (viz renderMyBackendTab) — dřív appka
+    // čekala na doběhnutí VŠECH TMDB fetchů (u velké historie klidně desítky
+    // vteřin) než se vůbec cokoliv zobrazilo. Chybějící postery/názvy se teď
+    // donačtou na pozadí přes fetchMyBackendPostersBackground níže a rovnou
+    // se opraví přímo v už vykreslených kartách.
+    function applyMyBackendPostersCacheOnly(items) {
+        const need = items.filter(it => it.id);
+        if (!need.length) return items;
+        const metaCache = _loadMyBackendMetaCache();
+        const now = Date.now();
+        for (const it of need) {
+            const kind = (it.type === 'tv' || it.type === 'shows' || it.type === 'episodes') ? 'tv' : 'movie';
+            const cached = metaCache[`${kind}:${it.id}`];
+            if (cached && (now - cached.ts) < MY_BACKEND_META_TTL) {
+                it.title = cached.title || it.title || `#${it.id}`;
+                it.year = cached.year || it.year;
+                if (cached.poster_path) it.poster_path = cached.poster_path;
+                it.tmdbType = cached.kind;
+            }
+        }
+        return items;
+    }
+
+    // Donačte na pozadí metadata pro položky, které v cache nebyly, a rovnou
+    // opraví odpovídající kartu v DOM (podle data-tmdb-id/data-tmdb-type) —
+    // bez překreslování celé mřížky. Guard přes window._myBackendActiveTab
+    // zajistí, že se nic nepřepíše, pokud uživatel mezitím přepnul tab.
+    async function fetchMyBackendPostersBackground(items, tab) {
+        const need = items.filter(it => it.id);
+        if (!need.length || !tmdbApiKey) return;
+        const byId = new Map();
+        for (const it of need) {
+            const kind = (it.type === 'tv' || it.type === 'shows' || it.type === 'episodes') ? 'tv' : 'movie';
+            const key = `${kind}:${it.id}`;
+            if (!byId.has(key)) byId.set(key, []);
+            byId.get(key).push(it);
+        }
+        const metaCache = _loadMyBackendMetaCache();
+        const now = Date.now();
+        const toFetch = [];
+        for (const [key, group] of byId.entries()) {
+            const cached = metaCache[key];
+            if (!(cached && (now - cached.ts) < MY_BACKEND_META_TTL)) toFetch.push([key, group]);
+        }
+        if (!toFetch.length) return;
+        let cacheDirty = false;
+        await _runWithConcurrency(toFetch, 15, async ([key, group]) => {
+            const [kind, id] = key.split(':');
+            try {
+                const res = await _fetchWithTimeout(`https://api.themoviedb.org/3/${kind}/${id}?api_key=${tmdbApiKey}&language=cs-CZ`);
+                if (!res.ok) return;
+                const d = await res.json();
+                let csTitle = d.title || d.name || '';
+                const origTitle = d.original_title || d.original_name || '';
+                if (!csTitle || (origTitle && csTitle === origTitle)) {
+                    try {
+                        const transRes = await _fetchWithTimeout(`https://api.themoviedb.org/3/${kind}/${id}/translations?api_key=${tmdbApiKey}`);
+                        const transData = await transRes.json();
+                        const csData = (transData.translations || []).find(t => t.iso_639_1 === 'cs' && t.data && (t.data.title || t.data.name));
+                        if (csData) csTitle = csData.data.title || csData.data.name;
+                    } catch (e) {}
+                }
+                const posterUrl = d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : null;
+                const year = (d.release_date || d.first_air_date || '').slice(0, 4);
+                const meta = { title: csTitle, year, poster_path: posterUrl, kind, ts: now };
+                metaCache[key] = meta;
+                cacheDirty = true;
+                group.forEach(it => {
+                    it.title = meta.title || it.title || `#${it.id}`;
+                    it.year = meta.year || it.year;
+                    if (meta.poster_path) it.poster_path = meta.poster_path;
+                    it.tmdbType = meta.kind;
+                });
+                if (window._myBackendActiveTab !== tab) return;
+                const cards = document.querySelectorAll(`#myBackendResultsContainer .card[data-tmdb-id="${id}"][data-tmdb-type="${kind}"]`);
+                cards.forEach(card => {
+                    if (meta.title) {
+                        const titleEl = card.querySelector('.card-title');
+                        if (titleEl) {
+                            const badge = titleEl.querySelector('span');
+                            titleEl.textContent = meta.title + (badge ? ' ' : '');
+                            if (badge) titleEl.appendChild(badge);
+                        }
+                    }
+                    if (meta.year) {
+                        const yearEl = card.querySelector('.card-meta span');
+                        if (yearEl) yearEl.textContent = meta.year;
+                    }
+                    if (meta.poster_path) {
+                        const media = card.querySelector('.card-media');
+                        if (media) {
+                            const img = media.querySelector('.card-image');
+                            if (img) img.src = meta.poster_path;
+                            else {
+                                const ph = media.querySelector('.card-placeholder');
+                                if (ph) ph.outerHTML = `<img class="card-image" src="${meta.poster_path}" loading="lazy">`;
+                            }
+                        }
+                    }
+                });
+            } catch (e) {}
+        });
+        if (cacheDirty) _saveMyBackendMetaCache(metaCache);
+    }
+
     // Dotáhne název konkrétní epizody (ne jen seriálu) pro záložku Hist.
     // epizody — samostatná cache od fetchMyBackendPosters, protože tady se
     // klíčuje podle show+season+episode, ne jen podle show id.
@@ -9893,6 +10000,64 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         return items;
     }
 
+    // Cache-only/background dvojice pro názvy epizod, stejný princip jako u
+    // fetchMyBackendPostersBackground výše — okamžité vykreslení z cache,
+    // chybějící se donačtou na pozadí bez blokování UI.
+    function applyMyBackendEpisodeTitlesCacheOnly(items) {
+        const need = items.filter(it => it.id && it.season != null && it.episode != null);
+        if (!need.length) return items;
+        const cache = _loadMyBackendEpTitleCache();
+        const now = Date.now();
+        for (const it of need) {
+            const cached = cache[`${it.id}:${it.season}:${it.episode}`];
+            if (cached && (now - cached.ts) < MY_BACKEND_META_TTL) it.episodeTitle = cached.title || '';
+        }
+        return items;
+    }
+
+    async function fetchMyBackendEpisodeTitlesBackground(items, tab) {
+        const need = items.filter(it => it.id && it.season != null && it.episode != null);
+        if (!need.length || !tmdbApiKey) return;
+        const cache = _loadMyBackendEpTitleCache();
+        const now = Date.now();
+        const toFetch = [];
+        for (const it of need) {
+            const key = `${it.id}:${it.season}:${it.episode}`;
+            const cached = cache[key];
+            if (!(cached && (now - cached.ts) < MY_BACKEND_META_TTL)) toFetch.push([key, it]);
+        }
+        if (!toFetch.length) return;
+        let cacheDirty = false;
+        await _runWithConcurrency(toFetch, 15, async ([key, it]) => {
+            try {
+                const res = await _fetchWithTimeout(`https://api.themoviedb.org/3/tv/${it.id}/season/${it.season}/episode/${it.episode}?api_key=${tmdbApiKey}&language=cs-CZ`);
+                if (!res.ok) return;
+                const d = await res.json();
+                let name = d.name || '';
+                if (name && /^(epizoda|episode)\s*\d+$/i.test(name.trim())) name = '';
+                cache[key] = { title: name, ts: now };
+                cacheDirty = true;
+                it.episodeTitle = name;
+                if (!name || window._myBackendActiveTab !== tab) return;
+                const card = document.querySelector(`#myBackendResultsContainer .card[data-tmdb-id="${it.id}"][data-se="${it.season}:${it.episode}"]`);
+                if (card) {
+                    const info = card.querySelector('.card-info');
+                    if (info) {
+                        let epEl = info.querySelector('.card-episode-title');
+                        if (!epEl) {
+                            epEl = document.createElement('div');
+                            epEl.className = 'card-episode-title';
+                            epEl.style.cssText = 'font-size:0.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+                            info.querySelector('.card-title')?.insertAdjacentElement('afterend', epEl);
+                        }
+                        epEl.textContent = name;
+                    }
+                }
+            } catch (e) {}
+        });
+        if (cacheDirty) _saveMyBackendEpTitleCache(cache);
+    }
+
     function myBackendCardRemoveArgs(tab, id, type) {
         // Vrátí JS volání pro tlačítko ✕ podle toho, v jaké záložce zrovna jsme
         if (tab === 'watchlist') return `myBackendRemoveItem('watchlist', ${id}, '${type}')`;
@@ -9920,7 +10085,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             // (hlavní mřížka, oblíbené, Trakt/Simkl/Sinator seznamy...), proto stejné
             // pozice (srdíčko vlevo, oko vedle něj) i zelená fajka v rohu v 1sloupci.
             const watchedCheck = (watched && cols1) ? `<div class="card-watched-check">✅</div>` : '';
-            return `<div class="card${watched?' is-watched':''}" data-tmdb-id="${it.id}" data-tmdb-type="${kind}" style="position:relative;${cols1?'border-radius:0;border:none;box-shadow:none;':''}" onclick="typeof openDetailFromMyBackend==='function'&&openDetailFromMyBackend(${it.id},'${kind}')">
+            return `<div class="card${watched?' is-watched':''}" data-tmdb-id="${it.id}" data-tmdb-type="${kind}" data-se="${it.season ?? ''}:${it.episode ?? ''}" style="position:relative;${cols1?'border-radius:0;border:none;box-shadow:none;':''}" onclick="typeof openDetailFromMyBackend==='function'&&openDetailFromMyBackend(${it.id},'${kind}')">
                 <div class="card-media">
                 ${poster ? `<img class="card-image" src="${poster}" loading="lazy" style="${imgStyle}">` : `<div class="card-placeholder">${kind === 'tv' ? '📺' : '🎬'}</div>`}
                 <button class="card-fav ${liked?'liked':''}" onclick="event.stopPropagation();toggleFav(${it.id},'${jsq(it.title||'')}','${it.year||''}',${it.rating||0},'${kind}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button>
@@ -10006,8 +10171,13 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     emptyMsg = 'Historie seriálů je prázdná.';
                 }
                 else if (tab.startsWith('list:')) { items = await myListItemsGet(tab.slice(5)); emptyMsg = 'Seznam je prázdný.'; }
-                items = await fetchMyBackendPosters(items);
-                if (tab === 'history-episodes') items = await fetchMyBackendEpisodeTitles(items);
+                // Postery/názvy se teď aplikují jen z lokální cache (okamžité, bez
+                // network fetche) — chybějící se donačtou na pozadí PO vykreslení,
+                // viz o pár řádků níže. Dřív appka čekala na doběhnutí VŠECH TMDB
+                // volání (u velké historie klidně desítky vteřin) než se cokoliv
+                // vůbec zobrazilo.
+                applyMyBackendPostersCacheOnly(items);
+                if (tab === 'history-episodes') applyMyBackendEpisodeTitlesCacheOnly(items);
             })();
             await Promise.race([_load, _timeout(120000)]);
             // Mezitím se uživatel mohl přepnout na jiný tab (jiné volání
@@ -10026,6 +10196,11 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const letterInput = $('myBackendLetterFilter');
             if (letterInput) letterInput.value = '';
             renderMyBackendGrid(items, emptyMsg, tab);
+            // Chybějící postery/názvy (nebyly v lokální cache) se donačtou na
+            // pozadí a rovnou opraví přímo v už vykreslených kartách — seznam
+            // se tak zobrazí okamžitě místo čekání na desítky/stovky TMDB volání.
+            fetchMyBackendPostersBackground(items, tab);
+            if (tab === 'history-episodes') fetchMyBackendEpisodeTitlesBackground(items, tab);
             // Otevření historie = dobrá příležitost potichu zkontrolovat, jestli
             // na Histře nepřibylo něco nového (viz checkHistraSyncOnHistoryTab).
             // Neblokující — tab se vykreslí hned, případný dosync přijde na pozadí.
