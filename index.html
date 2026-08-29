@@ -30023,8 +30023,10 @@ function renderTvProgram(items, now) {
 
             html += '<div style="display:flex;align-items:stretch;gap:0;margin-bottom:8px;background:var(--bg-card);border:1px solid rgba(0,180,216,0.25);border-radius:10px;overflow:hidden;">';
 
-            // Kanál — levý sloupec
-            html += '<div style="flex-shrink:0;width:72px;padding:8px 6px;background:rgba(0,180,216,0.07);display:flex;align-items:center;justify-content:center;border-right:1px solid rgba(0,180,216,0.15);">'
+            // Kanál — levý sloupec (logo, pokud ho dohledáme podle EPG jména mezi nahranými kanály)
+            const _chLogo = (findTvChannelByEpgName(chName)||{}).logo || '';
+            html += '<div style="flex-shrink:0;width:72px;padding:8px 6px;background:rgba(0,180,216,0.07);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-right:1px solid rgba(0,180,216,0.15);">'
+                + (_chLogo ? '<img src="' + _chLogo + '" loading="lazy" style="width:36px;height:36px;object-fit:contain;" onerror="this.style.display=\'none\'">' : '')
                 + '<span style="font-size:0.62rem;font-weight:800;color:#00b4d8;text-transform:uppercase;letter-spacing:0.04em;text-align:center;word-break:break-word;line-height:1.2;">'
                 + chName.replace(/\s*(HD|FHD|4K|hd)$/i,'').trim()
                 + '</span></div>';
@@ -30055,8 +30057,11 @@ function renderTvProgram(items, now) {
 
         } else {
             // Detailní pohled pro jeden kanál — původní zobrazení
+            const _chLogoD = (findTvChannelByEpgName(chName)||{}).logo || '';
             html += '<div style="margin-bottom:14px;">';
-            html += '<div style="font-size:0.68rem;font-weight:700;color:#00b4d8;text-transform:uppercase;letter-spacing:0.06em;padding:0 2px 5px;border-bottom:1px solid rgba(0,180,216,0.2);margin-bottom:6px;">' + chName + '</div>';
+            html += '<div style="display:flex;align-items:center;gap:6px;padding:0 2px 5px;border-bottom:1px solid rgba(0,180,216,0.2);margin-bottom:6px;">'
+                + (_chLogoD ? '<img src="' + _chLogoD + '" loading="lazy" style="width:20px;height:20px;object-fit:contain;" onerror="this.style.display=\'none\'">' : '')
+                + '<span style="font-size:0.68rem;font-weight:700;color:#00b4d8;text-transform:uppercase;letter-spacing:0.06em;">' + chName + '</span></div>';
 
             for(const p of progs) {
                 const isNow = p.isNow === true;
