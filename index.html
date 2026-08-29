@@ -10665,6 +10665,56 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         }
     }
 
+    // Swipe doleva/doprava na backdropu v detailu = procházení dalších fotek (banerů) titulu bez
+    // nutnosti otevírat celou Galerii. Backdropy se dotahují až tady (lazy), aby se nezatěžoval
+    // hlavní Promise.all v _openDetailNoStack — u titulů s jen 1 obrázkem se nic neděje (bez teček).
+    async function initModalBackdropSwipe(id, type) {
+        const wrap = document.getElementById(`modalBackdropWrap_${id}`);
+        const img = document.getElementById(`modalBackdropImg_${id}`);
+        const dotsEl = document.getElementById(`modalBackdropDots_${id}`);
+        if (!wrap || !img || !dotsEl) return;
+        let images = [];
+        try {
+            const res = await _fetchWithTimeout(`${BASE}/${type}/${id}/images?api_key=${tmdbApiKey}`);
+            const data = await res.json();
+            images = (data.backdrops || []).slice(0, 12).map(b => b.file_path).filter(Boolean);
+        } catch(e) { return; }
+        if (images.length <= 1) return; // nic k procházení
+
+        // Aktuálně zobrazený backdrop (z d.backdrop_path) ať zůstane jako první, ať swipe nezpůsobí
+        // "skok" na jiný obrázek hned na začátku.
+        const curSrc = img.getAttribute('src') || '';
+        const curIdx = images.findIndex(p => curSrc.includes(p));
+        if (curIdx > 0) { images.splice(curIdx, 1); images.unshift(images[curIdx] || ''); }
+        if (curIdx === -1 && curSrc) { /* aktuální backdrop není v listu images (jiný jazyk apod.) — necháme jak je, jen se přidá na konec při swipu doprava */ }
+
+        let idx = 0;
+        dotsEl.innerHTML = images.map((_, i) =>
+            `<span style="width:6px;height:6px;border-radius:50%;background:${i===idx?'#fff':'rgba(255,255,255,0.45)'};transition:background 0.2s;box-shadow:0 0 3px rgba(0,0,0,0.6);"></span>`
+        ).join('');
+
+        const showIndex = (newIdx) => {
+            idx = ((newIdx % images.length) + images.length) % images.length;
+            img.src = `${IMG}original${images[idx]}`;
+            [...dotsEl.children].forEach((d,i) => d.style.background = i===idx ? '#fff' : 'rgba(255,255,255,0.45)');
+        };
+
+        let startX = 0, startY = 0, dragging = false;
+        wrap.addEventListener('touchstart', (e) => {
+            if (!e.touches || !e.touches[0]) return;
+            startX = e.touches[0].clientX; startY = e.touches[0].clientY; dragging = true;
+        }, {passive:true});
+        wrap.addEventListener('touchend', (e) => {
+            if (!dragging || !e.changedTouches || !e.changedTouches[0]) return;
+            dragging = false;
+            const dx = e.changedTouches[0].clientX - startX;
+            const dy = e.changedTouches[0].clientY - startY;
+            if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                showIndex(dx < 0 ? idx + 1 : idx - 1);
+            }
+        }, {passive:true});
+    }
+
     async function showMediaGallery(id, type, title) {
         // Uložit galerii do stack
         navigationStack.push({ type: 'gallery', mediaId: id, mediaType: type, title });
@@ -11072,7 +11122,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const title = d.title||d.name; const year = (d.release_date||d.first_air_date||'').slice(0,4);
             const czTvName = tvTranslations ? (tvTranslations.translations||[]).find(t=>t.iso_639_1==='cs' && t.data && t.data.name)?.data.name : '';
             const rating = d.vote_average?d.vote_average.toFixed(1):'—';
-            const bg = d.backdrop_path?`<img class="modal-backdrop" src="${IMG}original${d.backdrop_path}">`:'';
+            const bg = d.backdrop_path?`<div class="modal-backdrop-wrap" id="modalBackdropWrap_${id}" style="position:relative;overflow:hidden;touch-action:pan-y;"><img class="modal-backdrop" id="modalBackdropImg_${id}" src="${IMG}original${d.backdrop_path}"><div class="modal-backdrop-dots" id="modalBackdropDots_${id}" style="position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:5px;pointer-events:none;"></div></div>`:'';
             const genres = (d.genres||[]).map(g=>`<span class="modal-genre" style="cursor:pointer;" onclick="openGenreBrowse(${g.id},'${jsq(g.name)}','${type}')" title="Procházet žánr: ${g.name}">${g.name}</span>`).join('');
             const cast = (credits.cast||[]).slice(0,8).map(c=>`<div class="cast-item" onclick="openPersonDetail(${c.id})"><img src="${c.profile_path?IMG+'w185'+c.profile_path:'https://via.placeholder.com/50'}"><div class="name">${c.name}</div><div class="role">${c.character}</div></div>`).join('');
             // Režiséři z crew (u seriálů z aggregate_credits, protože běžné credits u TV režiséry většinou neobsahují)
@@ -11242,6 +11292,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             initTraktWatchHistory(id, type);
             // Historie sledování na Sinator backendu
             initMySinatorWatchHistory(id, type);
+            // Swipe doleva/doprava na plakátu/backdropu = procházení dalších fotek (banerů) titulu
+            initModalBackdropSwipe(id, type);
             // POZOR: nikdy nepoužívat "innerHTML +=" tady dole — to celý obsah
             // modalu znovu sparsuje z řetězce a zničí to JS onclick handlery,
             // které si mezitím nastavily loadCsfdRating/initTrakt.../initMySinator...
