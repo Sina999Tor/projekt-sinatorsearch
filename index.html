@@ -10930,16 +10930,25 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     }
 
     async function showMediaGallery(id, type, title) {
-        // Uložit galerii do stack
-        navigationStack.push({ type: 'gallery', mediaId: id, mediaType: type, title });
-        $('modalNavBar').style.display='none'; $('modalScrollBody').innerHTML = '<div class="loading"><div class="spinner"></div>Načítám galerii...</div>';
+        const overlay = document.createElement('div');
+        overlay.id = 'galleryOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-card);z-index:10600;display:flex;flex-direction:column;overflow:hidden;';
+        overlay.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+                <span style="font-weight:700;font-size:1.1rem;">🖼️ Galerie: ${title}</span>
+                <button onclick="document.getElementById('galleryOverlay')?.remove();document.body.style.overflow=''" style="width:36px;height:36px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);color:#fff;cursor:pointer;font-size:1.1rem;flex-shrink:0;">✕</button>
+            </div>
+            <div style="flex:1;overflow-y:auto;padding:16px;"><div class="loading"><div class="spinner"></div>Načítám galerii...</div></div>`;
+        overlay.addEventListener('click', e => { if(e.target === overlay) { overlay.remove(); document.body.style.overflow=''; } });
+        document.body.appendChild(overlay);
+        document.body.style.overflow = 'hidden';
+        const bodyEl = overlay.querySelector('div[style*="overflow-y:auto"]');
         try {
             const res = await fetch(`${BASE}/${type}/${id}/images?api_key=${tmdbApiKey}`);
             const data = await res.json();
             const posters = (data.posters || []).slice(0, 20);
             const backdrops = (data.backdrops || []).slice(0, 20);
             const allImages = [...posters, ...backdrops];
-            if(allImages.length === 0) { $('modalScrollBody').innerHTML = '<div class="empty">😕 Žádné obrázky nenalezeny</div>'; return; }
+            if(allImages.length === 0) { bodyEl.innerHTML = '<div class="empty">😕 Žádné obrázky nenalezeny</div>'; return; }
             
             currentGalleryImages = allImages.map(img => ({
                 path: img.file_path,
@@ -10953,9 +10962,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 </div>`
             ).join('');
             
-            $('modalScrollBody').innerHTML = `${modalNav('Galerie: ' + title, true)}<div class="modal-body"><h2 class="modal-title">Galerie: ${title}</h2><p style="color:var(--text-muted); margin-bottom:20px;">${allImages.length} obrázků</p><div class="gallery-grid">${grid}</div></div>`;
+            bodyEl.innerHTML = `<p style="color:var(--text-muted); margin-bottom:20px;">${allImages.length} obrázků</p><div class="gallery-grid">${grid}</div>`;
         } catch(e) { 
-            $('modalScrollBody').innerHTML = '<div class="empty">⚠️ Chyba načtení galerie</div>'; 
+            bodyEl.innerHTML = '<div class="empty">⚠️ Chyba načtení galerie</div>'; 
         }
     }
 
