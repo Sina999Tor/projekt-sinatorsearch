@@ -947,6 +947,11 @@
                     <div id="traktImportStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;"></div>
                 </div>
                 <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Stáhne všechno, co máš uložené na Sinator backendu (watchlist, hodnocení, historii, rozkoukanost i vlastní seznamy) do ZIPu ve stejném formátu jako export z Traktu — jde ho tedy kdykoliv nahrát zpátky tlačítkem výše, i na jiný Sinator backend.</div>
+                    <button class="settings-btn-small" id="mySinatorExportBtn" style="width:100%;border-color:#8bc34a;color:#8bc34a;" onclick="exportMySinatorToZip(this)">📤 Export dat (ZIP, formát Traktu)</button>
+                    <div id="mySinatorExportStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;"></div>
+                </div>
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
                     <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Opakované importy uměly v historii vytvořit duplicitní záznamy (stejná položka víckrát). Tohle je jednorázově sloučí — pro každý film/epizodu/seriál ponechá jen nejnovější záznam.</div>
                     <button class="settings-btn-small" id="myBackendCleanupBtn" style="width:100%;border-color:#e07a6f;color:#e07a6f;" onclick="cleanupMySinatorHistoryDuplicates(this)">🧹 Vyčistit duplicity v historii</button>
                     <div id="myBackendCleanupStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;"></div>
@@ -1187,6 +1192,7 @@
             <div class="settings-divider"></div>
             <div class="settings-section">
                 <span class="settings-label">Záloha dat</span>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Kompletní záloha úplně všeho v appce — oblíbené, shlédnuté, všechny API klíče, Trakt/Simkl/Sinator backend přihlášení, IPTV údaje, vzhled i všechna ostatní nastavení.</div>
                 <div class="settings-actions">
                     <button class="settings-btn-small" onclick="exportBackup()">📤 Export</button>
                     <label class="settings-btn-small" style="cursor:pointer;">📥 Import
@@ -2679,6 +2685,104 @@
         }
     };
 
+
+    // ── Export všeho ze Sinator backendu do ZIPu ve formátu Trakt exportu ──
+    // (watchlist, hodnocení, historie, rozkoukanost, vlastní seznamy) —
+    // stejné názvy souborů/struktura jako čte handleTraktExportImport výše,
+    // takže tenhle ZIP jde kdykoliv nahrát zpátky (i na jiný backend).
+    function _slugify(s) {
+        return String(s || 'seznam').toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'seznam';
+    }
+    window.exportMySinatorToZip = async function(btnEl) {
+        const statusEl = $('mySinatorExportStatus');
+        if (!myBackendReady()) { alert('⚠️ Nejdřív nastav a ulož Sinator backend (klíč) výše.'); return; }
+        if (btnEl) btnEl.disabled = true;
+        if (statusEl) statusEl.textContent = 'Načítám ZIP knihovnu…';
+        try { await loadJSZipLib(); } catch (e) { if (statusEl) statusEl.textContent = '❌ ' + e.message; if (btnEl) btnEl.disabled = false; return; }
+
+        try {
+            if (statusEl) statusEl.textContent = 'Stahuji watchlist…';
+            const watchlist = await myWatchlistGet().catch(() => []);
+
+            if (statusEl) statusEl.textContent = 'Stahuji hodnocení…';
+            const [ratingsMovies, ratingsShows] = await Promise.all([
+                myRatingsGet('movies').catch(() => []),
+                myRatingsGet('shows').catch(() => [])
+            ]);
+
+            if (statusEl) statusEl.textContent = 'Stahuji historii sledování (může to chvíli trvat)…';
+            const [historyMovies, historyEpisodes] = await Promise.all([
+                myHistoryGetAll('movies', true).catch(() => []),
+                myHistoryGetAll('episodes', true).catch(() => [])
+            ]);
+
+            if (statusEl) statusEl.textContent = 'Stahuji rozkoukanost…';
+            const [progressMovies, progressShows] = await Promise.all([
+                myProgressGet('movies').catch(() => []),
+                myProgressGet('shows').catch(() => [])
+            ]);
+
+            if (statusEl) statusEl.textContent = 'Stahuji vlastní seznamy…';
+            const lists = await myListsGet().catch(() => []);
+            const listsWithItems = [];
+            for (const l of (lists || [])) {
+                if (statusEl) statusEl.textContent = `Seznam „${l.name}"…`;
+                const items = await myListItemsGet(l.id).catch(() => []);
+                listsWithItems.push({ list: l, items: items || [] });
+            }
+
+            if (statusEl) statusEl.textContent = 'Balím ZIP…';
+            const zip = new window.JSZip();
+
+            zip.file('lists-watchlist-1.json', JSON.stringify((watchlist || []).map(it => {
+                const key = it.type === 'tv' ? 'show' : 'movie';
+                return { type: key, [key]: { ids: { tmdb: it.id }, title: it.title || null, year: it.year || null } };
+            }), null, 2));
+
+            zip.file('ratings-movies-1.json', JSON.stringify((ratingsMovies || []).map(r => ({
+                movie: { ids: { tmdb: r.id } }, rating: r.rating, rated_at: r.rated_at || Date.now()
+            })), null, 2));
+            zip.file('ratings-shows.json', JSON.stringify((ratingsShows || []).map(r => ({
+                show: { ids: { tmdb: r.id } }, rating: r.rating, rated_at: r.rated_at || Date.now()
+            })), null, 2));
+
+            zip.file('watched-history-1.json', JSON.stringify([
+                ...(historyMovies || []).map(m => ({ type: 'movie', watched_at: m.watched_at, movie: { ids: { tmdb: m.id } } })),
+                ...(historyEpisodes || []).map(e => ({ type: 'episode', watched_at: e.watched_at, show: { ids: { tmdb: e.id } }, episode: { season: e.season, number: e.episode } }))
+            ], null, 2));
+
+            zip.file('watched-playback.json', JSON.stringify([
+                ...(progressMovies || []).map(m => ({ type: 'movie', progress: m.progress, paused_at: m.paused_at || Date.now(), movie: { ids: { tmdb: m.id } } })),
+                ...(progressShows || []).map(s => ({ type: 'episode', progress: s.progress, paused_at: s.paused_at || Date.now(), show: { ids: { tmdb: s.id } }, episode: { season: s.season, number: s.episode } }))
+            ], null, 2));
+
+            zip.file('lists-lists.json', JSON.stringify(listsWithItems.map((entry, i) => ({ ids: { trakt: i + 1 }, name: entry.list.name })), null, 2));
+            listsWithItems.forEach((entry, i) => {
+                const fname = `lists-list-${i + 1}-${_slugify(entry.list.name)}.json`;
+                zip.file(fname, JSON.stringify(entry.items.map(it => {
+                    const key = (it.type === 'tv' || it.type === 'shows') ? 'show' : 'movie';
+                    return { type: key, [key]: { ids: { tmdb: it.id }, title: it.title || null, year: it.year || null } };
+                }), null, 2));
+            });
+
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sinator-backend-export-${new Date().toISOString().slice(0, 10)}.zip`;
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+
+            if (statusEl) statusEl.innerHTML = `<span style="color:#1db954;">✅ Hotovo! Watchlist: ${(watchlist || []).length}, hodnocení: ${(ratingsMovies || []).length + (ratingsShows || []).length}, historie: ${(historyMovies || []).length + (historyEpisodes || []).length}, rozkoukanost: ${(progressMovies || []).length + (progressShows || []).length}, seznamy: ${listsWithItems.length}.</span>`;
+        } catch (e) {
+            console.error('Sinator export error:', e);
+            if (statusEl) statusEl.innerHTML = `<span style="color:#e07a6f;">❌ ${e && e.message ? e.message : e}</span>`;
+        } finally {
+            if (btnEl) btnEl.disabled = false;
+        }
+    };
 
     window.saveMyBackendSettings = async function() {
         const key = ($('myBackendKeyInput')?.value || '').trim();
@@ -13233,31 +13337,36 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
     function playOnYouTube(query) { const q = encodeURIComponent(query); window.open(`https://www.youtube.com/results?search_query=${q}`, '_blank'); }
 
+    // Posbírá úplně všechny klíče appky ze všech úložišť, která _store používá
+    // (localStorage, sessionStorage, in-memory fallback pro content://) — takže
+    // záloha obsahuje opravdu všechno, i nové klíče přidané v budoucnu, ne jen
+    // ručně vypsaný seznam.
+    function _collectAllStorageKeys() {
+        const keys = new Set();
+        try { Object.keys(window.localStorage).forEach(k => keys.add(k)); } catch (e) {}
+        try { Object.keys(window.sessionStorage).forEach(k => keys.add(k)); } catch (e) {}
+        try { Object.keys(_mem).forEach(k => keys.add(k)); } catch (e) {}
+        return Array.from(keys);
+    }
     function exportBackup() {
         const mdbUser = mdblistApiKey || _MDBLIST_USER_SAVED || (state.trakt && state.trakt.username) || '';
         let slozky = [];
         try { slozky = JSON.parse(localStorage.getItem('sinator_slozky') || '[]'); } catch(e) {}
+        let myBackendData = {};
+        try { myBackendData = JSON.parse(_store.getItem('sinator_mybackend') || '{}'); } catch(e) {}
 
-        // Kompletní sweep všech sinator_* klíčů + nastavení vzhledu
-        const allKeys = [
-            'sinator_favs','sinator_actor_favs','sinator_coll_favs','sinator_watched',
-            'sinator_trakt','sinator_simkl','sinator_slozky',
-            'sinator_tmdb_api_key','sinator_gemini_api_key','sinator_groq_api_key',
-            'sinator_openrouter_key','sinator_omdb_api_key','sinator_mdblist_user','sinator_mdblist_manual',
-            'sinator_ivysilani_user','sinator_ivysilani_pass','sinator_ivysilani_lists','sinator_ivysilani_lastSync',
-            'sinator_iprima_lists','sinator_adult_content','sinator_toolbar_collapsed',
-            'sinator_themes','sinator_d_nick',
-            'sinator_rozkoukane','sinator_rozkoukane_filmy',
-            'coloredIcons'
-        ];
+        // Kompletní sweep VŠECH klíčů appky (ne jen předem vypsaný seznam) —
+        // API klíče, hesla, Sinator backend, Trakt/Simkl tokeny, IPTV přihlašovací
+        // údaje, vzhled, cache i nastavení — doslova všechno, co appka ukládá.
+        const allKeys = _collectAllStorageKeys();
         const raw = {};
-        allKeys.forEach(k => { const v = localStorage.getItem(k); if(v !== null) raw[k] = v; });
+        allKeys.forEach(k => { const v = _store.getItem(k); if(v !== null && v !== undefined) raw[k] = v; });
 
         const d = {
-            version: 2,
+            version: 3,
             app: 'Sinator Search',
             exported: new Date().toISOString(),
-            // Strukturovaná data pro kompatibilitu se starými zálohami
+            // Strukturovaná data pro kompatibilitu se starými zálohami / čitelnost
             movies: state.favs,
             actors: state.actorFavs,
             collFavs: state.collFavs || [],
@@ -13266,6 +13375,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             watched: state.watched,
             mdblistUser: mdbUser,
             slozky: slozky,
+            myBackend: myBackendData,
             ivysilani: {
                 user:     _store.getItem('sinator_ivysilani_user') || '',
                 pass:     _store.getItem('sinator_ivysilani_pass') || '',
@@ -13278,7 +13388,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 gemini:      geminiApiKey      || '',
                 groq:        groqApiKey        || '',
                 openRouter:  openRouterKey     || '',
-                omdb:        omdbApiKey        || ''
+                omdb:        omdbApiKey        || '',
+                mybackend:   myBackendData.key || ''
             },
             settings: {
                 adultContent: _store.getItem('sinator_adult_content') || 'false',
@@ -13287,7 +13398,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 nick: _store.getItem('sinator_d_nick') || '',
                 themes: _store.getItem('sinator_themes') || ''
             },
-            // Surová záloha všeho
+            // Surová záloha ÚPLNĚ VŠECH klíčů appky — z tohohle se dá obnovit stav
+            // appky 1:1, i kdyby výše strukturovaná pole něco nepokrývala.
             raw: raw
         };
 
@@ -13297,14 +13409,14 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `sinator-backup-${new Date().toISOString().slice(0,10)}.json`;
+            a.download = `sinator-plna-zaloha-${new Date().toISOString().slice(0,10)}.json`;
             document.body.appendChild(a); a.click();
             setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
         } catch(e) {
             const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(json);
             const a = document.createElement('a');
             a.href = dataUri;
-            a.download = `sinator-backup-${Date.now()}.json`;
+            a.download = `sinator-plna-zaloha-${Date.now()}.json`;
             document.body.appendChild(a); a.click();
             setTimeout(() => document.body.removeChild(a), 1000);
         }
@@ -13315,10 +13427,12 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             `📁 Složky: ${slozky.length}`,
             `👥 Herci: ${state.actorFavs.length}`,
             state.trakt.username ? `📋 Trakt: ${state.trakt.username}` : '',
+            myBackendData.key ? '🧩 Sinator backend: ✓ (klíč uložen)' : '',
             d.apiKeys.tmdb ? '🔑 API klíče: ✓' : '',
-            d.settings.coloredIcons === '1' ? '🎨 Barevné ikony: zapnuto' : '🎨 Barevné ikony: vypnuto'
+            d.settings.coloredIcons === '1' ? '🎨 Barevné ikony: zapnuto' : '🎨 Barevné ikony: vypnuto',
+            `💾 Celkem uložených klíčů: ${allKeys.length}`
         ].filter(Boolean).join('\n');
-        alert('✅ Záloha exportována!\n\n' + stats);
+        alert('✅ Kompletní záloha exportována!\n\n' + stats);
     }
 
     function closeBackup() {
@@ -13352,10 +13466,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 const d = JSON.parse(e.target.result);
                 if(!d.app && !d.movies && !d.raw) { alert('❌ Neplatný soubor zálohy'); return; }
 
-                // 1) Surová záloha — obnoví vše najednou
+                // 1) Surová záloha — obnoví vše najednou (přes _store, aby to fungovalo
+                // i na content:// kde localStorage nemusí být dostupné)
                 if(d.raw && typeof d.raw === 'object') {
                     Object.entries(d.raw).forEach(([k, v]) => {
-                        if(v !== null && v !== undefined) localStorage.setItem(k, v);
+                        if(v !== null && v !== undefined) _store.setItem(k, v);
                     });
                 }
 
@@ -13403,6 +13518,13 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                     _mem['sinator_watched'] = _WATCHED_DATA_SAVED;
                     updateWatchedCount();
                 }
+                if(d.myBackend && d.myBackend.key) {
+                    state.myBackend = d.myBackend;
+                    _store.setItem('sinator_mybackend', JSON.stringify(state.myBackend));
+                } else if(d.apiKeys && d.apiKeys.mybackend) {
+                    state.myBackend = { key: d.apiKeys.mybackend };
+                    _store.setItem('sinator_mybackend', JSON.stringify(state.myBackend));
+                }
                 if(d.mdblistUser) { _doSaveMdblistUser(d.mdblistUser); }
 
                 const stats = [
@@ -13411,10 +13533,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                     `📁 Složky: ${(d.slozky||[]).length}`,
                     `👥 Herci: ${(d.actors||[]).length}`,
                     d.trakt && d.trakt.username ? `📋 Trakt: ${d.trakt.username}` : '',
+                    (d.myBackend && d.myBackend.key) || (d.apiKeys && d.apiKeys.mybackend) ? '🧩 Sinator backend: ✓ (klíč obnoven)' : '',
                     d.apiKeys && d.apiKeys.tmdb ? '🔑 API klíče: ✓' : '',
-                    d.raw ? `💾 Raw klíčů: ${Object.keys(d.raw).length}` : ''
+                    d.raw ? `💾 Obnovených klíčů: ${Object.keys(d.raw).length}` : ''
                 ].filter(Boolean).join('\n');
-                alert('✅ Záloha importována!\n\n' + stats + '\n\nAplikace se restartuje.');
+                alert('✅ Kompletní záloha importována!\n\n' + stats + '\n\nAplikace se restartuje.');
                 closeBackup();
                 setTimeout(() => location.reload(), 800);
             } catch(err) { alert('❌ Neplatný soubor zálohy: ' + err.message); }
