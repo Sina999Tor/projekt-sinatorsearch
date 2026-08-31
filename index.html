@@ -11871,7 +11871,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             // zhlédnutí). Jednotlivá data se dají smazat jen ručně přes ✕
             // v sekci "Historie sledování" níž. Díky tomu odškrtnutí a zpětné
             // zaškrtnutí zapíše druhé (další) zhlédnutí, ne jen jedno místo všech.
-            if (willMark) await myHistoryAdd(id, type);
+            if (willMark) {
+                await myHistoryAdd(id, type);
+                // Zaškrtnutí "Shlédnuto" automaticky vyřadí titul ze Sinator watchlistu, pokud v něm byl.
+                try { await myWatchlistRemove(id, type); } catch(e) {}
+            }
             refreshMySinatorWatchedCache();
             if (typeof initMySinatorWatchHistory === 'function') initMySinatorWatchHistory(id, type);
 
@@ -11894,6 +11898,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                     await ensureTraktToken();
                     const body = type === 'movie' ? { movies: [{ ids: { tmdb: id } }] } : { shows: [{ ids: { tmdb: id } }] };
                     await fetch(TRAKT_BASE + '/sync/history', { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
+                    try { await fetch(TRAKT_BASE + '/sync/watchlist/remove', { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) }); } catch(e) {}
                 } catch (e) { console.warn('Trakt sync error (ze Sinator přepínače):', e); }
             }
         } catch (e) {
@@ -13448,6 +13453,14 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                         // Pošleme jen skutečně odvysílané a označené epizody - Trakt tak taky neoznačí budoucí díly.
                         await fetch(TRAKT_BASE + '/sync/history', { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify({ shows: [{ ids: { tmdb: id }, seasons: traktSeasonsBody }] }) });
                     }
+                    // Označením za shlédnuté auto-odstraníme titul z Trakt watchlistu (pokud tam byl) —
+                    // watchlist má sloužit jen k plánování, ne k duplicitnímu držení už zhlédnutého.
+                    if(type === 'movie' || fullyAired) {
+                        try {
+                            const wlBody = type === 'movie' ? { movies: [{ ids: { tmdb: id } }] } : { shows: [{ ids: { tmdb: id } }] };
+                            await fetch(TRAKT_BASE + '/sync/watchlist/remove', { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(wlBody) });
+                        } catch(e) { console.warn('Trakt watchlist auto-remove error:', e); }
+                    }
                 } else {
                     const body = type === 'movie' ? { movies: [{ ids: { tmdb: id } }] } : { shows: [{ ids: { tmdb: id } }] };
                     await fetch(TRAKT_BASE + '/sync/history/remove', { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
@@ -13460,7 +13473,12 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         // shlédnutí i tam, ať není potřeba klikat na obě tlačítka zvlášť.
         if (typeof myBackendReady === 'function' && myBackendReady() && (type === 'movie' || fullyAired)) {
             try {
-                if (willMark) await myHistoryAdd(id, type);
+                if (willMark) {
+                    await myHistoryAdd(id, type);
+                    // Zaškrtnutí "Shlédnuto" automaticky vyřadí titul ze Sinator watchlistu
+                    // (pokud v něm byl) — ať se sledovaná položka nedrží zbytečně na dvou místech.
+                    try { await myWatchlistRemove(id, type); } catch(e) {}
+                }
                 else await myHistoryRemove(id, type);
                 if (typeof refreshMySinatorWatchedCache === 'function') refreshMySinatorWatchedCache();
                 if (typeof initMySinatorWatchedBadge === 'function') initMySinatorWatchedBadge(id, type);
