@@ -35091,8 +35091,8 @@ function renderMyStats() {
   const openRatedShows = `closeMyStatsModal();setTimeout(()=>window.openTraktRatingsList&&window.openTraktRatingsList('shows'),80)`;
   const openHistMovies = `closeMyStatsModal();setTimeout(()=>window.openTraktHistoryList&&window.openTraktHistoryList('movies'),80)`;
   const openHistEpisodes = `closeMyStatsModal();setTimeout(()=>window.openTraktHistoryList&&window.openTraktHistoryList('episodes'),80)`;
-  const ratedMoviesCount = Array.isArray(window._traktMovieRatingsCache) ? window._traktMovieRatingsCache.length : '–';
-  const ratedShowsCount = Array.isArray(window._traktShowRatingsCache) ? window._traktShowRatingsCache.length : '–';
+  const ratedMoviesCount = window._traktMovieRatingsCache ? window._traktMovieRatingsCache.length : '–';
+  const ratedShowsCount = window._traktShowRatingsCache ? window._traktShowRatingsCache.length : '–';
   const histMoviesCount = typeof window._traktHistMovieCount === 'number' ? window._traktHistMovieCount : '–';
   const histEpisodesCount = typeof window._traktHistEpisodeCount === 'number' ? window._traktHistEpisodeCount : '–';
   body.innerHTML = `<div>
@@ -35128,12 +35128,26 @@ function renderMyStats() {
   refreshTraktRatingCounts();
 }
 
-// Dopočítá skutečný počet hodnocených a historicky zhlédnutých filmů/seriálů na Traktu (pro kartičky ve statistikách)
+// Dopočítá skutečný počet hodnocených a historicky zhlédnutých filmů/seriálů — sečte VŠECHNY připojené zdroje (Trakt + Simkl + vlastní Sinator backend), ne jen jeden
 async function refreshTraktRatingCounts() {
   const _s = window._store || localStorage;
+  const results = await Promise.all([
+    _statsFetchTrakt(_s),
+    _statsFetchSimkl(_s),
+    _statsFetchMySinator(_s)
+  ]);
+  const connected = results.filter(Boolean);
+  if (!connected.length) return; // nic připojeno, necháme "–"
+  window._traktMovieRatingsCache = { length: connected.reduce((a,r)=>a+r.ratedMovies,0) };
+  window._traktShowRatingsCache = { length: connected.reduce((a,r)=>a+r.ratedShows,0) };
+  window._traktHistMovieCount = connected.reduce((a,r)=>a+r.histMovies,0);
+  window._traktHistEpisodeCount = connected.reduce((a,r)=>a+r.histEpisodes,0);
+  _paintTraktStatCounts();
+}
+async function _statsFetchTrakt(_s) {
   let traktData = {};
   try { traktData = JSON.parse(_s.getItem('sinator_trakt') || '{}'); } catch(e) { traktData = {}; }
-  if (!traktData.accessToken) return;
+  if (!traktData.accessToken) return null;
   const headers = {
     'Content-Type': 'application/json',
     'trakt-api-version': '2',
@@ -35149,19 +35163,82 @@ async function refreshTraktRatingCounts() {
     ]);
     const mData = mRes.ok ? await mRes.json() : [];
     const sData = sRes.ok ? await sRes.json() : [];
-    window._traktMovieRatingsCache = Array.isArray(mData) ? mData : [];
-    window._traktShowRatingsCache = Array.isArray(sData) ? sData : [];
-    window._traktHistMovieCount = hmRes.ok ? parseInt(hmRes.headers.get('X-Pagination-Item-Count')||'0', 10) : null;
-    window._traktHistEpisodeCount = heRes.ok ? parseInt(heRes.headers.get('X-Pagination-Item-Count')||'0', 10) : null;
-    const elM = document.getElementById('statRatedMovies');
-    const elS = document.getElementById('statRatedShows');
-    const elHM = document.getElementById('statHistMovies');
-    const elHE = document.getElementById('statHistEpisodes');
-    if (elM) elM.textContent = window._traktMovieRatingsCache.length;
-    if (elS) elS.textContent = window._traktShowRatingsCache.length;
-    if (elHM && window._traktHistMovieCount != null) elHM.textContent = window._traktHistMovieCount;
-    if (elHE && window._traktHistEpisodeCount != null) elHE.textContent = window._traktHistEpisodeCount;
-  } catch(e) { /* Trakt nedostupný, necháme "–" */ }
+    return {
+      ratedMovies: Array.isArray(mData) ? mData.length : 0,
+      ratedShows: Array.isArray(sData) ? sData.length : 0,
+      histMovies: hmRes.ok ? parseInt(hmRes.headers.get('X-Pagination-Item-Count')||'0', 10) : 0,
+      histEpisodes: heRes.ok ? parseInt(heRes.headers.get('X-Pagination-Item-Count')||'0', 10) : 0
+    };
+  } catch(e) { return null; }
+}
+async function _statsFetchSimkl(_s) {
+  let simklData = {};
+  try { simklData = JSON.parse(_s.getItem('sinator_simkl') || '{}'); } catch(e) { simklData = {}; }
+  if (!simklData.accessToken) return null;
+  try {
+    const h = { 'Authorization': 'Bearer ' + simklData.accessToken, 'simkl-api-key': (typeof SIMKL_CLIENT_ID!=='undefined'?SIMKL_CLIENT_ID:'') };
+    const res = await fetch('https://api.simkl.com/sync/all-items/', { headers: h });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const movies = data.movies || [];
+    const shows = [...(data.shows||[]), ...(data.anime||[])];
+    return {
+      ratedMovies: movies.filter(i => Number(i.user_rating) > 0).length,
+      ratedShows: shows.filter(i => Number(i.user_rating) > 0).length,
+      histMovies: movies.filter(i => i.status === 'completed').length,
+      histEpisodes: shows.reduce((sum,i) => sum + (Number(i.watched_episodes_count)||0), 0)
+    };
+  } catch(e) { return null; }
+}
+async function _statsFetchMySinator(_s) {
+  let myData = {};
+  try { myData = JSON.parse(_s.getItem('sinator_mybackend') || '{}'); } catch(e) { myData = {}; }
+  if (!myData.key) return null;
+  const MY_BACKEND_STATS_BASE = 'https://sinator-backend.vercel.app/api';
+  const headers = { 'Content-Type': 'application/json', 'x-api-key': myData.key };
+  const countHistory = async (type) => {
+    const pageSize = 500, concurrency = 6;
+    let total = 0, page = 1, done = false, rounds = 0;
+    while (!done && rounds < 40) {
+      rounds++;
+      const pages = Array.from({ length: concurrency }, (_, i) => page + i);
+      const batches = await Promise.all(pages.map(p =>
+        fetch(`${MY_BACKEND_STATS_BASE}/history?type=${type}&page=${p}&limit=${pageSize}`, { headers })
+          .then(r => r.ok ? r.json() : [])
+          .catch(() => [])
+      ));
+      for (const batch of batches) {
+        if (Array.isArray(batch)) total += batch.length;
+        if (!Array.isArray(batch) || batch.length < pageSize) done = true;
+      }
+      page += concurrency;
+    }
+    return total;
+  };
+  try {
+    const [mRatingsRes, sRatingsRes, histMovies, histEpisodes] = await Promise.all([
+      fetch(`${MY_BACKEND_STATS_BASE}/ratings?type=movies`, { headers }).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch(`${MY_BACKEND_STATS_BASE}/ratings?type=shows`, { headers }).then(r => r.ok ? r.json() : []).catch(() => []),
+      countHistory('movie'),
+      countHistory('episode')
+    ]);
+    return {
+      ratedMovies: Array.isArray(mRatingsRes) ? mRatingsRes.length : 0,
+      ratedShows: Array.isArray(sRatingsRes) ? sRatingsRes.length : 0,
+      histMovies,
+      histEpisodes
+    };
+  } catch(e) { return null; }
+}
+function _paintTraktStatCounts() {
+  const elM = document.getElementById('statRatedMovies');
+  const elS = document.getElementById('statRatedShows');
+  const elHM = document.getElementById('statHistMovies');
+  const elHE = document.getElementById('statHistEpisodes');
+  if (elM && window._traktMovieRatingsCache) elM.textContent = window._traktMovieRatingsCache.length;
+  if (elS && window._traktShowRatingsCache) elS.textContent = window._traktShowRatingsCache.length;
+  if (elHM && window._traktHistMovieCount != null) elHM.textContent = window._traktHistMovieCount;
+  if (elHE && window._traktHistEpisodeCount != null) elHE.textContent = window._traktHistEpisodeCount;
 }
 
 // Přiřazení žánrů k shlédnutým titulům (z TMDB, s lokální cache aby se nemuselo pořád dotahovat)
@@ -35173,6 +35250,16 @@ async function renderGenreStats(watchedMovies, watchedTv) {
   if (!tmdbKey) { box.innerHTML = ''; return; }
   let genreCache = {};
   try { genreCache = JSON.parse(_s.getItem('sinator_genre_cache') || '{}'); } catch(e) { genreCache = {}; }
+  // Vyčistit starou/vadnou cache, kde se místo českých názvů žánrů ukládala číselná TMDB ID
+  let _genreCachePoisoned = false;
+  Object.keys(genreCache).forEach(k => {
+    const v = genreCache[k];
+    if (!Array.isArray(v) || v.some(n => typeof n !== 'string' || /^\d+$/.test(n))) {
+      delete genreCache[k];
+      _genreCachePoisoned = true;
+    }
+  });
+  if (_genreCachePoisoned) { try { _s.setItem('sinator_genre_cache', JSON.stringify(genreCache)); } catch(e) {} }
 
   const items = [
     ...watchedMovies.map(w => ({ id: w.id, type: 'movie' })),
