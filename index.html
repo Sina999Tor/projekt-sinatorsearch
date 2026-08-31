@@ -34641,18 +34641,21 @@ window.deactivateAdminMode = function(...a) {
   </div>
 
   <!-- Přejít na den/měsíc/rok -->
-  <div id="calPickerView" style="display:none;flex:1;overflow-y:auto;padding:20px 16px;">
+  <div id="calPickerView" style="display:none;flex:1;overflow-y:auto;padding:16px;">
+    <button onclick="calClosePicker()" style="background:none;border:none;color:#22d3ee;cursor:pointer;font-size:0.85rem;margin-bottom:14px;padding:4px 0;">‹ Zpět na kalendář</button>
     <div style="font-weight:700;color:#fb923c;font-size:0.9rem;margin-bottom:14px;">🗓️ Přejít na konkrétní datum</div>
-    <div style="display:flex;gap:8px;margin-bottom:18px;">
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
       <select id="calPickDay" style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;color:#fff;padding:10px;border-radius:8px;font-size:0.9rem;"></select>
       <select id="calPickMonth" style="flex:1.4;background:#1a1a1a;border:1px solid #2a2a2a;color:#fff;padding:10px;border-radius:8px;font-size:0.9rem;"></select>
       <select id="calPickYear" style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;color:#fff;padding:10px;border-radius:8px;font-size:0.9rem;"></select>
     </div>
+    <button onclick="calGoToToday()" style="width:100%;background:#1a1a1a;border:1px solid #fb923c;color:#fb923c;padding:11px;border-radius:8px;cursor:pointer;font-weight:700;margin-bottom:18px;">📍 Aktuální měsíc</button>
     <div style="display:flex;gap:8px;">
       <button onclick="calClosePicker()" style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;color:#aaa;padding:12px;border-radius:8px;cursor:pointer;font-weight:600;">Zrušit</button>
       <button onclick="calGoToDate()" style="flex:2;background:#22d3ee;border:none;color:#0a0a0a;padding:12px;border-radius:8px;cursor:pointer;font-weight:700;">Přejít na den</button>
     </div>
   </div>
+
 
   <!-- Detail dne -->
   <div id="calDayView" style="display:none;flex:1;overflow-y:auto;padding:16px;">
@@ -35817,6 +35820,12 @@ function calOpenPicker() {
   if (yearSel) yearSel.value = st.year;
 }
 function calClosePicker() { calShowGridView(); }
+function calGoToToday() {
+  const now = new Date();
+  window._calState = { year: now.getFullYear(), month: now.getMonth() };
+  calShowGridView();
+  calRenderMonth();
+}
 function calGoToDate() {
   const day = parseInt(document.getElementById('calPickDay').value, 10);
   const month = parseInt(document.getElementById('calPickMonth').value, 10);
