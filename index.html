@@ -1553,6 +1553,7 @@
     function myBackendKey() { return (state.myBackend && state.myBackend.key) || ''; }
     function myHeaders() { return { 'Content-Type': 'application/json', 'x-api-key': myBackendKey() }; }
     function myBackendReady() { return !!myBackendKey(); }
+    window.myBackendReady = myBackendReady;
 
     async function myApi(path, opts = {}) {
         if (!myBackendReady()) throw new Error('Vlastní backend není nastavený (chybí adresa nebo klíč).');
@@ -3768,6 +3769,7 @@
         if (!target) target = hasTrakt ? 'trakt' : (hasSimkl ? 'simkl' : 'own');
         switchTsSource(target);
     }
+    window.openTraktModal = openTraktModal;
     
     function closeTraktModal() { 
         $('traktModal')?.classList.remove('open'); 
@@ -35087,10 +35089,21 @@ function renderMyStats() {
   const openFavActors = `closeMyStatsModal();setTimeout(()=>window._openFavsModalTab&&window._openFavsModalTab('actor'),80)`;
   const openWatchedMovies = `closeMyStatsModal();setTimeout(()=>window._openWatchedModalTab&&window._openWatchedModalTab('movie'),80)`;
   const openWatchedTv = `closeMyStatsModal();setTimeout(()=>window._openWatchedModalTab&&window._openWatchedModalTab('tv'),80)`;
-  const openRatedMovies = `closeMyStatsModal();setTimeout(()=>window.openTraktRatingsList&&window.openTraktRatingsList('movies'),80)`;
-  const openRatedShows = `closeMyStatsModal();setTimeout(()=>window.openTraktRatingsList&&window.openTraktRatingsList('shows'),80)`;
-  const openHistMovies = `closeMyStatsModal();setTimeout(()=>window.openTraktHistoryList&&window.openTraktHistoryList('movies'),80)`;
-  const openHistEpisodes = `closeMyStatsModal();setTimeout(()=>window.openTraktHistoryList&&window.openTraktHistoryList('episodes'),80)`;
+  const _sinatorReady = typeof window.myBackendReady === 'function' && window.myBackendReady();
+  // Otevře přímo danou záložku ve statistikách — pokud je propojen Sinator backend,
+  // vždy z něj (protože statistiky teď z něj i počítají), jinak fallback na Trakt/Simkl modal.
+  const openRatedMovies = _sinatorReady
+    ? `closeMyStatsModal();setTimeout(()=>{window._myBackendActiveTab='ratings-movies';window.openTraktModal&&window.openTraktModal('own');},80)`
+    : `closeMyStatsModal();setTimeout(()=>window.openTraktRatingsList&&window.openTraktRatingsList('movies'),80)`;
+  const openRatedShows = _sinatorReady
+    ? `closeMyStatsModal();setTimeout(()=>{window._myBackendActiveTab='ratings-shows';window.openTraktModal&&window.openTraktModal('own');},80)`
+    : `closeMyStatsModal();setTimeout(()=>window.openTraktRatingsList&&window.openTraktRatingsList('shows'),80)`;
+  const openHistMovies = _sinatorReady
+    ? `closeMyStatsModal();setTimeout(()=>{window._myBackendActiveTab='history-movies';window.openTraktModal&&window.openTraktModal('own');},80)`
+    : `closeMyStatsModal();setTimeout(()=>window.openTraktHistoryList&&window.openTraktHistoryList('movies'),80)`;
+  const openHistEpisodes = _sinatorReady
+    ? `closeMyStatsModal();setTimeout(()=>{window._myBackendActiveTab='history-episodes';window.openTraktModal&&window.openTraktModal('own');},80)`
+    : `closeMyStatsModal();setTimeout(()=>window.openTraktHistoryList&&window.openTraktHistoryList('episodes'),80)`;
   const ratedMoviesCount = window._traktMovieRatingsCache ? window._traktMovieRatingsCache.length : '–';
   const ratedShowsCount = window._traktShowRatingsCache ? window._traktShowRatingsCache.length : '–';
   const histMoviesCount = typeof window._traktHistMovieCount === 'number' ? window._traktHistMovieCount : '–';
@@ -35128,20 +35141,30 @@ function renderMyStats() {
   refreshTraktRatingCounts();
 }
 
-// Dopočítá skutečný počet hodnocených a historicky zhlédnutých filmů/seriálů — sečte VŠECHNY připojené zdroje (Trakt + Simkl + vlastní Sinator backend), ne jen jeden
+// Dopočítá skutečný počet hodnocených a historicky zhlédnutých filmů/seriálů pro statistiky.
+// Když je propojený vlastní Sinator backend, počítá se VÝHRADNĚ z něj (je to zdroj pravdy pro
+// tyto karty). Jen když Sinator není propojený, spočítá se to ze součtu Trakt + Simkl.
 async function refreshTraktRatingCounts() {
   const _s = window._store || localStorage;
-  const results = await Promise.all([
-    _statsFetchTrakt(_s),
-    _statsFetchSimkl(_s),
-    _statsFetchMySinator(_s)
-  ]);
-  const connected = results.filter(Boolean);
-  if (!connected.length) return; // nic připojeno, necháme "–"
-  window._traktMovieRatingsCache = { length: connected.reduce((a,r)=>a+r.ratedMovies,0) };
-  window._traktShowRatingsCache = { length: connected.reduce((a,r)=>a+r.ratedShows,0) };
-  window._traktHistMovieCount = connected.reduce((a,r)=>a+r.histMovies,0);
-  window._traktHistEpisodeCount = connected.reduce((a,r)=>a+r.histEpisodes,0);
+  const own = await _statsFetchMySinator(_s);
+  let combined;
+  if (own) {
+    combined = own;
+  } else {
+    const results = await Promise.all([_statsFetchTrakt(_s), _statsFetchSimkl(_s)]);
+    const connected = results.filter(Boolean);
+    if (!connected.length) return; // nic připojeno, necháme "–"
+    combined = {
+      ratedMovies: connected.reduce((a,r)=>a+r.ratedMovies,0),
+      ratedShows: connected.reduce((a,r)=>a+r.ratedShows,0),
+      histMovies: connected.reduce((a,r)=>a+r.histMovies,0),
+      histEpisodes: connected.reduce((a,r)=>a+r.histEpisodes,0)
+    };
+  }
+  window._traktMovieRatingsCache = { length: combined.ratedMovies };
+  window._traktShowRatingsCache = { length: combined.ratedShows };
+  window._traktHistMovieCount = combined.histMovies;
+  window._traktHistEpisodeCount = combined.histEpisodes;
   _paintTraktStatCounts();
 }
 async function _statsFetchTrakt(_s) {
@@ -35219,8 +35242,8 @@ async function _statsFetchMySinator(_s) {
     const [mRatingsRes, sRatingsRes, histMovies, histEpisodes] = await Promise.all([
       fetch(`${MY_BACKEND_STATS_BASE}/ratings?type=movies`, { headers }).then(r => r.ok ? r.json() : []).catch(() => []),
       fetch(`${MY_BACKEND_STATS_BASE}/ratings?type=shows`, { headers }).then(r => r.ok ? r.json() : []).catch(() => []),
-      countHistory('movie'),
-      countHistory('episode')
+      countHistory('movies'),
+      countHistory('episodes')
     ]);
     return {
       ratedMovies: Array.isArray(mRatingsRes) ? mRatingsRes.length : 0,
