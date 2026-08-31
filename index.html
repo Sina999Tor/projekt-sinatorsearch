@@ -952,6 +952,11 @@
                     <div id="myBackendCleanupStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;"></div>
                 </div>
                 <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Zpětně projde watchlist (Sinator, a pokud je propojený i Trakt) a odstraní z něj vše, co už je označené jako shlédnuté — watchlist má sloužit jen k plánování, ne držet duplicitně už zhlédnuté tituly.</div>
+                    <button class="settings-btn-small" id="watchlistCleanupBtn" style="width:100%;border-color:#4caf50;color:#4caf50;" onclick="cleanupWatchlistWatched(this)">🧹 Odstranit shlédnuté z watchlistu</button>
+                    <div id="watchlistCleanupStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;"></div>
+                </div>
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
                     <div style="font-size:0.72rem;color:#e05a5a;margin-bottom:8px;line-height:1.5;">⚠️ Nevratně smaže VŠECHNA data na tvém Sinator backendu (watchlist, seznamy, hodnocení, historii i rozkoukanost). API klíč a připojení backendu zůstanou zachované. Hodí se před čerstvým importem z Trakt exportu.</div>
                     <button class="settings-btn-small settings-btn-remove" id="myBackendWipeBtn" style="width:100%;" onclick="wipeMySinatorBackend(this)">💣 Smazat vše na Sinator backendu</button>
                     <div id="myBackendWipeStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;"></div>
@@ -9417,6 +9422,70 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         } finally {
             btnEl.disabled = false;
             btnEl.textContent = origLabel;
+        }
+    };
+
+    // ── Zpětné vyčištění watchlistu od už zhlédnutých titulů ──────────────
+    // Watchlist má sloužit jen k plánování ("chci vidět"), ne k duplicitnímu
+    // držení titulů, co už jsou označené jako shlédnuté (viz automatické
+    // odstranění při zaškrtnutí "Shlédnuto" — tohle je jednorázový zpětný
+    // úklid pro tituly, co se do watchlistu dostaly ještě předtím).
+    window.cleanupWatchlistWatched = async function(btnEl) {
+        const origLabel = btnEl ? btnEl.textContent : '';
+        if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳ Kontroluji…'; }
+        const statusEl = $('watchlistCleanupStatus');
+        const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
+        let removedSinator = 0, removedTrakt = 0, errors = 0;
+        try {
+            if (myBackendReady()) {
+                await refreshMySinatorWatchedCache();
+                setStatus('Kontroluji Sinator watchlist…');
+                let wl = [];
+                try { wl = await myWatchlistGet(); } catch (e) { wl = []; }
+                for (const it of (wl || [])) {
+                    const kind = it.tmdbType || (it.type === 'tv' || it.type === 'shows' ? 'tv' : 'movie');
+                    if (isWatched(it.id, kind)) {
+                        try { await myWatchlistRemove(it.id, it.type); removedSinator++; } catch (e) { errors++; }
+                    }
+                }
+                window._myBackendListsCache = null;
+                if (window._myBackendActiveTab === 'watchlist' && typeof loadMyBackendOverview === 'function') {
+                    loadMyBackendOverview('watchlist', true);
+                }
+            }
+            if (state.trakt && state.trakt.accessToken) {
+                setStatus(`Sinator hotovo (-${removedSinator}). Kontroluji Trakt watchlist…`);
+                try {
+                    await ensureTraktToken();
+                    const res = await fetchWithRetry(`${TRAKT_BASE}/users/${state.trakt.username || 'me'}/watchlist?extended=full&limit=1000`, { headers: getTraktHeaders() });
+                    const wl = res.ok ? await res.json() : [];
+                    for (const w of (wl || [])) {
+                        const m = w.movie || w.show;
+                        const tmdbId = m?.ids?.tmdb;
+                        if (!tmdbId) continue;
+                        const kind = w.type === 'movie' ? 'movie' : 'tv';
+                        if (isWatched(tmdbId, kind)) {
+                            try {
+                                const body = kind === 'movie' ? { movies: [{ ids: { tmdb: tmdbId } }] } : { shows: [{ ids: { tmdb: tmdbId } }] };
+                                await fetch(`${TRAKT_BASE}/sync/watchlist/remove`, { method: 'POST', headers: getTraktHeaders(), body: JSON.stringify(body) });
+                                removedTrakt++;
+                            } catch (e) { errors++; }
+                        }
+                    }
+                    window._traktListsCache = null;
+                } catch (e) { errors++; }
+            }
+            const parts = [];
+            if (myBackendReady()) parts.push(`Sinator: -${removedSinator}`);
+            if (state.trakt && state.trakt.accessToken) parts.push(`Trakt: -${removedTrakt}`);
+            let summary = parts.length ? `✅ Hotovo. ${parts.join(', ')}.` : '⚠️ Není propojený žádný podporovaný zdroj (Sinator/Trakt).';
+            if (errors) summary += `\n⚠️ ${errors} položek se nepodařilo odstranit.`;
+            setStatus(summary);
+            try { if (typeof _favToast === 'function') _favToast('🧹 Watchlist vyčištěn od shlédnutých'); } catch (e) {}
+        } catch (e) {
+            setStatus('❌ Chyba: ' + (e && e.message ? e.message : e));
+        } finally {
+            if (btnEl) { btnEl.disabled = false; btnEl.textContent = origLabel; }
         }
     };
 
