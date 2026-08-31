@@ -34615,6 +34615,53 @@ window.deactivateAdminMode = function(...a) {
   <div id="myStatsBody" style="flex:1;overflow-y:auto;padding:16px;"></div>
 </div>
 
+<!-- =====================================================
+     📅 KALENDÁŘ SLEDOVÁNÍ MODAL
+===================================================== -->
+<div id="calendarModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4310;flex-direction:column;overflow:hidden;" onclick="if(event.target===this)closeCalendarModal()">
+  <div style="background:#141414;width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #2a2a2a;">
+    <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;display:flex;align-items:center;gap:8px;">📅 Kalendář sledování</h3>
+    <button onclick="closeCalendarModal()" style="background:none;border:1px solid #333;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
+  </div>
+
+  <!-- Měsíční mřížka -->
+  <div id="calGridView" style="flex:1;overflow-y:auto;padding:16px;display:block;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
+      <button onclick="calChangeMonth(-1)" style="background:#1a1a1a;border:1px solid #2a2a2a;color:#fff;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:1rem;">‹</button>
+      <div onclick="calOpenPicker()" style="flex:1;text-align:center;cursor:pointer;font-weight:700;font-size:1rem;color:#22d3ee;padding:6px;border-radius:8px;" title="Přejít na konkrétní datum">
+        <span id="calMonthLabel">—</span> <span style="opacity:0.6;font-size:0.8rem;">🗓️</span>
+      </div>
+      <button onclick="calChangeMonth(1)" style="background:#1a1a1a;border:1px solid #2a2a2a;color:#fff;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:1rem;">›</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:8px;font-size:0.7rem;color:#666;text-align:center;font-weight:600;text-transform:uppercase;">
+      <div>Po</div><div>Út</div><div>St</div><div>Čt</div><div>Pá</div><div>So</div><div>Ne</div>
+    </div>
+    <div id="calGridBody"></div>
+    <div id="calSourceLabel" style="text-align:center;color:#555;font-size:0.7rem;margin-top:14px;"></div>
+  </div>
+
+  <!-- Přejít na den/měsíc/rok -->
+  <div id="calPickerView" style="display:none;flex:1;overflow-y:auto;padding:20px 16px;">
+    <div style="font-weight:700;color:#fb923c;font-size:0.9rem;margin-bottom:14px;">🗓️ Přejít na konkrétní datum</div>
+    <div style="display:flex;gap:8px;margin-bottom:18px;">
+      <select id="calPickDay" style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;color:#fff;padding:10px;border-radius:8px;font-size:0.9rem;"></select>
+      <select id="calPickMonth" style="flex:1.4;background:#1a1a1a;border:1px solid #2a2a2a;color:#fff;padding:10px;border-radius:8px;font-size:0.9rem;"></select>
+      <select id="calPickYear" style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;color:#fff;padding:10px;border-radius:8px;font-size:0.9rem;"></select>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="calClosePicker()" style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;color:#aaa;padding:12px;border-radius:8px;cursor:pointer;font-weight:600;">Zrušit</button>
+      <button onclick="calGoToDate()" style="flex:2;background:#22d3ee;border:none;color:#0a0a0a;padding:12px;border-radius:8px;cursor:pointer;font-weight:700;">Přejít na den</button>
+    </div>
+  </div>
+
+  <!-- Detail dne -->
+  <div id="calDayView" style="display:none;flex:1;overflow-y:auto;padding:16px;">
+    <button onclick="calShowGridView()" style="background:none;border:none;color:#22d3ee;cursor:pointer;font-size:0.85rem;margin-bottom:12px;padding:4px 0;">‹ Zpět na kalendář</button>
+    <div id="calDayLabel" style="font-weight:700;color:#fff;font-size:1rem;margin-bottom:14px;text-transform:capitalize;"></div>
+    <div id="calDayList"></div>
+  </div>
+</div>
+
 <script>
 // =====================================================
 // 📌 Zábava — pamatování posledního otevřeného seznamu
@@ -35429,6 +35476,16 @@ function renderMyStats() {
       ${statCard('🕓','Historie epizod',`<span id="statHistEpisodes">${histEpisodesCount}</span>`,'#f59e0b',openHistEpisodes)}
     </div>
     ${favs.length===0?`<div style="text-align:center;padding:20px;color:#555;font-size:0.85rem;">Zatím žádné oblíbené. Přidej filmy nebo seriály srdíčkem ❤️</div>`:''}
+    <div onclick="closeMyStatsModal();setTimeout(()=>openCalendarModal(),80)"
+      style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .15s,background .15s;"
+      onmouseover="this.style.borderColor='#22d3ee';this.style.background='#222'" onmouseout="this.style.borderColor='#2a2a2a';this.style.background='#1a1a1a'">
+      <span style="font-size:1.6rem;">📅</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;color:#22d3ee;font-size:0.9rem;">Kalendář sledování</div>
+        <div style="color:#888;font-size:0.72rem;margin-top:2px;">Procházej po dnech, co jsi ve který den sledoval/a</div>
+      </div>
+      <span style="color:#22d3ee;font-size:1.2rem;opacity:0.7;">›</span>
+    </div>
     ${topYears.length?`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:8px;">
       <div style="font-weight:700;color:#fb923c;font-size:0.82rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">📅 TOP roky v oblíbených</div>
       ${topYears.map(([y,c])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
@@ -35570,6 +35627,276 @@ function _paintTraktStatCounts() {
   if (elHM && window._traktHistMovieCount != null) elHM.textContent = window._traktHistMovieCount;
   if (elHE && window._traktHistEpisodeCount != null) elHE.textContent = window._traktHistEpisodeCount;
 }
+
+// =====================================================
+// 📅 KALENDÁŘ SLEDOVÁNÍ — procházení po dnech + skok na datum
+// =====================================================
+function _calMonthNames() { return ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec']; }
+function _calPad(n) { return String(n).padStart(2,'0'); }
+function calDateKey(d) { return `${d.getFullYear()}-${_calPad(d.getMonth()+1)}-${_calPad(d.getDate())}`; }
+
+function openCalendarModal() {
+  const m = document.getElementById('calendarModal');
+  if (!window._calState) { const now = new Date(); window._calState = { year: now.getFullYear(), month: now.getMonth() }; }
+  if (m) m.style.display = 'flex';
+  calShowGridView();
+  calRenderMonth();
+  if (window.updatePwaBtn) updatePwaBtn();
+}
+function closeCalendarModal() {
+  const m = document.getElementById('calendarModal');
+  if (m) m.style.display = 'none';
+}
+function calShowGridView() {
+  const g = document.getElementById('calGridView'), p = document.getElementById('calPickerView'), d = document.getElementById('calDayView');
+  if (g) g.style.display = 'block';
+  if (p) p.style.display = 'none';
+  if (d) d.style.display = 'none';
+}
+
+// ── Načtení a sloučení historie sledování z dostupných zdrojů ──────
+// Priorita: 1) vlastní Sinator backend (pouze id + watched_at, tituly se
+// dotáhnou z TMDB až při otevření konkrétního dne), 2) Trakt (tituly už
+// jsou součástí odpovědi), 3) lokální „Shlédnuto" v appce (má title i datum).
+async function _calFetchMySinatorHistory() {
+  let myData = {}; try { myData = JSON.parse((window._store || localStorage).getItem('sinator_mybackend') || '{}'); } catch (e) {}
+  if (!myData.key) return null;
+  const BASE_URL = 'https://sinator-backend.vercel.app/api';
+  const headers = { 'Content-Type': 'application/json', 'x-api-key': myData.key };
+  const fetchAll = async (type) => {
+    const pageSize = 500, concurrency = 8;
+    let all = [], page = 1, done = false, rounds = 0;
+    while (!done && rounds < 60) {
+      rounds++;
+      const pages = Array.from({ length: concurrency }, (_, i) => page + i);
+      const batches = await Promise.all(pages.map(p =>
+        fetch(`${BASE_URL}/history?type=${type}&page=${p}&limit=${pageSize}`, { headers })
+          .then(r => r.ok ? r.json() : []).catch(() => [])
+      ));
+      for (const b of batches) {
+        if (Array.isArray(b) && b.length) all = all.concat(b);
+        if (!Array.isArray(b) || b.length < pageSize) done = true;
+      }
+      page += concurrency;
+    }
+    return all;
+  };
+  try {
+    const [movies, episodes] = await Promise.all([fetchAll('movies'), fetchAll('episodes')]);
+    return { movies, episodes };
+  } catch (e) { return null; }
+}
+async function _calFetchTraktHistory() {
+  let traktData = {}; try { traktData = JSON.parse((window._store || localStorage).getItem('sinator_trakt') || '{}'); } catch (e) {}
+  if (!traktData.accessToken) return null;
+  const headers = { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': traktData.clientId || 'QOfvLB35_eg1LkJ-51VM7NckrgnWrCAe2xH5EbsumqE', 'Authorization': 'Bearer ' + traktData.accessToken };
+  const fetchAll = async (type) => {
+    let all = [], page = 1; const limit = 200;
+    while (page < 300) {
+      const res = await fetch(`https://api.trakt.tv/sync/history/${type}?page=${page}&limit=${limit}`, { headers });
+      if (!res.ok) break;
+      const data = await res.json();
+      if (!Array.isArray(data) || !data.length) break;
+      all = all.concat(data);
+      if (data.length < limit) break;
+      page++;
+    }
+    return all;
+  };
+  try {
+    const [movies, episodes] = await Promise.all([fetchAll('movies'), fetchAll('episodes')]);
+    return { movies, episodes };
+  } catch (e) { return null; }
+}
+
+async function calBuildIndex(forceRefresh) {
+  if (!forceRefresh && window._calIndexCache && (Date.now() - window._calIndexCache.ts) < 5 * 60 * 1000) return window._calIndexCache;
+  const _s = window._store || localStorage;
+  let entries = [];
+  let source = null;
+  const sinData = await _calFetchMySinatorHistory();
+  if (sinData && ((sinData.movies && sinData.movies.length) || (sinData.episodes && sinData.episodes.length))) {
+    source = 'sinator';
+    (sinData.movies || []).forEach(m => { const ts = +new Date(m.watched_at); if (!isNaN(ts) && m.id) entries.push({ ts, kind: 'movie', tmdbId: m.id }); });
+    (sinData.episodes || []).forEach(e => { const ts = +new Date(e.watched_at); if (!isNaN(ts) && e.id) entries.push({ ts, kind: 'episode', tmdbId: e.id, season: e.season, episode: e.episode }); });
+  } else {
+    const traktData = await _calFetchTraktHistory();
+    if (traktData && ((traktData.movies && traktData.movies.length) || (traktData.episodes && traktData.episodes.length))) {
+      source = 'trakt';
+      (traktData.movies || []).forEach(it => {
+        const ts = +new Date(it.watched_at);
+        if (!isNaN(ts) && it.movie) entries.push({ ts, kind: 'movie', tmdbId: it.movie.ids && it.movie.ids.tmdb, title: it.movie.title, year: it.movie.year });
+      });
+      (traktData.episodes || []).forEach(it => {
+        const ts = +new Date(it.watched_at);
+        if (!isNaN(ts) && it.show) entries.push({ ts, kind: 'episode', tmdbId: it.show.ids && it.show.ids.tmdb, title: it.show.title, year: it.show.year, season: it.episode && it.episode.season, episode: it.episode && it.episode.number, epTitle: it.episode && it.episode.title });
+      });
+    }
+  }
+  if (!entries.length) {
+    let watched = {}; try { watched = JSON.parse(_s.getItem('sinator_watched') || '{}'); } catch (e) {}
+    const vals = Object.values(watched);
+    if (vals.length) source = 'local';
+    vals.forEach(w => {
+      if (!w || !w.addedAt) return;
+      if (w.type === 'episode') {
+        entries.push({ ts: w.addedAt, kind: 'episode', tmdbId: w.tvId, season: w.seasonNumber, episode: w.epNumber, title: (w.title || '').replace(/\sS\d+E\d+$/, ''), poster: w.posterPath });
+      } else {
+        entries.push({ ts: w.addedAt, kind: w.type === 'tv' ? 'show' : 'movie', tmdbId: w.id, title: w.title, year: w.year, poster: w.posterPath });
+      }
+    });
+  }
+  const dayMap = {};
+  entries.forEach(e => {
+    const d = new Date(e.ts);
+    if (isNaN(d)) return;
+    const key = calDateKey(d);
+    (dayMap[key] = dayMap[key] || []).push(e);
+  });
+  window._calIndexCache = { ts: Date.now(), source, dayMap };
+  return window._calIndexCache;
+}
+
+async function calRenderMonth() {
+  const body = document.getElementById('calGridBody');
+  const label = document.getElementById('calMonthLabel');
+  const st = window._calState;
+  if (label) label.textContent = `${_calMonthNames()[st.month]} ${st.year}`;
+  if (body) body.innerHTML = `<div style="text-align:center;padding:30px 0;color:#666;font-size:0.85rem;">⏳ Načítám historii sledování…</div>`;
+  const idx = await calBuildIndex(false);
+  if (window._calState !== st) return; // uživatel mezitím přešel jinam
+  const year = st.year, month = st.month;
+  const firstDay = new Date(year, month, 1);
+  const startOffset = (firstDay.getDay() + 6) % 7; // Po=0 .. Ne=6
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayKey = calDateKey(new Date());
+  let cells = '';
+  for (let i = 0; i < startOffset; i++) cells += `<div></div>`;
+  for (let day = 1; day <= daysInMonth; day++) {
+    const key = `${year}-${_calPad(month + 1)}-${_calPad(day)}`;
+    const items = idx.dayMap[key] || [];
+    const has = items.length > 0;
+    const isToday = key === todayKey;
+    cells += `<div onclick="calOpenDay('${key}')" style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;font-size:0.85rem;cursor:pointer;
+      ${has ? 'background:rgba(34,211,238,0.12);border:1px solid rgba(34,211,238,0.4);' : 'background:#161616;border:1px solid #232323;'}
+      ${isToday ? 'box-shadow:0 0 0 2px #fbbf24 inset;' : ''}
+    ">
+      <span style="color:${has ? '#fff' : '#555'};font-weight:${has ? '700' : '400'};">${day}</span>
+      ${has ? `<span style="font-size:0.6rem;color:#22d3ee;margin-top:2px;">${items.length}×</span>` : ''}
+    </div>`;
+  }
+  if (body) body.innerHTML = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;">${cells}</div>`;
+  const srcLabel = document.getElementById('calSourceLabel');
+  if (srcLabel) srcLabel.textContent = idx.source === 'sinator' ? '🧩 Zdroj: Sinator backend' : idx.source === 'trakt' ? '🎬 Zdroj: Trakt' : idx.source === 'local' ? '📱 Zdroj: lokální historie v appce' : 'Zatím žádná historie sledování k zobrazení.';
+}
+
+function calChangeMonth(delta) {
+  const st = window._calState;
+  let m = st.month + delta, y = st.year;
+  if (m < 0) { m = 11; y--; } else if (m > 11) { m = 0; y++; }
+  st.month = m; st.year = y;
+  calRenderMonth();
+}
+
+function calOpenPicker() {
+  const g = document.getElementById('calGridView'), p = document.getElementById('calPickerView'), d = document.getElementById('calDayView');
+  if (g) g.style.display = 'none';
+  if (d) d.style.display = 'none';
+  if (p) p.style.display = 'block';
+  const st = window._calState;
+  const daySel = document.getElementById('calPickDay'), monSel = document.getElementById('calPickMonth'), yearSel = document.getElementById('calPickYear');
+  if (daySel && !daySel.dataset.filled) { daySel.innerHTML = Array.from({ length: 31 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join(''); daySel.dataset.filled = '1'; }
+  if (monSel && !monSel.dataset.filled) { monSel.innerHTML = _calMonthNames().map((n, i) => `<option value="${i}">${n}</option>`).join(''); monSel.dataset.filled = '1'; }
+  if (yearSel && !yearSel.dataset.filled) {
+    const nowY = new Date().getFullYear();
+    let opts = ''; for (let y = nowY + 1; y >= nowY - 40; y--) opts += `<option value="${y}">${y}</option>`;
+    yearSel.innerHTML = opts; yearSel.dataset.filled = '1';
+  }
+  if (daySel) daySel.value = st.day || new Date().getDate();
+  if (monSel) monSel.value = st.month;
+  if (yearSel) yearSel.value = st.year;
+}
+function calClosePicker() { calShowGridView(); }
+function calGoToDate() {
+  const day = parseInt(document.getElementById('calPickDay').value, 10);
+  const month = parseInt(document.getElementById('calPickMonth').value, 10);
+  const year = parseInt(document.getElementById('calPickYear').value, 10);
+  window._calState = { year, month, day };
+  const g = document.getElementById('calGridView'), p = document.getElementById('calPickerView');
+  if (g) g.style.display = 'none';
+  if (p) p.style.display = 'none';
+  calRenderMonth().then(() => { calOpenDay(`${year}-${_calPad(month + 1)}-${_calPad(day)}`); });
+}
+
+async function calResolveEntry(e) {
+  if (e.title) return e;
+  if (!e.tmdbId) return e;
+  window._calResolveCache = window._calResolveCache || {};
+  const cacheKey = `${e.kind === 'episode' ? 'tv' : 'movie'}_${e.tmdbId}`;
+  if (window._calResolveCache[cacheKey]) { const c = window._calResolveCache[cacheKey]; return { ...e, title: c.title, year: c.year, poster: c.poster }; }
+  const _s = window._store || localStorage;
+  const tmdbKey = _s.getItem('sinator_tmdb_api_key') || (window._siGetKey ? window._siGetKey() : '') || '';
+  if (!tmdbKey) return { ...e, title: 'Neznámý titul' };
+  try {
+    const path = e.kind === 'episode' ? `tv/${e.tmdbId}` : `movie/${e.tmdbId}`;
+    const res = await fetch(`https://api.themoviedb.org/3/${path}?api_key=${tmdbKey}&language=cs-CZ`);
+    if (res.ok) {
+      const d = await res.json();
+      const title = d.title || d.name || 'Neznámý titul';
+      const year = (d.release_date || d.first_air_date || '').slice(0, 4);
+      const poster = d.poster_path || '';
+      window._calResolveCache[cacheKey] = { title, year, poster };
+      return { ...e, title, year, poster };
+    }
+  } catch (err) {}
+  return { ...e, title: 'Neznámý titul' };
+}
+
+function calRenderDayRow(e) {
+  const time = new Date(e.ts);
+  const timeStr = `${_calPad(time.getHours())}:${_calPad(time.getMinutes())}`;
+  const poster = e.poster ? (String(e.poster).startsWith('http') ? e.poster : `https://image.tmdb.org/t/p/w92${e.poster}`) : '';
+  const epLabel = e.kind === 'episode' ? `<div style="color:#888;font-size:0.75rem;">S${_calPad(e.season || 0)}E${_calPad(e.episode || 0)}${e.epTitle ? ' – ' + e.epTitle : ''}</div>` : '';
+  const openType = e.kind === 'movie' ? 'movie' : 'tv';
+  const openId = e.tmdbId;
+  const clickable = !!openId;
+  return `<div ${clickable ? `onclick="calOpenItemDetail('${openId}','${openType}')"` : ''} style="display:flex;gap:10px;align-items:center;padding:10px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;margin-bottom:8px;${clickable ? 'cursor:pointer;' : ''}">
+    ${poster ? `<img src="${poster}" style="width:40px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : `<div style="width:40px;height:60px;background:#242424;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.1rem;">${e.kind === 'episode' ? '📺' : e.kind === 'show' ? '📺' : '🎬'}</div>`}
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:600;font-size:0.9rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.title || 'Neznámý titul'}${e.year ? ` <span style="color:#666;font-weight:400;">(${e.year})</span>` : ''}</div>
+      ${epLabel}
+      <div style="color:#666;font-size:0.7rem;margin-top:2px;">🕓 ${timeStr}</div>
+    </div>
+  </div>`;
+}
+
+async function calOpenDay(key) {
+  const g = document.getElementById('calGridView'), p = document.getElementById('calPickerView'), d = document.getElementById('calDayView');
+  if (g) g.style.display = 'none';
+  if (p) p.style.display = 'none';
+  if (d) d.style.display = 'block';
+  const [y, m, dd] = key.split('-').map(Number);
+  const dateObj = new Date(y, m - 1, dd);
+  const label = document.getElementById('calDayLabel');
+  if (label) label.textContent = dateObj.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const listEl = document.getElementById('calDayList');
+  if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:20px;color:#666;font-size:0.85rem;">⏳ Načítám…</div>`;
+  const idx = await calBuildIndex(false);
+  const items = (idx.dayMap[key] || []).slice().sort((a, b) => a.ts - b.ts);
+  if (!items.length) { if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:30px 0;color:#555;font-size:0.85rem;">Tento den jsi nic nesledoval/a.</div>`; return; }
+  const resolved = await Promise.all(items.map(calResolveEntry));
+  if (listEl) listEl.innerHTML = resolved.map(calRenderDayRow).join('');
+}
+
+function calOpenItemDetail(id, type) {
+  closeCalendarModal();
+  closeMyStatsModal();
+  const numId = parseInt(id, 10);
+  if (window._siOpenDetail) window._siOpenDetail(numId, type);
+  else if (typeof openDetail === 'function') openDetail(numId, type);
+}
+window.openCalendarModal = openCalendarModal;
+window.closeCalendarModal = closeCalendarModal;
 
 // Přiřazení žánrů k shlédnutým titulům (z TMDB, s lokální cache aby se nemuselo pořád dotahovat)
 async function renderGenreStats(watchedMovies, watchedTv) {
@@ -36096,6 +36423,7 @@ async function _zabavaAiCall(prompt) {
   orig['moodModal'] = function() { if(typeof closeMoodModal==='function') closeMoodModal(); };
   orig['koukatSModal'] = function() { if(typeof closeKoukatSModal==='function') closeKoukatSModal(); };
   orig['myStatsModal'] = function() { if(typeof closeMyStatsModal==='function') closeMyStatsModal(); };
+  orig['calendarModal'] = function() { if(typeof closeCalendarModal==='function') closeCalendarModal(); };
   orig['tentodenModal'] = function() { if(typeof closeTentodenModal==='function') closeTentodenModal(); };
   orig['uzByloVKineModal'] = function() { if(typeof closeUzByloVKineModal==='function') closeUzByloVKineModal(); };
   window._modalCloseMap = orig;
