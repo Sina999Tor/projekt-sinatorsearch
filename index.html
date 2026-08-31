@@ -15001,6 +15001,25 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         loadTraktListItems({id: l.ids.trakt, name: l.name, item_count: l.item_count});
     };
 
+    // ── Export pro modul "Náhodný tip" (jede v jiném <script> bloku, viz
+    // níže) — potřebuje číst watchlist/seznamy ze Sinator backendu, Traktu
+    // a Simklu, aniž by musel duplikovat celou logiku připojení.
+    window._ntBackend = {
+        myBackendReady,
+        myWatchlistGet,
+        myListsGet,
+        myListItemsGet,
+        getTrakt: () => state.trakt,
+        getSimkl: () => state.simkl,
+        getFavs: () => state.favs,
+        getTraktHeaders,
+        ensureTraktToken,
+        fetchWithRetry,
+        TRAKT_BASE,
+        SIMKL_BASE,
+        SIMKL_CLIENT_ID
+    };
+
 </script>
 <!-- KINO MODAL -->
 <div class="kino-modal-overlay" id="kinoModal" onclick="if(event.target===this)closeKinoModal()">
@@ -32815,6 +32834,7 @@ function loadSlozky() {
 function saveSlozky(data) {
     localStorage.setItem(SK_KEY, JSON.stringify(data));
 }
+window.loadSlozky = loadSlozky;
 
 // ── Default emojis for folders ───────────────────────────────────
 const FOLDER_EMOJIS = ['📁','🎬','📺','⭐','🔥','💡','🎭','🍿','🎥','💎','🕹️','🌙'];
@@ -34408,10 +34428,14 @@ window.deactivateAdminMode = function(...a) {
     <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">🎲 Co dnes sledovat?</h3>
     <button onclick="closeNahodnyTipModal()" style="background:none;border:1px solid #333;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
   </div>
-  <div style="flex-shrink:0;display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #2a2a2a;">
-    <button onclick="ntSetFilter('movie')" id="ntBtnMovie" class="nt-filter-btn nt-active" style="flex:1;padding:9px;border-radius:10px;border:1px solid #e50914;background:rgba(229,9,20,0.15);color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;">🎬 Film</button>
-    <button onclick="ntSetFilter('tv')" id="ntBtnTv" class="nt-filter-btn" style="flex:1;padding:9px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.85rem;font-weight:600;cursor:pointer;">📺 Seriál</button>
-    <button onclick="ntSetFilter('both')" id="ntBtnBoth" class="nt-filter-btn" style="flex:1;padding:9px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.85rem;font-weight:600;cursor:pointer;">🎲 Obojí</button>
+  <div style="flex-shrink:0;display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px 6px;border-bottom:1px solid #2a2a2a;">
+    <button onclick="ntSetFilter('movie')" id="ntBtnMovie" class="nt-filter-btn nt-active" style="flex:1;min-width:80px;padding:9px;border-radius:10px;border:1px solid #e50914;background:rgba(229,9,20,0.15);color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;">🎬 Film</button>
+    <button onclick="ntSetFilter('tv')" id="ntBtnTv" class="nt-filter-btn" style="flex:1;min-width:80px;padding:9px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.85rem;font-weight:600;cursor:pointer;">📺 Seriál</button>
+    <button onclick="ntSetFilter('both')" id="ntBtnBoth" class="nt-filter-btn" style="flex:1;min-width:80px;padding:9px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.85rem;font-weight:600;cursor:pointer;">🎲 Obojí</button>
+  </div>
+  <div style="flex-shrink:0;display:flex;gap:8px;flex-wrap:wrap;padding:6px 16px 12px;border-bottom:1px solid #2a2a2a;">
+    <button onclick="ntSetFilter('watchlist')" id="ntBtnWatchlist" class="nt-filter-btn" style="flex:1;min-width:120px;padding:9px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.85rem;font-weight:600;cursor:pointer;">🔖 Můj watchlist</button>
+    <button onclick="ntSetFilter('seznam')" id="ntBtnSeznam" class="nt-filter-btn" style="flex:1;min-width:120px;padding:9px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:0.85rem;font-weight:600;cursor:pointer;">📁 Můj seznam</button>
   </div>
   <div id="ntResult" style="flex:1;overflow-y:auto;padding:20px;display:flex;align-items:center;justify-content:center;">
     <p style="color:#888;font-size:0.9rem;text-align:center;">Stiskni tlačítko a dostaneš tip!</p>
@@ -34646,7 +34670,7 @@ function closeNahodnyTipModal() {
 }
 function ntSetFilter(f) {
   _ntFilter = f;
-  ['movie','tv','both'].forEach(x => {
+  ['movie','tv','both','watchlist','seznam'].forEach(x => {
     const btn = document.getElementById('ntBtn'+x.charAt(0).toUpperCase()+x.slice(1));
     if (!btn) return;
     if (x === f) {
@@ -34656,6 +34680,200 @@ function ntSetFilter(f) {
     }
   });
 }
+
+// ── Náhodný výběr z pole (helper) ───────────────────────────────────
+function _ntPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ── Sjednotí položku watchlistu/seznamu z různých zdrojů na tvar
+// { id (tmdb), type: 'movie'|'tv', title, year, poster_path } ──────
+function _ntNormFromMyBackend(it) {
+  if (!it || !it.id) return null;
+  return { id: it.id, type: it.type === 'tv' ? 'tv' : 'movie', title: it.title || '?', year: it.year || '', poster_path: it.poster_path || null };
+}
+function _ntNormFromTrakt(it) {
+  const m = it.movie || it.show;
+  const tmdbId = m?.ids?.tmdb;
+  if (!tmdbId) return null;
+  return { id: tmdbId, type: it.type === 'movie' ? 'movie' : 'tv', title: m.title || '?', year: m.year || '', poster_path: null };
+}
+function _ntNormFromSimkl(it, type) {
+  const m = it.movie || it.show;
+  const tmdbId = m?.ids?.tmdb;
+  if (!tmdbId) return null;
+  return { id: tmdbId, type, title: m.title || '?', year: m.year || '', poster_path: null };
+}
+function _ntNormFromSlozka(it) {
+  if (!it || !it.id) return null;
+  return { id: it.id, type: it.type === 'tv' ? 'tv' : 'movie', title: it.title || '?', year: it.year || '', poster_path: it.poster || null };
+}
+
+// ── Watchlist: Sinator backend → Trakt → Simkl → lokální oblíbené ───
+async function ntGetWatchlistPool() {
+  const b = window._ntBackend;
+  // 1) Sinator backend
+  try {
+    if (b && b.myBackendReady && b.myBackendReady()) {
+      const raw = await b.myWatchlistGet();
+      const items = (raw || []).map(_ntNormFromMyBackend).filter(Boolean);
+      if (items.length) return { items, source: 'Sinator watchlist' };
+    }
+  } catch (e) {}
+  // 2) Trakt
+  try {
+    const trakt = b && b.getTrakt && b.getTrakt();
+    if (trakt && trakt.accessToken) {
+      if (b.ensureTraktToken) await b.ensureTraktToken();
+      const username = trakt.username || 'me';
+      const res = await b.fetchWithRetry(`${b.TRAKT_BASE}/users/${username}/watchlist?extended=full&limit=200`, { headers: b.getTraktHeaders() });
+      if (res.ok) {
+        const raw = await res.json();
+        const items = (raw || []).map(_ntNormFromTrakt).filter(Boolean);
+        if (items.length) return { items, source: 'Trakt watchlist' };
+      }
+    }
+  } catch (e) {}
+  // 3) Simkl ("Chci vidět" = plantowatch)
+  try {
+    const simkl = b && b.getSimkl && b.getSimkl();
+    if (simkl && simkl.accessToken) {
+      const h = { 'Authorization': `Bearer ${simkl.accessToken}`, 'simkl-api-key': b.SIMKL_CLIENT_ID };
+      const [mRes, sRes] = await Promise.all([
+        fetch(`${b.SIMKL_BASE}/sync/all-items/movies/plantowatch?client_id=${b.SIMKL_CLIENT_ID}`, { headers: h }),
+        fetch(`${b.SIMKL_BASE}/sync/all-items/shows/plantowatch?client_id=${b.SIMKL_CLIENT_ID}`, { headers: h })
+      ]);
+      const md = mRes.ok ? await mRes.json() : {};
+      const sd = sRes.ok ? await sRes.json() : {};
+      const items = [
+        ...(md.movies || []).map(it => _ntNormFromSimkl(it, 'movie')),
+        ...(sd.shows || []).map(it => _ntNormFromSimkl(it, 'tv'))
+      ].filter(Boolean);
+      if (items.length) return { items, source: 'Simkl — Chci vidět' };
+    }
+  } catch (e) {}
+  // 4) Lokální oblíbené (localStorage)
+  try {
+    const favs = b && b.getFavs && b.getFavs();
+    if (favs && favs.length) {
+      const items = favs.map(f => ({ id: f.id, type: f.type === 'tv' ? 'tv' : 'movie', title: f.title || '?', year: f.year || '', poster_path: f.poster || null }));
+      if (items.length) return { items, source: '❤️ Oblíbené (lokální)' };
+    }
+  } catch (e) {}
+  return { items: [], source: null };
+}
+
+// ── Seznamy: Sinator backend → Trakt → Simkl → lokální složky ───────
+async function ntGetSeznamPool() {
+  const b = window._ntBackend;
+  // 1) Sinator backend — vlastní seznamy
+  try {
+    if (b && b.myBackendReady && b.myBackendReady()) {
+      const lists = (await b.myListsGet()) || [];
+      const nonEmpty = lists.filter(l => (l.item_count || 0) > 0);
+      if (nonEmpty.length) {
+        const list = _ntPick(nonEmpty);
+        const raw = await b.myListItemsGet(list.id);
+        const items = (raw || []).map(_ntNormFromMyBackend).filter(Boolean);
+        if (items.length) return { items, source: `📁 ${list.name} (Sinator)` };
+      }
+    }
+  } catch (e) {}
+  // 2) Trakt — vlastní seznamy
+  try {
+    const trakt = b && b.getTrakt && b.getTrakt();
+    if (trakt && trakt.accessToken) {
+      if (b.ensureTraktToken) await b.ensureTraktToken();
+      const username = trakt.username || 'me';
+      const headers = b.getTraktHeaders();
+      const listsRes = await b.fetchWithRetry(`${b.TRAKT_BASE}/users/${username}/lists`, { headers });
+      if (listsRes.ok) {
+        const lists = await listsRes.json();
+        if (lists && lists.length) {
+          const list = _ntPick(lists);
+          const itemsRes = await b.fetchWithRetry(`${b.TRAKT_BASE}/users/${username}/lists/${list.ids.trakt}/items?extended=full&limit=200`, { headers });
+          if (itemsRes.ok) {
+            const raw = await itemsRes.json();
+            const items = (raw || []).map(_ntNormFromTrakt).filter(Boolean);
+            if (items.length) return { items, source: `📁 ${list.name} (Trakt)` };
+          }
+        }
+      }
+    }
+  } catch (e) {}
+  // 3) Simkl — celá knihovna (všechny statusy filmů/seriálů/anime)
+  try {
+    const simkl = b && b.getSimkl && b.getSimkl();
+    if (simkl && simkl.accessToken) {
+      const h = { 'Authorization': `Bearer ${simkl.accessToken}`, 'simkl-api-key': b.SIMKL_CLIENT_ID };
+      const res = await fetch(`${b.SIMKL_BASE}/sync/all-items/`, { headers: h });
+      if (res.ok) {
+        const data = await res.json();
+        const items = [
+          ...(data.movies || []).map(it => _ntNormFromSimkl(it, 'movie')),
+          ...(data.shows || []).map(it => _ntNormFromSimkl(it, 'tv')),
+          ...(data.anime || []).map(it => _ntNormFromSimkl(it, 'tv'))
+        ].filter(Boolean);
+        if (items.length) return { items, source: '📁 Moje seznamy (Simkl)' };
+      }
+    }
+  } catch (e) {}
+  // 4) Lokální složky (localStorage sinator_slozky)
+  try {
+    const folders = (b && b.loadSlozky) ? b.loadSlozky() : (window.loadSlozky ? window.loadSlozky() : []);
+    const nonEmpty = (folders || []).filter(f => f.items && f.items.length);
+    if (nonEmpty.length) {
+      const folder = _ntPick(nonEmpty);
+      const items = folder.items.map(_ntNormFromSlozka).filter(Boolean);
+      if (items.length) return { items, source: `📁 ${folder.name} (lokální složka)` };
+    }
+  } catch (e) {}
+  return { items: [], source: null };
+}
+
+// ── Vykreslí náhodně vybranou položku z dané "pool" (watchlist/seznam),
+// doplní detaily (plakát, popis, hodnocení) z TMDB podle tmdb id ──────
+async function ntRenderFromPool(pool) {
+  const res = document.getElementById('ntResult');
+  const btn = document.getElementById('ntBtn');
+  if (!pool || !pool.items.length) {
+    res.innerHTML = '<p style="color:#888;text-align:center;font-size:0.85rem;">Nic nenalezeno — watchlist/seznamy jsou prázdné (a nejsou připojené Sinator/Trakt/Simkl).</p>';
+    if (btn) btn.disabled = false;
+    return;
+  }
+  const picked = _ntPick(pool.items);
+  const type = picked.type === 'tv' ? 'tv' : 'movie';
+  const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+  let title = picked.title, year = picked.year, overview = '', rating = '?';
+  let poster = picked.poster_path ? `https://image.tmdb.org/t/p/w300${picked.poster_path}` : '';
+  if (tmdbKey && picked.id) {
+    try {
+      const d = await fetch(`https://api.themoviedb.org/3/${type}/${picked.id}?api_key=${tmdbKey}&language=cs-CZ`).then(r => r.json());
+      if (d && !d.status_code) {
+        title = d.title || d.name || title;
+        year = (d.release_date || d.first_air_date || '').substring(0, 4) || year;
+        overview = d.overview || '';
+        rating = d.vote_average ? d.vote_average.toFixed(1) : '?';
+        if (d.poster_path) poster = `https://image.tmdb.org/t/p/w300${d.poster_path}`;
+      }
+    } catch (e) {}
+  }
+  const badge = type === 'tv' ? '📺 Seriál' : '🎬 Film';
+  res.innerHTML = `<div style="display:flex;gap:14px;align-items:flex-start;width:100%;">
+    ${poster ? `<img src="${poster}" style="width:80px;border-radius:10px;flex-shrink:0;" onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('nahodnytip','nahodnyTipModal',${picked.id},'${type}')" loading="lazy">` : ''}
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:700;font-size:1rem;color:#fff;margin-bottom:4px;">${title}</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+        <span style="background:rgba(229,9,20,0.2);color:#ff6b6b;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600;">${badge}</span>
+        ${year ? `<span style="color:#888;font-size:0.78rem;">${year}</span>` : ''}
+        <span style="color:#fbbf24;font-size:0.78rem;">★ ${rating}</span>
+      </div>
+      ${pool.source ? `<div style="color:#6090ff;font-size:0.7rem;margin-bottom:6px;">📍 ${pool.source}</div>` : ''}
+      <p style="color:#aaa;font-size:0.78rem;line-height:1.5;margin:0 0 10px;">${(overview || 'Popis není k dispozici.').substring(0, 160)}${overview.length > 160 ? '…' : ''}</p>
+      <button onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('nahodnytip','nahodnyTipModal',${picked.id},'${type}')" style="padding:8px 16px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:0.82rem;font-weight:600;cursor:pointer;">Detail →</button>
+    </div>
+  </div>`;
+  if (btn) btn.disabled = false;
+}
+
 async function loadNahodnyTip() {
   const res = document.getElementById('ntResult');
   const btn = document.getElementById('ntBtn');
@@ -34663,6 +34881,8 @@ async function loadNahodnyTip() {
   res.innerHTML = '<div style="text-align:center;color:#888;padding:20px;font-size:2rem;">⏳</div>';
   if (btn) btn.disabled = true;
   try {
+    if (_ntFilter === 'watchlist') { await ntRenderFromPool(await ntGetWatchlistPool()); return; }
+    if (_ntFilter === 'seznam') { await ntRenderFromPool(await ntGetSeznamPool()); return; }
     const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
     if (!tmdbKey) { res.innerHTML = '<p style="color:#e50914;text-align:center;font-size:0.85rem;">Chybí TMDB API klíč v nastavení.</p>'; if(btn)btn.disabled=false; return; }
     const type = _ntFilter === 'both' ? (Math.random() > 0.5 ? 'movie' : 'tv') : _ntFilter;
@@ -34671,7 +34891,7 @@ async function loadNahodnyTip() {
     const data = await fetch(url).then(r => r.json());
     const items = (data.results || []).filter(i => i.poster_path);
     if (!items.length) { res.innerHTML = '<p style="color:#888;text-align:center;">Nic nenalezeno, zkus znovu.</p>'; if(btn)btn.disabled=false; return; }
-    const item = items[Math.floor(Math.random() * items.length)];
+    const item = _ntPick(items);
     const title = item.title || item.name || '?';
     const year = (item.release_date || item.first_air_date || '').substring(0,4);
     const rating = item.vote_average?.toFixed(1) || '?';
