@@ -2955,6 +2955,9 @@
                 toast('🗑️ Odebráno ze shlédnutých');
             } else {
                 await myHistoryAdd(id, type);
+                // Zaškrtnutí "Shlédnuto" automaticky vyřadí titul ze Sinator watchlistu
+                // (pokud v něm byl) — stejně jako u ostatních "Shlédnuto" tlačítek.
+                try { await myWatchlistRemove(id, type); } catch(e) {}
                 toast('✅ Přidáno do shlédnutých');
             }
             refreshMySinatorWatchedCache();
@@ -9585,13 +9588,34 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             let summary = parts.length ? `✅ Hotovo. ${parts.join(', ')}.` : '⚠️ Není propojený žádný podporovaný zdroj (Sinator/Trakt).';
             if (errors) summary += `\n⚠️ ${errors} položek se nepodařilo odstranit.`;
             setStatus(summary);
-            try { if (typeof _favToast === 'function') _favToast('🧹 Watchlist vyčištěn od shlédnutých'); } catch (e) {}
+            if (removedSinator + removedTrakt > 0) {
+                try { if (typeof _favToast === 'function') _favToast(`🧹 Watchlist vyčištěn od shlédnutých (-${removedSinator + removedTrakt})`); } catch (e) {}
+            }
         } catch (e) {
             setStatus('❌ Chyba: ' + (e && e.message ? e.message : e));
         } finally {
             if (btnEl) { btnEl.disabled = false; btnEl.textContent = origLabel; }
         }
     };
+
+    // ── Automatický (tichý) úklid watchlistu při startu appky ─────────────
+    // Ruční tlačítko výše ("🧹 Odstranit shlédnuté z watchlistu") teď navíc
+    // běží samo při každém otevření appky — watchlist má sloužit jen k
+    // plánování, ne držet duplicitně už zhlédnuté tituly (týká se hlavně
+    // titulů označených jako shlédnuté jinde — Trakt appka, import ZIPu...
+    // — protože přímé zaškrtnutí "Shlédnuto" v týhle appce už watchlist čistí
+    // rovnou). Max 1x za 6 hodin, ať se zbytečně nezatěžuje backend/Trakt
+    // při každém rychlém restartu appky.
+    async function _autoCleanupWatchlistOnStart() {
+        try {
+            if (!myBackendReady() && !(state.trakt && state.trakt.accessToken)) return;
+            const last = parseInt(_store.getItem('sinator_watchlist_autoclean_last') || '0', 10);
+            if (Date.now() - last < 6 * 60 * 60 * 1000) return;
+            _store.setItem('sinator_watchlist_autoclean_last', String(Date.now()));
+            await window.cleanupWatchlistWatched();
+        } catch (e) { console.warn('Auto watchlist cleanup error:', e); }
+    }
+    window.addEventListener('load', () => { setTimeout(_autoCleanupWatchlistOnStart, 3000); });
 
     async function refreshMySinatorWatchedCache() {
         if (typeof myBackendReady !== 'function' || !myBackendReady()) return;
