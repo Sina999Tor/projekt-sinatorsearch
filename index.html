@@ -14621,12 +14621,14 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         _openDetailNoStack(id, type);
     }
 
-    // ══ TEMATICKÉ SEZNAMY (komunitní seznamy z TMDB podle témat) ═══════════
-    // Princip: vezme aktuálně trendující filmy/seriály na TMDB, pro každý
-    // zastoupený žánr najde jednoho zástupce a přes TMDB endpoint
-    // /movie(nebo tv)/{id}/lists dotáhne skutečné veřejné komunitní seznamy,
-    // do kterých ho diváci zařadili. Není to appkou vymyšlený watchlist, ale
-    // reálná data z TMDB komunity, jen roztříděná podle témat/žánrů.
+    // ══ TEMATICKÉ SEZNAMY ═══════════════════════════════════════════════════
+    // Dvě vrstvy dat:
+    // 1) "Tematické výběry" — appkou sestavené žánrové výběry (TMDB /discover),
+    //    vždy plné kvalitních plakátů, nezávislé na tom, jestli zrovna existují
+    //    dobré komunitní seznamy.
+    // 2) "Komunitní seznamy z TMDB" — skutečné veřejné seznamy jiných uživatelů
+    //    TMDB (přes /movie(nebo tv)/{id}/lists u aktuálně trendujících titulů),
+    //    roztříděné podle žánru zástupce.
     const _THEMATIC_GENRE_EMOJI = {
         'Akční':'🔥','Dobrodružné':'🗺️','Animovaný':'🎨','Komedie':'😂','Krimi':'🕵️',
         'Dokumentární':'🎥','Drama':'🎭','Rodinný':'👨‍👩‍👧','Fantasy':'🧙','Historický':'📜',
@@ -14637,6 +14639,28 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     };
     function _thematicEmoji(name) { return _THEMATIC_GENRE_EMOJI[name] || '🎬'; }
 
+    // Ručně sestavené žánrové/tematické výběry — kombinace TMDB žánrů (a u pár
+    // z nich i minimálního hodnocení/počtu hlasů), ať sekce nejsou náhodné, ale
+    // mají jasné téma a hezké plakáty.
+    const CURATED_THEMATIC_THEMES = [
+        { emoji:'🔥', name:'Akční trháky',            type:'movie', params:'with_genres=28&sort_by=popularity.desc&vote_count.gte=200' },
+        { emoji:'😂', name:'Feel-good komedie',       type:'movie', params:'with_genres=35&sort_by=vote_average.desc&vote_count.gte=300' },
+        { emoji:'🔪', name:'Temné thrillery',         type:'movie', params:'with_genres=53&sort_by=vote_average.desc&vote_count.gte=250' },
+        { emoji:'👻', name:'Horory',                  type:'movie', params:'with_genres=27&sort_by=popularity.desc&vote_count.gte=150' },
+        { emoji:'🚀', name:'Sci-fi klasiky',          type:'movie', params:'with_genres=878&sort_by=vote_average.desc&vote_count.gte=500' },
+        { emoji:'🧙', name:'Fantasy světy',           type:'movie', params:'with_genres=14&sort_by=popularity.desc&vote_count.gte=200' },
+        { emoji:'💕', name:'Romantická dramata',      type:'movie', params:'with_genres=10749,18&sort_by=popularity.desc&vote_count.gte=200' },
+        { emoji:'🕵️', name:'Detektivky a záhady',     type:'movie', params:'with_genres=9648,80&sort_by=popularity.desc&vote_count.gte=150' },
+        { emoji:'👨‍👩‍👧', name:'Rodinná dobrodružství', type:'movie', params:'with_genres=10751,12&sort_by=popularity.desc&vote_count.gte=150' },
+        { emoji:'🎭', name:'Černé komedie',           type:'movie', params:'with_genres=35,80&sort_by=popularity.desc&vote_count.gte=100' },
+        { emoji:'⚔️', name:'Válečná dramata',          type:'movie', params:'with_genres=10752,18&sort_by=vote_average.desc&vote_count.gte=200' },
+        { emoji:'🦸', name:'Superhrdinské filmy',      type:'movie', params:'with_genres=28,878&sort_by=popularity.desc&vote_count.gte=300' },
+        { emoji:'🎬', name:'Nejlepší akční seriály',   type:'tv',    params:'with_genres=10759&sort_by=popularity.desc&vote_count.gte=150' },
+        { emoji:'🕶️', name:'Kriminální seriály',       type:'tv',    params:'with_genres=80&sort_by=popularity.desc&vote_count.gte=150' },
+        { emoji:'🧛', name:'Upíři a nadpřirozeno',     type:'movie', params:'with_genres=27,14&sort_by=popularity.desc&vote_count.gte=100' },
+        { emoji:'🌌', name:'Vesmírná dobrodružství',   type:'movie', params:'with_genres=878,12&sort_by=popularity.desc&vote_count.gte=200' }
+    ];
+
     function openThematicListsModal() {
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if(nav && left && right) {
@@ -14645,7 +14669,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             nav.style.display = 'flex';
         }
         $('modalScrollBody').innerHTML = `<div id="thematicListsBody" style="padding:16px;">
-            <div style="text-align:center;padding:40px 0;color:var(--text-muted);">⏳ Hledám komunitní seznamy na TMDB…</div>
+            <div style="text-align:center;padding:40px 0;color:var(--text-muted);">⏳ Sestavuji tematické seznamy…</div>
         </div>`;
         $('modal')?.classList.add('open');
         $('modalContent')?.classList.add('watched-full');
@@ -14656,62 +14680,99 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         }
     }
 
+    async function loadCuratedThematicSections() {
+        if(!tmdbApiKey) return [];
+        const results = await Promise.all(CURATED_THEMATIC_THEMES.map(async theme => {
+            try {
+                const url = `${BASE}/discover/${theme.type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&${theme.params}&page=1`;
+                const data = await fetch(url).then(r=>r.json());
+                const items = (data.results||[]).slice(0,12).map(it => ({ ...it, media_type: theme.type }));
+                return { emoji: theme.emoji, name: theme.name, items };
+            } catch(e) { return { emoji: theme.emoji, name: theme.name, items: [] }; }
+        }));
+        return results.filter(s => s.items.length > 0);
+    }
+
+    async function loadCommunityThematicSections() {
+        const [trendRes, gMovie, gTv] = await Promise.all([
+            fetch(`${BASE}/trending/all/week?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({results:[]})),
+            fetch(`${BASE}/genre/movie/list?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({genres:[]})),
+            fetch(`${BASE}/genre/tv/list?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({genres:[]}))
+        ]);
+        const genreMap = {};
+        [...(gMovie.genres||[]), ...(gTv.genres||[])].forEach(g => { genreMap[g.id] = g.name; });
+
+        const trending = (trendRes.results||[]).filter(it => (it.media_type==='movie'||it.media_type==='tv') && it.genre_ids && it.genre_ids.length);
+        // Vyber max. 7 zástupců pokrývajících různé žánry (podle prvního/dominantního žánru)
+        const seeds = [];
+        const seenGenres = new Set();
+        for(const it of trending) {
+            const primaryGenre = it.genre_ids[0];
+            if(seenGenres.has(primaryGenre)) continue;
+            seenGenres.add(primaryGenre);
+            seeds.push({ item: it, genreName: genreMap[primaryGenre] || 'Doporučené' });
+            if(seeds.length >= 7) break;
+        }
+
+        const sectionResults = await Promise.all(seeds.map(async seed => {
+            const mt = seed.item.media_type;
+            try {
+                const res = await fetch(`${BASE}/${mt}/${seed.item.id}/lists?api_key=${tmdbApiKey}&language=cs-CZ&page=1`).then(r=>r.json());
+                const lists = (res.results||[]).filter(l => (l.item_count||0) >= 4).sort((a,b)=>(b.item_count||0)-(a.item_count||0)).slice(0,10);
+                return { genreName: seed.genreName, lists };
+            } catch(e) { return { genreName: seed.genreName, lists: [] }; }
+        }));
+
+        const seenListIds = new Set();
+        return sectionResults
+            .map(s => ({ ...s, lists: s.lists.filter(l => { if(seenListIds.has(l.id)) return false; seenListIds.add(l.id); return true; }) }))
+            .filter(s => s.lists.length > 0);
+    }
+
     async function loadThematicLists() {
         const body = $('thematicListsBody');
         if(!tmdbApiKey) { if(body) body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">⚠️ Nejdřív nastav TMDB API klíč v Nastavení.</div>'; return; }
         try {
-            const [trendRes, gMovie, gTv] = await Promise.all([
-                fetch(`${BASE}/trending/all/week?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({results:[]})),
-                fetch(`${BASE}/genre/movie/list?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({genres:[]})),
-                fetch(`${BASE}/genre/tv/list?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({genres:[]}))
+            const [curated, community] = await Promise.all([
+                loadCuratedThematicSections(),
+                loadCommunityThematicSections().catch(() => [])
             ]);
-            const genreMap = {};
-            [...(gMovie.genres||[]), ...(gTv.genres||[])].forEach(g => { genreMap[g.id] = g.name; });
-
-            const trending = (trendRes.results||[]).filter(it => (it.media_type==='movie'||it.media_type==='tv') && it.genre_ids && it.genre_ids.length);
-            // Vyber max. 7 zástupců pokrývajících různé žánry (podle prvního/dominantního žánru)
-            const seeds = [];
-            const seenGenres = new Set();
-            for(const it of trending) {
-                const primaryGenre = it.genre_ids[0];
-                if(seenGenres.has(primaryGenre)) continue;
-                seenGenres.add(primaryGenre);
-                seeds.push({ item: it, genreName: genreMap[primaryGenre] || 'Doporučené' });
-                if(seeds.length >= 7) break;
-            }
-
-            const sectionResults = await Promise.all(seeds.map(async seed => {
-                const mt = seed.item.media_type;
-                try {
-                    const res = await fetch(`${BASE}/${mt}/${seed.item.id}/lists?api_key=${tmdbApiKey}&language=cs-CZ&page=1`).then(r=>r.json());
-                    const lists = (res.results||[]).filter(l => (l.item_count||0) >= 4).sort((a,b)=>(b.item_count||0)-(a.item_count||0)).slice(0,10);
-                    return { genreName: seed.genreName, lists };
-                } catch(e) { return { genreName: seed.genreName, lists: [] }; }
-            }));
-
-            const seenListIds = new Set();
-            const sections = sectionResults
-                .map(s => ({ ...s, lists: s.lists.filter(l => { if(seenListIds.has(l.id)) return false; seenListIds.add(l.id); return true; }) }))
-                .filter(s => s.lists.length > 0);
-            state._thematicListsCache = sections;
-            renderThematicListsSections(sections);
+            const data = { curated, community };
+            state._thematicListsCache = data;
+            renderThematicListsSections(data);
         } catch(e) {
             const b = $('thematicListsBody');
             if(b) b.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);">❌ Nepodařilo se načíst seznamy.<br><button onclick="state._thematicListsCache=null;loadThematicLists()" style="margin-top:12px;padding:8px 16px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;">🔄 Zkusit znovu</button></div>`;
         }
     }
 
-    function renderThematicListsSections(sections) {
+    function renderThematicListsSections(data) {
         const body = $('thematicListsBody');
         if(!body) return;
-        if(!sections.length) {
-            body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);">😕 Zatím se nepodařilo najít žádné komunitní seznamy.<br><button onclick="state._thematicListsCache=null;loadThematicLists()" style="margin-top:12px;padding:8px 16px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;">🔄 Zkusit znovu</button></div>`;
+        const curated = (data && data.curated) || [];
+        const community = (data && data.community) || [];
+        if(!curated.length && !community.length) {
+            body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);">😕 Zatím se nepodařilo najít žádné seznamy.<br><button onclick="state._thematicListsCache=null;loadThematicLists()" style="margin-top:12px;padding:8px 16px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;">🔄 Zkusit znovu</button></div>`;
             return;
         }
-        body.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+        let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
                 <button onclick="state._thematicListsCache=null;loadThematicLists()" style="padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);cursor:pointer;font-size:0.78rem;">🔄 Obnovit</button>
-            </div>` +
-            sections.map(sec => `
+            </div>`;
+
+        if(curated.length) {
+            html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin:4px 0 12px;">🎨 Tematické výběry</div>`;
+            html += curated.map(sec => `
+            <div style="margin-bottom:22px;">
+                <div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;color:#fb923c;">${sec.emoji} ${sec.name}</div>
+                <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;">
+                    ${sec.items.map(it => `<div style="flex:0 0 118px;width:118px;">${cardHtml(it)}</div>`).join('')}
+                </div>
+            </div>`).join('');
+        }
+
+        if(community.length) {
+            html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin:18px 0 12px;border-top:1px solid var(--border);padding-top:16px;">👥 Komunitní seznamy z TMDB</div>`;
+            html += community.map(sec => `
             <div style="margin-bottom:22px;">
                 <div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;color:#fb923c;">${_thematicEmoji(sec.genreName)} ${sec.genreName} <span style="color:var(--text-muted);font-weight:400;font-size:0.78rem;">— podle diváků na TMDB</span></div>
                 <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;">
@@ -14728,6 +14789,9 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                     }).join('')}
                 </div>
             </div>`).join('');
+        }
+
+        body.innerHTML = html;
     }
 
     async function openThematicListDetail(listId, name) {
