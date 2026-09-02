@@ -14621,6 +14621,143 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         _openDetailNoStack(id, type);
     }
 
+    // ══ TEMATICKÉ SEZNAMY (komunitní seznamy z TMDB podle témat) ═══════════
+    // Princip: vezme aktuálně trendující filmy/seriály na TMDB, pro každý
+    // zastoupený žánr najde jednoho zástupce a přes TMDB endpoint
+    // /movie(nebo tv)/{id}/lists dotáhne skutečné veřejné komunitní seznamy,
+    // do kterých ho diváci zařadili. Není to appkou vymyšlený watchlist, ale
+    // reálná data z TMDB komunity, jen roztříděná podle témat/žánrů.
+    const _THEMATIC_GENRE_EMOJI = {
+        'Akční':'🔥','Dobrodružné':'🗺️','Animovaný':'🎨','Komedie':'😂','Krimi':'🕵️',
+        'Dokumentární':'🎥','Drama':'🎭','Rodinný':'👨‍👩‍👧','Fantasy':'🧙','Historický':'📜',
+        'Horor':'👻','Hudební':'🎵','Mysteriózní':'🔍','Romantický':'💕','Sci-Fi':'🚀',
+        'Vědeckofantastický':'🚀','TV film':'📺','Thriller':'🔪','Válečný':'⚔️','Western':'🤠',
+        'Akce a dobrodružství':'🔥','Sci-Fi a Fantasy':'🚀','Mýdlová opera':'🎭','Politický':'🏛️',
+        'Kids':'🧸','Zprávy':'📰','Reality':'📺','Talk show':'🎙️'
+    };
+    function _thematicEmoji(name) { return _THEMATIC_GENRE_EMOJI[name] || '🎬'; }
+
+    function openThematicListsModal() {
+        const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
+        if(nav && left && right) {
+            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;background:none;-webkit-text-fill-color:#fb923c;color:#fb923c;" title="Zpět nahoru">🧵 Tematické seznamy ↑</span>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openListsModal();" title="Zpět na Seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            nav.style.display = 'flex';
+        }
+        $('modalScrollBody').innerHTML = `<div id="thematicListsBody" style="padding:16px;">
+            <div style="text-align:center;padding:40px 0;color:var(--text-muted);">⏳ Hledám komunitní seznamy na TMDB…</div>
+        </div>`;
+        $('modal')?.classList.add('open');
+        $('modalContent')?.classList.add('watched-full');
+        if(state._thematicListsCache) renderThematicListsSections(state._thematicListsCache);
+        else loadThematicLists();
+        if(state._thematicScrollTop) {
+            requestAnimationFrame(() => { const sb=$('modalScrollBody'); if(sb) sb.scrollTop = state._thematicScrollTop; state._thematicScrollTop = 0; });
+        }
+    }
+
+    async function loadThematicLists() {
+        const body = $('thematicListsBody');
+        if(!tmdbApiKey) { if(body) body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">⚠️ Nejdřív nastav TMDB API klíč v Nastavení.</div>'; return; }
+        try {
+            const [trendRes, gMovie, gTv] = await Promise.all([
+                fetch(`${BASE}/trending/all/week?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({results:[]})),
+                fetch(`${BASE}/genre/movie/list?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({genres:[]})),
+                fetch(`${BASE}/genre/tv/list?api_key=${tmdbApiKey}&language=cs-CZ`).then(r=>r.json()).catch(()=>({genres:[]}))
+            ]);
+            const genreMap = {};
+            [...(gMovie.genres||[]), ...(gTv.genres||[])].forEach(g => { genreMap[g.id] = g.name; });
+
+            const trending = (trendRes.results||[]).filter(it => (it.media_type==='movie'||it.media_type==='tv') && it.genre_ids && it.genre_ids.length);
+            // Vyber max. 7 zástupců pokrývajících různé žánry (podle prvního/dominantního žánru)
+            const seeds = [];
+            const seenGenres = new Set();
+            for(const it of trending) {
+                const primaryGenre = it.genre_ids[0];
+                if(seenGenres.has(primaryGenre)) continue;
+                seenGenres.add(primaryGenre);
+                seeds.push({ item: it, genreName: genreMap[primaryGenre] || 'Doporučené' });
+                if(seeds.length >= 7) break;
+            }
+
+            const sectionResults = await Promise.all(seeds.map(async seed => {
+                const mt = seed.item.media_type;
+                try {
+                    const res = await fetch(`${BASE}/${mt}/${seed.item.id}/lists?api_key=${tmdbApiKey}&language=cs-CZ&page=1`).then(r=>r.json());
+                    const lists = (res.results||[]).filter(l => (l.item_count||0) >= 4).sort((a,b)=>(b.item_count||0)-(a.item_count||0)).slice(0,10);
+                    return { genreName: seed.genreName, lists };
+                } catch(e) { return { genreName: seed.genreName, lists: [] }; }
+            }));
+
+            const seenListIds = new Set();
+            const sections = sectionResults
+                .map(s => ({ ...s, lists: s.lists.filter(l => { if(seenListIds.has(l.id)) return false; seenListIds.add(l.id); return true; }) }))
+                .filter(s => s.lists.length > 0);
+            state._thematicListsCache = sections;
+            renderThematicListsSections(sections);
+        } catch(e) {
+            const b = $('thematicListsBody');
+            if(b) b.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);">❌ Nepodařilo se načíst seznamy.<br><button onclick="state._thematicListsCache=null;loadThematicLists()" style="margin-top:12px;padding:8px 16px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;">🔄 Zkusit znovu</button></div>`;
+        }
+    }
+
+    function renderThematicListsSections(sections) {
+        const body = $('thematicListsBody');
+        if(!body) return;
+        if(!sections.length) {
+            body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);">😕 Zatím se nepodařilo najít žádné komunitní seznamy.<br><button onclick="state._thematicListsCache=null;loadThematicLists()" style="margin-top:12px;padding:8px 16px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;">🔄 Zkusit znovu</button></div>`;
+            return;
+        }
+        body.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+                <button onclick="state._thematicListsCache=null;loadThematicLists()" style="padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);cursor:pointer;font-size:0.78rem;">🔄 Obnovit</button>
+            </div>` +
+            sections.map(sec => `
+            <div style="margin-bottom:22px;">
+                <div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;color:#fb923c;">${_thematicEmoji(sec.genreName)} ${sec.genreName} <span style="color:var(--text-muted);font-weight:400;font-size:0.78rem;">— podle diváků na TMDB</span></div>
+                <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;">
+                    ${sec.lists.map(l => {
+                        const poster = l.poster_path ? `${IMG}w342${l.poster_path}` : '';
+                        const safeName = jsq(l.name||'');
+                        return `<div onclick="openThematicListDetail(${l.id},'${safeName}')" style="flex:0 0 120px;width:120px;cursor:pointer;">
+                            <div style="width:120px;height:180px;border-radius:10px;overflow:hidden;background:var(--bg-elevated);display:flex;align-items:center;justify-content:center;position:relative;">
+                                ${poster ? `<img src="${poster}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">` : `<span style="font-size:2rem;">🧵</span>`}
+                                <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.75);padding:3px 5px;font-size:0.65rem;color:#fb923c;text-align:center;">📃 ${l.item_count||0}</div>
+                            </div>
+                            <div style="font-size:0.75rem;margin-top:6px;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${(l.name||'').replace(/'/g,"&#39;")}</div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`).join('');
+    }
+
+    async function openThematicListDetail(listId, name) {
+        const right = $('modalNavRight');
+        if(right) right.innerHTML = `<button class="modal-close-btn" onclick="closeThematicListDetail()" title="Zpět na tematické seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Tematické seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+        const body = $('thematicListsBody');
+        if(body) body.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--text-muted);">⏳ Načítám seznam „${(name||'').replace(/'/g,"&#39;")}"…</div>`;
+        try {
+            const res = await fetch(`${BASE}/list/${listId}?api_key=${tmdbApiKey}&language=cs-CZ`);
+            const data = await res.json();
+            const items = (data.items||[]).filter(it => it.media_type==='movie' || it.media_type==='tv');
+            const desc = data.description ? `<div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;line-height:1.5;">${data.description.replace(/'/g,"&#39;")}</div>` : '';
+            if(body) body.innerHTML = `
+                <div style="font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:700;margin-bottom:6px;color:#fff;">🧵 ${(data.name||name||'').replace(/'/g,"&#39;")}</div>
+                ${desc}
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:14px;">📃 ${items.length} položek · ❤️ ${data.favorite_count||0} oblíbení na TMDB</div>
+                <div class="results" style="grid-template-columns:repeat(2,1fr);gap:4px;padding:0;width:100%;">
+                    ${items.length ? items.map(it => cardHtml(it)).join('') : '<div style="grid-column:span 2;text-align:center;padding:30px;color:var(--text-muted);">Tenhle seznam je momentálně prázdný.</div>'}
+                </div>`;
+        } catch(e) {
+            if(body) body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);">❌ Nepodařilo se načíst seznam.</div>`;
+        }
+    }
+
+    function closeThematicListDetail() {
+        const right = $('modalNavRight');
+        if(right) right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openListsModal();" title="Zpět na Seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+        renderThematicListsSections(state._thematicListsCache || []);
+    }
+
     // ══ TRAKT WATCHLIST + LIST PICKER ════════════════════════════════════════
 
     async function toggleTraktWatchlist(tmdbId, type, btn) {
@@ -15355,6 +15492,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <button onclick="closeListsModal();openWatchedModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">✅</span>
             <div><div style="color:#1db954;font-weight:700;">Shlédnuté</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmy a seriály které jsi viděl/a</div></div>
+        </button>
+        <button onclick="closeListsModal();openThematicListsModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🧵</span>
+            <div><div style="color:#fb923c;font-weight:700;">Tematické seznamy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Komunitní seznamy z TMDB podle témat</div></div>
         </button>
         <button onclick="closeListsModal();openRozkoukaneModal()" class="menu-row-btn" id="listsMenuRozkoukaneBtn" style="display:none;" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎭</span>
