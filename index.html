@@ -14736,14 +14736,25 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const body = $('thematicListsBody');
         if(body) body.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--text-muted);">⏳ Načítám seznam „${(name||'').replace(/'/g,"&#39;")}"…</div>`;
         try {
-            const res = await fetch(`${BASE}/list/${listId}?api_key=${tmdbApiKey}&language=cs-CZ`);
-            const data = await res.json();
-            const items = (data.items||[]).filter(it => it.media_type==='movie' || it.media_type==='tv');
-            const desc = data.description ? `<div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;line-height:1.5;">${data.description.replace(/'/g,"&#39;")}</div>` : '';
+            // TMDB /list/{id} vrací položky po stránkách (~20/stránku), stejně
+            // jako klasický discover — u větších seznamů proto musíme projet
+            // všechny stránky, jinak appka ukáže jen prvních 20.
+            let page = 1, totalPages = 1, allItems = [], meta = null;
+            do {
+                if(body && page > 1) body.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--text-muted);">⏳ Načítám seznam „${(name||'').replace(/'/g,"&#39;")}"… (${allItems.length} položek)</div>`;
+                const res = await fetch(`${BASE}/list/${listId}?api_key=${tmdbApiKey}&language=cs-CZ&page=${page}`);
+                const data = await res.json();
+                if(!meta) meta = data;
+                allItems = allItems.concat(data.items || []);
+                totalPages = data.total_pages || 1;
+                page++;
+            } while(page <= totalPages && page <= 50);
+            const items = allItems.filter(it => it.media_type==='movie' || it.media_type==='tv');
+            const desc = meta && meta.description ? `<div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;line-height:1.5;">${meta.description.replace(/'/g,"&#39;")}</div>` : '';
             if(body) body.innerHTML = `
-                <div style="font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:700;margin-bottom:6px;color:#fff;">🧵 ${(data.name||name||'').replace(/'/g,"&#39;")}</div>
+                <div style="font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:700;margin-bottom:6px;color:#fff;">🧵 ${((meta&&meta.name)||name||'').replace(/'/g,"&#39;")}</div>
                 ${desc}
-                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:14px;">📃 ${items.length} položek · ❤️ ${data.favorite_count||0} oblíbení na TMDB</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:14px;">📃 ${items.length} položek · ❤️ ${(meta&&meta.favorite_count)||0} oblíbení na TMDB</div>
                 <div class="results" style="grid-template-columns:repeat(2,1fr);gap:4px;padding:0;width:100%;">
                     ${items.length ? items.map(it => cardHtml(it)).join('') : '<div style="grid-column:span 2;text-align:center;padding:30px;color:var(--text-muted);">Tenhle seznam je momentálně prázdný.</div>'}
                 </div>`;
