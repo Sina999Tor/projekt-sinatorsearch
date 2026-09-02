@@ -14662,6 +14662,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     ];
 
     function openThematicListsModal() {
+        const sbClear = $('modalScrollBody'); if(sbClear) sbClear.onscroll = null;
+        state._thematicFull = null;
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if(nav && left && right) {
             left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;background:none;-webkit-text-fill-color:#fb923c;color:#fb923c;" title="Zpět nahoru">🧵 Tematické seznamy ↑</span>`;
@@ -14682,13 +14684,13 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
     async function loadCuratedThematicSections() {
         if(!tmdbApiKey) return [];
-        const results = await Promise.all(CURATED_THEMATIC_THEMES.map(async theme => {
+        const results = await Promise.all(CURATED_THEMATIC_THEMES.map(async (theme, idx) => {
             try {
                 const url = `${BASE}/discover/${theme.type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&${theme.params}&page=1`;
                 const data = await fetch(url).then(r=>r.json());
                 const items = (data.results||[]).slice(0,12).map(it => ({ ...it, media_type: theme.type }));
-                return { emoji: theme.emoji, name: theme.name, items };
-            } catch(e) { return { emoji: theme.emoji, name: theme.name, items: [] }; }
+                return { themeIndex: idx, emoji: theme.emoji, name: theme.name, items };
+            } catch(e) { return { themeIndex: idx, emoji: theme.emoji, name: theme.name, items: [] }; }
         }));
         return results.filter(s => s.items.length > 0);
     }
@@ -14766,6 +14768,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 <div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;color:#fb923c;">${sec.emoji} ${sec.name}</div>
                 <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;">
                     ${sec.items.map(it => `<div style="flex:0 0 118px;width:118px;">${cardHtml(it)}</div>`).join('')}
+                    <div onclick="openThematicThemeFull(${sec.themeIndex})" style="flex:0 0 118px;width:118px;height:222px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;border:1px dashed rgba(251,146,60,0.5);border-radius:10px;color:#fb923c;background:rgba(251,146,60,0.06);">
+                        <span style="font-size:1.6rem;">➕</span>
+                        <span style="font-size:0.72rem;text-align:center;padding:0 6px;">Zobrazit vše</span>
+                    </div>
                 </div>
             </div>`).join('');
         }
@@ -14830,7 +14836,69 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     function closeThematicListDetail() {
         const right = $('modalNavRight');
         if(right) right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openListsModal();" title="Zpět na Seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
-        renderThematicListsSections(state._thematicListsCache || []);
+        renderThematicListsSections(state._thematicListsCache || {});
+    }
+
+    // ── "Zobrazit vše" — otevře jeden konkrétní tematický výběr na celou
+    // obrazovku s nekonečným scrollem (postupně dotahuje další stránky
+    // stejného TMDB /discover dotazu, dokud jsou k dispozici další položky).
+    function _thematicFullScrollHandler() {
+        const st = state._thematicFull;
+        const sb = $('modalScrollBody');
+        if(!st || !sb || st.loading) return;
+        if(st.page > 0 && st.page >= st.totalPages) return;
+        if(sb.scrollTop + sb.clientHeight >= sb.scrollHeight - 500) {
+            _thematicFullLoadMore();
+        }
+    }
+
+    async function _thematicFullLoadMore() {
+        const st = state._thematicFull;
+        if(!st || st.loading) return;
+        if(st.page > 0 && st.page >= st.totalPages) return;
+        st.loading = true;
+        const statusEl = $('thematicFullStatus');
+        if(statusEl) statusEl.textContent = '⏳ Načítám další…';
+        const nextPage = st.page + 1;
+        try {
+            const url = `${BASE}/discover/${st.theme.type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&${st.theme.params}&page=${nextPage}`;
+            const data = await fetch(url).then(r=>r.json());
+            st.page = data.page || nextPage;
+            st.totalPages = data.total_pages || nextPage;
+            const items = (data.results||[]).filter(it => !st.seenIds.has(it.id)).map(it => { st.seenIds.add(it.id); return { ...it, media_type: st.theme.type }; });
+            const grid = $('thematicFullGrid');
+            if(grid) grid.insertAdjacentHTML('beforeend', items.map(it => cardHtml(it)).join(''));
+            if(statusEl) statusEl.textContent = (st.page >= st.totalPages) ? `✅ Načteno vše (${st.seenIds.size})` : '';
+        } catch(e) {
+            if(statusEl) statusEl.textContent = '❌ Chyba načítání, zkus posunout znovu.';
+        } finally {
+            st.loading = false;
+        }
+    }
+
+    function openThematicThemeFull(idx) {
+        const theme = CURATED_THEMATIC_THEMES[idx];
+        if(!theme) return;
+        state._thematicFull = { theme, page: 0, totalPages: 1, loading: false, seenIds: new Set() };
+        const right = $('modalNavRight');
+        if(right) right.innerHTML = `<button class="modal-close-btn" onclick="closeThematicThemeFull()" title="Zpět na tematické seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Tematické seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+        const body = $('thematicListsBody');
+        if(body) body.innerHTML = `
+            <div style="font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:700;margin-bottom:14px;color:#fff;">${theme.emoji} ${theme.name}</div>
+            <div id="thematicFullGrid" class="results" style="grid-template-columns:repeat(2,1fr);gap:4px;padding:0;width:100%;"></div>
+            <div id="thematicFullStatus" style="text-align:center;padding:16px;color:var(--text-muted);font-size:0.85rem;"></div>`;
+        const sb = $('modalScrollBody');
+        if(sb) sb.onscroll = _thematicFullScrollHandler;
+        _thematicFullLoadMore();
+    }
+
+    function closeThematicThemeFull() {
+        const sb = $('modalScrollBody');
+        if(sb) sb.onscroll = null;
+        state._thematicFull = null;
+        const right = $('modalNavRight');
+        if(right) right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openListsModal();" title="Zpět na Seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+        renderThematicListsSections(state._thematicListsCache || {});
     }
 
     // ══ TRAKT WATCHLIST + LIST PICKER ════════════════════════════════════════
