@@ -1212,7 +1212,7 @@
             <div class="settings-section">
                 <span class="settings-label">▶️ Přehrávání v externí aplikaci</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">
-                    Tlačítko "📱 Přehrát v externí aplikaci" u filmu/seriálu otevře zapnutou appku a zkopíruje název do schránky. Zapni appky, které máš v telefonu, a odkaz uprav v "⚙️ Nastavit" (pokud máš víc zapnutých, appka se před spuštěním zeptá, kterou použít). Výchozí stav je vypnuto.
+                    Tlačítko "📱 Přehrát v externí aplikaci" u filmu/seriálu otevře zapnutou appku a zkopíruje název do schránky. Zapni appky, které máš v telefonu (pokud máš víc zapnutých, appka se před spuštěním zeptá, kterou použít). Výchozí stav je vypnuto. Stremio a Streamlet umí rovnou otevřít vyhledávání s názvem; Nuvio zatím nemá veřejný odkaz na vyhledávání, takže appku jen otevře a název vlož ručně (zkopírovaný už bude ve schránce). Odkazy si můžeš kdykoliv upravit v "⚙️ Nastavit".
                 </div>
                 <div id="externalPlayAppsList" style="display:flex;flex-direction:column;gap:8px;"></div>
                 <button class="settings-btn-small" onclick="addCustomExternalPlayApp()" style="width:100%;margin-top:10px;background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;font-weight:600;padding:10px;">➕ Přidat vlastní aplikaci</button>
@@ -3211,11 +3211,23 @@
     window.jsq = jsq;
 
     // === ▶️ Přehrávání v externí aplikaci (Stremio/Nuvio/Streamlet/vlastní) ===
+    // Stremio má oficiálně zdokumentovaný search deep link: stremio:///search?search={query}
+    // (pozor, TŘI lomítka a parametr se jmenuje "search", ne "query").
+    // Nuvio (com.nuvio.app, Expo scheme "nuvio") nemá veřejně zdokumentovaný
+    // deep link přímo na vyhledávání — odkaz appku jen otevře, název filmu
+    // se zkopíruje do schránky a vloží se ručně do vyhledávání v appce.
     const DEFAULT_EXTERNAL_PLAY_APPS = [
-        { id:'stremio',   name:'Stremio',   emoji:'🟣', urlTemplate:'stremio://search?query={query}', enabled:false, builtin:true },
-        { id:'nuvio',     name:'Nuvio',     emoji:'🎬', urlTemplate:'nuvio://search?q={query}',        enabled:false, builtin:true },
-        { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',    enabled:false, builtin:true }
+        { id:'stremio',   name:'Stremio',   emoji:'🟣', urlTemplate:'stremio:///search?search={query}', enabled:false, builtin:true },
+        { id:'nuvio',     name:'Nuvio',     emoji:'🎬', urlTemplate:'nuvio://',                          enabled:false, builtin:true },
+        { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, builtin:true }
     ];
+    // Migrace: pokud má uživatel uložené staré (nefunkční) odhady odkazů
+    // z dřívější verze, potichu je nahradíme opravenými výchozími hodnotami —
+    // ale jen pokud si je sám ručně nezměnil (jinak bychom přepsali jeho úpravu).
+    const _OLD_EXTERNAL_PLAY_APP_TEMPLATES = {
+        stremio: 'stremio://search?query={query}',
+        nuvio:   'nuvio://search?q={query}'
+    };
 
     function getExternalPlayApps() {
         try {
@@ -3223,9 +3235,18 @@
             if(!raw) return DEFAULT_EXTERNAL_PLAY_APPS.map(a => ({...a}));
             const saved = JSON.parse(raw);
             if(!Array.isArray(saved)) return DEFAULT_EXTERNAL_PLAY_APPS.map(a => ({...a}));
+            let migrated = false;
+            saved.forEach(a => {
+                const oldTpl = _OLD_EXTERNAL_PLAY_APP_TEMPLATES[a.id];
+                if(oldTpl && a.urlTemplate === oldTpl) {
+                    const def = DEFAULT_EXTERNAL_PLAY_APPS.find(d => d.id === a.id);
+                    if(def) { a.urlTemplate = def.urlTemplate; migrated = true; }
+                }
+            });
             const savedIds = new Set(saved.map(a => a.id));
             const merged = saved.slice();
             DEFAULT_EXTERNAL_PLAY_APPS.forEach(d => { if(!savedIds.has(d.id)) merged.push({...d}); });
+            if(migrated) saveExternalPlayApps(merged);
             return merged;
         } catch(e) { return DEFAULT_EXTERNAL_PLAY_APPS.map(a => ({...a})); }
     }
