@@ -1208,6 +1208,15 @@
                 </div>
                 <button class="settings-btn-small" onclick="openExternalInstallModal()" style="width:100%;background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;font-weight:600;padding:10px;">🧩 Instalace do externí aplikace</button>
             </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section">
+                <span class="settings-label">▶️ Přehrávání v externí aplikaci</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">
+                    Tlačítko "📱 Přehrát v externí aplikaci" u filmu/seriálu otevře zapnutou appku a zkopíruje název do schránky. Zapni appky, které máš v telefonu, a odkaz uprav v "⚙️ Nastavit" (pokud máš víc zapnutých, appka se před spuštěním zeptá, kterou použít). Výchozí stav je vypnuto.
+                </div>
+                <div id="externalPlayAppsList" style="display:flex;flex-direction:column;gap:8px;"></div>
+                <button class="settings-btn-small" onclick="addCustomExternalPlayApp()" style="width:100%;margin-top:10px;background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;font-weight:600;padding:10px;">➕ Přidat vlastní aplikaci</button>
+            </div>
             </div>
             <!-- ============ TAB: ADMIN ============ -->
             <div class="settings-tab-content" id="settingsTabContentAdmin">
@@ -3201,6 +3210,184 @@
     }
     window.jsq = jsq;
 
+    // === ▶️ Přehrávání v externí aplikaci (Stremio/Nuvio/Streamlet/vlastní) ===
+    const DEFAULT_EXTERNAL_PLAY_APPS = [
+        { id:'stremio',   name:'Stremio',   emoji:'🟣', urlTemplate:'stremio://search?query={query}', enabled:false, builtin:true },
+        { id:'nuvio',     name:'Nuvio',     emoji:'🎬', urlTemplate:'nuvio://search?q={query}',        enabled:false, builtin:true },
+        { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',    enabled:false, builtin:true }
+    ];
+
+    function getExternalPlayApps() {
+        try {
+            const raw = localStorage.getItem('sinator_external_play_apps');
+            if(!raw) return DEFAULT_EXTERNAL_PLAY_APPS.map(a => ({...a}));
+            const saved = JSON.parse(raw);
+            if(!Array.isArray(saved)) return DEFAULT_EXTERNAL_PLAY_APPS.map(a => ({...a}));
+            const savedIds = new Set(saved.map(a => a.id));
+            const merged = saved.slice();
+            DEFAULT_EXTERNAL_PLAY_APPS.forEach(d => { if(!savedIds.has(d.id)) merged.push({...d}); });
+            return merged;
+        } catch(e) { return DEFAULT_EXTERNAL_PLAY_APPS.map(a => ({...a})); }
+    }
+    window.getExternalPlayApps = getExternalPlayApps;
+
+    function saveExternalPlayApps(apps) {
+        try { localStorage.setItem('sinator_external_play_apps', JSON.stringify(apps)); } catch(e) {}
+    }
+
+    function getEnabledExternalPlayApps() {
+        return getExternalPlayApps().filter(a => a.enabled);
+    }
+    window.getEnabledExternalPlayApps = getEnabledExternalPlayApps;
+
+    function toggleExternalPlayApp(id) {
+        const apps = getExternalPlayApps();
+        const app = apps.find(a => a.id === id);
+        if(!app) return;
+        app.enabled = !app.enabled;
+        saveExternalPlayApps(apps);
+        renderExternalPlayAppsSettings();
+    }
+    window.toggleExternalPlayApp = toggleExternalPlayApp;
+
+    function renderExternalPlayAppsSettings() {
+        const container = document.getElementById('externalPlayAppsList');
+        if(!container) return;
+        const apps = getExternalPlayApps();
+        container.innerHTML = apps.map(app => `
+            <div style="display:flex;align-items:center;gap:10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:10px 12px;">
+                <span style="font-size:1.3rem;flex-shrink:0;">${app.emoji || '📱'}</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;color:#eee;font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_copyTitleEsc(app.name)}</div>
+                    <div style="font-size:0.68rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${app.urlTemplate ? _copyTitleEsc(app.urlTemplate) : 'Odkaz nenastaven — appka se jen otevře'}</div>
+                </div>
+                <button onclick="openConfigureExternalPlayApp('${app.id}')" style="flex-shrink:0;background:none;border:1px solid var(--border);color:var(--text-muted);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;">⚙️ Nastavit</button>
+                <div onclick="toggleExternalPlayApp('${app.id}')" style="width:44px;height:24px;border-radius:12px;background:${app.enabled ? '#1db954' : '#333'};position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
+                    <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${app.enabled ? '22px' : '2px'};transition:left 0.2s;pointer-events:none;"></div>
+                </div>
+            </div>
+        `).join('');
+    }
+    window.renderExternalPlayAppsSettings = renderExternalPlayAppsSettings;
+
+    function openConfigureExternalPlayApp(id) {
+        const apps = getExternalPlayApps();
+        const app = apps.find(a => a.id === id);
+        if(!app) return;
+        document.getElementById('configureExternalPlayAppOverlay')?.remove();
+        const overlay = document.createElement('div');
+        overlay.id = 'configureExternalPlayAppOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
+        const isCustom = !app.builtin;
+        overlay.innerHTML = `
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                    <span style="font-weight:700;font-size:1.05rem;color:var(--gold);">⚙️ Nastavit aplikaci</span>
+                    <button onclick="document.getElementById('configureExternalPlayAppOverlay').remove()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;line-height:1;">✕</button>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:12px;">
+                    <div>
+                        <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:4px;">Název aplikace</label>
+                        <input id="cfgExtAppName" value="${_copyTitleEsc(app.name)}" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-dark);color:#fff;font-size:0.88rem;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:4px;">Odkaz pro spuštění (použij {query} pro název filmu)</label>
+                        <input id="cfgExtAppUrl" value="${_copyTitleEsc(app.urlTemplate || '')}" placeholder="např. nuvio://search?q={query}" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-dark);color:#fff;font-size:0.85rem;box-sizing:border-box;">
+                        <div style="font-size:0.68rem;color:var(--text-muted);opacity:0.7;margin-top:4px;">Pokud appka nemá odkaz na vyhledávání, nech pole prázdné — appka se jen otevře a název filmu se zkopíruje do schránky, aby šel vložit ručně.</div>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:4px;">
+                        ${isCustom ? `<button onclick="deleteCustomExternalPlayApp('${id}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid rgba(229,9,20,0.4);background:rgba(229,9,20,0.12);color:#ff6b6b;font-weight:600;cursor:pointer;">🗑️ Smazat</button>` : ''}
+                        <button onclick="saveConfigureExternalPlayApp('${id}')" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--gold);color:#1a1a1a;font-weight:700;cursor:pointer;">💾 Uložit</button>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+    }
+    window.openConfigureExternalPlayApp = openConfigureExternalPlayApp;
+
+    function saveConfigureExternalPlayApp(id) {
+        const apps = getExternalPlayApps();
+        const app = apps.find(a => a.id === id);
+        if(!app) return;
+        const nameEl = document.getElementById('cfgExtAppName');
+        const urlEl = document.getElementById('cfgExtAppUrl');
+        const newName = (nameEl?.value || '').trim();
+        if(newName) app.name = newName;
+        app.urlTemplate = (urlEl?.value || '').trim();
+        saveExternalPlayApps(apps);
+        document.getElementById('configureExternalPlayAppOverlay')?.remove();
+        renderExternalPlayAppsSettings();
+        try { showToast('Uloženo'); } catch(e) {}
+    }
+    window.saveConfigureExternalPlayApp = saveConfigureExternalPlayApp;
+
+    function deleteCustomExternalPlayApp(id) {
+        let apps = getExternalPlayApps();
+        apps = apps.filter(a => a.id !== id);
+        saveExternalPlayApps(apps);
+        document.getElementById('configureExternalPlayAppOverlay')?.remove();
+        renderExternalPlayAppsSettings();
+    }
+    window.deleteCustomExternalPlayApp = deleteCustomExternalPlayApp;
+
+    function addCustomExternalPlayApp() {
+        const apps = getExternalPlayApps();
+        const id = 'custom_' + Date.now();
+        apps.push({ id, name:'Nová aplikace', emoji:'📱', urlTemplate:'', enabled:false, builtin:false });
+        saveExternalPlayApps(apps);
+        renderExternalPlayAppsSettings();
+        openConfigureExternalPlayApp(id);
+    }
+    window.addCustomExternalPlayApp = addCustomExternalPlayApp;
+
+    function launchExternalPlayApp(app, title) {
+        try { navigator.clipboard && navigator.clipboard.writeText(title); } catch(e) {}
+        try { if (navigator.vibrate) navigator.vibrate(12); } catch(e) {}
+        document.getElementById('externalPlayAppChooserOverlay')?.remove();
+        if(app.urlTemplate && app.urlTemplate.trim()) {
+            const url = app.urlTemplate.replace(/\{query\}/g, encodeURIComponent(title)).replace(/\{title\}/g, encodeURIComponent(title));
+            try { showToast(`Otevírám ${app.name} — název "${title}" zkopírován`); } catch(e) {}
+            window.location.href = url;
+        } else {
+            try { showToast(`${app.name}: název "${title}" zkopírován, appku otevři ručně a vlož ho do vyhledávání`); } catch(e) {}
+        }
+    }
+    window.launchExternalPlayApp = launchExternalPlayApp;
+
+    function showExternalPlayAppChooser(apps, title) {
+        document.getElementById('externalPlayAppChooserOverlay')?.remove();
+        const overlay = document.createElement('div');
+        overlay.id = 'externalPlayAppChooserOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
+        window._extPlayChooserData = { apps, title };
+        overlay.innerHTML = `
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                    <span style="font-weight:700;font-size:1.05rem;color:var(--gold);">▶️ Přehrát v externí aplikaci</span>
+                    <button onclick="document.getElementById('externalPlayAppChooserOverlay').remove()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;line-height:1;">✕</button>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    ${apps.map((a,i) => `<button onclick="window._extPlayChooserPick(${i})" style="text-align:left;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:#fff;cursor:pointer;font-size:0.92rem;font-weight:600;">
+                        <span style="font-size:1.3rem;">${a.emoji || '📱'}</span> ${_copyTitleEsc(a.name)}
+                    </button>`).join('')}
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        window._extPlayChooserPick = (i) => {
+            const data = window._extPlayChooserData;
+            launchExternalPlayApp(data.apps[i], data.title);
+        };
+    }
+    window.showExternalPlayAppChooser = showExternalPlayAppChooser;
+
+    function playInExternalApp(title) {
+        const apps = getEnabledExternalPlayApps();
+        if(!apps.length) { try{ showToast('Nastav appku v Nastavení → Ostatní'); }catch(e){} return; }
+        if(apps.length === 1) { launchExternalPlayApp(apps[0], title); return; }
+        showExternalPlayAppChooser(apps, title);
+    }
+    window.playInExternalApp = playInExternalApp;
+
     // === Přímé "one-click" odkazy na streamovací platformy podle titulu ===
     // TMDB u watch/providers nedává URL konkrétní služby pro daný titul, jen obecný
     // JustWatch odkaz. Tady si pro nejběžnější služby v CZ/SK regionu poskládáme
@@ -4043,6 +4230,7 @@
         if($('omdbApiKeyInput')) $('omdbApiKeyInput').value = omdbApiKey;
         initMyBackendSettingsInputs();
         initHistraSettingsInputs();
+        if(typeof renderExternalPlayAppsSettings === 'function') renderExternalPlayAppsSettings();
         updateGeminiStatus(); updateGroqStatus(); updateOpenRouterStatus(); updateOmdbStatus();
         syncConnectServiceDots();
         updateThemeToggleUI();
@@ -11660,6 +11848,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             
             const posterPath = d.poster_path || '';
             const playBtn = `<button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;font-size:1.5em;font-weight:700;padding:18px;width:100%;margin:14px 0;display:block;" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeTitle}'))">▶️ Přehrát</button>`;
+            const enabledExtPlayApps = (typeof getEnabledExternalPlayApps === 'function') ? getEnabledExternalPlayApps() : [];
+            const externalPlayBtn = enabledExtPlayApps.length ? `<button class="action-btn-modal" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#c4b5fd;font-size:1em;font-weight:700;padding:14px;width:100%;margin:0 0 14px;display:block;" onclick="window.playInExternalApp('${safeTitle}')">📱 Přehrát v externí aplikaci</button>` : '';
             const abGrid = 'display:grid;grid-template-columns:1fr;gap:8px;margin:14px 0;';
             const abSubGrid = 'display:none;grid-template-columns:1fr;gap:8px;margin-top:4px;grid-column:1/-1;';
             const coreBtns = `<div class="action-buttons" style="${abGrid}">
@@ -11692,7 +11882,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 </div>`;
             const extraBtns = '';
             const actionBtns = coreBtns + extraBtns;
-            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div style="display:flex;gap:8px;margin-bottom:8px;">${(typeof myBackendReady==='function'&&myBackendReady())?'':`<button style="flex:1;cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:12px;border-radius:8px;font-size:0.95rem;font-weight:700;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button>`}<button id="mySinatorWatchedBadge_${id}" style="flex:1;display:none;cursor:pointer;padding:12px;border-radius:8px;font-size:0.95rem;font-weight:700;" onclick="toggleMySinatorWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">🧩 …</button></div><div class="modal-chips"><div class="modal-chip" style="cursor:pointer;" title="Najít filmy/seriály se stejným hodnocením" onclick="openRatingBrowse(${d.vote_average||0},'${type}')"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:rgba(255,0,0,0.15);border:1px solid #ff0000;color:#ff5555;" onclick="openYouTube('${safeTitle}')" title="Přehrát trailer">▶️ Trailer</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="openSoundtrack('${safeTitle}')" title="Soundtrack">🎵 Soundtrack</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showSimilarInModal(${id},'${type}',this)" title="Podobné tituly">🎯 Podobné tituly</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="window._dPrefill={tmdbId:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}'};openAddDoporuceni()" title="Doporučit">⭐ Doporučit</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showMediaGallery(${id}, '${type}', '${safeTitle}')" title="Galerie">🖼️ Galerie</button>${(cast || directors.length) ? `<button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showCastCrewChooser(${id},'${type}',${cast?'true':'false'},${directors.length?'true':'false'})" title="Herci a režie">🎭 Herci a režie</button>` : ''}${d.belongs_to_collection ? `<button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showCollectionOverlay(${d.belongs_to_collection.id}, '${jsq(d.belongs_to_collection.name)}')" title="Kolekce">📦 Kolekce</button>` : ''}</div>${playBtn}${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="mySinatorRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div><div id="mySinatorWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
+            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div style="display:flex;gap:8px;margin-bottom:8px;">${(typeof myBackendReady==='function'&&myBackendReady())?'':`<button style="flex:1;cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:12px;border-radius:8px;font-size:0.95rem;font-weight:700;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button>`}<button id="mySinatorWatchedBadge_${id}" style="flex:1;display:none;cursor:pointer;padding:12px;border-radius:8px;font-size:0.95rem;font-weight:700;" onclick="toggleMySinatorWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">🧩 …</button></div><div class="modal-chips"><div class="modal-chip" style="cursor:pointer;" title="Najít filmy/seriály se stejným hodnocením" onclick="openRatingBrowse(${d.vote_average||0},'${type}')"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:rgba(255,0,0,0.15);border:1px solid #ff0000;color:#ff5555;" onclick="openYouTube('${safeTitle}')" title="Přehrát trailer">▶️ Trailer</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="openSoundtrack('${safeTitle}')" title="Soundtrack">🎵 Soundtrack</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showSimilarInModal(${id},'${type}',this)" title="Podobné tituly">🎯 Podobné tituly</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="window._dPrefill={tmdbId:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}'};openAddDoporuceni()" title="Doporučit">⭐ Doporučit</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showMediaGallery(${id}, '${type}', '${safeTitle}')" title="Galerie">🖼️ Galerie</button>${(cast || directors.length) ? `<button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showCastCrewChooser(${id},'${type}',${cast?'true':'false'},${directors.length?'true':'false'})" title="Herci a režie">🎭 Herci a režie</button>` : ''}${d.belongs_to_collection ? `<button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showCollectionOverlay(${d.belongs_to_collection.id}, '${jsq(d.belongs_to_collection.name)}')" title="Kolekce">📦 Kolekce</button>` : ''}</div>${playBtn}${externalPlayBtn}${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="mySinatorRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div><div id="mySinatorWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
             
             if(type === 'tv') {
                 $('modalScrollBody').insertAdjacentHTML('beforeend', `<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);"><h3 style="margin-bottom:16px;font-size:1.2rem;">📺 Sezóny a epizody</h3><div id="seasons-container"></div></div>`);
