@@ -3213,12 +3213,14 @@
     // === ▶️ Přehrávání v externí aplikaci (Stremio/Nuvio/Streamlet/vlastní) ===
     // Stremio má oficiálně zdokumentovaný search deep link: stremio:///search?search={query}
     // (pozor, TŘI lomítka a parametr se jmenuje "search", ne "query").
-    // Nuvio (com.nuvio.app, Expo scheme "nuvio") nemá veřejně zdokumentovaný
-    // deep link přímo na vyhledávání — odkaz appku jen otevře, název filmu
-    // se zkopíruje do schránky a vloží se ručně do vyhledávání v appce.
+    // Nuvio (balíček com.nuvio.app) nemá veřejně zdokumentovaný deep link na
+    // vyhledávání a i samotné schéma "nuvio://" bez cesty/hostitele Android
+    // prohlížeč občas nespustí. Proto appku otevíráme přes Android "intent://"
+    // syntaxi s explicitním package názvem — ta je v mobilních prohlížečích
+    // mnohem spolehlivější než holé vlastní schéma (funguje jen na Androidu).
     const DEFAULT_EXTERNAL_PLAY_APPS = [
         { id:'stremio',   name:'Stremio',   emoji:'🟣', urlTemplate:'stremio:///search?search={query}', enabled:false, builtin:true },
-        { id:'nuvio',     name:'Nuvio',     emoji:'🎬', urlTemplate:'nuvio://',                          enabled:false, builtin:true },
+        { id:'nuvio',     name:'Nuvio',     emoji:'🎬', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.app;end', enabled:false, builtin:true },
         { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, builtin:true }
     ];
     // Migrace: pokud má uživatel uložené staré (nefunkční) odhady odkazů
@@ -3226,7 +3228,7 @@
     // ale jen pokud si je sám ručně nezměnil (jinak bychom přepsali jeho úpravu).
     const _OLD_EXTERNAL_PLAY_APP_TEMPLATES = {
         stremio: 'stremio://search?query={query}',
-        nuvio:   'nuvio://search?q={query}'
+        nuvio:   ['nuvio://search?q={query}', 'nuvio://']
     };
 
     function getExternalPlayApps() {
@@ -3237,8 +3239,10 @@
             if(!Array.isArray(saved)) return DEFAULT_EXTERNAL_PLAY_APPS.map(a => ({...a}));
             let migrated = false;
             saved.forEach(a => {
-                const oldTpl = _OLD_EXTERNAL_PLAY_APP_TEMPLATES[a.id];
-                if(oldTpl && a.urlTemplate === oldTpl) {
+                let oldTpls = _OLD_EXTERNAL_PLAY_APP_TEMPLATES[a.id];
+                if(!oldTpls) return;
+                if(!Array.isArray(oldTpls)) oldTpls = [oldTpls];
+                if(oldTpls.includes(a.urlTemplate)) {
                     const def = DEFAULT_EXTERNAL_PLAY_APPS.find(d => d.id === a.id);
                     if(def) { a.urlTemplate = def.urlTemplate; migrated = true; }
                 }
