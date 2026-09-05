@@ -1212,7 +1212,7 @@
             <div class="settings-section">
                 <span class="settings-label">▶️ Přehrávání v externí aplikaci</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">
-                    Tlačítko "📱 Přehrát v externí aplikaci" u filmu/seriálu otevře zapnutou appku a zkopíruje název do schránky. Zapni appky, které máš v telefonu (pokud máš víc zapnutých, appka se před spuštěním zeptá, kterou použít). Výchozí stav je vypnuto. Stremio a Streamlet umí rovnou otevřít vyhledávání s názvem; Nuvio zatím nemá veřejný odkaz na vyhledávání, takže appku jen otevře a název vlož ručně (zkopírovaný už bude ve schránce). Odkazy si můžeš kdykoliv upravit v "⚙️ Nastavit".
+                    Tlačítko "📱 Přehrát v externí aplikaci" u filmu/seriálu otevře zapnutou appku a zkopíruje název do schránky. Zapni appky, které máš v telefonu (pokud máš víc zapnutých, appka se před spuštěním zeptá, kterou použít). Výchozí stav je vypnuto. Stremio, Streamlet i Nuvio se teď pokusí rovnou otevřít vyhledávání s názvem (u Nuvio jde o neoficiální odkaz, takže pokud by v budoucí verzi appky přestal fungovat, název bude i tak ve schránce ke ručnímu vložení). Odkazy si můžeš kdykoliv upravit v "⚙️ Nastavit".
                 </div>
                 <div id="externalPlayAppsList" style="display:flex;flex-direction:column;gap:8px;"></div>
                 <button class="settings-btn-small" onclick="addCustomExternalPlayApp()" style="width:100%;margin-top:10px;background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;font-weight:600;padding:10px;">➕ Přidat vlastní aplikaci</button>
@@ -3214,13 +3214,16 @@
     // Stremio má oficiálně zdokumentovaný search deep link: stremio:///search?search={query}
     // (pozor, TŘI lomítka a parametr se jmenuje "search", ne "query").
     // Nuvio (balíček com.nuvio.app) nemá veřejně zdokumentovaný deep link na
-    // vyhledávání a i samotné schéma "nuvio://" bez cesty/hostitele Android
-    // prohlížeč občas nespustí. Proto appku otevíráme přes Android "intent://"
-    // syntaxi s explicitním package názvem — ta je v mobilních prohlížečích
-    // mnohem spolehlivější než holé vlastní schéma (funguje jen na Androidu).
+    // vyhledávání, takže "search?query=" níže je neoficiální odhad (appka je
+    // postavená na Expo/React Native, které typicky mapují cestu z URL na
+    // obrazovku podle vlastního schématu). Proto appku otevíráme přes Android
+    // "intent://" syntaxi s explicitním package názvem a browser_fallback_url —
+    // to je v mobilních prohlížečích mnohem spolehlivější než holé vlastní
+    // schéma a funguje jen na Androidu. Pokud appka cestu "search" nerozpozná,
+    // aspoň se otevře a název zůstane zkopírovaný ve schránce.
     const DEFAULT_EXTERNAL_PLAY_APPS = [
         { id:'stremio',   name:'Stremio',   emoji:'🟣', urlTemplate:'stremio:///search?search={query}', enabled:false, builtin:true },
-        { id:'nuvio',     name:'Nuvio',     emoji:'🎬', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.app;end', enabled:false, builtin:true },
+        { id:'nuvio',     name:'Nuvio',     emoji:'🎬', urlTemplate:'intent://search?query={query}#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.nuvio.app;end', enabled:false, builtin:true },
         { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, builtin:true }
     ];
     // Migrace: pokud má uživatel uložené staré (nefunkční) odhady odkazů
@@ -3228,7 +3231,7 @@
     // ale jen pokud si je sám ručně nezměnil (jinak bychom přepsali jeho úpravu).
     const _OLD_EXTERNAL_PLAY_APP_TEMPLATES = {
         stremio: 'stremio://search?query={query}',
-        nuvio:   ['nuvio://search?q={query}', 'nuvio://']
+        nuvio:   ['nuvio://search?q={query}', 'nuvio://', 'intent://open#Intent;scheme=nuvio;package=com.nuvio.app;end']
     };
 
     function getExternalPlayApps() {
@@ -11617,6 +11620,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     <div class="modal-chips">${airDate ? `<div class="modal-chip"><b>📅 Premiéra:</b> <strong>${airDate}</strong></div>` : ''}${runtime ? `<div class="modal-chip"><b>⏱</b> ${runtime} min</div>` : ''}<div class="modal-chip"><b>★</b> ${rating}/10</div><button id="epWatchedBtn_${tvId}_${seasonNumber}_${episodeNumber}" class="modal-chip" style="cursor:pointer;border:1px solid ${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'#1db954':'var(--border)'};background:${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'rgba(29,185,84,0.15)':'transparent'};color:${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'#1db954':'var(--text-muted)'};font-weight:600;" onclick="window.toggleEpWatchedInModal(${tvId},${seasonNumber},${episodeNumber},'${titleJs}',this)">${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>
                     <p class="modal-overview">${ep.overview || 'Popis není dostupný.'}</p>
                     <div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/tv/${tvId}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_ep_${tvId}" style="cursor:pointer;" title="Načítám..."><span class="rating-value" id="csfdRatingVal_ep_${tvId}">…</span><span class="rating-source">Trakt</span></div></div>
+                    ${(typeof getEnabledExternalPlayApps === 'function' && getEnabledExternalPlayApps().length) ? `<button class="action-btn-modal" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#c4b5fd;font-size:1em;font-weight:700;padding:14px;width:100%;margin:0 0 14px;display:block;" onclick="window.playInExternalApp('${seriesTitleJs} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}')">📱 Přehrát v externí aplikaci</button>` : ''}
                     <div class="action-buttons">
                         <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${seriesTitleJs} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}'))">▶️ Přehrát</button>
                         <button class="action-btn-modal youtube" onclick="openYouTube('${seriesTitleJs} S${seasonNumber}E${episodeNumber}')">▶️ Trailer</button>
