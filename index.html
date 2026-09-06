@@ -3868,9 +3868,31 @@
             `<button class="tab-sort-opt${curSort===o.val?' active':''}" onclick="applyTabSort('${o.val}')">${o.label}</button>`
         ).join('');
         if (state.view === 'movies') {
+            html += `<button class="tab-sort-opt" onclick="event.stopPropagation();applyNovinkyFilter()">🆕 Novinky (VOD/Blu-ray)</button>`;
             html += `<button class="tab-sort-opt" onclick="event.stopPropagation();renderReleaseTypeOptions()">🎬 Typ vydání</button>`;
+        } else if (state.view === 'tv' || state.view === 'miniseries' || state.view === 'anime') {
+            html += `<button class="tab-sort-opt" onclick="event.stopPropagation();applyNovinkyFilter()">🆕 Novinky (${new Date().getFullYear()})</button>`;
         }
         dd.innerHTML = html;
+    };
+
+    // "Novinky" — u filmů jen tituly, které v aktuálním roce vyšly na VOD/Blu-ray
+    // (release_type 4 nebo 5, ne kino); u seriálů/minisérií/anime prostě tituly
+    // s premiérou v aktuálním roce (TMDB u seriálů typ uvedení nerozlišuje,
+    // "vyšlo" u nich prakticky vždy znamená premiéru na streamovací platformě).
+    window.applyNovinkyFilter = function() {
+        $('tabSortDropdown').style.display = 'none';
+        $('globalSortBtn')?.classList.remove('active');
+        if (state.view === 'movies') {
+            openNewReleasesBrowse();
+        } else {
+            const y = new Date().getFullYear();
+            state.filters.year = String(y);
+            state.filters.sortBy = 'primary_release_date.desc';
+            if ($('sortFilter')) $('sortFilter').value = state.filters.sortBy;
+            state.page = 1; state._allItems = []; state._loadingMore = false;
+            loadFilteredContent(true);
+        }
     };
 
     window.renderReleaseTypeOptions = function() {
@@ -15496,10 +15518,43 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     }
     window.openReleaseTypeBrowse = openReleaseTypeBrowse;
 
+    // "Novinky" pro filmy — jen tituly, které v aktuálním roce vyšly na VOD (4) nebo
+    // Blu-ray/fyzické médium (5), ne kino. Sdílí fetch/verifikační logiku s _fetchReleaseTypeBatch,
+    // jen s polem typů místo jednoho a s podmínkou na rok konkrétního vydání.
+    async function openNewReleasesBrowse() {
+        closeModal();
+        const viewKey = 'movies';
+        document.querySelectorAll('#mainTabs .tab').forEach(b => b.classList.remove('active'));
+        const tabBtn = document.querySelector(`#mainTabs .tab[data-view="${viewKey}"]`);
+        if (tabBtn) tabBtn.classList.add('active');
+        state.view = viewKey;
+        state.searchQuery = null;
+        state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
+        state.aiDiscoverExtra = null;
+        hideMainAzBar();
+        const curYear = new Date().getFullYear();
+        state.filters = { mediaType: 'movie', genreId: '', year: '', sortBy: 'popularity.desc', ageRating: '', studio: '', network: '', country: '', audio: '' };
+        $('mainContent').style.display = 'block';
+        closeHelperModals();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        resultsEl.innerHTML = '<div class="loading"><div class="spinner"></div>Načítám...</div>';
+        paginationContainer.style.display = 'none';
+
+        state._releaseTypeBrowse = { releaseTypes: [4, 5], requireYear: curYear, tmdbPage: 0, tmdbTotalPages: 1, seen: new Set() };
+        state._customLoadMore = _loadMoreReleaseType;
+
+        setInfiniteLoading(true);
+        const got = await _fetchReleaseTypeBatch(20, true);
+        setInfiniteLoading(false);
+        state._loadingMore = false;
+        if (!got) resultsEl.innerHTML = `<div class="empty">Nenalezeny žádné novinky na VOD/Blu-ray z roku ${curYear}.</div>`;
+    }
+    window.openNewReleasesBrowse = openNewReleasesBrowse;
+
     // Vrátí typ uvedení filmu STEJNÝM způsobem, jakým se počítá chip v detailu (region CZ, jinak US;
     // nejnovější typ, který už nastal, jinak nejbližší nadcházející). Díky tomu browse odpovídá přesně
     // tomu, co je vidět na chipu v detailu — ne hrubému "má tento typ kdekoli na světě".
-    function resolveMovieReleaseType(rdData) {
+    function resolveMovieReleaseInfo(rdData) {
         if (!rdData || !rdData.results) return null;
         const region = (rdData.results||[]).find(r => r.iso_3166_1 === 'CZ') || (rdData.results||[]).find(r => r.iso_3166_1 === 'US');
         const dates = region?.release_dates || [];
@@ -15507,7 +15562,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const today = new Date().toISOString().slice(0,10);
         const past = dates.filter(rd => (rd.release_date||'').slice(0,10) <= today).sort((a,b) => (b.release_date||'').localeCompare(a.release_date||''));
         const entry = past[0] || dates.slice().sort((a,b) => (a.release_date||'').localeCompare(b.release_date||''))[0];
-        return entry ? entry.type : null;
+        return entry ? { type: entry.type, date: (entry.release_date||'').slice(0,10) } : null;
+    }
+    function resolveMovieReleaseType(rdData) {
+        const info = resolveMovieReleaseInfo(rdData);
+        return info ? info.type : null;
     }
 
     // Dotáhne a vyfiltruje další dávku titulů pro browse podle typu vydání.
@@ -15515,13 +15574,19 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     async function _fetchReleaseTypeBatch(targetCount, isFirstBatch) {
         const rtb = state._releaseTypeBrowse;
         if (!rtb) return false;
+        const isNovinky = Array.isArray(rtb.releaseTypes);
+        const typesParam = isNovinky ? rtb.releaseTypes.join('|') : rtb.releaseType;
+        const dateFrom = rtb.requireYear ? `${rtb.requireYear}-01-01` : '1900-01-01';
+        const dateTo = rtb.requireYear ? `${rtb.requireYear}-12-31` : '2030-12-31';
+        const sortBy = isNovinky ? 'primary_release_date.desc' : 'popularity.desc';
+        const voteFloor = isNovinky ? 1 : 10; // novinky ještě nemusí mít moc hlasů
         const collected = [];
         let scannedThisCall = 0;
         const maxScansThisCall = 8; // bezpečnostní limit dotazů na jedno doctažení dávky
         while (collected.length < targetCount && scannedThisCall < maxScansThisCall && (rtb.tmdbPage === 0 || rtb.tmdbPage < rtb.tmdbTotalPages)) {
             rtb.tmdbPage++;
             scannedThisCall++;
-            const durl = `${BASE}/discover/movie?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=popularity.desc&vote_count.gte=10&with_release_type=${rtb.releaseType}&region=US&release_date.gte=1900-01-01&release_date.lte=2030-12-31&page=${rtb.tmdbPage}`;
+            const durl = `${BASE}/discover/movie?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=${sortBy}&vote_count.gte=${voteFloor}&with_release_type=${typesParam}&region=US&release_date.gte=${dateFrom}&release_date.lte=${dateTo}&page=${rtb.tmdbPage}`;
             let ddata;
             try {
                 const dres = await fetch(durl);
@@ -15534,8 +15599,14 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 try {
                     const rdRes = await fetch(`${BASE}/movie/${r.id}/release_dates?api_key=${tmdbApiKey}`);
                     const rdData = await rdRes.json();
-                    const resolvedType = resolveMovieReleaseType(rdData);
-                    if (resolvedType !== rtb.releaseType) return null;
+                    const info = resolveMovieReleaseInfo(rdData);
+                    if (!info) return null;
+                    if (isNovinky) {
+                        if (!rtb.releaseTypes.includes(info.type)) return null;
+                        if (rtb.requireYear && info.date.slice(0,4) !== String(rtb.requireYear)) return null;
+                    } else if (info.type !== rtb.releaseType) {
+                        return null;
+                    }
                     return r;
                 } catch (e) { return null; }
             }));
