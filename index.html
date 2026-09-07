@@ -11656,7 +11656,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                             <button class="action-btn-modal kinobox" onclick="openKinobox('${seriesTitleJs}', '')">🎫 Kinobox</button>
                             <button class="action-btn-modal imdb" onclick="openImdb('${seriesTitleJs}', '')">🎬 IMDb</button>
                             <button class="action-btn-modal" onclick="openEdna('${seriesTitleJs}')">📺 Edna</button>
-                            <button class="action-btn-modal" onclick="openHistra('${seriesTitleJs}')">🎦 Histra.net</button>
+                            <button class="action-btn-modal" onclick="openHistra(${tvId},'tv')">🎦 Histra.net</button>
                             ${state.trakt.accessToken ? `<button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${seriesTitleJs}')">📊 Trakt</button>` : ''}
                         </div>
                     </div>
@@ -11925,7 +11925,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
 <button class="action-btn-modal" style="background:rgba(0,85,165,0.15);border-color:#0055a5;color:#60b0ff;" onclick="openCT('${safeTitle}')">📡 ČT</button>
 <button class="action-btn-modal" onclick="openEdna('${safeTitle}')">📺 Edna</button>
 <button class="action-btn-modal" onclick="openMrkni('${safeTitle}', '${year}')">📺 Mrkni.tv</button>
-<button class="action-btn-modal" onclick="openHistra('${safeTitle}')">🎦 Histra.net</button>
+<button class="action-btn-modal" onclick="openHistra(${id},'${type}')">🎦 Histra.net</button>
 ${state.trakt.accessToken ? `<button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${safeTitle}')">📊 Trakt hledat</button>` : ''}
 </div>
 ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">📋 Trakt ▾</button>
@@ -12582,7 +12582,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     function openEdna(t) { window.open(`https://www.edna.cz/vyhledavani/?q=${encodeURIComponent(t)}`, '_blank'); }
     window.openEdna = openEdna;
     function openImdb(t, y) { window.open(`https://www.imdb.com/find?q=${encodeURIComponent(t+' '+y)}`, '_blank'); }
-    function openHistra(t) { window.open(`https://histra.net/?s=${encodeURIComponent(t)}`, '_blank'); }
+    function openHistra(id, type) { window.open(`https://histra.net/${type === 'tv' ? 'tv' : 'movie'}/${id}`, '_blank'); }
     function openMrkni(title, year) {
         const s = (title||'').toLowerCase();
         const m = {'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'};
