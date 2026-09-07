@@ -31118,7 +31118,8 @@ async function buildEpgView() {
         epg = tvState.epgData || {};
     }
     let windowStart, windowEnd;
-    if(isToday) {
+    if(isToday && !tvState._epgActiveChannel) {
+        // Kompaktní "Vše" pohled — jen okolí teď (kvůli výkonu a přehlednosti)
         windowStart = new Date(now.getTime() - 2*60*60*1000);
         windowEnd   = new Date(now.getTime() + 12*60*60*1000);
     } else {
