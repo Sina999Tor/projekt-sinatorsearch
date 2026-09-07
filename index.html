@@ -30761,7 +30761,7 @@ function _epgCatchupSource(channel) {
     const c = (channel || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     if (/\bnova\b/.test(c)) return { label: '📼 Nova.cz (archiv)', url: 'https://tv.nova.cz/hledat?q=' };
     if (/\bprima\b/.test(c)) return { label: '📼 iPrima.cz (archiv)', url: 'https://www.iprima.cz/vyhledavani?q=' };
-    if (/^ct(\d|\s|:|art|sport|decko|$)/.test(c)) return { label: '📼 iVysílání (archiv)', url: 'https://www.ceskatelevize.cz/ivysilani/hledani/?q=' };
+    if (/^ct(\d|\s|:|art|sport|decko|$)/.test(c)) return { label: '📼 iVysílání (archiv)', url: 'https://www.ceskatelevize.cz/ivysilani/hledani/?keyword=' };
     if (/\btv seznam\b|\btelevize seznam\b|\bseznam tv\b/.test(c)) return { label: '📼 Stream.cz (archiv)', url: 'https://www.stream.cz/hledani?q=' };
     return null;
 }
