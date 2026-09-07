@@ -53,11 +53,33 @@ jobs:
 
           echo "slovakia1.xml: $(wc -c < slovakia1.xml) bytes"
 
+      - name: Archive today's snapshot (rolling 7 days)
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          mkdir -p "archive/$TODAY"
+          [ -s czech3.xml ] && cp czech3.xml "archive/$TODAY/czech3.xml"
+          [ -s slovakia1.xml ] && cp slovakia1.xml "archive/$TODAY/slovakia1.xml"
+          echo "Archivováno pro $TODAY"
+
+          # Smaž archivní dny starší než 7 dní zpátky
+          CUTOFF=$(date -u -d "7 days ago" +%Y-%m-%d)
+          if [ -d archive ]; then
+            for dir in archive/*/; do
+              [ -d "$dir" ] || continue
+              d=$(basename "$dir")
+              if [[ "$d" < "$CUTOFF" ]]; then
+                echo "Mažu starý archiv: $d"
+                rm -rf "$dir"
+              fi
+            done
+          fi
+
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add czech3.xml slovakia1.xml
+          git add -A archive
           if git diff --staged --quiet; then
             echo "Zadna zmena."
           else
