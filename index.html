@@ -31066,7 +31066,7 @@ async function loadEpgData() {
     buildEpgView();
 }
 
-function buildEpgView() {
+async function buildEpgView() {
     const selDate = tvState._epgSelectedDate || epgStartOfDay(new Date());
     const now = new Date();
     const isToday = epgStartOfDay(now).getTime() === selDate.getTime();
@@ -31074,8 +31074,8 @@ function buildEpgView() {
 
     // Popisek data + tlačítko "Dnes"
     const el = document.getElementById('tvProgramDateLabel');
+    const diffDays = Math.round((selDate.getTime() - epgStartOfDay(now).getTime()) / (24*60*60*1000));
     if(el) {
-        const diffDays = Math.round((selDate.getTime() - epgStartOfDay(now).getTime()) / (24*60*60*1000));
         let prefix = '';
         if(diffDays === 0) prefix = 'Dnes, ';
         else if(diffDays === -1) prefix = 'Včera, ';
@@ -31098,7 +31098,25 @@ function buildEpgView() {
         .replace(/[áa]/g,'a').replace(/[éíě]/g,'e').replace(/[óo]/g,'o').replace(/[úůu]/g,'u')
         .replace(/\s*(hd|fhd|4k|hevc)\s*$/i,'').replace(/[.\s]/g,'').trim();
 
-    const epg = tvState.epgData || {};
+    let epg;
+    let archiveMissing = false;
+    const listElEarly = document.getElementById('tvProgramList');
+    if(diffDays < 0) {
+        if(diffDays < -7) {
+            if(listElEarly) listElEarly.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;text-align:center;padding:20px;">⚠️ Zpětně jde zobrazit nejvýš 7 dní (archiv dál nesahá).</div>';
+            renderEpgChannelBubbles([]);
+            tvState._epgAllChannels = {};
+            tvState.epgLoaded = true;
+            return;
+        }
+        if(listElEarly) listElEarly.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:20px 10px;">⏳ Načítám archiv…</div>';
+        const dateKey = selDate.toISOString().slice(0,10);
+        epg = await loadArchivedEpgForDate(dateKey);
+        if(!epg) archiveMissing = true;
+        epg = epg || {};
+    } else {
+        epg = tvState.epgData || {};
+    }
     let windowStart, windowEnd;
     if(isToday) {
         windowStart = new Date(now.getTime() - 2*60*60*1000);
@@ -31151,7 +31169,7 @@ function buildEpgView() {
         const listEl2 = document.getElementById('tvProgramList');
         if(listEl2) listEl2.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;text-align:center;padding:20px;">'
             + '⚠️ Pro tento den nejsou v lokálních XML datech žádná data.'
-            + (isToday ? '' : '<br><span style="font-size:0.72rem;">Zdroj obvykle obsahuje jen dnešek a pár dní dopředu, zpětně data typicky nejsou.</span>')
+            + (archiveMissing ? '<br><span style="font-size:0.72rem;">Záloha pro tento den zatím není k dispozici (archivujeme jen posledních 7 dní, a jen od zavedení zálohování).</span>' : (isToday ? '' : '<br><span style="font-size:0.72rem;">Zdroj obvykle obsahuje jen dnešek a pár dní dopředu, zpětně data typicky nejsou.</span>'))
             + '<br><br>'
             + '<a href="https://tv.seznam.cz" target="_blank" style="color:#00b4d8;">📋 tv.seznam.cz</a> &nbsp;'
             + '<a href="https://mujtvprogram.cz" target="_blank" style="color:#00b4d8;">📋 mujtvprogram.cz</a>'
@@ -31356,7 +31374,7 @@ function renderTvProgram(items, now) {
     listEl.innerHTML = html;
 }
 
-function parseXmltvEpg(xml) {
+function parseXmltvEpg(xml, returnOnly) {
     function parseXmltvTime(s) {
         if(!s) return null;
         s = s.trim();
@@ -31460,7 +31478,32 @@ function parseXmltvEpg(xml) {
         const match = normalizedBuckets[normId] || normalizedBuckets[normName];
         if(match) { epgData[ch.id] = match; epgData[ch.name] = match; }
     }
+    if (returnOnly) return epgData;
     tvState.epgData = epgData;
+}
+
+// Archivované denní zálohy EPG (viz .github/workflows/update-epg.yml) — na
+// branch epg-data se ve složce archive/YYYY-MM-DD/ drží posledních 7 dní.
+// Používá se při procházení EPG do minulosti, kam živé czech3.xml/slovakia1.xml
+// nesahají (ty mají jen dnešek + pár dní dopředu).
+async function loadArchivedEpgForDate(dateKey) {
+    if (!tvState._epgArchiveCache) tvState._epgArchiveCache = {};
+    if (dateKey in tvState._epgArchiveCache) return tvState._epgArchiveCache[dateKey];
+    const files = [
+        `https://raw.githubusercontent.com/Sina999Tor/projekt-sinatorsearch/epg-data/archive/${dateKey}/czech3.xml`,
+        `https://raw.githubusercontent.com/Sina999Tor/projekt-sinatorsearch/epg-data/archive/${dateKey}/slovakia1.xml`
+    ];
+    let combinedXml = '';
+    for (const file of files) {
+        try {
+            const res = await fetch(file, { signal: AbortSignal.timeout(20000) });
+            if (!res.ok) continue;
+            combinedXml += (await res.text()) + '\n';
+        } catch (e) { /* pro daný den nemusí záloha existovat */ }
+    }
+    const data = combinedXml.length > 100 ? parseXmltvEpg(combinedXml, true) : null;
+    tvState._epgArchiveCache[dateKey] = data;
+    return data;
 }
 // -----------------------------------------------------------------------------
 // Načtení lokálních EPG XML souborů (czech3.xml + slovakia1.xml)
