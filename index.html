@@ -11941,7 +11941,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 </div>`;
             const extraBtns = '';
             const actionBtns = coreBtns + extraBtns;
-            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div style="display:flex;gap:8px;margin-bottom:8px;">${(typeof myBackendReady==='function'&&myBackendReady())?'':`<button style="flex:1;cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:12px;border-radius:8px;font-size:0.95rem;font-weight:700;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button>`}<button id="mySinatorWatchedBadge_${id}" style="flex:1;display:none;cursor:pointer;padding:12px;border-radius:8px;font-size:0.95rem;font-weight:700;" onclick="toggleMySinatorWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">🧩 …</button></div><div class="modal-chips"><div class="modal-chip" style="cursor:pointer;" title="Najít filmy/seriály se stejným hodnocením" onclick="openRatingBrowse(${d.vote_average||0},'${type}')"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:rgba(255,0,0,0.15);border:1px solid #ff0000;color:#ff5555;" onclick="openYouTube('${safeTitle}')" title="Přehrát trailer">▶️ Trailer</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="openSoundtrack('${safeTitle}')" title="Soundtrack">🎵 Soundtrack</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showSimilarInModal(${id},'${type}',this)" title="Podobné tituly">🎯 Podobné tituly</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="window._dPrefill={tmdbId:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}'};openAddDoporuceni()" title="Doporučit">⭐ Doporučit</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showMediaGallery(${id}, '${type}', '${safeTitle}')" title="Galerie">🖼️ Galerie</button>${(cast || directors.length) ? `<button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showCastCrewChooser(${id},'${type}',${cast?'true':'false'},${directors.length?'true':'false'})" title="Herci a režie">🎭 Herci a režie</button>` : ''}${d.belongs_to_collection ? `<button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showCollectionOverlay(${d.belongs_to_collection.id}, '${jsq(d.belongs_to_collection.name)}')" title="Kolekce">📦 Kolekce</button>` : ''}</div>${playBtn}${externalPlayBtn}${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="mySinatorRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div><div id="mySinatorWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
+            $('modalScrollBody').innerHTML=`${modalNav(title, hasBack, `<button class="modal-fav-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavInModalCurrent()">${isLiked ? '❤️' : '🤍'}</button>`)}${bg}<div class="modal-body"><h2 class="modal-title">${title}</h2>${d.tagline?`<p class="modal-tagline">"${d.tagline}"</p>`:''}<div style="display:flex;gap:8px;margin-bottom:8px;">${(typeof myBackendReady==='function'&&myBackendReady())?'':`<button style="flex:1;cursor:pointer;border:1px solid ${isWatched(id,type)?'#1db954':'var(--border)'};background:${isWatched(id,type)?'rgba(29,185,84,0.15)':'transparent'};color:${isWatched(id,type)?'#1db954':'var(--text-muted)'};padding:12px;border-radius:8px;font-size:0.95rem;font-weight:700;" onclick="toggleWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">${isWatched(id,type)?'✅ Shlédnuto':'☐ Shlédnuto'}</button>`}<button id="mySinatorWatchedBadge_${id}" style="flex:1;display:none;cursor:pointer;padding:12px;border-radius:8px;font-size:0.95rem;font-weight:700;" onclick="toggleMySinatorWatched(${id},'${type}','${jsq(title)}',${year?`'${year}'`:'\'\''},'${posterPath}',this)">🧩 …</button></div><div class="modal-chips"><div class="modal-chip" style="cursor:pointer;" title="Najít filmy/seriály se stejným hodnocením" onclick="openRatingBrowse(${d.vote_average||0},'${type}')"><b>★</b> ${rating}/10</div>${releaseDateChip}${releaseTypeChip}${certChip}${seriesStatusChip}<button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:rgba(255,0,0,0.15);border:1px solid #ff0000;color:#ff5555;" onclick="openYouTube('${safeTitle}')" title="Přehrát trailer">▶️ Trailer</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="openSoundtrack('${safeTitle}')" title="Soundtrack">🎵 Soundtrack</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showSimilarInModal(${id},'${type}',this)" title="Podobné tituly">🎯 Podobné tituly</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="window._dPrefill={tmdbId:${id},type:'${type}',title:'${safeTitle}',year:${year},poster:'${d.poster_path||''}'};openAddDoporuceni()" title="Doporučit">⭐ Doporučit</button><button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showMediaGallery(${id}, '${type}', '${safeTitle}')" title="Galerie">🖼️ Galerie</button>${(cast || directors.length) ? `<button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showCastCrewChooser(${id},'${type}',${cast?'true':'false'},${directors.length?'true':'false'},'${safeTitle}',${year||0})" title="Herci a režie">🎭 Herci a režie</button>` : ''}${d.belongs_to_collection ? `<button class="modal-chip" style="cursor:pointer;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);" onclick="showCollectionOverlay(${d.belongs_to_collection.id}, '${jsq(d.belongs_to_collection.name)}')" title="Kolekce">📦 Kolekce</button>` : ''}</div>${playBtn}${externalPlayBtn}${genres?`<div class="modal-genres">${genres}</div>`:''}<p class="modal-overview">${d.overview || 'Popis není dostupný.'}</p>${providersHtml}<div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/${type}/${id}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_${id}" style="cursor:pointer;" title="Načítám ČSFD..."><span class="rating-value" id="csfdRatingVal_${id}">…</span><span class="rating-source">ČSFD</span></div></div><div id="traktUserRatingSlot_${id}"></div><div id="mySinatorRatingSlot_${id}"></div><div id="traktWatchHistorySlot_${id}"></div><div id="mySinatorWatchHistorySlot_${id}"></div>${actionBtns}</div></div>`;
             
             if(type === 'tv') {
                 $('modalScrollBody').insertAdjacentHTML('beforeend', `<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);"><h3 style="margin-bottom:16px;font-size:1.2rem;">📺 Sezóny a epizody</h3><div id="seasons-container"></div></div>`);
@@ -11968,7 +11968,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         } catch(e) { console.error(e); $('modalScrollBody').innerHTML=`<div class="empty">Chyba detailu: ${e.message}</div>`; }
     }
 
-    function showCastCrewChooser(movieId, movieType, hasCast, hasDirectors) {
+    function showCastCrewChooser(movieId, movieType, hasCast, hasDirectors, safeTitle, year) {
         document.getElementById('castCrewChooser')?.remove();
         const overlay = document.createElement('div');
         overlay.id = 'castCrewChooser';
@@ -11988,6 +11988,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                     <div style="font-weight:700;font-size:1rem;">Režie</div>
                     <div style="margin-left:auto;color:#8a2be2;font-size:1.2rem;">›</div>
                 </div>` : ''}
+                <div onclick="document.getElementById('castCrewChooser').remove();document.body.style.overflow='';showDabingModal(${movieId},'${movieType}','${safeTitle||''}',${year||0})" style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;cursor:pointer;">
+                    <div style="width:44px;height:44px;border-radius:10px;background:rgba(96,144,255,0.15);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;">🎙</div>
+                    <div style="font-weight:700;font-size:1rem;">Dabing</div>
+                    <div style="margin-left:auto;color:#8a2be2;font-size:1.2rem;">›</div>
+                </div>
             </div>`;
         overlay.addEventListener('click', e => { if(e.target === overlay) { overlay.remove(); document.body.style.overflow=''; } });
         document.body.appendChild(overlay);
@@ -12071,6 +12076,135 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         overlay.addEventListener('click', e => { if(e.target === overlay) { overlay.remove(); document.body.style.overflow=''; } });
         document.body.appendChild(overlay);
         document.body.style.overflow = 'hidden';
+    }
+
+    // ── Dabing (CZ/SK) — zjištění pomocí AI (TMDB dabéry needeviduje) ─────
+    // Používá stejnou trojici providerů jako AI vyhledávání (Gemini → Groq →
+    // OpenRouter s klíčem → OpenRouter free modely), ale jako prostý text
+    // completion bez function-calling (na dabing nepotřebujeme tool schema).
+    async function _callDabingAi(systemPrompt, userPrompt) {
+        const _postJson = async (url, headers, body) => {
+            try {
+                const res = await _withAiTimeout(fetch(url, { method:'POST', headers, body: JSON.stringify(body) }), 20000);
+                if (!res || !res.ok) return null;
+                return await res.json().catch(() => null);
+            } catch(e) { return null; }
+        };
+        // 1) Gemini
+        if (geminiApiKey) {
+            const j = await _postJson(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${geminiApiKey}`,
+                { 'Content-Type':'application/json' },
+                { system_instruction:{parts:[{text:systemPrompt}]}, contents:[{role:'user',parts:[{text:userPrompt}]}], generationConfig:{temperature:0.15, maxOutputTokens:1200} }
+            );
+            const text = j?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) return text;
+        }
+        // 2) Groq
+        if (groqApiKey) {
+            const j = await _postJson('https://api.groq.com/openai/v1/chat/completions',
+                { 'Content-Type':'application/json', 'Authorization':'Bearer '+groqApiKey },
+                { model:'openai/gpt-oss-120b', messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}], temperature:0.15, max_tokens:1200 }
+            );
+            const text = j?.choices?.[0]?.message?.content;
+            if (text) return text;
+        }
+        // 3) OpenRouter (vlastní klíč)
+        if (openRouterKey) {
+            const j = await _postJson('https://openrouter.ai/api/v1/chat/completions',
+                { 'Content-Type':'application/json', 'Authorization':'Bearer '+openRouterKey, 'HTTP-Referer':'https://si-search.netlify.app', 'X-Title':'Sinator' },
+                { model:'openrouter/free', messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}], temperature:0.15, max_tokens:1200 }
+            );
+            const text = j?.choices?.[0]?.message?.content;
+            if (text) return text;
+        }
+        // 4) OpenRouter free modely bez klíče
+        const freeModels = ['meta-llama/llama-3.3-70b-instruct:free','meta-llama/llama-3.1-8b-instruct:free','mistralai/mistral-7b-instruct:free'];
+        for (const model of freeModels) {
+            const j = await _postJson('https://openrouter.ai/api/v1/chat/completions',
+                { 'Content-Type':'application/json', 'Authorization':'Bearer sk-or-free', 'HTTP-Referer':'https://si-search.netlify.app', 'X-Title':'Sinator' },
+                { model, messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}], temperature:0.15, max_tokens:1200 }
+            );
+            const text = j?.choices?.[0]?.message?.content;
+            if (text) return text;
+        }
+        return null;
+    }
+
+    async function showDabingModal(movieId, movieType, safeTitle, year) {
+        document.getElementById('castCrewChooser')?.remove();
+        document.getElementById('dabingOverlay')?.remove();
+        const overlay = document.createElement('div');
+        overlay.id = 'dabingOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-card);z-index:10600;display:flex;flex-direction:column;overflow:hidden;';
+        overlay.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+                <span style="font-weight:700;font-size:1.1rem;">🎙 Dabing</span>
+                <button onclick="document.getElementById('dabingOverlay').remove();document.body.style.overflow=''" style="width:36px;height:36px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);color:#fff;cursor:pointer;font-size:1.1rem;">✕</button>
+            </div>
+            <div id="dabingBody" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;">
+                <div style="text-align:center;padding:40px 0;color:var(--text-muted);"><span class="ai-spin" style="font-size:1.6rem;display:inline-block;">⟳</span><div style="margin-top:10px;">Zjišťuji informace o dabingu…</div></div>
+            </div>`;
+        overlay.addEventListener('click', e => { if(e.target === overlay) { overlay.remove(); document.body.style.overflow=''; } });
+        document.body.appendChild(overlay);
+        document.body.style.overflow = 'hidden';
+
+        const cacheKey = `sinator_dabing_${movieType}_${movieId}`;
+        let result = null;
+        try {
+            const cached = _store.getItem(cacheKey);
+            if (cached) result = JSON.parse(cached);
+        } catch(e) {}
+
+        if (!result) {
+            const systemPrompt = 'Jsi expert na český a slovenský dabing filmů a seriálů. Na dotaz o konkrétním titulu vrať POUZE validní JSON (žádný text okolo, žádný markdown blok) přesně v tomto formátu: {"cz":[{"actor":"Jméno dabéra","character":"Koho/jakou postavu daboval"}],"sk":[{"actor":"Jméno dabéra","character":"Koho/jakou postavu daboval"}],"note":"volitelná krátká poznámka - např. že SK dabing neexistuje, že jde o česko/slovenskou produkci s originálním zvukem, nebo že údaje nejsou jisté"}. Pokud daný dabing (CZ nebo SK) neexistuje nebo o něm nemáš spolehlivé informace, vrať pro něj prázdné pole []. Uveď max 12 nejdůležitějších rolí u každého jazyka. Pokud si nejsi jistý konkrétním jménem dabéra, danou položku radši vynech, nevymýšlej si smyšlená jména.';
+            const userPrompt = `Titul: "${safeTitle}"${year ? ' (' + year + ')' : ''}. Uveď český (CZ) a slovenský (SK) dabing - jména dabérů a koho daboval.`;
+            const raw = await _callDabingAi(systemPrompt, userPrompt);
+            if (raw) {
+                try {
+                    const clean = raw.replace(/```json|```/g, '').trim();
+                    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+                    result = JSON.parse(jsonMatch ? jsonMatch[0] : clean);
+                } catch(e) { result = null; }
+            }
+            if (result) {
+                try { _store.setItem(cacheKey, JSON.stringify(result)); } catch(e) {}
+            }
+        }
+
+        const body = document.getElementById('dabingBody');
+        if (!body) return; // overlay mezitím zavřen
+        const cz = result?.cz || [], sk = result?.sk || [];
+        if (!cz.length && !sk.length && !result?.note) {
+            body.innerHTML = `<div style="text-align:center;padding:40px 16px;color:var(--text-muted);">
+                <div style="font-size:2rem;margin-bottom:10px;">🎙</div>
+                Informace o dabingu se nepodařilo najít.<br>
+                <span style="font-size:0.78rem;">Pro spolehlivější výsledky nastavte Gemini/Groq/OpenRouter API klíč v Nastavení.</span>
+            </div>`;
+            return;
+        }
+        const renderList = (arr, label, color) => {
+            if (!arr || !arr.length) return `<div>
+                <div style="font-size:0.78rem;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">${label}</div>
+                <div style="padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;color:var(--text-muted);font-size:0.8rem;">Nedostupné / nenalezeno</div>
+            </div>`;
+            const rows = arr.map(p => `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;">
+                    <div style="width:40px;height:40px;border-radius:50%;background:rgba(139,92,246,0.15);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">🎙</div>
+                    <div style="min-width:0;">
+                        <div style="font-weight:700;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.actor || '?'}</div>
+                        <div style="color:var(--text-muted);font-size:0.72rem;margin-top:2px;">${p.character || ''}</div>
+                    </div>
+                </div>`).join('');
+            return `<div>
+                <div style="font-size:0.78rem;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">${label} (${arr.length})</div>
+                <div style="display:flex;flex-direction:column;gap:8px;">${rows}</div>
+            </div>`;
+        };
+        body.innerHTML = `
+            ${renderList(cz, '🇨🇿 Český dabing', '#7db8f7')}
+            ${renderList(sk, '🇸🇰 Slovenský dabing', '#f5a623')}
+            ${result?.note ? `<div style="padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;font-size:0.8rem;color:var(--text-muted);">ℹ️ ${result.note}</div>` : ''}
+            <div style="font-size:0.68rem;color:var(--text-muted);text-align:center;margin-top:6px;">Zdroj: AI odhad — pro ověření doporučujeme dabingforum.cz nebo dabingdatabaze.cz</div>
+        `;
     }
 
     async function loadCsfdRating(tmdbId, type, title, year, idPrefix='') {
