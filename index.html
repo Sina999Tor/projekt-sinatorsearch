@@ -30759,10 +30759,12 @@ function playEpgChannelAlt(chName) {
 
 function _epgCatchupSource(channel) {
     const c = (channel || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    if (/\bnova\b/.test(c)) return { label: '📼 Nova.cz (archiv)', url: 'https://tv.nova.cz/hledat?q=' };
-    if (/\bprima\b/.test(c)) return { label: '📼 iPrima.cz (archiv)', url: 'https://www.iprima.cz/vyhledavani?q=' };
-    if (/^ct(\d|\s|:|art|sport|decko|$)/.test(c)) return { label: '📼 iVysílání (archiv)', url: 'https://www.ceskatelevize.cz/ivysilani/hledani/?keyword=' };
-    if (/\btv seznam\b|\btelevize seznam\b|\bseznam tv\b/.test(c)) return { label: '📼 Stream.cz (archiv)', url: 'https://www.stream.cz/hledani?q=' };
+    if (/\bnova\b/.test(c)) return { type: 'query', label: '📼 Nova.cz (archiv)', url: 'https://tv.nova.cz/hledat?q=' };
+    if (/\bprima\b/.test(c)) return { type: 'query', label: '📼 iPrima.cz (archiv)', url: 'https://www.iprima.cz/vyhledavani?q=' };
+    if (/^ct(\d|\s|:|art|sport|decko|$)/.test(c)) return { type: 'query', label: '📼 iVysílání (archiv)', url: 'https://www.ceskatelevize.cz/ivysilani/hledani/?keyword=' };
+    // Televize Seznam má vlastní přehratelný archiv adresovaný přesným časem
+    // vysílání (?tf=<unix čas v sekundách>), ne textovým hledáním.
+    if (/seznam/.test(c)) return { type: 'timestamp', label: '▶️ Televize Seznam (archiv)', urlBase: 'https://www.televizeseznam.cz/tv?tf=' };
     return null;
 }
 
@@ -30799,7 +30801,11 @@ function openEpgDetail(ep) {
             <div style="display:flex;flex-wrap:wrap;gap:8px;">
                 <button onclick="document.getElementById('epgDetailModal').style.display='none'; if(typeof openSourcesModal==='function') openSourcesModal('${title.replace(/'/g,"\\'")}', '', 'tv');" style="background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">🔍 Vyhledat zdroje</button>
                 <button onclick="tvSearchProgram('${title.replace(/'/g,"\'")}'); document.getElementById('epgDetailModal').style.display='none';" style="background:var(--accent);border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">🔍 Hledat v Sinatoru</button>
-                ${catchup ? `<button onclick="window.open('${catchup.url}${qArchive}','_blank')" style="background:rgba(0,180,216,0.15);border:1px solid #00b4d8;color:#7fdcf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">${catchup.label}</button>` : ''}
+                ${catchup ? (catchup.type === 'timestamp'
+                    ? (ep.start ? `<button onclick="window.open('${catchup.urlBase}${Math.floor(ep.start/1000)}','_blank')" style="background:rgba(0,180,216,0.15);border:1px solid #00b4d8;color:#7fdcf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">${catchup.label}</button>`
+                        : `<button onclick="window.open('https://www.stream.cz/hledani?q=${qArchive}','_blank')" style="background:rgba(0,180,216,0.15);border:1px solid #00b4d8;color:#7fdcf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">📼 Stream.cz (archiv)</button>`)
+                    : `<button onclick="window.open('${catchup.url}${qArchive}','_blank')" style="background:rgba(0,180,216,0.15);border:1px solid #00b4d8;color:#7fdcf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">${catchup.label}</button>`
+                ) : ''}
                 <button onclick="window.open('https://www.csfd.cz/hledat/?q=${q}','_blank')" style="background:var(--bg-elevated);border:1px solid var(--border);color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;">🎬 ČSFD</button>
                 <button onclick="window.open('https://www.imdb.com/find/?q=${q}','_blank')" style="background:var(--bg-elevated);border:1px solid var(--border);color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;">⭐ IMDb</button>
                 <button onclick="window.open('https://www.google.com/search?q=${q}+seriál+film','_blank')" style="background:var(--bg-elevated);border:1px solid var(--border);color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;">🌐 Google</button>
@@ -31333,7 +31339,7 @@ function renderTvProgram(items, now) {
 
             // Aktuální pořad — střed
             html += '<div class="tv-program-item now" style="flex:1;border:none;border-radius:0;margin:0;padding:8px 10px;cursor:pointer;background:transparent;" '
-                + 'onclick="openEpgDetail({title:\'' + safeNowTitle + '\',desc:\'' + safeNowDesc + '\',channel:\'' + safeCh + '\',timeLabel:\'' + safeNowTime + (nowEnd?'–'+nowEnd:'') + '\',isNow:true,url:\'' + ((nowProg&&nowProg.url)||'').replace(/\'/g,"\\\'"  ) + '\'})">'
+                + 'onclick="openEpgDetail({title:\'' + safeNowTitle + '\',desc:\'' + safeNowDesc + '\',channel:\'' + safeCh + '\',timeLabel:\'' + safeNowTime + (nowEnd?'–'+nowEnd:'') + '\',isNow:true,start:' + ((nowProg&&nowProg.startMs)||0) + ',url:\'' + ((nowProg&&nowProg.url)||'').replace(/\'/g,"\\\'"  ) + '\'})">'
                 + '<div style="display:flex;align-items:flex-start;gap:8px;">'
                 + '<div class="tv-program-time" style="font-size:0.67rem;">▶</div>'
                 + '<div class="tv-program-info">'
@@ -31346,7 +31352,7 @@ function renderTvProgram(items, now) {
             // Následující — pravý sloupec (pokud existuje)
             if(nextProg) {
                 html += '<div style="flex-shrink:0;width:110px;border-left:1px solid rgba(255,255,255,0.06);padding:8px 8px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:2px;" '
-                    + 'onclick="openEpgDetail({title:\'' + safeNextTitle + '\',desc:\'' + safeNextDesc + '\',channel:\'' + safeCh + '\',timeLabel:\'' + safeNextTime + '\',isNow:false,url:\'' + ((nextProg&&nextProg.url)||'').replace(/\'/g,"\\\'"  ) + '\'})">'
+                    + 'onclick="openEpgDetail({title:\'' + safeNextTitle + '\',desc:\'' + safeNextDesc + '\',channel:\'' + safeCh + '\',timeLabel:\'' + safeNextTime + '\',isNow:false,start:' + ((nextProg&&nextProg.startMs)||0) + ',url:\'' + ((nextProg&&nextProg.url)||'').replace(/\'/g,"\\\'"  ) + '\'})">'
                     + '<div style="font-size:0.6rem;color:var(--text-muted);font-weight:600;">Poté</div>'
                     + '<div style="font-size:0.67rem;color:#00b4d8;font-weight:700;font-family:monospace;">' + nextTime + '</div>'
                     + '<div style="font-size:0.7rem;color:var(--text-muted);font-weight:500;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3;">' + nextTitle + '</div>'
@@ -31372,7 +31378,7 @@ function renderTvProgram(items, now) {
                 const safeCh    = chName.replace(/'/g,"\\'");
 
                 html += '<div class="tv-program-item' + (isNow ? ' now' : '') + '" '
-                    + 'onclick="openEpgDetail({title:\'' + safeTitle + '\',desc:\'' + safeDesc + '\',channel:\'' + safeCh + '\',timeLabel:\'' + safeTime + (p.endTime ? '–'+p.endTime : '') + '\',isNow:' + (p.isNow ? 'true' : 'false') + ',url:\'' + (p.url||'').replace(/\'/g,"\\\'"  ) + '\'})">'
+                    + 'onclick="openEpgDetail({title:\'' + safeTitle + '\',desc:\'' + safeDesc + '\',channel:\'' + safeCh + '\',timeLabel:\'' + safeTime + (p.endTime ? '–'+p.endTime : '') + '\',isNow:' + (p.isNow ? 'true' : 'false') + ',start:' + (p.startMs||0) + ',url:\'' + (p.url||'').replace(/\'/g,"\\\'"  ) + '\'})">'
                     + '<div class="tv-program-time">' + fmt(p.time) + '</div>'
                     + '<div class="tv-program-info">'
                     + '<div class="tv-program-name' + (isPast?' past':'') + '">'
