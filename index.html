@@ -11208,6 +11208,11 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             else if (backTo === 'mdblist') openMdblistModal();
             else if (backTo === 'watching') openWatchingModal();
             else if (backTo === 'moviesprogress') openMoviesProgressModal();
+            else if (backTo === 'epg') {
+                openTvModal();
+                switchTvTab('epg');
+                if (window._epgPendingReturn) { openEpgDetail(window._epgPendingReturn); window._epgPendingReturn = null; }
+            }
             else if (['zebricky','upcoming','porovnani','mood','tentoden','koukats','nahodnytip','uzbylo'].includes(backTo)) {
                 const modalIds = { zebricky:'zebrickyModal', upcoming:'upcomingModal', porovnani:'porovnaniModal', mood:'moodModal', tentoden:'tentodenModal', koukats:'koukatSModal', nahodnytip:'nahodnyTipModal', uzbylo:'uzByloVKineModal' };
                 if (window._reopenZabavaSub) window._reopenZabavaSub(modalIds[backTo]);
@@ -30774,6 +30779,7 @@ function _epgCatchupSource(channel) {
 
 function openEpgDetail(ep) {
     // ep = { title, desc, channel?, timeLabel?, start?, end? }
+    window._lastEpgDetail = ep;
     const title = ep.title || '';
     const desc  = ep.desc  || '';
     const channel = ep.channel || '';
@@ -30833,6 +30839,10 @@ function openEpgDetail(ep) {
 }
 
 function tvSearchProgram(title) {
+    // Zapamatuj si pořad z EPG, ze kterého uživatel hledal — "← Zpět" v detailu
+    // filmu/pořadu (viz navigateBack) na to pak naváže místo návratu na hlavní obrazovku.
+    window._epgPendingReturn = window._lastEpgDetail || null;
+    state._backTo = 'epg';
     // Zavři EPG detail modal
     const epgModal = document.getElementById('epgDetailModal');
     if(epgModal) epgModal.style.display = 'none';
