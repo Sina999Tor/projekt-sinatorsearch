@@ -11477,7 +11477,10 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         } catch(e) { alert('❌ Nepodařilo se přeložit biografii.'); btn.textContent = originalText; btn.disabled = false; }
     }
 
-    function openDabdb(title, year) { window.open(`https://www.dabdb.cz/?s=${encodeURIComponent(`${title} ${year}`.trim())}`, '_blank'); }
+    // DabDB nemá spolehlivě funkční přímý search-URL parametr (je to SPA, ?s= nefunguje) —
+    // jako nejjistější fallback proto otevřeme Google vyhledávání omezené na dabdb.cz,
+    // které na daný titul spolehlivě najde konkrétní stránku dabingu.
+    function openDabdb(title, year) { window.open(`https://www.google.com/search?q=${encodeURIComponent(`site:dabdb.cz ${title} ${year||''}`.trim())}`, '_blank'); }
 
     async function fetchSeasons(tvId) { try { const res = await fetch(`${BASE}/tv/${tvId}?api_key=${tmdbApiKey}&language=cs-CZ`); const data = await res.json(); return data.seasons?.filter(s => s.season_number > 0) || []; } catch(e) { return []; } }
     async function fetchEpisodes(tvId, seasonNumber) { try { const res = await fetch(`${BASE}/tv/${tvId}/season/${seasonNumber}?api_key=${tmdbApiKey}&language=cs-CZ`); const data = await res.json(); return data.episodes || []; } catch(e) { return []; } }
@@ -12210,6 +12213,9 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 <div style="font-size:2rem;margin-bottom:10px;">🎙</div>
                 Informace o dabingu se nepodařilo najít.<br>
                 <span style="font-size:0.78rem;">Pro spolehlivější a úplnější výsledky nastavte Gemini API klíč v Nastavení (umí si dohledat obsazení na webu).</span>
+                <div style="margin-top:18px;">
+                    <button onclick="openDabdb('${jsq(safeTitle||'')}',${year||0})" style="cursor:pointer;padding:10px 18px;border-radius:10px;font-size:0.85rem;font-weight:700;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);">🔎 Hledat na DabDB.cz</button>
+                </div>
             </div>`;
             return;
         }
@@ -12240,6 +12246,9 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             ${renderList(cz, '🇨🇿 Český dabing', '#7db8f7')}
             ${renderList(sk, '🇸🇰 Slovenský dabing', '#f5a623')}
             ${result?.note ? `<div style="padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;font-size:0.8rem;color:var(--text-muted);">ℹ️ ${result.note}</div>` : ''}
+            <div style="display:flex;gap:8px;justify-content:center;margin-top:4px;">
+                <button onclick="openDabdb('${jsq(safeTitle||'')}',${year||0})" style="cursor:pointer;padding:8px 14px;border-radius:8px;font-size:0.78rem;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);">🔎 Ověřit na DabDB.cz</button>
+            </div>
             <div style="font-size:0.68rem;color:var(--text-muted);text-align:center;margin-top:6px;line-height:1.5;">Zdroj: AI vyhledávání (dabingforum.cz, dabdb.cz) — u novějších/méně známých titulů ověřte na <a href="https://dabingforum.cz" target="_blank" style="color:var(--accent);">dabingforum.cz</a>.<br>Foto u dabéra = fotka daboveného herce (TMDB); fotky samotných dabérů nejsou z veřejných zdrojů spolehlivě dostupné.</div>
         `;
     }
