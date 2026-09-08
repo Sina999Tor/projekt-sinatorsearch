@@ -11796,8 +11796,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const bg = d.backdrop_path?`<div class="modal-backdrop-wrap" id="modalBackdropWrap_${id}" style="position:relative;overflow:hidden;touch-action:pan-y;"><img class="modal-backdrop" id="modalBackdropImg_${id}" src="${IMG}original${d.backdrop_path}"><div class="modal-backdrop-dots" id="modalBackdropDots_${id}" style="position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:5px;pointer-events:none;"></div></div>`:'';
             const genres = (d.genres||[]).map(g=>`<span class="modal-genre" style="cursor:pointer;" onclick="openGenreBrowse(${g.id},'${jsq(g.name)}','${type}')" title="Procházet žánr: ${g.name}">${g.name}</span>`).join('');
             const cast = (credits.cast||[]).slice(0,8).map(c=>`<div class="cast-item" onclick="openPersonDetail(${c.id})"><img src="${c.profile_path?IMG+'w185'+c.profile_path:'https://via.placeholder.com/50'}"><div class="name">${c.name}</div><div class="role">${c.character}</div></div>`).join('');
-            // Fotky herců (jméno + TMDB profile_path) pro spárování s dabingem — posílá se přes showCastCrewChooser do showDabingModal
-            const dabingCastData = jsq(JSON.stringify((credits.cast||[]).slice(0,30).map(c=>({n:c.name,p:c.profile_path||''}))));
+            // Fotky herců (jméno + TMDB profile_path) pro spárování s dabingem — posílá se přes showCastCrewChooser do showDabingModal.
+            // Base64 (ne jen jsq) — surový JSON obsahuje " a ty by uvnitř onclick="..." (dvojité uvozovky) předčasně ukončily HTML atribut.
+            const dabingCastData = btoa(unescape(encodeURIComponent(JSON.stringify((credits.cast||[]).slice(0,30).map(c=>({n:c.name,p:c.profile_path||''}))))));
             // Režiséři z crew (u seriálů z aggregate_credits, protože běžné credits u TV režiséry většinou neobsahují)
             let directors = (credits.crew||[]).filter(c=>c.job==='Director');
             if (type === 'tv') {
@@ -11972,8 +11973,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
     function showCastCrewChooser(movieId, movieType, hasCast, hasDirectors, safeTitle, year, castPhotosJson) {
         document.getElementById('castCrewChooser')?.remove();
-        // Fotky herců pro spárování s dabingem — uloženo globálně, showDabingModal si je odtud přečte
-        try { window._dabingCastPhotos = JSON.parse(castPhotosJson || '[]'); } catch(e) { window._dabingCastPhotos = []; }
+        // Fotky herců pro spárování s dabingem — uloženo globálně, showDabingModal si je odtud přečte (base64 → JSON)
+        try { window._dabingCastPhotos = JSON.parse(decodeURIComponent(escape(atob(castPhotosJson || '')))); } catch(e) { window._dabingCastPhotos = []; }
         const overlay = document.createElement('div');
         overlay.id = 'castCrewChooser';
         overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-card);z-index:10600;display:flex;flex-direction:column;overflow:hidden;';
