@@ -31262,11 +31262,12 @@ function filterEpgChannelBubbles(query) {
     renderEpgChannelBubbles(filtered);
 }
 
-// Smaže text ve vyhledávacím poli přes křížek — rychlé zrušení filtru.
+// Smaže text ve vyhledávacím poli přes křížek — rychlé zrušení filtru (textu
+// i případně vybrané bubliny kanálu) a návrat na "Vše".
 function clearEpgChannelSearch() {
     const input = document.getElementById('tvEpgChannelSearch');
     if(input) input.value = '';
-    filterEpgChannelBubbles('');
+    selectEpgChannel(null); // zruší i vybranou bublinu a znovu vykreslí vše
     if(input) input.focus();
 }
 
