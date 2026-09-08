@@ -30789,6 +30789,21 @@ function _epgCatchupSource(channel) {
     return null;
 }
 
+// Data pro klik na položku programu se ukládají sem a v HTML se na ně
+// odkazuje jen indexem (onclick="openEpgDetailAt(N)") — díky tomu nezáleží
+// na tom, jaké znaky (uvozovky, zpětná lomítka…) obsahuje název/popis
+// pořadu; dřív se kvůli neošetřeným uvozovkám v HTML atributu u některých
+// pořadů/kanálů klik vůbec nespustil.
+window._epgClickData = [];
+function _epgPushClickData(obj) {
+    window._epgClickData.push(obj);
+    return window._epgClickData.length - 1;
+}
+function openEpgDetailAt(idx) {
+    const ep = (window._epgClickData || [])[idx];
+    if(ep) openEpgDetail(ep);
+}
+
 function openEpgDetail(ep) {
     // ep = { title, desc, channel?, timeLabel?, start?, end? }
     window._lastEpgDetail = ep;
@@ -31392,6 +31407,9 @@ function renderTvProgram(items, now) {
     // Zjisti zda jsme v "Vše" módu (každý kanál má max 2 položky: now + next) — jen pro dnešek
     const isAllMode = !tvState._epgActiveChannel && tvState._epgIsToday;
 
+    // Vyprázdni pole s daty pro klik — plní se znovu níže při stavbě HTML.
+    window._epgClickData = [];
+
     let html = '';
     for(const [chName, progs] of Object.entries(byChannel)) {
 
@@ -31406,14 +31424,17 @@ function renderTvProgram(items, now) {
             const nowEnd   = nowProg && nowProg.endTime ? nowProg.endTime : '';
             const nextTitle = nextProg ? (nextProg.title||'?') : '';
             const nextTime  = nextProg ? fmt(nextProg.time) : '';
+            const safeCh   = chName.replace(/'/g,"\\'");
 
-            const safeNowTitle  = nowTitle.replace(/'/g,"\\'");
-            const safeNowDesc   = (nowProg && nowProg.desc||'').replace(/'/g,"\\'");
-            const safeNowTime   = (nowProg && nowProg.time||'').replace(/'/g,"\\'");
-            const safeCh        = chName.replace(/'/g,"\\'");
-            const safeNextTitle = nextTitle.replace(/'/g,"\\'");
-            const safeNextDesc  = (nextProg && nextProg.desc||'').replace(/'/g,"\\'");
-            const safeNextTime  = nextTime.replace(/'/g,"\\'");
+            const nowIdx = _epgPushClickData({
+                title: nowTitle, desc: (nowProg && nowProg.desc) || '', channel: chName,
+                timeLabel: ((nowProg && nowProg.time) || '') + (nowEnd ? '–'+nowEnd : ''),
+                isNow: true, start: (nowProg && nowProg.startMs) || 0, url: (nowProg && nowProg.url) || ''
+            });
+            const nextIdx = nextProg ? _epgPushClickData({
+                title: nextTitle, desc: (nextProg && nextProg.desc) || '', channel: chName,
+                timeLabel: nextTime, isNow: false, start: (nextProg && nextProg.startMs) || 0, url: (nextProg && nextProg.url) || ''
+            }) : -1;
 
             // Výpočet progress baru
             let progressPct = 0;
@@ -31436,11 +31457,11 @@ function renderTvProgram(items, now) {
 
             // Aktuální pořad — střed
             html += '<div class="tv-program-item now" style="flex:1;border:none;border-radius:0;margin:0;padding:8px 10px;cursor:pointer;background:transparent;" '
-                + 'onclick="openEpgDetail({title:\'' + safeNowTitle + '\',desc:\'' + safeNowDesc + '\',channel:\'' + safeCh + '\',timeLabel:\'' + safeNowTime + (nowEnd?'–'+nowEnd:'') + '\',isNow:true,start:' + ((nowProg&&nowProg.startMs)||0) + ',url:\'' + ((nowProg&&nowProg.url)||'').replace(/\'/g,"\\\'"  ) + '\'})">'
+                + 'onclick="openEpgDetailAt(' + nowIdx + ')">'
                 + '<div style="display:flex;align-items:flex-start;gap:8px;">'
                 + '<div class="tv-program-time" style="font-size:0.67rem;">▶</div>'
                 + '<div class="tv-program-info">'
-                + '<div class="tv-program-name" style="font-size:0.8rem;">' + nowTitle + '</div>'
+                + '<div class="tv-program-name" style="font-size:0.8rem;">' + _escapeHtmlU(nowTitle) + '</div>'
                 + (nowEnd ? '<div class="tv-program-ch">do ' + nowEnd + ' · právě teď</div>' : '')
                 + (nowProg ? '<div class="tv-program-progress" style="margin-top:4px;"><div class="tv-program-progress-bar" style="width:' + progressPct + '%"></div></div>' : '')
                 + '</div></div>'
@@ -31449,10 +31470,10 @@ function renderTvProgram(items, now) {
             // Následující — pravý sloupec (pokud existuje)
             if(nextProg) {
                 html += '<div style="flex-shrink:0;width:110px;border-left:1px solid rgba(255,255,255,0.06);padding:8px 8px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:2px;" '
-                    + 'onclick="openEpgDetail({title:\'' + safeNextTitle + '\',desc:\'' + safeNextDesc + '\',channel:\'' + safeCh + '\',timeLabel:\'' + safeNextTime + '\',isNow:false,start:' + ((nextProg&&nextProg.startMs)||0) + ',url:\'' + ((nextProg&&nextProg.url)||'').replace(/\'/g,"\\\'"  ) + '\'})">'
+                    + 'onclick="openEpgDetailAt(' + nextIdx + ')">'
                     + '<div style="font-size:0.6rem;color:var(--text-muted);font-weight:600;">Poté</div>'
                     + '<div style="font-size:0.67rem;color:#00b4d8;font-weight:700;font-family:monospace;">' + nextTime + '</div>'
-                    + '<div style="font-size:0.7rem;color:var(--text-muted);font-weight:500;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3;">' + nextTitle + '</div>'
+                    + '<div style="font-size:0.7rem;color:var(--text-muted);font-weight:500;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3;">' + _escapeHtmlU(nextTitle) + '</div>'
                     + '</div>';
             }
 
@@ -31469,17 +31490,19 @@ function renderTvProgram(items, now) {
             for(const p of progs) {
                 const isNow = p.isNow === true;
                 const isPast = tvState._epgIsToday && !isNow && p.endTime && p.endTime < now.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'});
-                const safeTitle = (p.title||'').replace(/'/g,"\\'");
-                const safeDesc  = (p.desc||'').replace(/'/g,"\\'");
-                const safeTime  = (p.time||'').replace(/'/g,"\\'");
-                const safeCh    = chName.replace(/'/g,"\\'");
+
+                const idx = _epgPushClickData({
+                    title: p.title || '', desc: p.desc || '', channel: chName,
+                    timeLabel: (p.time || '') + (p.endTime ? '–'+p.endTime : ''),
+                    isNow: !!p.isNow, start: p.startMs || 0, url: p.url || ''
+                });
 
                 html += '<div class="tv-program-item' + (isNow ? ' now' : '') + '" '
-                    + 'onclick="openEpgDetail({title:\'' + safeTitle + '\',desc:\'' + safeDesc + '\',channel:\'' + safeCh + '\',timeLabel:\'' + safeTime + (p.endTime ? '–'+p.endTime : '') + '\',isNow:' + (p.isNow ? 'true' : 'false') + ',start:' + (p.startMs||0) + ',url:\'' + (p.url||'').replace(/\'/g,"\\\'"  ) + '\'})">'
+                    + 'onclick="openEpgDetailAt(' + idx + ')">'
                     + '<div class="tv-program-time">' + fmt(p.time) + '</div>'
                     + '<div class="tv-program-info">'
                     + '<div class="tv-program-name' + (isPast?' past':'') + '">'
-                    + (isNow ? '▶ ' : '') + (p.title||'?')
+                    + (isNow ? '▶ ' : '') + _escapeHtmlU(p.title||'?')
                     + '</div>'
                     + (p.endTime ? '<div class="tv-program-ch">do ' + p.endTime + (isNow?' · právě teď':'') + '</div>' : '')
                     + (isNow ? '<div class="tv-program-progress"><div class="tv-program-progress-bar" style="width:50%"></div></div>' : '')
