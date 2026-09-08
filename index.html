@@ -30753,6 +30753,36 @@ function playEpgChannelLive(chName) {
     openInVlcUrl(ch.url);
 }
 
+// Wrappery pro tlačítka v EPG detailu — čtou pořad/kanál z window._lastEpgDetail
+// místo toho, aby si název/kanál vkládaly přímo do onclick atributu jako
+// string. Název pořadu z XMLTV feedu může obsahovat uvozovku, apostrof nebo
+// HTML entitu — po vložení do onclick="..." atributu je prohlížeč ještě před
+// spuštěním JS dekóduje, což rozbíjelo JS syntaxi a tlačítko přestalo fungovat.
+function playEpgChannelLiveFromDetail() {
+    playEpgChannelLive((window._lastEpgDetail || {}).channel || '');
+}
+function playEpgChannelAltFromDetail() {
+    playEpgChannelAlt((window._lastEpgDetail || {}).channel || '');
+}
+function openHellspyFromDetail() {
+    const t = (window._lastEpgDetail || {}).title || '';
+    if(typeof window.openHellspy === 'function') window.openHellspy('https://www.hellspy.to/?query=' + encodeURIComponent(t));
+}
+function playInExternalAppFromDetail() {
+    const t = (window._lastEpgDetail || {}).title || '';
+    if(typeof window.playInExternalApp === 'function') window.playInExternalApp(t);
+}
+function openSourcesModalFromDetail() {
+    document.getElementById('epgDetailModal').style.display = 'none';
+    const t = (window._lastEpgDetail || {}).title || '';
+    if(typeof openSourcesModal === 'function') openSourcesModal(t, '', 'tv');
+}
+function tvSearchProgramFromDetail() {
+    const t = (window._lastEpgDetail || {}).title || '';
+    tvSearchProgram(t);
+    document.getElementById('epgDetailModal').style.display = 'none';
+}
+
 // Nabídne alternativní streamy pro daný kanál (napříč Kanály/Kanály 2/3/4) —
 // pro případ, že se hlavní zdroj sekává. Využívá stejné findTvAltSources jako
 // živý přehrávač.
@@ -30828,21 +30858,21 @@ function openEpgDetail(ep) {
             <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;">
                 <div style="font-size:2.2rem;flex-shrink:0;">📺</div>
                 <div>
-                    <div style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:700;line-height:1.3;margin-bottom:4px;">${title}</div>
-                    ${channel || timeLabel ? `<div style="font-size:0.8rem;color:#00b4d8;font-weight:600;">${channel}${channel && timeLabel ? ' · ' : ''}${timeLabel}</div>` : ''}
+                    <div style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:700;line-height:1.3;margin-bottom:4px;">${_epgEscapeHtml(title)}</div>
+                    ${channel || timeLabel ? `<div style="font-size:0.8rem;color:#00b4d8;font-weight:600;">${_epgEscapeHtml(channel)}${channel && timeLabel ? ' · ' : ''}${_epgEscapeHtml(timeLabel)}</div>` : ''}
                 </div>
             </div>
-            ${desc ? `<div style="font-size:0.85rem;color:var(--text-muted);line-height:1.6;margin-bottom:20px;padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;border-left:3px solid #00b4d8;">${desc}</div>` : ''}
+            ${desc ? `<div style="font-size:0.85rem;color:var(--text-muted);line-height:1.6;margin-bottom:20px;padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;border-left:3px solid #00b4d8;">${_epgEscapeHtml(desc)}</div>` : ''}
             ${ep.isNow ? `<div style="margin-bottom:16px;display:flex;flex-direction:column;gap:8px;">
-                <button onclick="playEpgChannelLive('${channel.replace(/'/g,"\\'")}')" style="width:100%;padding:11px 16px;background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶ Přehrát živě ve VLC</button>
-                <button onclick="playEpgChannelAlt('${channel.replace(/'/g,"\\'")}')" style="width:100%;padding:9px 16px;background:rgba(255,152,0,0.12);border:1px solid #ff9800;color:#ffcc80;border-radius:10px;cursor:pointer;font-size:0.85rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">🔀 Jiný zdroj (když se sekává)</button>
-                <button onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${title.replace(/'/g,"\\'")}'))" style="width:100%;padding:11px 16px;background:rgba(30,60,110,0.35);border:1px solid #3a6ea5;color:#9cc4f0;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶️ Přehrát od začátku (Hellspy)</button>
+                <button onclick="playEpgChannelLiveFromDetail()" style="width:100%;padding:11px 16px;background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶ Přehrát živě ve VLC</button>
+                <button onclick="playEpgChannelAltFromDetail()" style="width:100%;padding:9px 16px;background:rgba(255,152,0,0.12);border:1px solid #ff9800;color:#ffcc80;border-radius:10px;cursor:pointer;font-size:0.85rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">🔀 Jiný zdroj (když se sekává)</button>
+                <button onclick="openHellspyFromDetail()" style="width:100%;padding:11px 16px;background:rgba(30,60,110,0.35);border:1px solid #3a6ea5;color:#9cc4f0;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶️ Přehrát od začátku (Hellspy)</button>
             </div>` : ''}
-            ${(typeof getEnabledExternalPlayApps === 'function' && getEnabledExternalPlayApps().length) ? `<button onclick="window.playInExternalApp('${title.replace(/'/g,"\\'")}')" style="width:100%;padding:11px 16px;background:rgba(139,92,246,0.15);border:1px solid #8b5cf6;color:#c4b5fd;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;">📱 Přehrát v externí aplikaci</button>` : ''}
+            ${(typeof getEnabledExternalPlayApps === 'function' && getEnabledExternalPlayApps().length) ? `<button onclick="playInExternalAppFromDetail()" style="width:100%;padding:11px 16px;background:rgba(139,92,246,0.15);border:1px solid #8b5cf6;color:#c4b5fd;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;">📱 Přehrát v externí aplikaci</button>` : ''}
             <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Hledat / otevřít</div>
             <div style="display:flex;flex-wrap:wrap;gap:8px;">
-                <button onclick="document.getElementById('epgDetailModal').style.display='none'; if(typeof openSourcesModal==='function') openSourcesModal('${title.replace(/'/g,"\\'")}', '', 'tv');" style="background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">🔍 Vyhledat zdroje</button>
-                <button onclick="tvSearchProgram('${title.replace(/'/g,"\'")}'); document.getElementById('epgDetailModal').style.display='none';" style="background:var(--accent);border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">🔍 Hledat v Sinatoru</button>
+                <button onclick="openSourcesModalFromDetail()" style="background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">🔍 Vyhledat zdroje</button>
+                <button onclick="tvSearchProgramFromDetail()" style="background:var(--accent);border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">🔍 Hledat v Sinatoru</button>
                 ${catchup ? (catchup.type === 'timestamp'
                     ? (ep.start ? `<button onclick="window.open('${catchup.urlBase}${Math.floor(ep.start/1000)}','_blank')" style="background:rgba(0,180,216,0.15);border:1px solid #00b4d8;color:#7fdcf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">${catchup.label}</button>`
                         : `<button onclick="window.open('https://www.stream.cz/hledani?q=${qArchive}','_blank')" style="background:rgba(0,180,216,0.15);border:1px solid #00b4d8;color:#7fdcf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">📼 Stream.cz (archiv)</button>`)
@@ -31532,6 +31562,22 @@ function parseXmltvEpg(xml, returnOnly) {
         const utc = Date.UTC(+yr,+mo-1,+dy,+hr,+mn,+sc) - offset*60000;
         return new Date(utc);
     }
+    // Dekóduje XML/HTML entity (&amp; &lt; &gt; &quot; &apos; &#39; &#x27; …) na
+    // skutečné znaky. Feedy je občas nechávají v datech, a pokud by zůstaly
+    // nedekódované jako doslovný text, později by se při zobrazení/escapování
+    // objevily jako viditelné "&apos;" místo apostrofu, nebo by (naopak) po
+    // vložení do HTML atributu (onclick) rozbily JS syntaxi.
+    function decodeXmlEntities(s) {
+        if(!s) return s;
+        return s.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (whole, ent) => {
+            if(ent[0] === '#') {
+                const code = ent[1] === 'x' || ent[1] === 'X' ? parseInt(ent.slice(2), 16) : parseInt(ent.slice(1), 10);
+                return isNaN(code) ? whole : String.fromCodePoint(code);
+            }
+            const named = {amp:'&', lt:'<', gt:'>', quot:'"', apos:"'", nbsp:' '};
+            return ent in named ? named[ent] : whole;
+        });
+    }
     const progRe = /<programme\s+([^>]+)>([\s\S]*?)<\/programme>/g;
     const buckets = {};
     let m;
@@ -31545,7 +31591,7 @@ function parseXmltvEpg(xml, returnOnly) {
         const title = (/<title[^>]*>([^<]+)<\/title>/.exec(body)||[])[1]||'';
         const desc  = (/<desc[^>]*>([^<]+)<\/desc>/.exec(body)||[])[1]||'';
         if(!buckets[chan]) buckets[chan] = [];
-        buckets[chan].push({ title: title.replace(/&amp;/g,'&').trim(), start, end, desc: desc.replace(/&amp;/g,'&').trim() });
+        buckets[chan].push({ title: decodeXmlEntities(title).trim(), start, end, desc: decodeXmlEntities(desc).trim() });
     }
     for(const chan in buckets) buckets[chan].sort((a,b) => a.start - b.start);
 
