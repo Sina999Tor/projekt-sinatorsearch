@@ -31129,6 +31129,10 @@ async function buildEpgView() {
     const todayBtn = document.getElementById('tvEpgTodayBtn');
     if(todayBtn) todayBtn.style.display = isToday ? 'none' : 'inline-block';
 
+    // Obnov uložený filtr (vybraný kanál) hned na začátku — musí být hotovo
+    // předtím, než se níže rozhoduje o kompaktním "Vše" okně vs. celém dni.
+    restoreEpgFilterState();
+
     // EPG záložka zobrazuje VŠECHNY kanály z playlistu (ne jen aktuální skupinu)
     const filtered = tvState.channels || [];
 
@@ -31207,8 +31211,19 @@ async function buildEpgView() {
     tvState._epgAllChannels = channelItems;
     if(!tvState._epgActiveChannel) tvState._epgActiveChannel = null;
 
-    // Renderuj bubliny kanálů
-    renderEpgChannelBubbles(Object.keys(channelItems));
+    // Restore znovu (řeší případ, kdy channelItems byly poprvé sestaveny až teď —
+    // vyhledávací pole mohlo mezitím dostat obnovenou hodnotu z localStorage).
+    restoreEpgFilterState();
+
+    // Renderuj bubliny kanálů — respektuj aktuální (i obnovený) vyhledávací
+    // text, ať se filtr "sport" nezruší při každém překreslení (návrat z VLC,
+    // přepnutí zpět na záložku Program, automatický refresh apod.).
+    const epgSearchInputEl = document.getElementById('tvEpgChannelSearch');
+    if(epgSearchInputEl && epgSearchInputEl.value) {
+        filterEpgChannelBubbles(epgSearchInputEl.value);
+    } else {
+        renderEpgChannelBubbles(Object.keys(channelItems));
+    }
 
     if(Object.keys(channelItems).length === 0) {
         const listEl2 = document.getElementById('tvProgramList');
@@ -31233,10 +31248,30 @@ function _epgNormText(s) {
 // Filtruje bubliny kanálů podle textu z vyhledávacího políčka nad nimi —
 // hledá se podkanál kdekoli v názvu (funguje jak na písmeno, tak na celý název).
 function filterEpgChannelBubbles(query) {
+    // Ulož dotaz — filtr tak přežije návrat z VLC i případné znovunačtení appky,
+    // dokud ho uživatel sám nesmaže (viz restoreEpgFilterState / buildEpgView).
+    try { localStorage.setItem('tv_epg_search_query', query || ''); } catch(e) {}
     const all = Object.keys(tvState._epgAllChannels || {});
     const q = _epgNormText(query).trim();
     const filtered = q ? all.filter(name => _epgNormText(name).includes(q)) : all;
     renderEpgChannelBubbles(filtered);
+}
+
+// Obnoví uložený vyhledávací dotaz a vybraný kanál (bublinu) ze localStorage —
+// volá se při každém sestavení EPG pohledu, aby filtr zůstal aktivní i po
+// návratu z VLC / znovunačtení appky, dokud ho uživatel sám nesmaže.
+function restoreEpgFilterState() {
+    if(tvState._epgActiveChannel === undefined) {
+        let savedCh = null;
+        try { savedCh = localStorage.getItem('tv_epg_active_channel'); } catch(e) {}
+        tvState._epgActiveChannel = savedCh || null;
+    }
+    const input = document.getElementById('tvEpgChannelSearch');
+    if(input && !input.value) {
+        let savedQ = '';
+        try { savedQ = localStorage.getItem('tv_epg_search_query') || ''; } catch(e) {}
+        if(savedQ) input.value = savedQ;
+    }
 }
 
 function renderEpgChannelBubbles(chNames) {
@@ -31275,7 +31310,16 @@ function renderEpgChannelBubbles(chNames) {
 
 function selectEpgChannel(name) {
     tvState._epgActiveChannel = name;
-    renderEpgChannelBubbles(Object.keys(tvState._epgAllChannels || {}));
+    // "Vše" (name === null) filtr smaže, jinak zůstává uložený, dokud ho
+    // uživatel sám nesmaže (klikem na "Vše" nebo smazáním textu v hledání).
+    try {
+        if(name) localStorage.setItem('tv_epg_active_channel', name);
+        else localStorage.removeItem('tv_epg_active_channel');
+    } catch(e) {}
+    // Respektuj aktuálně napsaný vyhledávací text — nevracej se k celému
+    // nefiltrovanému seznamu bublin.
+    const input = document.getElementById('tvEpgChannelSearch');
+    filterEpgChannelBubbles(input ? input.value : '');
     renderEpgFiltered(new Date());
     // Scroll list na začátek
     const listEl = document.getElementById('tvProgramList');
