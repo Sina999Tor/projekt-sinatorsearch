@@ -30803,6 +30803,11 @@ function openEpgDetailAt(idx) {
     const ep = (window._epgClickData || [])[idx];
     if(ep) openEpgDetail(ep);
 }
+// Vlastní escape helper — _escapeHtmlU žije v izolovaném <script type="module">
+// bloku (Firebase), takže odtud není dostupný jako globální funkce.
+function _epgEscapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 function openEpgDetail(ep) {
     // ep = { title, desc, channel?, timeLabel?, start?, end? }
@@ -31461,7 +31466,7 @@ function renderTvProgram(items, now) {
                 + '<div style="display:flex;align-items:flex-start;gap:8px;">'
                 + '<div class="tv-program-time" style="font-size:0.67rem;">▶</div>'
                 + '<div class="tv-program-info">'
-                + '<div class="tv-program-name" style="font-size:0.8rem;">' + _escapeHtmlU(nowTitle) + '</div>'
+                + '<div class="tv-program-name" style="font-size:0.8rem;">' + _epgEscapeHtml(nowTitle) + '</div>'
                 + (nowEnd ? '<div class="tv-program-ch">do ' + nowEnd + ' · právě teď</div>' : '')
                 + (nowProg ? '<div class="tv-program-progress" style="margin-top:4px;"><div class="tv-program-progress-bar" style="width:' + progressPct + '%"></div></div>' : '')
                 + '</div></div>'
@@ -31473,7 +31478,7 @@ function renderTvProgram(items, now) {
                     + 'onclick="openEpgDetailAt(' + nextIdx + ')">'
                     + '<div style="font-size:0.6rem;color:var(--text-muted);font-weight:600;">Poté</div>'
                     + '<div style="font-size:0.67rem;color:#00b4d8;font-weight:700;font-family:monospace;">' + nextTime + '</div>'
-                    + '<div style="font-size:0.7rem;color:var(--text-muted);font-weight:500;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3;">' + _escapeHtmlU(nextTitle) + '</div>'
+                    + '<div style="font-size:0.7rem;color:var(--text-muted);font-weight:500;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3;">' + _epgEscapeHtml(nextTitle) + '</div>'
                     + '</div>';
             }
 
@@ -31502,7 +31507,7 @@ function renderTvProgram(items, now) {
                     + '<div class="tv-program-time">' + fmt(p.time) + '</div>'
                     + '<div class="tv-program-info">'
                     + '<div class="tv-program-name' + (isPast?' past':'') + '">'
-                    + (isNow ? '▶ ' : '') + _escapeHtmlU(p.title||'?')
+                    + (isNow ? '▶ ' : '') + _epgEscapeHtml(p.title||'?')
                     + '</div>'
                     + (p.endTime ? '<div class="tv-program-ch">do ' + p.endTime + (isNow?' · právě teď':'') + '</div>' : '')
                     + (isNow ? '<div class="tv-program-progress"><div class="tv-program-progress-bar" style="width:50%"></div></div>' : '')
