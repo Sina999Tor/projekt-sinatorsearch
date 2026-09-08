@@ -16498,7 +16498,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         </div>
         <!-- Hledání kanálu (filtruje bubliny níže) -->
         <div style="flex-shrink:0;padding:6px 10px 0;background:var(--bg-dark);">
-            <input id="tvEpgChannelSearch" type="text" placeholder="🔎 Hledat kanál (podle názvu nebo písmene)…" oninput="filterEpgChannelBubbles(this.value)" style="width:100%;box-sizing:border-box;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-size:0.78rem;">
+            <div style="position:relative;">
+                <input id="tvEpgChannelSearch" type="text" placeholder="🔎 Hledat kanál (podle názvu nebo písmene)…" oninput="filterEpgChannelBubbles(this.value)" style="width:100%;box-sizing:border-box;padding:6px 30px 6px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-size:0.78rem;">
+                <button id="tvEpgChannelSearchClear" type="button" onclick="clearEpgChannelSearch()" title="Smazat filtr" style="display:none;position:absolute;right:4px;top:50%;transform:translateY(-50%);width:22px;height:22px;line-height:20px;padding:0;border:none;border-radius:50%;background:rgba(255,255,255,0.12);color:var(--text-muted);font-size:0.85rem;cursor:pointer;">✕</button>
+            </div>
         </div>
         <!-- Bubliny kanálů -->
         <div id="tvEpgChannelBubbles" style="flex-shrink:0;display:flex;gap:6px;padding:7px 10px;overflow-x:auto;overflow-y:hidden;border-bottom:1px solid var(--border);scrollbar-width:none;background:var(--bg-dark);"></div>
@@ -31251,10 +31254,20 @@ function filterEpgChannelBubbles(query) {
     // Ulož dotaz — filtr tak přežije návrat z VLC i případné znovunačtení appky,
     // dokud ho uživatel sám nesmaže (viz restoreEpgFilterState / buildEpgView).
     try { localStorage.setItem('tv_epg_search_query', query || ''); } catch(e) {}
+    const clearBtn = document.getElementById('tvEpgChannelSearchClear');
+    if(clearBtn) clearBtn.style.display = query ? 'block' : 'none';
     const all = Object.keys(tvState._epgAllChannels || {});
     const q = _epgNormText(query).trim();
     const filtered = q ? all.filter(name => _epgNormText(name).includes(q)) : all;
     renderEpgChannelBubbles(filtered);
+}
+
+// Smaže text ve vyhledávacím poli přes křížek — rychlé zrušení filtru.
+function clearEpgChannelSearch() {
+    const input = document.getElementById('tvEpgChannelSearch');
+    if(input) input.value = '';
+    filterEpgChannelBubbles('');
+    if(input) input.focus();
 }
 
 // Obnoví uložený vyhledávací dotaz a vybraný kanál (bublinu) ze localStorage —
@@ -31272,6 +31285,8 @@ function restoreEpgFilterState() {
         try { savedQ = localStorage.getItem('tv_epg_search_query') || ''; } catch(e) {}
         if(savedQ) input.value = savedQ;
     }
+    const clearBtn = document.getElementById('tvEpgChannelSearchClear');
+    if(clearBtn) clearBtn.style.display = (input && input.value) ? 'block' : 'none';
 }
 
 function renderEpgChannelBubbles(chNames) {
