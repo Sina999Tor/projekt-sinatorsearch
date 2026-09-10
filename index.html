@@ -139,6 +139,36 @@
     color:#fff;
     letter-spacing:.02em;
 }
+/* Rozklikávací tlačítko s alternativami (duplicitní stanice ve stejném seznamu) */
+.tv-ch-item{ position:relative; }
+.tv-ch-alt-btn{
+    position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%;
+    background:rgba(0,0,0,0.55) !important; border:1px solid rgba(255,255,255,0.25) !important;
+    color:#fff !important; font-size:0.85rem; display:flex !important; align-items:center; justify-content:center;
+    cursor:pointer; z-index:2; padding:0 !important;
+}
+.tv-ch-alts{
+    width:100%; margin-top:2px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.09);
+    border-radius:10px; padding:4px; box-sizing:border-box;
+}
+.tv-ch-alt-item{
+    padding:8px 10px; font-size:0.76rem; color:var(--text,#fff); border-radius:8px; cursor:pointer; text-align:left;
+}
+.tv-ch-alt-item:active{ background:rgba(255,255,255,0.1); }
+.tv-more-btn{
+    grid-column:1/-1 !important; width:100%; padding:12px; margin-top:2px;
+    background:rgba(255,255,255,0.05); border:1px dashed rgba(255,255,255,0.28); border-radius:12px;
+    color:var(--text-muted,#aaa); font-weight:700; font-size:0.82rem; cursor:pointer;
+}
+.tv-ch-nologo-panel{
+    grid-column:1/-1 !important; display:flex; flex-direction:column; gap:2px;
+    background:rgba(0,0,0,0.25); border-radius:10px; padding:6px; box-sizing:border-box;
+}
+.tv-ch-nologo-item{
+    padding:10px; font-size:0.8rem; color:var(--text,#fff); border-radius:8px; cursor:pointer;
+    border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.tv-ch-nologo-item:active{ background:rgba(255,255,255,0.08); }
 @media (min-width:560px){
     .tv-channel-list{ grid-template-columns:repeat(2,1fr) !important; }
 }
@@ -17415,6 +17445,85 @@ function tvSortChannels(list) {
 }
 window.tvDisplayName = tvDisplayName;
 window.tvSortChannels = tvSortChannels;
+
+// === Deduplikace + "jen platná loga" pro zobrazení seznamu kanálů ========
+// Seskupí kanály podle normalizovaného názvu (viz _tvNormalizeName - řeší i
+// napříč seznamy). V rámci jedné skupiny: pokud aspoň jeden má platné logo,
+// zobrazí se jako 1 dlaždice (nejkratší/nejčistší název) + tlačítko se šipkou
+// s ostatními variantami (alternativy). Pokud skupina nemá logo vůbec,
+// nezobrazí se v hlavní mřížce, ale skryje se pod tlačítko "Další TV".
+function tvGroupChannels(list) {
+    const groups = new Map();
+    const order = [];
+    (list || []).forEach(ch => {
+        const key = (typeof _tvNormalizeName === 'function' ? _tvNormalizeName(ch.name) : tvSortKey(ch.name)) || ch.name;
+        if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+        groups.get(key).push(ch);
+    });
+    const shown = [];
+    const noLogo = [];
+    order.forEach(key => {
+        const arr = groups.get(key);
+        const withLogo = arr.filter(c => c.logo);
+        if (withLogo.length) {
+            const primary = withLogo.slice().sort((a, b) => tvDisplayName(a.name).length - tvDisplayName(b.name).length)[0];
+            shown.push({ ch: primary, alts: arr.filter(c => c !== primary) });
+        } else {
+            noLogo.push({ ch: arr[0], alts: arr.slice(1) });
+        }
+    });
+    return { shown, noLogo };
+}
+window.tvGroupChannels = tvGroupChannels;
+
+function tvToggleAlts(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+}
+window.tvToggleAlts = tvToggleAlts;
+
+let _tvAltUidSeq = 0;
+
+// Jedna dlaždice (VŽDY jen logo + název, bez písmenka-avataru). Pokud logo
+// za běhu nenačte (404 apod.), dlaždice se sama skryje. `onclickForChannel`
+// je funkce (ch) => JS příkaz pro spuštění daného kanálu (idx-based nebo
+// přímý JSON encode - liší se dle konkrétního seznamu).
+function tvTileHtml(entry, onclickForChannel, isActive) {
+    const ch = entry.ch;
+    const alts = entry.alts || [];
+    const shortName = tvDisplayName(ch.name);
+    const safeTitle = (ch.name || '').replace(/"/g, '&quot;');
+    const uid = 'tvalt_' + (++_tvAltUidSeq);
+    const altBtn = alts.length
+        ? '<button class="tv-ch-alt-btn" onclick="event.stopPropagation();tvToggleAlts(\'' + uid + '\')" title="Alternativy (' + alts.length + ')">▾</button>'
+        : '';
+    const altPanel = alts.length
+        ? '<div class="tv-ch-alts" id="' + uid + '" style="display:none;">' + alts.map(a => {
+            return '<div class="tv-ch-alt-item" onclick="event.stopPropagation();' + onclickForChannel(a) + '">' + tvDisplayName(a.name) + (a.logo ? '' : ' <span style="opacity:.55;">(bez loga)</span>') + '</div>';
+        }).join('') + '</div>'
+        : '';
+    return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + ' has-logo" onclick="' + onclickForChannel(ch) + '" title="' + safeTitle + '">'
+        + '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.closest(\'.tv-ch-item\').style.display=\'none\';">'
+        + altBtn
+        + '<div class="tv-ch-name">' + shortName + '</div>'
+        + (isActive ? '<div class="tv-ch-live-badge">▶ ŽIVĚ</div>' : '')
+        + altPanel
+        + '</div>';
+}
+window.tvTileHtml = tvTileHtml;
+
+// Tlačítko "➕ Další TV" (stanice bez platného loga) + skrytý panel s jejich
+// prostým výpisem (jen název, žádné logo/avatar).
+function tvNoLogoSectionHtml(noLogo, onclickForChannel, panelId) {
+    if (!noLogo.length) return '';
+    const items = noLogo.map(entry => {
+        return '<div class="tv-ch-nologo-item" onclick="' + onclickForChannel(entry.ch) + '">' + tvDisplayName(entry.ch.name) + '</div>';
+    }).join('');
+    return '<button class="tv-more-btn" onclick="tvToggleAlts(\'' + panelId + '\')">➕ Další TV (' + noLogo.length + ')</button>'
+        + '<div class="tv-ch-nologo-panel" id="' + panelId + '" style="display:none;">' + items + '</div>';
+}
+window.tvNoLogoSectionHtml = tvNoLogoSectionHtml;
 // =========================================================================
 
 const ALT_PLAYLISTS = {
@@ -30365,16 +30474,17 @@ function renderAltChannelListSearch() {
     const filtered = altState._searchResults || [];
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Žádné kanály neodpovídají hledání.</div>'; return; }
     const filteredSorted = tvSortChannels(filtered);
-    listEl.innerHTML = filteredSorted.map((ch, i) => {
-        const label = ALT_PLAYLISTS[ch._sourceCode]?.label || ch._sourceCode;
-        const shortName = tvDisplayName(ch.name);
-        return '<div class="tv-ch-item ' + (ch.logo ? 'has-logo' : 'no-logo') + '" onclick="playAltChannelDirect(\'' + encodeURIComponent(JSON.stringify({url:ch.url,name:ch.name,logo:ch.logo||''})) + '\')" title="' + ch.name + '">'
-            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\';var p=this.parentElement;if(p){p.classList.remove(\'has-logo\');p.classList.add(\'no-logo\');}">'
-                       + '<div class="tv-ch-logo-ph" style="display:none;background:' + tvAvatarColor(ch.name) + '">' + tvAvatarLetter(ch.name) + '</div>'
-                       : tvAvatarHtml(ch.name))
-            + '<div class="tv-ch-name">' + shortName + '<span style="font-size:0.65rem;color:var(--text-muted);display:block;">' + label + '</span></div>'
-            + '</div>';
-    }).join('');
+    const encodeCh = (c) => encodeURIComponent(JSON.stringify({url:c.url,name:c.name,logo:c.logo||''}));
+    const onclickFor = (c) => 'playAltChannelDirect(\'' + encodeCh(c) + '\')';
+    const grouped = tvGroupChannels(filteredSorted);
+    listEl.innerHTML = grouped.shown.map(entry => {
+        const label = ALT_PLAYLISTS[entry.ch._sourceCode]?.label || entry.ch._sourceCode || '';
+        const tile = tvTileHtml(entry, onclickFor, false);
+        // Přidat popisek zdrojového playlistu pod název (jen zde, u cross-search výsledků)
+        return tile.replace('<div class="tv-ch-name">' + tvDisplayName(entry.ch.name) + '</div>',
+            '<div class="tv-ch-name">' + tvDisplayName(entry.ch.name) + '<span style="font-size:0.65rem;color:var(--text-muted);display:block;">' + label + '</span></div>');
+    }).join('')
+    + tvNoLogoSectionHtml(grouped.noLogo, onclickFor, 'tvNoLogoPanel_altsearch');
 }
 
 function playAltChannelDirect(encoded) {
@@ -30401,18 +30511,13 @@ function renderAltChannelList() {
     }
     const filtered = tvSortChannels(altState.filtered);
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Žádné kanály neodpovídají hledání.</div>'; return; }
-    listEl.innerHTML = filtered.map((ch) => {
-        const isActive = altState.currentChannel && altState.currentChannel.url === ch.url;
-        const globalIdx = altState.channels.indexOf(ch);
-        const shortName = tvDisplayName(ch.name);
-        return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + ' ' + (ch.logo ? 'has-logo' : 'no-logo') + '" onclick="playAltChannel(' + globalIdx + ')" title="' + ch.name + '">'
-            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\';var p=this.parentElement;if(p){p.classList.remove(\'has-logo\');p.classList.add(\'no-logo\');}">'
-                       + '<div class="tv-ch-logo-ph" style="display:none;background:' + tvAvatarColor(ch.name) + '">' + tvAvatarLetter(ch.name) + '</div>'
-                       : tvAvatarHtml(ch.name))
-            + '<div class="tv-ch-name">' + shortName + '</div>'
-            + (isActive ? '<div class="tv-ch-live-badge">▶ ŽIVĚ</div>' : '')
-            + '</div>';
-    }).join('');
+    const grouped = tvGroupChannels(filtered);
+    const onclickFor = (c) => 'playAltChannel(' + altState.channels.indexOf(c) + ')';
+    listEl.innerHTML = grouped.shown.map(entry => {
+        const isActive = !!(altState.currentChannel && (altState.currentChannel.url === entry.ch.url || entry.alts.some(a => altState.currentChannel.url === a.url)));
+        return tvTileHtml(entry, onclickFor, isActive);
+    }).join('')
+    + tvNoLogoSectionHtml(grouped.noLogo, onclickFor, 'tvNoLogoPanel_alt');
 }
 
 function playAltChannel(idx) {
@@ -30539,18 +30644,13 @@ function renderAlt2ChannelList() {
     );
     filtered = tvSortChannels(filtered);
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>'; return; }
-    listEl.innerHTML = filtered.map((ch) => {
-        const isActive = alt2State.currentChannel && alt2State.currentChannel.url === ch.url;
-        const globalIdx = alt2State.channels.indexOf(ch);
-        const shortName = tvDisplayName(ch.name);
-        return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + ' ' + (ch.logo ? 'has-logo' : 'no-logo') + '" onclick="playAlt2Channel(' + globalIdx + ')" title="' + ch.name + '">'
-            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\';var p=this.parentElement;if(p){p.classList.remove(\'has-logo\');p.classList.add(\'no-logo\');}">'
-                       + '<div class="tv-ch-logo-ph" style="display:none;background:' + tvAvatarColor(ch.name) + '">' + tvAvatarLetter(ch.name) + '</div>'
-                       : tvAvatarHtml(ch.name))
-            + '<div class="tv-ch-name">' + shortName + '</div>'
-            + (isActive ? '<div class="tv-ch-live-badge">▶ ŽIVĚ</div>' : '')
-            + '</div>';
-    }).join('');
+    const grouped = tvGroupChannels(filtered);
+    const onclickFor = (c) => 'playAlt2Channel(' + alt2State.channels.indexOf(c) + ')';
+    listEl.innerHTML = grouped.shown.map(entry => {
+        const isActive = !!(alt2State.currentChannel && (alt2State.currentChannel.url === entry.ch.url || entry.alts.some(a => alt2State.currentChannel.url === a.url)));
+        return tvTileHtml(entry, onclickFor, isActive);
+    }).join('')
+    + tvNoLogoSectionHtml(grouped.noLogo, onclickFor, 'tvNoLogoPanel_alt2');
 }
 
 function playAlt2Channel(idx) {
@@ -30640,18 +30740,13 @@ function renderAlt3ChannelList() {
     );
     filtered = tvSortChannels(filtered);
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? '\u017d\u00e1dn\u00e9 kan\u00e1ly neodpov\u00eddaj\u00ed hled\u00e1n\u00ed.' : '\u017d\u00e1dn\u00e9 kan\u00e1ly.') + '</div>'; return; }
-    listEl.innerHTML = filtered.map((ch) => {
-        const isActive = alt3State.currentChannel && alt3State.currentChannel.url === ch.url;
-        const globalIdx = alt3State.channels.indexOf(ch);
-        const shortName = tvDisplayName(ch.name);
-        return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + ' ' + (ch.logo ? 'has-logo' : 'no-logo') + '" onclick="playAlt3Channel(' + globalIdx + ')" title="' + ch.name + '">'
-            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\';var p=this.parentElement;if(p){p.classList.remove(\'has-logo\');p.classList.add(\'no-logo\');}">'
-                       + '<div class="tv-ch-logo-ph" style="display:none;background:' + tvAvatarColor(ch.name) + '">' + tvAvatarLetter(ch.name) + '</div>'
-                       : tvAvatarHtml(ch.name))
-            + '<div class="tv-ch-name">' + shortName + '</div>'
-            + (isActive ? '<div class="tv-ch-live-badge">▶ ŽIVĚ</div>' : '')
-            + '</div>';
-    }).join('');
+    const grouped = tvGroupChannels(filtered);
+    const onclickFor = (c) => 'playAlt3Channel(' + alt3State.channels.indexOf(c) + ')';
+    listEl.innerHTML = grouped.shown.map(entry => {
+        const isActive = !!(alt3State.currentChannel && (alt3State.currentChannel.url === entry.ch.url || entry.alts.some(a => alt3State.currentChannel.url === a.url)));
+        return tvTileHtml(entry, onclickFor, isActive);
+    }).join('')
+    + tvNoLogoSectionHtml(grouped.noLogo, onclickFor, 'tvNoLogoPanel_alt3');
 }
 
 function playAlt3Channel(idx) {
@@ -30732,18 +30827,13 @@ function renderTvChannelList() {
 
     filtered = tvSortChannels(filtered);
 
-    listEl.innerHTML = filtered.map((ch) => {
-        const isActive = tvState.currentChannel && tvState.currentChannel.url === ch.url;
-        const globalIdx = tvState.channels.indexOf(ch);
-        const shortName = tvDisplayName(ch.name);
-        return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + ' ' + (ch.logo ? 'has-logo' : 'no-logo') + '" onclick="playTvChannel(' + globalIdx + ')" title="' + ch.name + '">'
-            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\';var p=this.parentElement;if(p){p.classList.remove(\'has-logo\');p.classList.add(\'no-logo\');}">'
-                       + '<div class="tv-ch-logo-ph" style="display:none;background:' + tvAvatarColor(ch.name) + '">' + tvAvatarLetter(ch.name) + '</div>'
-                       : tvAvatarHtml(ch.name))
-            + '<div class="tv-ch-name">' + shortName + '</div>'
-            + (isActive ? '<div class="tv-ch-live-badge">▶ ŽIVĚ</div>' : '')
-            + '</div>';
-    }).join('');
+    const grouped = tvGroupChannels(filtered);
+    const onclickFor = (c) => 'playTvChannel(' + tvState.channels.indexOf(c) + ')';
+    listEl.innerHTML = grouped.shown.map(entry => {
+        const isActive = !!(tvState.currentChannel && (tvState.currentChannel.url === entry.ch.url || entry.alts.some(a => tvState.currentChannel.url === a.url)));
+        return tvTileHtml(entry, onclickFor, isActive);
+    }).join('')
+    + tvNoLogoSectionHtml(grouped.noLogo, onclickFor, 'tvNoLogoPanel_main');
 }
 
 function playTvChannel(idx) {
