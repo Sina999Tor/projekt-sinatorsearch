@@ -128,6 +128,16 @@
     padding:3px 10px;
     border-radius:20px;
 }
+/* Když se logo stanice zobrazí, jméno může být menší (logo už kanál identifikuje).
+   Když logo chybí / nenačte se, zůstává ikonka 📺 a jméno je větší a výraznější. */
+.tv-ch-item.has-logo .tv-ch-name{
+    font-size:0.76rem !important;
+    font-weight:600 !important;
+}
+.tv-ch-item.no-logo .tv-ch-name{
+    font-size:0.95rem !important;
+    font-weight:800 !important;
+}
 @media (min-width:560px){
     .tv-channel-list{ grid-template-columns:repeat(2,1fr) !important; }
 }
@@ -17342,19 +17352,24 @@ function parseM3U(text) {
 }
 
 // === Sjednocené pomocné funkce pro zobrazení / řazení TV kanálů =========
+// Některé zdroje používají "stylizované" znaky (ᴴᴰ, ᴿᴬᵂ...) místo běžného textu HD/RAW.
+// Převedeme je na normální písmena, aby šly rozpoznat a odstranit stejně jako běžné "HD".
+function _tvNormalizeUnicode(name) {
+    try { return (name || '').normalize('NFKD'); } catch (e) { return name || ''; }
+}
 // Odstraní zbytečnou předponu země (např. "CZ| ", "SK| ", "DE| "...) z názvu,
 // protože stanice se stejně zobrazuje uvnitř dané kategorie (CZ, SK, DE/AT...).
 function _tvStripCountryPrefix(name) {
-    return (name || '').replace(/^[A-Z]{2,3}\s*\|\s*/, '').trim();
+    return _tvNormalizeUnicode(name).replace(/^[A-Z]{2,4}\s*\|\s*/, '').trim();
 }
-// Postupně odstraní koncové "kvalitní" přípony (HD, FHD, 4K, UHD, HEVC, JZC, SVC...),
+// Postupně odstraní koncové "kvalitní" přípony (HD, FHD, 4K, UHD, HEVC, JZC, SVC, RAW...),
 // aby se stejný kanál v různé kvalitě zobrazoval pod stejným, čistým názvem.
 function _tvStripQualitySuffix(name) {
     let s = (name || '').trim();
     let changed = true;
     while (changed) {
         changed = false;
-        const m = s.match(/^(.*?)\s+(4K|UHD|FHD|HEVC|JZC|SVC|HD)$/i);
+        const m = s.match(/^(.*?)\s+(4K|UHD|FHD|HEVC|JZC|SVC|RAW|HD)$/i);
         if (m) { s = m[1].trim(); changed = true; }
     }
     return s;
@@ -30333,8 +30348,8 @@ function renderAltChannelListSearch() {
     listEl.innerHTML = filteredSorted.map((ch, i) => {
         const label = ALT_PLAYLISTS[ch._sourceCode]?.label || ch._sourceCode;
         const shortName = tvDisplayName(ch.name);
-        return '<div class="tv-ch-item" onclick="playAltChannelDirect(\'' + encodeURIComponent(JSON.stringify({url:ch.url,name:ch.name,logo:ch.logo||''})) + '\')" title="' + ch.name + '">'
-            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'">'
+        return '<div class="tv-ch-item ' + (ch.logo ? 'has-logo' : 'no-logo') + '" onclick="playAltChannelDirect(\'' + encodeURIComponent(JSON.stringify({url:ch.url,name:ch.name,logo:ch.logo||''})) + '\')" title="' + ch.name + '">'
+            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\';var p=this.parentElement;if(p){p.classList.remove(\'has-logo\');p.classList.add(\'no-logo\');}">'
                        + '<div class="tv-ch-logo-ph" style="display:none">📺</div>'
                        : '<div class="tv-ch-logo-ph">📺</div>')
             + '<div class="tv-ch-name">' + shortName + '<span style="font-size:0.65rem;color:var(--text-muted);display:block;">' + label + '</span></div>'
@@ -30370,8 +30385,8 @@ function renderAltChannelList() {
         const isActive = altState.currentChannel && altState.currentChannel.url === ch.url;
         const globalIdx = altState.channels.indexOf(ch);
         const shortName = tvDisplayName(ch.name);
-        return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + '" onclick="playAltChannel(' + globalIdx + ')" title="' + ch.name + '">'
-            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'">'
+        return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + ' ' + (ch.logo ? 'has-logo' : 'no-logo') + '" onclick="playAltChannel(' + globalIdx + ')" title="' + ch.name + '">'
+            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\';var p=this.parentElement;if(p){p.classList.remove(\'has-logo\');p.classList.add(\'no-logo\');}">'
                        + '<div class="tv-ch-logo-ph" style="display:none">📺</div>'
                        : '<div class="tv-ch-logo-ph">📺</div>')
             + '<div class="tv-ch-name">' + shortName + '</div>'
@@ -30508,8 +30523,8 @@ function renderAlt2ChannelList() {
         const isActive = alt2State.currentChannel && alt2State.currentChannel.url === ch.url;
         const globalIdx = alt2State.channels.indexOf(ch);
         const shortName = tvDisplayName(ch.name);
-        return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + '" onclick="playAlt2Channel(' + globalIdx + ')" title="' + ch.name + '">'
-            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'">'
+        return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + ' ' + (ch.logo ? 'has-logo' : 'no-logo') + '" onclick="playAlt2Channel(' + globalIdx + ')" title="' + ch.name + '">'
+            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\';var p=this.parentElement;if(p){p.classList.remove(\'has-logo\');p.classList.add(\'no-logo\');}">'
                        + '<div class="tv-ch-logo-ph" style="display:none">📺</div>'
                        : '<div class="tv-ch-logo-ph">📺</div>')
             + '<div class="tv-ch-name">' + shortName + '</div>'
@@ -30609,8 +30624,8 @@ function renderAlt3ChannelList() {
         const isActive = alt3State.currentChannel && alt3State.currentChannel.url === ch.url;
         const globalIdx = alt3State.channels.indexOf(ch);
         const shortName = tvDisplayName(ch.name);
-        return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + '" onclick="playAlt3Channel(' + globalIdx + ')" title="' + ch.name + '">'
-            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'">'
+        return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + ' ' + (ch.logo ? 'has-logo' : 'no-logo') + '" onclick="playAlt3Channel(' + globalIdx + ')" title="' + ch.name + '">'
+            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\';var p=this.parentElement;if(p){p.classList.remove(\'has-logo\');p.classList.add(\'no-logo\');}">'
                        + '<div class="tv-ch-logo-ph" style="display:none">📺</div>'
                        : '<div class="tv-ch-logo-ph">📺</div>')
             + '<div class="tv-ch-name">' + shortName + '</div>'
@@ -30701,8 +30716,8 @@ function renderTvChannelList() {
         const isActive = tvState.currentChannel && tvState.currentChannel.url === ch.url;
         const globalIdx = tvState.channels.indexOf(ch);
         const shortName = tvDisplayName(ch.name);
-        return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + '" onclick="playTvChannel(' + globalIdx + ')" title="' + ch.name + '">'
-            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'">'
+        return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + ' ' + (ch.logo ? 'has-logo' : 'no-logo') + '" onclick="playTvChannel(' + globalIdx + ')" title="' + ch.name + '">'
+            + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\';var p=this.parentElement;if(p){p.classList.remove(\'has-logo\');p.classList.add(\'no-logo\');}">'
                        + '<div class="tv-ch-logo-ph" style="display:none">📺</div>'
                        : '<div class="tv-ch-logo-ph">📺</div>')
             + '<div class="tv-ch-name">' + shortName + '</div>'
