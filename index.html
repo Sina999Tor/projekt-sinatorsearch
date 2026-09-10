@@ -167,8 +167,14 @@
 .tv-ch-nologo-item{
     padding:10px; font-size:0.8rem; color:var(--text,#fff); border-radius:8px; cursor:pointer;
     border-bottom:1px solid rgba(255,255,255,0.05);
+    display:flex; align-items:center; gap:10px;
 }
 .tv-ch-nologo-item:active{ background:rgba(255,255,255,0.08); }
+.tv-ch-nologo-mini{
+    width:28px !important; height:28px !important; max-width:none !important;
+    object-fit:contain !important; background:rgba(0,0,0,0.35) !important;
+    border-radius:6px !important; flex:none; padding:2px; box-sizing:border-box;
+}
 @media (min-width:560px){
     .tv-channel-list{ grid-template-columns:repeat(2,1fr) !important; }
 }
@@ -17428,6 +17434,95 @@ function tvAvatarHtml(name) {
     return '<div class="tv-ch-logo-ph" style="background:' + tvAvatarColor(name) + '">' + tvAvatarLetter(name) + '</div>';
 }
 window.tvAvatarHtml = tvAvatarHtml;
+
+// === Automatické dohledání loga z GitHub repozitáře podle názvu kanálu ===
+// (https://github.com/antolikpiestany/Moja-IPTV/tree/main/Loga%20Kanalov)
+// Přesný seznam souborů v repozitáři se nedá dopředu zjistit (adresář na
+// GitHubu nejde načíst přes fetch/CORS), proto zkoušíme víc pravděpodobných
+// variant názvu souboru (s diakritikou / bez, velká/malá písmena, přípony) —
+// první, která se skutečně načte, se použije.
+const GITHUB_LOGO_BASE = 'https://raw.githubusercontent.com/antolikpiestany/Moja-IPTV/main/Loga%20Kanalov/';
+function tvGithubLogoCandidates(name) {
+    const clean = (typeof tvDisplayName === 'function' ? tvDisplayName(name) : (name || '')).trim();
+    if (!clean) return [];
+    const noDia = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const bases = [];
+    [clean, noDia, noDia.toUpperCase(), noDia.toLowerCase()].forEach(b => {
+        if (b && bases.indexOf(b) === -1) bases.push(b);
+    });
+    const exts = ['png', 'jpg', 'jpeg', 'webp'];
+    const urls = [];
+    bases.forEach(b => exts.forEach(ext => urls.push(GITHUB_LOGO_BASE + encodeURIComponent(b) + '.' + ext)));
+    return urls;
+}
+window.tvGithubLogoCandidates = tvGithubLogoCandidates;
+
+// Postupně zkusí varianty loga z GitHubu. Pokud žádná neexistuje, dlaždice se
+// (na rozdíl od dřívějška) NESCHOVÁ — zobrazí se místo ní barevný avatar
+// s písmenem stanice, stejně jako jinde v aplikaci.
+function tvLogoFallback(img, name) {
+    name = name || img.dataset.chname || '';
+    if (!img._tvFbList) { img._tvFbList = tvGithubLogoCandidates(name); img._tvFbIdx = 0; }
+    if (img._tvFbIdx < img._tvFbList.length) {
+        const next = img._tvFbList[img._tvFbIdx++];
+        img.onerror = function () { tvLogoFallback(img, name); };
+        img.src = next;
+    } else {
+        const ph = document.createElement('div');
+        ph.className = 'tv-ch-logo-ph';
+        ph.style.background = tvAvatarColor(name);
+        ph.textContent = tvAvatarLetter(name);
+        if (img.parentNode) img.parentNode.replaceChild(ph, img);
+    }
+}
+window.tvLogoFallback = tvLogoFallback;
+
+// Totéž pro malé miniatury u kanálů, které v playlistu vůbec neměly
+// tvg-logo — pokud se na GitHubu najde logo podle názvu, zobrazí se malá
+// ikonka vedle textu; pokud ne, miniatura se prostě skryje (zůstane jen text).
+function tvNoLogoImgFallback(img, name) {
+    name = name || img.dataset.chname || '';
+    if (!img._tvFbList) { img._tvFbList = tvGithubLogoCandidates(name); img._tvFbIdx = 0; }
+    if (img._tvFbIdx < img._tvFbList.length) {
+        const next = img._tvFbList[img._tvFbIdx++];
+        img.onerror = function () { tvNoLogoImgFallback(img, name); };
+        img.src = next;
+    } else {
+        img.style.display = 'none';
+    }
+}
+window.tvNoLogoImgFallback = tvNoLogoImgFallback;
+
+// Nastaví logo v přehrávači ("teď hraje"); pokud kanál logo nemá / se nenačte,
+// zkusí ho dohledat na GitHubu podle názvu, jinak logo prostě skryje.
+function tvSetNowLogo(logo, ch) {
+    if (!logo) return;
+    logo._tvFbList = null; logo._tvFbIdx = 0;
+    if (ch && ch.logo) {
+        logo.src = ch.logo;
+        logo.style.display = 'block';
+        logo.dataset.chname = ch.name || '';
+        logo.onerror = function () { tvLogoFallbackOrHide(logo, ch.name); };
+    } else if (ch && ch.name && tvGithubLogoCandidates(ch.name).length) {
+        logo.dataset.chname = ch.name;
+        logo._tvFbList = tvGithubLogoCandidates(ch.name);
+        logo._tvFbIdx = 1;
+        logo.src = logo._tvFbList[0];
+        logo.style.display = 'block';
+        logo.onerror = function () { tvLogoFallbackOrHide(logo, ch.name); };
+    } else {
+        logo.style.display = 'none';
+    }
+}
+function tvLogoFallbackOrHide(logo, name) {
+    if (!logo._tvFbList) { logo._tvFbList = tvGithubLogoCandidates(name); logo._tvFbIdx = 0; }
+    if (logo._tvFbIdx < logo._tvFbList.length) {
+        logo.src = logo._tvFbList[logo._tvFbIdx++];
+    } else {
+        logo.style.display = 'none';
+    }
+}
+window.tvSetNowLogo = tvSetNowLogo;
 // Normalizovaný klíč pro řazení — díky němu skončí stejné kanály (různé zdroje/kvality)
 // vždy hned vedle sebe (např. "ČT1", "CZ| CT 1 HD", "CZ| CT 1 HEVC" → stejný klíč).
 function tvSortKey(name) {
@@ -17504,7 +17599,7 @@ function tvTileHtml(entry, onclickForChannel, isActive) {
         }).join('') + '</div>'
         : '';
     return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + ' has-logo" onclick="' + onclickForChannel(ch) + '" title="' + safeTitle + '">'
-        + '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.closest(\'.tv-ch-item\').style.display=\'none\';">'
+        + '<img class="tv-ch-logo" src="' + ch.logo + '" data-chname="' + safeTitle + '" onerror="tvLogoFallback(this)">'
         + altBtn
         + '<div class="tv-ch-name">' + shortName + '</div>'
         + (isActive ? '<div class="tv-ch-live-badge">▶ ŽIVĚ</div>' : '')
@@ -17518,7 +17613,13 @@ window.tvTileHtml = tvTileHtml;
 function tvNoLogoSectionHtml(noLogo, onclickForChannel, panelId) {
     if (!noLogo.length) return '';
     const items = noLogo.map(entry => {
-        return '<div class="tv-ch-nologo-item" onclick="' + onclickForChannel(entry.ch) + '">' + tvDisplayName(entry.ch.name) + '</div>';
+        const label = tvDisplayName(entry.ch.name);
+        const safeLabel = (entry.ch.name || '').replace(/"/g, '&quot;');
+        const candidates = tvGithubLogoCandidates(entry.ch.name);
+        const miniImg = candidates.length
+            ? '<img class="tv-ch-nologo-mini" src="' + candidates[0] + '" data-chname="' + safeLabel + '" onerror="tvNoLogoImgFallback(this)">'
+            : '';
+        return '<div class="tv-ch-nologo-item" onclick="' + onclickForChannel(entry.ch) + '">' + miniImg + '<span>' + label + '</span></div>';
     }).join('');
     return '<button class="tv-more-btn" onclick="tvToggleAlts(\'' + panelId + '\')">➕ Další TV (' + noLogo.length + ')</button>'
         + '<div class="tv-ch-nologo-panel" id="' + panelId + '" style="display:none;">' + items + '</div>';
@@ -30492,7 +30593,7 @@ function playAltChannelDirect(encoded) {
         const ch = JSON.parse(decodeURIComponent(encoded));
         altState.currentChannel = ch;
         const logo = document.getElementById('tvNowLogo');
-        if(logo) { logo.src = ch.logo || ''; logo.style.display = ch.logo ? 'block' : 'none'; }
+        if(logo) { tvSetNowLogo(logo, ch); }
         const nameEl = document.getElementById('tvNowName');
         if(nameEl) nameEl.textContent = ch.name;
         openInVlcUrl(ch.url);
@@ -30526,7 +30627,7 @@ function playAltChannel(idx) {
     altState.currentChannel = ch;
     renderAltChannelList();
     const logo = document.getElementById('tvNowLogo');
-    if(logo) { logo.src = ch.logo || ''; logo.style.display = ch.logo ? 'block' : 'none'; }
+    if(logo) { tvSetNowLogo(logo, ch); }
     const nameEl = document.getElementById('tvNowName');
     if(nameEl) nameEl.textContent = ch.name;
     openInVlcUrl(ch.url);
@@ -30853,7 +30954,7 @@ function playTvChannel(idx) {
 
     // Aktualizuj info bar
     const logo = document.getElementById('tvNowLogo');
-    if(logo) { logo.src = ch.logo || ''; logo.style.display = ch.logo ? 'block' : 'none'; }
+    if(logo) { tvSetNowLogo(logo, ch); }
     const nameEl = document.getElementById('tvNowName');
     if(nameEl) nameEl.textContent = ch.name;
     // === NETLIFY MODE: okamžitě otevřít ve VLC / externím přehrávači ===
