@@ -178,6 +178,35 @@
 @media (min-width:560px){
     .tv-channel-list{ grid-template-columns:repeat(2,1fr) !important; }
 }
+/* Přepínač Dlaždice / Seznam */
+.tv-viewmode-toggle{ display:flex; gap:6px; margin-top:6px; }
+.tv-viewmode-btn{
+    flex:1; padding:6px 8px; border-radius:8px; border:1px solid var(--border);
+    background:var(--bg-elevated); color:var(--text-muted); font-size:0.74rem; font-weight:700;
+    cursor:pointer;
+}
+.tv-viewmode-btn.active{
+    border-color:var(--accent,#00b4d8) !important; color:#fff !important;
+    background:var(--accent,#00b4d8) !important;
+}
+/* Režim "Seznam" — kompaktní výpis všech stanic pod sebou, bez log */
+.tv-channel-list.list-mode{
+    display:flex !important; flex-direction:column !important; gap:0 !important;
+    padding:4px 12px !important;
+}
+.tv-ch-row{
+    display:flex !important; align-items:center !important; justify-content:space-between !important;
+    gap:8px; padding:12px 6px; border-bottom:1px solid rgba(255,255,255,0.07);
+    cursor:pointer; color:var(--text,#fff);
+}
+.tv-ch-row:active{ background:rgba(255,255,255,0.06); }
+.tv-ch-row.active{ color:var(--accent,#00b4d8); }
+.tv-ch-row-name{ font-size:0.86rem; font-weight:600; word-break:break-word; }
+.tv-ch-row-sub{ font-size:0.65rem; color:var(--text-muted); font-weight:600; }
+.tv-ch-row-live{
+    flex-shrink:0; font-size:0.6rem; font-weight:800; letter-spacing:.02em; color:#fff;
+    background:#e50914; padding:2px 8px; border-radius:20px;
+}
 </style>
   <script>
     (function() {
@@ -16577,6 +16606,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     <!-- Kanály: mřížka ikon –  Kanály tab -->
     <div id="tvSearchWrap" style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
         <input type="text" id="tvChannelSearchInput" oninput="filterTvChannels(this.value)" placeholder="🔍 Hledat ve všech kanálech…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
+        <div class="tv-viewmode-toggle">
+            <button class="tv-viewmode-btn" data-mode="tiles" onclick="tvSetViewMode('tiles')">🔲 Dlaždice</button>
+            <button class="tv-viewmode-btn" data-mode="list" onclick="tvSetViewMode('list')">☰ Seznam</button>
+        </div>
     </div>
     <div id="tvChannelListWrap" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0;">
         <div class="tv-channel-list" id="tvChannelList"></div>
@@ -16587,6 +16620,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <div class="tv-group-tabs" id="tvAlt2GroupTabs"></div>
         <div style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
             <input type="text" id="tvAlt2SearchInput" oninput="filterAlt2Channels(this.value)" placeholder="🔍 Hledat kanál…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
+            <div class="tv-viewmode-toggle">
+                <button class="tv-viewmode-btn" data-mode="tiles" onclick="tvSetViewMode('tiles')">🔲 Dlaždice</button>
+                <button class="tv-viewmode-btn" data-mode="list" onclick="tvSetViewMode('list')">☰ Seznam</button>
+            </div>
         </div>
         <div id="tvAlt2ListWrap" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0;">
             <div class="tv-channel-list" id="tvAlt2List"></div>
@@ -16598,6 +16635,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <div class="tv-group-tabs" id="tvAlt3GroupTabs"></div>
         <div style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
             <input type="text" id="tvAlt3SearchInput" oninput="filterAlt3Channels(this.value)" placeholder="🔍 Hledat kanál…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
+            <div class="tv-viewmode-toggle">
+                <button class="tv-viewmode-btn" data-mode="tiles" onclick="tvSetViewMode('tiles')">🔲 Dlaždice</button>
+                <button class="tv-viewmode-btn" data-mode="list" onclick="tvSetViewMode('list')">☰ Seznam</button>
+            </div>
         </div>
         <div id="tvAlt3ListWrap" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0;">
             <div class="tv-channel-list" id="tvAlt3List"></div>
@@ -16637,6 +16678,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <div class="tv-group-tabs" id="tvAltPlaylistTabs" style="flex-shrink:0;"></div>
         <div style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
             <input type="text" id="tvAltSearchInput" oninput="filterAltChannels(this.value)" placeholder="🔍 Hledat kanál…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;">
+            <div class="tv-viewmode-toggle">
+                <button class="tv-viewmode-btn" data-mode="tiles" onclick="tvSetViewMode('tiles')">🔲 Dlaždice</button>
+                <button class="tv-viewmode-btn" data-mode="list" onclick="tvSetViewMode('list')">☰ Seznam</button>
+            </div>
         </div>
         <div id="tvAltChannelListWrap" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0;">
             <div class="tv-channel-list" id="tvAltChannelList"></div>
@@ -16684,6 +16729,7 @@ function openTvModal() {
     tvM.classList.add('open');
     startTvClock();
     switchTvTab('channels');  // vždy začni na záložce Kanály
+    if (typeof tvUpdateViewModeButtons === 'function') tvUpdateViewModeButtons();
     // Na pozadí: načti EPG XML soubory
     if(!tvState.epgLoaded) loadEpgData();
     // Načti lokální EPG XML soubory (czech3.xml + slovakia1.xml)
@@ -17468,11 +17514,7 @@ function tvLogoFallback(img, name) {
         img.onerror = function () { tvLogoFallback(img, name); };
         img.src = next;
     } else {
-        const ph = document.createElement('div');
-        ph.className = 'tv-ch-logo-ph';
-        ph.style.background = tvAvatarColor(name);
-        ph.textContent = tvAvatarLetter(name);
-        if (img.parentNode) img.parentNode.replaceChild(ph, img);
+        tvDemoteTileToNoLogo(img, name);
     }
 }
 window.tvLogoFallback = tvLogoFallback;
@@ -17625,6 +17667,92 @@ function tvNoLogoSectionHtml(noLogo, onclickForChannel, panelId) {
         + '<div class="tv-ch-nologo-panel" id="' + panelId + '" style="display:none;">' + items + '</div>';
 }
 window.tvNoLogoSectionHtml = tvNoLogoSectionHtml;
+
+// === Přepínač zobrazení Dlaždice / Seznam (sdílený napříč Kanály/2/3/4) ==
+let tvViewMode = 'tiles';
+try { tvViewMode = (window._store && window._store.getItem('sinator_tv_view_mode')) || 'tiles'; } catch(e) {}
+
+function tvUpdateViewModeButtons() {
+    document.querySelectorAll('.tv-viewmode-btn').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-mode') === tvViewMode);
+    });
+}
+window.tvUpdateViewModeButtons = tvUpdateViewModeButtons;
+
+function tvSetViewMode(mode) {
+    if (mode !== 'tiles' && mode !== 'list') return;
+    tvViewMode = mode;
+    try { window._store && window._store.setItem('sinator_tv_view_mode', mode); } catch(e) {}
+    tvUpdateViewModeButtons();
+    if (typeof renderTvChannelList === 'function') renderTvChannelList();
+    if (typeof renderAlt2ChannelList === 'function') renderAlt2ChannelList();
+    if (typeof renderAlt3ChannelList === 'function') renderAlt3ChannelList();
+    if (typeof altState !== 'undefined' && altState.filterText && typeof renderAltChannelListSearch === 'function') {
+        renderAltChannelListSearch();
+    } else if (typeof renderAltChannelList === 'function') {
+        renderAltChannelList();
+    }
+}
+window.tvSetViewMode = tvSetViewMode;
+
+// Jeden řádek v režimu "Seznam" — jen název, bez loga/avataru, klik spustí TV.
+function tvListRowHtml(entry, onclickForChannel, isActive, subtitle) {
+    const ch = entry.ch;
+    const label = tvDisplayName(ch.name);
+    const safeTitle = (ch.name || '').replace(/"/g, '&quot;');
+    return '<div class="tv-ch-row' + (isActive ? ' active' : '') + '" onclick="' + onclickForChannel(ch) + '" title="' + safeTitle + '">'
+        + '<span class="tv-ch-row-name">' + label + (subtitle ? '<span class="tv-ch-row-sub" style="display:block;">' + subtitle + '</span>' : '') + '</span>'
+        + (isActive ? '<span class="tv-ch-row-live">▶ ŽIVĚ</span>' : '')
+        + '</div>';
+}
+window.tvListRowHtml = tvListRowHtml;
+
+// Vykreslí kanály podle aktuálního tvViewMode: "tiles" = jen loga v mřížce +
+// zbytek pod "Další TV"; "list" = úplně všechny stanice pod sebou v seznamu.
+function tvRenderChannelsHtml(grouped, onclickForChannel, isActiveFn, panelId, subtitleFn) {
+    if (tvViewMode === 'list') {
+        const all = grouped.shown.concat(grouped.noLogo);
+        all.sort((a, b) => {
+            const ka = tvSortKey(a.ch.name), kb = tvSortKey(b.ch.name);
+            return ka < kb ? -1 : (ka > kb ? 1 : 0);
+        });
+        return all.map(entry => tvListRowHtml(entry, onclickForChannel, isActiveFn(entry), subtitleFn ? subtitleFn(entry) : '')).join('');
+    }
+    return grouped.shown.map(entry => tvTileHtml(entry, onclickForChannel, isActiveFn(entry))).join('')
+        + tvNoLogoSectionHtml(grouped.noLogo, onclickForChannel, panelId);
+}
+window.tvRenderChannelsHtml = tvRenderChannelsHtml;
+
+// Když se dlaždici s (domněle) platným logem nepodaří logo načíst (404 u
+// zdroje i u všech GitHub náhrad), NEZOBRAZUJE se místo ní písmenkový avatar
+// v hlavní mřížce — dlaždice se z mřížky odstraní a stanice se přesune do
+// sekce "Další TV" (stejně jako stanice, co logo nikdy neměly).
+function tvDemoteTileToNoLogo(img, name) {
+    const tile = img.closest ? img.closest('.tv-ch-item') : null;
+    if (!tile) { if (img.parentNode) img.parentNode.removeChild(img); return; }
+    const listEl = tile.parentElement;
+    const onclickAttr = (tile.getAttribute('onclick') || '').replace(/"/g, '&quot;');
+    const label = tvDisplayName(name);
+    const itemHtml = '<div class="tv-ch-nologo-item" onclick="' + onclickAttr + '"><span>' + label + '</span></div>';
+    tile.remove();
+    if (!listEl) return;
+    const panel = listEl.querySelector('.tv-ch-nologo-panel');
+    const btn = listEl.querySelector('.tv-more-btn');
+    if (panel) {
+        panel.insertAdjacentHTML('beforeend', itemHtml);
+        if (btn) {
+            const m = btn.textContent.match(/\((\d+)\)/);
+            const n = m ? (parseInt(m[1], 10) + 1) : 1;
+            btn.textContent = '➕ Další TV (' + n + ')';
+        }
+    } else {
+        const uid = 'tvNoLogoPanel_rt' + (++_tvAltUidSeq);
+        listEl.insertAdjacentHTML('beforeend',
+            '<button class="tv-more-btn" onclick="tvToggleAlts(\'' + uid + '\')">➕ Další TV (1)</button>'
+            + '<div class="tv-ch-nologo-panel" id="' + uid + '" style="display:none;">' + itemHtml + '</div>');
+    }
+}
+window.tvDemoteTileToNoLogo = tvDemoteTileToNoLogo;
 // =========================================================================
 
 const ALT_PLAYLISTS = {
@@ -30578,8 +30706,15 @@ function renderAltChannelListSearch() {
     const encodeCh = (c) => encodeURIComponent(JSON.stringify({url:c.url,name:c.name,logo:c.logo||''}));
     const onclickFor = (c) => 'playAltChannelDirect(\'' + encodeCh(c) + '\')';
     const grouped = tvGroupChannels(filteredSorted);
+    const labelFor = (entry) => ALT_PLAYLISTS[entry.ch._sourceCode]?.label || entry.ch._sourceCode || '';
+    if (tvViewMode === 'list') {
+        listEl.classList.add('list-mode');
+        listEl.innerHTML = tvRenderChannelsHtml(grouped, onclickFor, () => false, 'tvNoLogoPanel_altsearch', labelFor);
+        return;
+    }
+    listEl.classList.remove('list-mode');
     listEl.innerHTML = grouped.shown.map(entry => {
-        const label = ALT_PLAYLISTS[entry.ch._sourceCode]?.label || entry.ch._sourceCode || '';
+        const label = labelFor(entry);
         const tile = tvTileHtml(entry, onclickFor, false);
         // Přidat popisek zdrojového playlistu pod název (jen zde, u cross-search výsledků)
         return tile.replace('<div class="tv-ch-name">' + tvDisplayName(entry.ch.name) + '</div>',
@@ -30614,11 +30749,9 @@ function renderAltChannelList() {
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Žádné kanály neodpovídají hledání.</div>'; return; }
     const grouped = tvGroupChannels(filtered);
     const onclickFor = (c) => 'playAltChannel(' + altState.channels.indexOf(c) + ')';
-    listEl.innerHTML = grouped.shown.map(entry => {
-        const isActive = !!(altState.currentChannel && (altState.currentChannel.url === entry.ch.url || entry.alts.some(a => altState.currentChannel.url === a.url)));
-        return tvTileHtml(entry, onclickFor, isActive);
-    }).join('')
-    + tvNoLogoSectionHtml(grouped.noLogo, onclickFor, 'tvNoLogoPanel_alt');
+    const isActiveFor = (entry) => !!(altState.currentChannel && (altState.currentChannel.url === entry.ch.url || entry.alts.some(a => altState.currentChannel.url === a.url)));
+    listEl.classList.toggle('list-mode', tvViewMode === 'list');
+    listEl.innerHTML = tvRenderChannelsHtml(grouped, onclickFor, isActiveFor, 'tvNoLogoPanel_alt');
 }
 
 function playAltChannel(idx) {
@@ -30746,12 +30879,10 @@ function renderAlt2ChannelList() {
     filtered = tvSortChannels(filtered);
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>'; return; }
     const grouped = tvGroupChannels(filtered);
+    const isActiveFor = (entry) => !!(alt2State.currentChannel && (alt2State.currentChannel.url === entry.ch.url || entry.alts.some(a => alt2State.currentChannel.url === a.url)));
     const onclickFor = (c) => 'playAlt2Channel(' + alt2State.channels.indexOf(c) + ')';
-    listEl.innerHTML = grouped.shown.map(entry => {
-        const isActive = !!(alt2State.currentChannel && (alt2State.currentChannel.url === entry.ch.url || entry.alts.some(a => alt2State.currentChannel.url === a.url)));
-        return tvTileHtml(entry, onclickFor, isActive);
-    }).join('')
-    + tvNoLogoSectionHtml(grouped.noLogo, onclickFor, 'tvNoLogoPanel_alt2');
+    listEl.classList.toggle('list-mode', tvViewMode === 'list');
+    listEl.innerHTML = tvRenderChannelsHtml(grouped, onclickFor, isActiveFor, 'tvNoLogoPanel_alt2');
 }
 
 function playAlt2Channel(idx) {
@@ -30843,11 +30974,9 @@ function renderAlt3ChannelList() {
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? '\u017d\u00e1dn\u00e9 kan\u00e1ly neodpov\u00eddaj\u00ed hled\u00e1n\u00ed.' : '\u017d\u00e1dn\u00e9 kan\u00e1ly.') + '</div>'; return; }
     const grouped = tvGroupChannels(filtered);
     const onclickFor = (c) => 'playAlt3Channel(' + alt3State.channels.indexOf(c) + ')';
-    listEl.innerHTML = grouped.shown.map(entry => {
-        const isActive = !!(alt3State.currentChannel && (alt3State.currentChannel.url === entry.ch.url || entry.alts.some(a => alt3State.currentChannel.url === a.url)));
-        return tvTileHtml(entry, onclickFor, isActive);
-    }).join('')
-    + tvNoLogoSectionHtml(grouped.noLogo, onclickFor, 'tvNoLogoPanel_alt3');
+    const isActiveFor = (entry) => !!(alt3State.currentChannel && (alt3State.currentChannel.url === entry.ch.url || entry.alts.some(a => alt3State.currentChannel.url === a.url)));
+    listEl.classList.toggle('list-mode', tvViewMode === 'list');
+    listEl.innerHTML = tvRenderChannelsHtml(grouped, onclickFor, isActiveFor, 'tvNoLogoPanel_alt3');
 }
 
 function playAlt3Channel(idx) {
@@ -30930,11 +31059,9 @@ function renderTvChannelList() {
 
     const grouped = tvGroupChannels(filtered);
     const onclickFor = (c) => 'playTvChannel(' + tvState.channels.indexOf(c) + ')';
-    listEl.innerHTML = grouped.shown.map(entry => {
-        const isActive = !!(tvState.currentChannel && (tvState.currentChannel.url === entry.ch.url || entry.alts.some(a => tvState.currentChannel.url === a.url)));
-        return tvTileHtml(entry, onclickFor, isActive);
-    }).join('')
-    + tvNoLogoSectionHtml(grouped.noLogo, onclickFor, 'tvNoLogoPanel_main');
+    const isActiveFor = (entry) => !!(tvState.currentChannel && (tvState.currentChannel.url === entry.ch.url || entry.alts.some(a => tvState.currentChannel.url === a.url)));
+    listEl.classList.toggle('list-mode', tvViewMode === 'list');
+    listEl.innerHTML = tvRenderChannelsHtml(grouped, onclickFor, isActiveFor, 'tvNoLogoPanel_main');
 }
 
 function playTvChannel(idx) {
