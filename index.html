@@ -55,6 +55,82 @@
   <style>#__vercel_toolbar_container, vercel-live-feedback { display: none !important; }
 .modal-chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;align-items:stretch;}
 .modal-chips>.modal-chip,.modal-chips>button.modal-chip{width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;}
+
+/* ══ Sjednocený vzhled TV kanálů (Kanály / Kanály 2 / 3 / 4) ══════════════
+   Vždy jen 2 dlaždice vedle sebe, větší loga, celý název stanice viditelný. */
+.tv-channel-list{
+    display:grid !important;
+    grid-template-columns:repeat(2,1fr) !important;
+    gap:12px !important;
+    padding:12px !important;
+    box-sizing:border-box;
+}
+.tv-ch-item{
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:center !important;
+    justify-content:flex-start !important;
+    gap:8px;
+    width:100% !important;
+    box-sizing:border-box;
+    background:linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02)) !important;
+    border:1px solid rgba(255,255,255,0.09) !important;
+    border-radius:16px !important;
+    padding:14px 10px !important;
+    cursor:pointer;
+    transition:transform .15s ease, border-color .15s ease, background .15s ease;
+}
+.tv-ch-item:active{ transform:scale(0.96); }
+.tv-ch-item.active{
+    border-color:var(--accent,#00b4d8) !important;
+    background:linear-gradient(180deg,rgba(0,180,216,0.16),rgba(0,180,216,0.05)) !important;
+    box-shadow:0 0 0 1px var(--accent,#00b4d8) inset;
+}
+.tv-ch-logo{
+    width:100% !important;
+    height:84px !important;
+    max-width:none !important;
+    object-fit:contain !important;
+    background:rgba(0,0,0,0.35) !important;
+    border-radius:12px !important;
+    padding:8px;
+    box-sizing:border-box;
+    display:block;
+}
+.tv-ch-logo-ph{
+    width:100% !important;
+    height:84px !important;
+    display:grid !important;
+    place-items:center;
+    font-size:2.1rem;
+    background:rgba(0,0,0,0.35) !important;
+    border-radius:12px !important;
+    box-sizing:border-box;
+}
+.tv-ch-name{
+    font-size:0.86rem !important;
+    font-weight:700;
+    text-align:center;
+    line-height:1.28;
+    color:var(--text,#fff);
+    white-space:normal !important;
+    overflow:visible !important;
+    text-overflow:unset !important;
+    word-break:break-word;
+    width:100%;
+}
+.tv-ch-live-badge{
+    font-size:0.63rem;
+    font-weight:800;
+    letter-spacing:.02em;
+    color:#fff;
+    background:#e50914;
+    padding:3px 10px;
+    border-radius:20px;
+}
+@media (min-width:560px){
+    .tv-channel-list{ grid-template-columns:repeat(2,1fr) !important; }
+}
 </style>
   <script>
     (function() {
@@ -17265,6 +17341,47 @@ function parseM3U(text) {
     return channels;
 }
 
+// === Sjednocené pomocné funkce pro zobrazení / řazení TV kanálů =========
+// Odstraní zbytečnou předponu země (např. "CZ| ", "SK| ", "DE| "...) z názvu,
+// protože stanice se stejně zobrazuje uvnitř dané kategorie (CZ, SK, DE/AT...).
+function _tvStripCountryPrefix(name) {
+    return (name || '').replace(/^[A-Z]{2,3}\s*\|\s*/, '').trim();
+}
+// Postupně odstraní koncové "kvalitní" přípony (HD, FHD, 4K, UHD, HEVC, JZC, SVC...),
+// aby se stejný kanál v různé kvalitě zobrazoval pod stejným, čistým názvem.
+function _tvStripQualitySuffix(name) {
+    let s = (name || '').trim();
+    let changed = true;
+    while (changed) {
+        changed = false;
+        const m = s.match(/^(.*?)\s+(4K|UHD|FHD|HEVC|JZC|SVC|HD)$/i);
+        if (m) { s = m[1].trim(); changed = true; }
+    }
+    return s;
+}
+// Čistý zobrazovaný název (bez CZ|/SK|... prefixu a bez kvalitní přípony).
+function tvDisplayName(name) {
+    return _tvStripQualitySuffix(_tvStripCountryPrefix(name));
+}
+// Normalizovaný klíč pro řazení — díky němu skončí stejné kanály (různé zdroje/kvality)
+// vždy hned vedle sebe (např. "ČT1", "CZ| CT 1 HD", "CZ| CT 1 HEVC" → stejný klíč).
+function tvSortKey(name) {
+    let s = tvDisplayName(name);
+    s = s.replace(/^tv\s+/i, '').replace(/\s+tv$/i, '');
+    s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+function tvSortChannels(list) {
+    return list.slice().sort((a, b) => {
+        const ka = tvSortKey(a.name), kb = tvSortKey(b.name);
+        if (ka !== kb) return ka < kb ? -1 : 1;
+        return a.name.localeCompare(b.name, 'cs', { sensitivity: 'base', numeric: true });
+    });
+}
+window.tvDisplayName = tvDisplayName;
+window.tvSortChannels = tvSortChannels;
+// =========================================================================
+
 const ALT_PLAYLISTS = {
     cz: { label: `🇨🇿 CZ`, m3u: `#EXTM3U
 #EXTINF:-1 tvg-logo="http://tv.iptelka.eu/loga/ct1hd.png" tvg-id="ČT1.cz" tvg-chno="",ČT 1 HD
@@ -30212,9 +30329,10 @@ function renderAltChannelListSearch() {
     if(!listEl) return;
     const filtered = altState._searchResults || [];
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Žádné kanály neodpovídají hledání.</div>'; return; }
-    listEl.innerHTML = filtered.map((ch, i) => {
+    const filteredSorted = tvSortChannels(filtered);
+    listEl.innerHTML = filteredSorted.map((ch, i) => {
         const label = ALT_PLAYLISTS[ch._sourceCode]?.label || ch._sourceCode;
-        const shortName = ch.name.replace(/\s*(HD|FHD|4K|hd)$/i,'').trim();
+        const shortName = tvDisplayName(ch.name);
         return '<div class="tv-ch-item" onclick="playAltChannelDirect(\'' + encodeURIComponent(JSON.stringify({url:ch.url,name:ch.name,logo:ch.logo||''})) + '\')" title="' + ch.name + '">'
             + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'">'
                        + '<div class="tv-ch-logo-ph" style="display:none">📺</div>'
@@ -30246,12 +30364,12 @@ function renderAltChannelList() {
         listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Vyber playlist výše.</div>';
         return;
     }
-    const filtered = altState.filtered;
+    const filtered = tvSortChannels(altState.filtered);
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Žádné kanály neodpovídají hledání.</div>'; return; }
     listEl.innerHTML = filtered.map((ch) => {
         const isActive = altState.currentChannel && altState.currentChannel.url === ch.url;
         const globalIdx = altState.channels.indexOf(ch);
-        const shortName = ch.name.replace(/\s*(HD|FHD|4K|hd)$/i,'').trim();
+        const shortName = tvDisplayName(ch.name);
         return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + '" onclick="playAltChannel(' + globalIdx + ')" title="' + ch.name + '">'
             + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'">'
                        + '<div class="tv-ch-logo-ph" style="display:none">📺</div>'
@@ -30384,12 +30502,12 @@ function renderAlt2ChannelList() {
         (adultAllowed || !isAdultChannel(ch)) &&
         (searchText ? ch.name.toLowerCase().includes(searchText) : (alt2State.activeGroup === 'all' || alt2GroupKey(ch) === alt2State.activeGroup))
     );
-    filtered = filtered.slice().sort((a, b) => a.name.localeCompare(b.name, 'cs', { sensitivity: 'base', numeric: true }));
+    filtered = tvSortChannels(filtered);
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>'; return; }
     listEl.innerHTML = filtered.map((ch) => {
         const isActive = alt2State.currentChannel && alt2State.currentChannel.url === ch.url;
         const globalIdx = alt2State.channels.indexOf(ch);
-        const shortName = ch.name.replace(/\s*(HD|FHD|4K|HEVC|hd)$/i,'').trim();
+        const shortName = tvDisplayName(ch.name);
         return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + '" onclick="playAlt2Channel(' + globalIdx + ')" title="' + ch.name + '">'
             + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'">'
                        + '<div class="tv-ch-logo-ph" style="display:none">📺</div>'
@@ -30485,12 +30603,12 @@ function renderAlt3ChannelList() {
         (adultAllowed || !isAdultChannel(ch)) &&
         (searchText ? ch.name.toLowerCase().includes(searchText) : (alt3State.activeGroup === 'all' || alt3GroupKey(ch) === alt3State.activeGroup))
     );
-    filtered = filtered.slice().sort((a, b) => a.name.localeCompare(b.name, 'cs', { sensitivity: 'base', numeric: true }));
+    filtered = tvSortChannels(filtered);
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? '\u017d\u00e1dn\u00e9 kan\u00e1ly neodpov\u00eddaj\u00ed hled\u00e1n\u00ed.' : '\u017d\u00e1dn\u00e9 kan\u00e1ly.') + '</div>'; return; }
     listEl.innerHTML = filtered.map((ch) => {
         const isActive = alt3State.currentChannel && alt3State.currentChannel.url === ch.url;
         const globalIdx = alt3State.channels.indexOf(ch);
-        const shortName = ch.name.replace(/\s*(HD|FHD|4K|HEVC|hd)$/i,'').trim();
+        const shortName = tvDisplayName(ch.name);
         return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + '" onclick="playAlt3Channel(' + globalIdx + ')" title="' + ch.name + '">'
             + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'">'
                        + '<div class="tv-ch-logo-ph" style="display:none">📺</div>'
@@ -30577,12 +30695,12 @@ function renderTvChannelList() {
 
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály v této skupině.') + '</div>'; return; }
 
-    filtered = filtered.slice().sort((a, b) => a.name.localeCompare(b.name, 'cs', { sensitivity: 'base', numeric: true }));
+    filtered = tvSortChannels(filtered);
 
     listEl.innerHTML = filtered.map((ch) => {
         const isActive = tvState.currentChannel && tvState.currentChannel.url === ch.url;
         const globalIdx = tvState.channels.indexOf(ch);
-        const shortName = ch.name.replace(/\s*(HD|FHD|4K|hd)$/i,'').trim();
+        const shortName = tvDisplayName(ch.name);
         return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + '" onclick="playTvChannel(' + globalIdx + ')" title="' + ch.name + '">'
             + (ch.logo ? '<img class="tv-ch-logo" src="' + ch.logo + '" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'">'
                        + '<div class="tv-ch-logo-ph" style="display:none">📺</div>'
