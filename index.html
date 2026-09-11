@@ -16746,7 +16746,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     </div>
 
     <!-- Tabs: skupiny kanálů + šipka na schování celé nabídky -->
-    <div class="tv-chrome-row">
+    <div class="tv-chrome-row" id="tvGroupTabsRow">
         <div class="tv-group-tabs tv-chrome-item" id="tvGroupTabs"></div>
         <button type="button" class="tv-chrome-toggle" onclick="toggleTvChrome()" title="Schovat nabídku">▲</button>
     </div>
@@ -31119,6 +31119,8 @@ function switchTvTab(tab) {
     document.getElementById('tvAlt2Wrap').style.display = isAlt2 ? 'flex' : 'none';
     document.getElementById('tvAlt3Wrap').style.display = isAlt3 ? 'flex' : 'none';
     document.getElementById('tvGroupTabs').style.display = isAnyAlt ? 'none' : '';
+    const tvGroupTabsRow = document.getElementById('tvGroupTabsRow');
+    if(tvGroupTabsRow) tvGroupTabsRow.style.display = isAnyAlt ? 'none' : '';
     document.getElementById('tvVlcInfo').style.display = isEpg ? 'none' : '';
     const btnCh = document.getElementById('tvTabChannels');
     const btnEpg = document.getElementById('tvTabEpg');
