@@ -77,6 +77,11 @@
 .tv-dd-opt.active{ color:#00b4d8; background:rgba(0,180,216,0.1); }
 .tv-dd-opt:active{ background:rgba(255,255,255,0.08); }
 .tv-group-dd{ margin:8px 12px; }
+/* Kontejnery kategorií mívaly overflow-x:auto (vodorovné scrollování starých
+   tlačítek), což implicitně ořezávalo i svisle přesahující rozbalenou nabídku.
+   Zajistíme, že rozbalená nabídka nebude nikde useknutá. */
+.tv-group-tabs, #tvAltPlaylistTabs { overflow: visible !important; }
+.tv-dd-menu{ z-index:9999; }
 
 .modal-chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;align-items:stretch;}
 .modal-chips>.modal-chip,.modal-chips>button.modal-chip{width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;}
@@ -31015,7 +31020,13 @@ document.addEventListener('click', function(e) {
 }, true);
 
 // Scroll (i uvnitř seznamu kanálů) vždy zavře otevřenou nabídku.
+// Poslech na document (capture) i window pro jistotu, plus touchmove —
+// to se spustí hned na začátku tažení prstem, ještě než stihne vyletět scroll.
 document.addEventListener('scroll', function() { tvDdCloseAll(); }, true);
+window.addEventListener('scroll', function() { tvDdCloseAll(); }, true);
+document.addEventListener('touchmove', function(e) {
+    if(!e.target.closest('.tv-dd-menu')) tvDdCloseAll();
+}, { capture: true, passive: true });
 
 function switchTvTab(tab) {
     // Při přepnutí na jakoukoliv nabídku (i opětovném kliknutí na stejnou) vždy vymaž vyhledávací pole
