@@ -1055,6 +1055,16 @@
                     <span class="settings-label">Uživatel:</span>
                     <span class="code" id="traktCodeValue">---</span>
                 </div>
+                <div style="margin:10px 0;padding-top:10px;border-top:1px dashed var(--border);">
+                    <span class="settings-label" style="font-size:0.78rem;">🔑 Vlastní Trakt API aplikace</span>
+                    <input type="text" class="settings-input" id="traktClientIdInput" placeholder="Client ID" value="" autocomplete="off">
+                    <input type="password" class="settings-input" id="traktClientSecretInput" placeholder="Client Secret" value="" autocomplete="off" style="margin-top:6px;">
+                    <div class="settings-actions">
+                        <button class="settings-btn-small" onclick="saveTraktClientKeys()">💾 Uložit</button>
+                        <button class="settings-btn-small settings-btn-remove" onclick="clearTraktClientKeys()">🗑️ Smazat</button>
+                    </div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Založ appku na <a href="https://trakt.tv/oauth/applications/new" target="_blank" style="color:#1db954;">trakt.tv/oauth/applications/new</a> — Redirect URI: <span class="code" style="font-size:0.68rem;">urn:ietf:wg:oauth:2.0:oob</span></div>
+                </div>
                 <div class="settings-actions">
                     <button class="settings-btn-small" onclick="connectTrakt()">🔑 Připojit</button>
                     <button class="settings-btn-small settings-btn-remove" onclick="disconnectTrakt()">❌ Odhlásit</button>
@@ -1725,7 +1735,7 @@
     if (_store.getItem('sinator_adult_content') === null) _store.setItem('sinator_adult_content', 'false');
     let adultContent = _store.getItem('sinator_adult_content') === 'true';
     let _aiAbortController = null;
-    const TRAKT_CLIENT_ID = 'QOfvLB35_eg1LkJ-51VM7NckrgnWrCAe2xH5EbsumqE';
+    let TRAKT_CLIENT_ID = _store.getItem('sinator_trakt_client_id') || '';
 
     // ── Vlastní backend (náhrada za Trakt, viz sinator-backend) ─────────────
     // Adresa je napevno (stejný princip jako TRAKT_BASE) — uživatel zadává jen klíč.
@@ -3242,7 +3252,7 @@
     };
 
 
-    const TRAKT_CLIENT_SECRET = 'rIukoJbVTROcnT9W0-B3Ns3D7dkxN57uuzqsRJAYQVc';
+    let TRAKT_CLIENT_SECRET = _store.getItem('sinator_trakt_client_secret') || '';
     const REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob';
     const SIMKL_CLIENT_ID = 'a4b20739a0cbf73cfd54302fe2be81088b840262b9554059f180b91df334e545';
     const SIMKL_BASE = 'https://api.simkl.com';
@@ -4398,6 +4408,7 @@
             if (panel) panel.classList.toggle('active', key === service);
         });
         if (!service) syncConnectServiceDots();
+        if (service === 'trakt' && typeof updateTraktClientKeyStatus === 'function') updateTraktClientKeyStatus();
     }
     window.switchConnectService = switchConnectService;
 
@@ -6191,6 +6202,11 @@
     window.connectTraktFromMdblist = function() {
         closeMdblistModal();
         if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
+        if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
+            alert('Nejprve v Nastavení > Klíče > Propojení > Trakt.tv vyplň vlastní Client ID a Client Secret.');
+            openSettingsModal(); switchSettingsTab('keys'); switchKeysSubTab('connect'); switchConnectService('trakt');
+            return;
+        }
         const authUrl = `https://trakt.tv/oauth/authorize?response_type=code&client_id=${TRAKT_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
         const content = $('modalContent');
         content.innerHTML = `<div style="padding:40px;text-align:center;">
@@ -6459,6 +6475,10 @@
 
     function connectTrakt() {
         if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
+        if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
+            alert('Nejprve vyplň vlastní Trakt Client ID a Client Secret (sekce "🔑 Vlastní Trakt API aplikace" výše) a klikni "💾 Uložit".\n\nAppku založíš na trakt.tv/oauth/applications/new (Redirect URI: urn:ietf:wg:oauth:2.0:oob).');
+            return;
+        }
         closeSettingsModal();
         const authUrl = `https://trakt.tv/oauth/authorize?response_type=code&client_id=${TRAKT_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
         const content = $('modalContent');
@@ -6476,6 +6496,47 @@
         $('modal').classList.add('open');
     }
     window.connectTrakt = connectTrakt;
+
+    // Vlastní Trakt Client ID/Secret zadané uživatelem v Nastavení > Klíče —
+    // uloží se do localStorage a od teď se používají místo (mrtvého) natvrdo
+    // zadaného klíče.
+    function saveTraktClientKeys() {
+        const idInput = $('traktClientIdInput');
+        const secInput = $('traktClientSecretInput');
+        const id = idInput ? idInput.value.trim() : '';
+        const secret = secInput ? secInput.value.trim() : '';
+        if (!id || !secret) { alert('Vyplň obě pole — Client ID i Client Secret.'); return; }
+        TRAKT_CLIENT_ID = id;
+        TRAKT_CLIENT_SECRET = secret;
+        try {
+            _store.setItem('sinator_trakt_client_id', id);
+            _store.setItem('sinator_trakt_client_secret', secret);
+        } catch(e) {}
+        alert('✅ Trakt API klíče uloženy. Teď klikni na "🔑 Připojit".');
+    }
+    window.saveTraktClientKeys = saveTraktClientKeys;
+
+    function clearTraktClientKeys() {
+        if (!confirm('Smazat vlastní Trakt Client ID/Secret?')) return;
+        TRAKT_CLIENT_ID = '';
+        TRAKT_CLIENT_SECRET = '';
+        try {
+            _store.removeItem('sinator_trakt_client_id');
+            _store.removeItem('sinator_trakt_client_secret');
+        } catch(e) {}
+        const idInput = $('traktClientIdInput'); if (idInput) idInput.value = '';
+        const secInput = $('traktClientSecretInput'); if (secInput) secInput.value = '';
+    }
+    window.clearTraktClientKeys = clearTraktClientKeys;
+
+    // Předvyplní pole hodnotami z paměti (volá se při otevření panelu Trakt).
+    function updateTraktClientKeyStatus() {
+        const idInput = $('traktClientIdInput');
+        const secInput = $('traktClientSecretInput');
+        if (idInput) idInput.value = TRAKT_CLIENT_ID || '';
+        if (secInput) secInput.value = TRAKT_CLIENT_SECRET || '';
+    }
+    window.updateTraktClientKeyStatus = updateTraktClientKeyStatus;
 
     // Přečte kód vložený do #traktCodeInput a dokončí OAuth výměnou za token
     // (viz submitTraktCodeWithCode). Používá se z browser-authorize modalu
