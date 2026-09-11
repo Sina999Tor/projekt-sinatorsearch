@@ -53,25 +53,30 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
   <style>#__vercel_toolbar_container, vercel-live-feedback { display: none !important; }
-#tvTabSelect, .tv-group-select{
-    width:100%;
-    padding:10px 34px 10px 12px;
-    border-radius:10px;
-    border:1px solid var(--border,#333);
-    background-color:var(--bg-elevated,#1a1a1a);
-    color:var(--text,#fff);
-    font-size:0.85rem;
-    font-weight:700;
-    box-sizing:border-box;
-    appearance:none;
-    -webkit-appearance:none;
-    -moz-appearance:none;
-    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'><path fill='%2300b4d8' d='M7 10l5 5 5-5z'/></svg>");
-    background-repeat:no-repeat;
-    background-position:right 10px center;
-    background-size:16px;
+.tv-dd{ position:relative; }
+.tv-dd-btn{
+    width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:10px 12px; border-radius:10px; border:1px solid var(--border,#333);
+    background:var(--bg-elevated,#1a1a1a); color:var(--text,#fff);
+    font-size:0.85rem; font-weight:700; box-sizing:border-box; cursor:pointer;
 }
-.tv-group-select{ margin:8px 12px; width:calc(100% - 24px); }
+.tv-dd-arrow{ color:#00b4d8; font-size:0.7rem; transition:transform .15s ease; flex-shrink:0; }
+.tv-dd.open .tv-dd-arrow{ transform:rotate(180deg); }
+.tv-dd-menu{
+    display:none; position:absolute; left:0; right:0; top:calc(100% + 4px);
+    max-height:260px; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+    background:var(--bg-elevated,#1a1a1a); border:1px solid var(--border,#333);
+    border-radius:10px; z-index:60; box-shadow:0 8px 24px rgba(0,0,0,0.45);
+}
+.tv-dd.open .tv-dd-menu{ display:block; }
+.tv-dd-opt{
+    padding:10px 12px; font-size:0.84rem; font-weight:600; color:var(--text,#fff);
+    cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.tv-dd-opt:last-child{ border-bottom:none; }
+.tv-dd-opt.active{ color:#00b4d8; background:rgba(0,180,216,0.1); }
+.tv-dd-opt:active{ background:rgba(255,255,255,0.08); }
+.tv-group-dd{ margin:8px 12px; }
 
 .modal-chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;align-items:stretch;}
 .modal-chips>.modal-chip,.modal-chips>button.modal-chip{width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;}
@@ -16714,12 +16719,15 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
     <!-- Navigace: Kanály / Kanály 2 / Kanály 3 / Kanály 4 (rozvírací nabídka) -->
     <div style="flex-shrink:0;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg-dark);margin-top:8px;">
-        <select id="tvTabSelect" onchange="switchTvTab(this.value)">
-            <option value="channels">📺 Kanály</option>
-            <option value="alt">📺 Kanály 2</option>
-            <option value="alt2">📺 Kanály 3</option>
-            <option value="alt3">📺 Kanály 4</option>
-        </select>
+        <div class="tv-dd" id="tvTabDD" data-handler="switchTvTab">
+            <button type="button" class="tv-dd-btn" onclick="tvDdToggle('tvTabDD')"><span class="tv-dd-btn-label">📺 Kanály</span><span class="tv-dd-arrow">▾</span></button>
+            <div class="tv-dd-menu">
+                <div class="tv-dd-opt active" data-value="channels">📺 Kanály</div>
+                <div class="tv-dd-opt" data-value="alt">📺 Kanály 2</div>
+                <div class="tv-dd-opt" data-value="alt2">📺 Kanály 3</div>
+                <div class="tv-dd-opt" data-value="alt3">📺 Kanály 4</div>
+            </div>
+        </div>
     </div>
 
     <!-- Tabs: skupiny kanálů -->
@@ -30836,12 +30844,12 @@ let altState = window.altState = { activeCode: null, channels: [], filtered: [],
 function renderAltPlaylistTabs() {
     const tabs = document.getElementById('tvAltPlaylistTabs');
     if(!tabs) return;
-    const options = Object.keys(ALT_PLAYLISTS).filter(code => code !== 'alt2').map(code => {
+    const opts = Object.keys(ALT_PLAYLISTS).filter(code => code !== 'alt2').map(code => {
         const pl = ALT_PLAYLISTS[code];
         if(pl._count === undefined) pl._count = (pl.m3u.match(/#EXTINF/g) || []).length;
-        return `<option value="${code}" ${code === altState.activeCode ? 'selected' : ''}>${pl.label} (${pl._count})</option>`;
-    }).join('');
-    tabs.innerHTML = `<select class="tv-group-select" onchange="selectAltPlaylist(this.value)">${options}</select>`;
+        return { value: code, label: `${pl.label} (${pl._count})` };
+    });
+    tabs.innerHTML = tvDdBuildHtml('tvAltPlaylistDD', 'selectAltPlaylist', opts, altState.activeCode);
 }
 
 function selectAltPlaylist(code) {
@@ -30956,16 +30964,58 @@ function playAltChannel(idx) {
     updateTvQuickAltRow(ch.name, ch.url);
 }
 
-// Otevřený <select> (Kanály / kategorie) se má při scrollování seznamu
-// zavřít, ne zůstat "viset" nad obsahem. Scroll event nebubluje, proto
-// listener s capture:true na document, který zachytí scroll z jakéhokoliv
-// vnořeného scrollovatelného prvku (tvChannelListWrap, tvAlt2ListWrap...).
-document.addEventListener('scroll', function() {
-    const ae = document.activeElement;
-    if(ae && ae.tagName === 'SELECT' && (ae.id === 'tvTabSelect' || ae.classList.contains('tv-group-select'))) {
-        ae.blur();
+// ── Vlastní rozvírací nabídka (.tv-dd) pro Kanály/2/3/4 a kategorie ──────
+// Na rozdíl od nativního <select> (systémový popup mimo webview, nejde
+// spolehlivě zavřít z JS) je tohle čisté HTML/CSS/JS, takže se dá zavřít
+// vždy: klikem mimo, výběrem položky i scrollem seznamu pod ním.
+function tvDdToggle(id) {
+    const wrap = document.getElementById(id);
+    if(!wrap) return;
+    const willOpen = !wrap.classList.contains('open');
+    tvDdCloseAll();
+    if(willOpen) wrap.classList.add('open');
+}
+window.tvDdToggle = tvDdToggle;
+
+function tvDdCloseAll() {
+    document.querySelectorAll('.tv-dd.open').forEach(el => el.classList.remove('open'));
+}
+window.tvDdCloseAll = tvDdCloseAll;
+
+// Postaví HTML pro dynamicky generovanou nabídku kategorií (CZ/SK/Film/...).
+// options: [{value, label}], activeValue: aktuálně vybraná hodnota.
+function tvDdBuildHtml(ddId, handlerName, options, activeValue) {
+    const active = options.find(o => o.value === activeValue) || options[0];
+    const optsHtml = options.map(o => `<div class="tv-dd-opt${o.value === activeValue ? ' active' : ''}" data-value="${String(o.value).replace(/"/g,'&quot;')}">${o.label}</div>`).join('');
+    return `<div class="tv-dd tv-group-dd" id="${ddId}" data-handler="${handlerName}">
+        <button type="button" class="tv-dd-btn" onclick="tvDdToggle('${ddId}')"><span class="tv-dd-btn-label">${active ? active.label : ''}</span><span class="tv-dd-arrow">▾</span></button>
+        <div class="tv-dd-menu">${optsHtml}</div>
+    </div>`;
+}
+window.tvDdBuildHtml = tvDdBuildHtml;
+
+// Klik na položku nabídky → nastav aktivní stav, zavolej příslušný handler
+// (switchTvTab / switchTvGroup / selectAltPlaylist / switchAlt2Group / switchAlt3Group)
+document.addEventListener('click', function(e) {
+    const opt = e.target.closest('.tv-dd-opt');
+    if(opt) {
+        const wrap = opt.closest('.tv-dd');
+        if(!wrap) return;
+        const value = opt.getAttribute('data-value');
+        const handlerName = wrap.getAttribute('data-handler');
+        wrap.querySelectorAll('.tv-dd-opt').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        const lbl = wrap.querySelector('.tv-dd-btn-label');
+        if(lbl) lbl.textContent = opt.textContent;
+        tvDdCloseAll();
+        if(handlerName && typeof window[handlerName] === 'function') window[handlerName](value);
+        return;
     }
+    if(!e.target.closest('.tv-dd')) tvDdCloseAll();
 }, true);
+
+// Scroll (i uvnitř seznamu kanálů) vždy zavře otevřenou nabídku.
+document.addEventListener('scroll', function() { tvDdCloseAll(); }, true);
 
 function switchTvTab(tab) {
     // Při přepnutí na jakoukoliv nabídku (i opětovném kliknutí na stejnou) vždy vymaž vyhledávací pole
@@ -31000,8 +31050,13 @@ function switchTvTab(tab) {
     if(btnAlt) { btnAlt.style.background = isAlt ? 'var(--accent)' : 'transparent'; btnAlt.style.color = isAlt ? '#fff' : 'var(--text-muted)'; }
     if(btnAlt2) { btnAlt2.style.background = isAlt2 ? 'var(--accent)' : 'transparent'; btnAlt2.style.color = isAlt2 ? '#fff' : 'var(--text-muted)'; }
     if(btnAlt3) { btnAlt3.style.background = isAlt3 ? 'var(--accent)' : 'transparent'; btnAlt3.style.color = isAlt3 ? '#fff' : 'var(--text-muted)'; }
-    const tvTabSel = document.getElementById('tvTabSelect');
-    if(tvTabSel && !isEpg) tvTabSel.value = tab;
+    const tvTabDD = document.getElementById('tvTabDD');
+    if(tvTabDD && !isEpg) {
+        tvTabDD.querySelectorAll('.tv-dd-opt').forEach(o => o.classList.toggle('active', o.getAttribute('data-value') === tab));
+        const activeOpt = tvTabDD.querySelector('.tv-dd-opt.active');
+        const lbl = tvTabDD.querySelector('.tv-dd-btn-label');
+        if(lbl && activeOpt) lbl.textContent = activeOpt.textContent;
+    }
     if(isEpg) loadEpgData();
     if(isAlt) {
         renderAltPlaylistTabs();
@@ -31049,9 +31104,8 @@ function renderAlt2GroupTabs() {
     const counts = {};
     visible.forEach(ch => { const k = alt2GroupKey(ch); counts[k] = (counts[k] || 0) + 1; });
     const order = Object.keys(ALT2_GROUP_LABELS).filter(k => (k !== '18' || adultAllowed) && counts[k]);
-    let opts = `<option value="all" ${alt2State.activeGroup === 'all' ? 'selected' : ''}>📋 Vše (${visible.length})</option>`;
-    opts += order.map(k => `<option value="${k}" ${alt2State.activeGroup === k ? 'selected' : ''}>${ALT2_GROUP_LABELS[k]} (${counts[k]})</option>`).join('');
-    tabs.innerHTML = `<select class="tv-group-select" onchange="switchAlt2Group(this.value)">${opts}</select>`;
+    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${ALT2_GROUP_LABELS[k]} (${counts[k]})` })));
+    tabs.innerHTML = tvDdBuildHtml('tvAlt2GroupDD', 'switchAlt2Group', opts, alt2State.activeGroup);
 }
 
 function switchAlt2Group(id) {
@@ -31143,9 +31197,8 @@ function renderAlt3GroupTabs() {
     const counts = {};
     visible.forEach(ch => { const k = alt3GroupKey(ch); counts[k] = (counts[k] || 0) + 1; });
     const order = Object.keys(ALT3_GROUP_LABELS).filter(k => counts[k]);
-    let opts = `<option value="all" ${alt3State.activeGroup === 'all' ? 'selected' : ''}>📋 Vše (${visible.length})</option>`;
-    opts += order.map(k => `<option value="${k}" ${alt3State.activeGroup === k ? 'selected' : ''}>${ALT3_GROUP_LABELS[k]} (${counts[k]})</option>`).join('');
-    tabs.innerHTML = `<select class="tv-group-select" onchange="switchAlt3Group(this.value)">${opts}</select>`;
+    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${ALT3_GROUP_LABELS[k]} (${counts[k]})` })));
+    tabs.innerHTML = tvDdBuildHtml('tvAlt3GroupDD', 'switchAlt3Group', opts, alt3State.activeGroup);
 }
 
 function switchAlt3Group(id) {
@@ -31194,11 +31247,11 @@ window.playAlt3Channel = playAlt3Channel;
 function renderTvGroups() {
     const tabs = document.getElementById('tvGroupTabs');
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
-    const options = TV_GROUPS.map(g => {
+    const opts = TV_GROUPS.map(g => {
         const count = tvState.channels.filter(ch => g.match(ch) && (adultAllowed || !isAdultChannel(ch))).length;
-        return `<option value="${g.id}" ${g.id === tvState.activeGroup ? 'selected' : ''}>${g.label} (${count})</option>`;
-    }).join('');
-    tabs.innerHTML = `<select class="tv-group-select" onchange="switchTvGroup(this.value)">${options}</select>`;
+        return { value: g.id, label: `${g.label} (${count})` };
+    });
+    tabs.innerHTML = tvDdBuildHtml('tvGroupDD', 'switchTvGroup', opts, tvState.activeGroup);
 }
 
 function switchTvGroup(id) {
@@ -31212,9 +31265,6 @@ function switchTvGroup(id) {
 function filterTvChannels(text) {
     tvState._searchText = (text || '').toLowerCase().trim();
     renderTvChannelList();
-    // Udrž dropdown se skupinami synchronizovaný s aktuálně vybranou skupinou
-    const gsel = document.querySelector('#tvGroupTabs .tv-group-select');
-    if(gsel) gsel.value = tvState.activeGroup;
 }
 window.filterTvChannels = filterTvChannels;
 
