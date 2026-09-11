@@ -30837,11 +30837,12 @@ let altState = window.altState = { activeCode: null, channels: [], filtered: [],
 function renderAltPlaylistTabs() {
     const tabs = document.getElementById('tvAltPlaylistTabs');
     if(!tabs) return;
-    tabs.innerHTML = Object.keys(ALT_PLAYLISTS).filter(code => code !== 'alt2').map(code => {
+    const options = Object.keys(ALT_PLAYLISTS).filter(code => code !== 'alt2').map(code => {
         const pl = ALT_PLAYLISTS[code];
         if(pl._count === undefined) pl._count = (pl.m3u.match(/#EXTINF/g) || []).length;
-        return `<button class="tv-group-tab ${code === altState.activeCode ? 'active' : ''}" onclick="selectAltPlaylist('${code}')">${pl.label} (${pl._count})</button>`;
+        return `<option value="${code}" ${code === altState.activeCode ? 'selected' : ''}>${pl.label} (${pl._count})</option>`;
     }).join('');
+    tabs.innerHTML = `<select class="tv-group-select" onchange="selectAltPlaylist(this.value)">${options}</select>`;
 }
 
 function selectAltPlaylist(code) {
@@ -31038,9 +31039,9 @@ function renderAlt2GroupTabs() {
     const counts = {};
     visible.forEach(ch => { const k = alt2GroupKey(ch); counts[k] = (counts[k] || 0) + 1; });
     const order = Object.keys(ALT2_GROUP_LABELS).filter(k => (k !== '18' || adultAllowed) && counts[k]);
-    let html = `<button class="tv-group-tab ${alt2State.activeGroup === 'all' ? 'active' : ''}" onclick="switchAlt2Group('all')">📋 Vše (${visible.length})</button>`;
-    html += order.map(k => `<button class="tv-group-tab ${alt2State.activeGroup === k ? 'active' : ''}" onclick="switchAlt2Group('${k}')">${ALT2_GROUP_LABELS[k]} (${counts[k]})</button>`).join('');
-    tabs.innerHTML = html;
+    let opts = `<option value="all" ${alt2State.activeGroup === 'all' ? 'selected' : ''}>📋 Vše (${visible.length})</option>`;
+    opts += order.map(k => `<option value="${k}" ${alt2State.activeGroup === k ? 'selected' : ''}>${ALT2_GROUP_LABELS[k]} (${counts[k]})</option>`).join('');
+    tabs.innerHTML = `<select class="tv-group-select" onchange="switchAlt2Group(this.value)">${opts}</select>`;
 }
 
 function switchAlt2Group(id) {
@@ -31132,9 +31133,9 @@ function renderAlt3GroupTabs() {
     const counts = {};
     visible.forEach(ch => { const k = alt3GroupKey(ch); counts[k] = (counts[k] || 0) + 1; });
     const order = Object.keys(ALT3_GROUP_LABELS).filter(k => counts[k]);
-    let html = `<button class="tv-group-tab ${alt3State.activeGroup === 'all' ? 'active' : ''}" onclick="switchAlt3Group('all')">📋 Vše (${visible.length})</button>`;
-    html += order.map(k => `<button class="tv-group-tab ${alt3State.activeGroup === k ? 'active' : ''}" onclick="switchAlt3Group('${k}')">${ALT3_GROUP_LABELS[k]} (${counts[k]})</button>`).join('');
-    tabs.innerHTML = html;
+    let opts = `<option value="all" ${alt3State.activeGroup === 'all' ? 'selected' : ''}>📋 Vše (${visible.length})</option>`;
+    opts += order.map(k => `<option value="${k}" ${alt3State.activeGroup === k ? 'selected' : ''}>${ALT3_GROUP_LABELS[k]} (${counts[k]})</option>`).join('');
+    tabs.innerHTML = `<select class="tv-group-select" onchange="switchAlt3Group(this.value)">${opts}</select>`;
 }
 
 function switchAlt3Group(id) {
