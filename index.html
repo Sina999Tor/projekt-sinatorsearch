@@ -82,7 +82,7 @@
    tlačítek), což implicitně ořezávalo i svisle přesahující rozbalenou nabídku.
    Zajistíme, že rozbalená nabídka nebude nikde useknutá. */
 .tv-group-tabs, #tvAltPlaylistTabs { overflow: visible !important; }
-.tv-dd-menu{ z-index:9999; }
+.tv-dd-menu{ z-index:999999; }
 
 .modal-chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;align-items:stretch;}
 .modal-chips>.modal-chip,.modal-chips>button.modal-chip{width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;}
@@ -30848,6 +30848,7 @@ https://moveonjoy-scan.vercel.app/api/scan?url=https://fl25.moveonjoy.com/DISNEY
 let altState = window.altState = { activeCode: null, channels: [], filtered: [], filterText: '', currentChannel: null, parsedCache: {} };
 
 function renderAltPlaylistTabs() {
+    tvDdCloseAll();
     const tabs = document.getElementById('tvAltPlaylistTabs');
     if(!tabs) return;
     const opts = Object.keys(ALT_PLAYLISTS).filter(code => code !== 'alt2').map(code => {
@@ -30979,11 +30980,48 @@ function tvDdToggle(id) {
     if(!wrap) return;
     const willOpen = !wrap.classList.contains('open');
     tvDdCloseAll();
-    if(willOpen) wrap.classList.add('open');
+    if(willOpen) {
+        wrap.classList.add('open');
+        tvDdPositionMenu(wrap);
+    }
 }
 window.tvDdToggle = tvDdToggle;
 
+// Přesune otevřenou nabídku na <body> jako position:fixed, umístěnou přesně
+// pod tlačítko. Tím uteče z jakéhokoliv nadřazeného kontejneru, který by ji
+// mohl (overflow/touch-action) ořezávat nebo blokovat scroll uvnitř ní.
+function tvDdPositionMenu(wrap) {
+    const btn = wrap.querySelector('.tv-dd-btn');
+    const menu = wrap.querySelector('.tv-dd-menu');
+    if(!btn || !menu) return;
+    const rect = btn.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    const maxH = Math.max(140, Math.min(260, vh - rect.bottom - 16));
+    menu.style.position = 'fixed';
+    menu.style.left = rect.left + 'px';
+    menu.style.top = (rect.bottom + 4) + 'px';
+    menu.style.width = rect.width + 'px';
+    menu.style.maxHeight = maxH + 'px';
+    menu.style.display = 'block';
+    if(menu.parentElement !== document.body) {
+        menu._tvDdHome = wrap;
+        document.body.appendChild(menu);
+    }
+}
+
 function tvDdCloseAll() {
+    document.querySelectorAll('.tv-dd-menu').forEach(menu => {
+        if(menu._tvDdHome) {
+            menu._tvDdHome.appendChild(menu);
+            menu.style.position = '';
+            menu.style.left = '';
+            menu.style.top = '';
+            menu.style.width = '';
+            menu.style.maxHeight = '';
+            menu.style.display = '';
+            menu._tvDdHome = null;
+        }
+    });
     document.querySelectorAll('.tv-dd.open').forEach(el => el.classList.remove('open'));
 }
 window.tvDdCloseAll = tvDdCloseAll;
@@ -30995,7 +31033,7 @@ function tvDdBuildHtml(ddId, handlerName, options, activeValue) {
     const optsHtml = options.map(o => `<div class="tv-dd-opt${o.value === activeValue ? ' active' : ''}" data-value="${String(o.value).replace(/"/g,'&quot;')}">${o.label}</div>`).join('');
     return `<div class="tv-dd tv-group-dd" id="${ddId}" data-handler="${handlerName}">
         <button type="button" class="tv-dd-btn" onclick="tvDdToggle('${ddId}')"><span class="tv-dd-btn-label">${active ? active.label : ''}</span><span class="tv-dd-arrow">▾</span></button>
-        <div class="tv-dd-menu">${optsHtml}</div>
+        <div class="tv-dd-menu" data-owner="${ddId}">${optsHtml}</div>
     </div>`;
 }
 window.tvDdBuildHtml = tvDdBuildHtml;
@@ -31005,11 +31043,13 @@ window.tvDdBuildHtml = tvDdBuildHtml;
 document.addEventListener('click', function(e) {
     const opt = e.target.closest('.tv-dd-opt');
     if(opt) {
-        const wrap = opt.closest('.tv-dd');
+        const menu = opt.closest('.tv-dd-menu');
+        const ddId = menu ? menu.getAttribute('data-owner') : null;
+        const wrap = ddId ? document.getElementById(ddId) : opt.closest('.tv-dd');
         if(!wrap) return;
         const value = opt.getAttribute('data-value');
         const handlerName = wrap.getAttribute('data-handler');
-        wrap.querySelectorAll('.tv-dd-opt').forEach(o => o.classList.remove('active'));
+        (menu || wrap).querySelectorAll('.tv-dd-opt').forEach(o => o.classList.remove('active'));
         opt.classList.add('active');
         const lbl = wrap.querySelector('.tv-dd-btn-label');
         if(lbl) lbl.textContent = opt.textContent;
@@ -31017,17 +31057,20 @@ document.addEventListener('click', function(e) {
         if(handlerName && typeof window[handlerName] === 'function') window[handlerName](value);
         return;
     }
-    if(!e.target.closest('.tv-dd')) tvDdCloseAll();
+    if(!e.target.closest('.tv-dd') && !e.target.closest('.tv-dd-menu')) tvDdCloseAll();
 }, true);
 
-// Scroll (i uvnitř seznamu kanálů) vždy zavře otevřenou nabídku.
-// Poslech na document (capture) i window pro jistotu, plus touchmove —
-// to se spustí hned na začátku tažení prstem, ještě než stihne vyletět scroll.
-document.addEventListener('scroll', function() { tvDdCloseAll(); }, true);
+// Scroll pozadí (seznamu kanálů) zavře otevřenou nabídku. Scroll UVNITŘ
+// samotné nabídky (teď position:fixed na body) se nezavírá.
+document.addEventListener('scroll', function(e) {
+    if(e.target && e.target.closest && e.target.closest('.tv-dd-menu')) return;
+    tvDdCloseAll();
+}, true);
 window.addEventListener('scroll', function() { tvDdCloseAll(); }, true);
 document.addEventListener('touchmove', function(e) {
     if(!e.target.closest('.tv-dd-menu')) tvDdCloseAll();
 }, { capture: true, passive: true });
+window.addEventListener('resize', function() { tvDdCloseAll(); });
 
 function switchTvTab(tab) {
     // Při přepnutí na jakoukoliv nabídku (i opětovném kliknutí na stejnou) vždy vymaž vyhledávací pole
@@ -31109,6 +31152,7 @@ function loadAlt2Channels() {
 }
 
 function renderAlt2GroupTabs() {
+    tvDdCloseAll();
     const tabs = document.getElementById('tvAlt2GroupTabs');
     if(!tabs) return;
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
@@ -31202,6 +31246,7 @@ function loadAlt3Channels() {
 }
 
 function renderAlt3GroupTabs() {
+    tvDdCloseAll();
     const tabs = document.getElementById('tvAlt3GroupTabs');
     if(!tabs) return;
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
@@ -31257,6 +31302,7 @@ function playAlt3Channel(idx) {
 window.playAlt3Channel = playAlt3Channel;
 
 function renderTvGroups() {
+    tvDdCloseAll();
     const tabs = document.getElementById('tvGroupTabs');
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
     const opts = TV_GROUPS.map(g => {
