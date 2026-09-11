@@ -30956,6 +30956,17 @@ function playAltChannel(idx) {
     updateTvQuickAltRow(ch.name, ch.url);
 }
 
+// Otevřený <select> (Kanály / kategorie) se má při scrollování seznamu
+// zavřít, ne zůstat "viset" nad obsahem. Scroll event nebubluje, proto
+// listener s capture:true na document, který zachytí scroll z jakéhokoliv
+// vnořeného scrollovatelného prvku (tvChannelListWrap, tvAlt2ListWrap...).
+document.addEventListener('scroll', function() {
+    const ae = document.activeElement;
+    if(ae && ae.tagName === 'SELECT' && (ae.id === 'tvTabSelect' || ae.classList.contains('tv-group-select'))) {
+        ae.blur();
+    }
+}, true);
+
 function switchTvTab(tab) {
     // Při přepnutí na jakoukoliv nabídku (i opětovném kliknutí na stejnou) vždy vymaž vyhledávací pole
     ['tvChannelSearchInput','tvAltSearchInput','tvAlt2SearchInput','tvAlt3SearchInput'].forEach(id => {
