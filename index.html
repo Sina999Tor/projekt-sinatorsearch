@@ -6460,11 +6460,34 @@
     function connectTrakt() {
         if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
         closeSettingsModal();
+        const authUrl = `https://trakt.tv/oauth/authorize?response_type=code&client_id=${TRAKT_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
         const content = $('modalContent');
-        content.innerHTML = `<div style="padding: 40px; text-align: center;"><h2 style="margin-bottom: 20px;">Připojení k Trakt.tv</h2><p style="color: var(--text-muted);">Generuji kód…</p></div>`;
+        content.innerHTML = `<div style="padding:40px;text-align:center;">
+            <h2 style="margin-bottom:16px;background:linear-gradient(135deg,#fff,#1db954);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">📋 Připojení k Trakt.tv</h2>
+            <p style="margin-bottom:20px;color:var(--text-muted);">1. Klikněte pro autorizaci na Trakt.tv<br>2. Zkopírujte zobrazený kód<br>3. Vložte kód do pole níže</p>
+            <a href="${authUrl}" target="_blank" style="display:inline-block;margin-bottom:24px;padding:12px 24px;background:linear-gradient(135deg,#1db954,#17a244);color:#fff;text-decoration:none;border-radius:8px;font-weight:700;box-shadow:0 4px 15px rgba(29,185,84,0.3);">🔑 Otevřít Trakt.tv</a>
+            <div style="margin-top:8px;">
+                <input type="text" id="traktCodeInput" placeholder="Vložte kód z Trakt zde..." style="padding:12px;border-radius:8px;border:1px solid #1db954;background:var(--bg-elevated);color:#fff;width:100%;max-width:300px;margin-bottom:14px;font-size:1rem;box-sizing:border-box;text-align:center;">
+                <br>
+                <button onclick="submitTraktCode();" style="padding:12px 28px;background:linear-gradient(135deg,#1db954,#17a244);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;">✅ Připojit</button>
+                <button onclick="closeModal();" style="margin-left:10px;padding:12px 18px;background:transparent;color:var(--text-muted);border:1px solid var(--border);border-radius:8px;cursor:pointer;">Zrušit</button>
+            </div>
+        </div>`;
         $('modal').classList.add('open');
-        startTraktDeviceFlow();
     }
+    window.connectTrakt = connectTrakt;
+
+    // Přečte kód vložený do #traktCodeInput a dokončí OAuth výměnou za token
+    // (viz submitTraktCodeWithCode). Používá se z browser-authorize modalu
+    // výše i z connectTraktFromMdblist.
+    async function submitTraktCode() {
+        const input = $('traktCodeInput');
+        const code = input ? input.value.trim() : '';
+        if (!code) { alert('Nejprve vlož kód z Trakt.tv do pole.'); return; }
+        await submitTraktCodeWithCode(code);
+        if (state.trakt && state.trakt.accessToken) { try { closeModal(); } catch(e) {} }
+    }
+    window.submitTraktCode = submitTraktCode;
 
     async function startTraktDeviceFlow() {
         const content = $('modalContent');
