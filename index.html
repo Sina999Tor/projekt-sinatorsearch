@@ -53,6 +53,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
   <style>#__vercel_toolbar_container, vercel-live-feedback { display: none !important; }
+#tvTabSelect, .tv-group-select{
+    width:100%;
+    padding:10px 34px 10px 12px;
+    border-radius:10px;
+    border:1px solid var(--border,#333);
+    background-color:var(--bg-elevated,#1a1a1a);
+    color:var(--text,#fff);
+    font-size:0.85rem;
+    font-weight:700;
+    box-sizing:border-box;
+    appearance:none;
+    -webkit-appearance:none;
+    -moz-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'><path fill='%2300b4d8' d='M7 10l5 5 5-5z'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 10px center;
+    background-size:16px;
+}
+.tv-group-select{ margin:8px 12px; width:calc(100% - 24px); }
+
 .modal-chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;align-items:stretch;}
 .modal-chips>.modal-chip,.modal-chips>button.modal-chip{width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;}
 
@@ -16693,12 +16713,14 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <button id="tvTabEpg" onclick="switchTvTab('epg')" style="width:100%;padding:11px 6px;background:transparent;border:1px solid var(--accent);color:var(--accent);font-size:0.9rem;font-weight:700;cursor:pointer;border-radius:10px;">📅 Program</button>
     </div>
 
-    <!-- Navigace: Kanály / Kanály 2 / Kanály 3 / Kanály 4 -->
-    <div style="flex-shrink:0;display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--bg-dark);margin-top:8px;">
-        <button id="tvTabChannels" onclick="switchTvTab('channels')" style="flex:1;padding:8px 6px;background:var(--accent);border:none;color:#fff;font-size:0.8rem;font-weight:700;cursor:pointer;border-radius:0;">📺 Kanály</button>
-        <button id="tvTabAlt" onclick="switchTvTab('alt')" style="flex:1;padding:8px 6px;background:transparent;border:none;color:var(--text-muted);font-size:0.8rem;font-weight:600;cursor:pointer;border-radius:0;">📺 Kanály 2</button>
-        <button id="tvTabAlt2" onclick="switchTvTab('alt2')" style="flex:1;padding:8px 6px;background:transparent;border:none;color:var(--text-muted);font-size:0.8rem;font-weight:600;cursor:pointer;border-radius:0;">📺 Kanály 3</button>
-        <button id="tvTabAlt3" onclick="switchTvTab('alt3')" style="flex:1;padding:8px 6px;background:transparent;border:none;color:var(--text-muted);font-size:0.8rem;font-weight:600;cursor:pointer;border-radius:0;">📺 Kanály 4</button>
+    <!-- Navigace: Kanály / Kanály 2 / Kanály 3 / Kanály 4 (rozvírací nabídka) -->
+    <div style="flex-shrink:0;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg-dark);margin-top:8px;">
+        <select id="tvTabSelect" onchange="switchTvTab(this.value)">
+            <option value="channels">📺 Kanály</option>
+            <option value="alt">📺 Kanály 2</option>
+            <option value="alt2">📺 Kanály 3</option>
+            <option value="alt3">📺 Kanály 4</option>
+        </select>
     </div>
 
     <!-- Tabs: skupiny kanálů -->
@@ -30967,6 +30989,8 @@ function switchTvTab(tab) {
     if(btnAlt) { btnAlt.style.background = isAlt ? 'var(--accent)' : 'transparent'; btnAlt.style.color = isAlt ? '#fff' : 'var(--text-muted)'; }
     if(btnAlt2) { btnAlt2.style.background = isAlt2 ? 'var(--accent)' : 'transparent'; btnAlt2.style.color = isAlt2 ? '#fff' : 'var(--text-muted)'; }
     if(btnAlt3) { btnAlt3.style.background = isAlt3 ? 'var(--accent)' : 'transparent'; btnAlt3.style.color = isAlt3 ? '#fff' : 'var(--text-muted)'; }
+    const tvTabSel = document.getElementById('tvTabSelect');
+    if(tvTabSel && !isEpg) tvTabSel.value = tab;
     if(isEpg) loadEpgData();
     if(isAlt) {
         renderAltPlaylistTabs();
@@ -31159,16 +31183,15 @@ window.playAlt3Channel = playAlt3Channel;
 function renderTvGroups() {
     const tabs = document.getElementById('tvGroupTabs');
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
-    tabs.innerHTML = TV_GROUPS.map(g => {
+    const options = TV_GROUPS.map(g => {
         const count = tvState.channels.filter(ch => g.match(ch) && (adultAllowed || !isAdultChannel(ch))).length;
-        return `<button class="tv-group-tab ${g.id === tvState.activeGroup ? 'active' : ''}" onclick="switchTvGroup('${g.id}')">${g.label} (${count})</button>`;
+        return `<option value="${g.id}" ${g.id === tvState.activeGroup ? 'selected' : ''}>${g.label} (${count})</option>`;
     }).join('');
+    tabs.innerHTML = `<select class="tv-group-select" onchange="switchTvGroup(this.value)">${options}</select>`;
 }
 
 function switchTvGroup(id) {
     tvState.activeGroup = id;
-    document.querySelectorAll('#tvGroupTabs .tv-group-tab').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
     // Clear search when switching group
     const si = document.getElementById('tvChannelSearchInput');
     if(si) { si.value = ''; tvState._searchText = ''; }
@@ -31178,16 +31201,9 @@ function switchTvGroup(id) {
 function filterTvChannels(text) {
     tvState._searchText = (text || '').toLowerCase().trim();
     renderTvChannelList();
-    // When searching, highlight no specific group tab
-    if(tvState._searchText) {
-        document.querySelectorAll('#tvGroupTabs .tv-group-tab').forEach(b => b.classList.remove('active'));
-    } else {
-        // Restore active group highlight
-        document.querySelectorAll('#tvGroupTabs .tv-group-tab').forEach(b => {
-            const gid = b.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
-            if(gid === tvState.activeGroup) b.classList.add('active');
-        });
-    }
+    // Udrž dropdown se skupinami synchronizovaný s aktuálně vybranou skupinou
+    const gsel = document.querySelector('#tvGroupTabs .tv-group-select');
+    if(gsel) gsel.value = tvState.activeGroup;
 }
 window.filterTvChannels = filterTvChannels;
 
