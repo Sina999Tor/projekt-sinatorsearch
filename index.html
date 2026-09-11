@@ -78,6 +78,15 @@
 .tv-dd-opt.active{ color:#00b4d8; background:rgba(0,180,216,0.1); }
 .tv-dd-opt:active{ background:rgba(255,255,255,0.08); }
 .tv-group-dd{ margin:8px 12px; }
+/* ── Schování celé TV nabídky (chrome) — tlačítko vpravo vedle kategorie ── */
+.tv-chrome-row{ display:flex; align-items:center; gap:6px; justify-content:flex-end; }
+.tv-chrome-row .tv-group-tabs{ flex:1; min-width:0; }
+.tv-chrome-toggle{
+    flex-shrink:0; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+    margin:8px 12px 8px 0; border-radius:8px; border:1px solid var(--border,#333);
+    background:var(--bg-elevated,#1a1a1a); color:#00b4d8; font-size:0.85rem; cursor:pointer;
+}
+.tv-modal-overlay.tv-chrome-collapsed .tv-chrome-item{ display:none !important; }
 /* Kontejnery kategorií mívaly overflow-x:auto (vodorovné scrollování starých
    tlačítek), což implicitně ořezávalo i svisle přesahující rozbalenou nabídku.
    Zajistíme, že rozbalená nabídka nebude nikde useknutá. */
@@ -16719,12 +16728,12 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     </div>
 
     <!-- Program: samostatné velké tlačítko nad nabídkou kanálů -->
-    <div style="flex-shrink:0;padding:8px 12px 0;background:var(--bg-dark);">
+    <div class="tv-chrome-item" style="flex-shrink:0;padding:8px 12px 0;background:var(--bg-dark);">
         <button id="tvTabEpg" onclick="switchTvTab('epg')" style="width:100%;padding:11px 6px;background:transparent;border:1px solid var(--accent);color:var(--accent);font-size:0.9rem;font-weight:700;cursor:pointer;border-radius:10px;">📅 Program</button>
     </div>
 
     <!-- Navigace: Kanály / Kanály 2 / Kanály 3 / Kanály 4 (rozvírací nabídka) -->
-    <div style="flex-shrink:0;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg-dark);margin-top:8px;">
+    <div class="tv-chrome-item" style="flex-shrink:0;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg-dark);margin-top:8px;">
         <div class="tv-dd" id="tvTabDD" data-handler="switchTvTab">
             <button type="button" class="tv-dd-btn" onclick="tvDdToggle('tvTabDD')"><span class="tv-dd-btn-label">📺 Kanály</span><span class="tv-dd-arrow">▾</span></button>
             <div class="tv-dd-menu" data-owner="tvTabDD">
@@ -16736,24 +16745,27 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         </div>
     </div>
 
-    <!-- Tabs: skupiny kanálů -->
-    <div class="tv-group-tabs" id="tvGroupTabs"></div>
+    <!-- Tabs: skupiny kanálů + šipka na schování celé nabídky -->
+    <div class="tv-chrome-row">
+        <div class="tv-group-tabs tv-chrome-item" id="tvGroupTabs"></div>
+        <button type="button" class="tv-chrome-toggle" onclick="toggleTvChrome()" title="Schovat nabídku">▲</button>
+    </div>
 
     <!-- Info: VLC nutný -->
-    <div id="tvVlcInfo" style="flex-shrink:0;padding:6px 12px;background:rgba(255,102,0,0.07);border-bottom:1px solid rgba(255,102,0,0.18);font-size:0.72rem;color:var(--text-muted);text-align:center;">
+    <div id="tvVlcInfo" class="tv-chrome-item" style="flex-shrink:0;padding:6px 12px;background:rgba(255,102,0,0.07);border-bottom:1px solid rgba(255,102,0,0.18);font-size:0.72rem;color:var(--text-muted);text-align:center;">
         ℹ️ Pro spuštění TV je nutný <a href="https://play.google.com/store/apps/details?id=org.videolan.vlc" target="_blank" style="color:#f60;text-decoration:none;font-weight:700;">VLC</a> (<a href="https://apps.apple.com/app/vlc-for-mobile/id650377962" target="_blank" style="color:#f60;text-decoration:none;font-weight:700;">App Store</a>)
     </div>
 
     <!-- Rychlé přepnutí zdroje: po spuštění kanálu se sem doplní stejnojmenné
          kanály z ostatních 3 seznamů (Kanály/2/3/4) — jedno klepnutí znovu
          otevře VLC s jiným zdrojem, bez nutnosti ručně přepínat záložky. -->
-    <div id="tvQuickAltRow" style="display:none;flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
+    <div id="tvQuickAltRow" class="tv-chrome-item" style="display:none;flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
         <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:5px;">🔁 Seká se to? Zkus jiný zdroj:</div>
         <div id="tvQuickAltChips" style="display:flex;gap:6px;overflow-x:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;"></div>
     </div>
 
     <!-- Kanály: mřížka ikon –  Kanály tab -->
-    <div id="tvSearchWrap" style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
+    <div id="tvSearchWrap" class="tv-chrome-item" style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
         <input type="text" id="tvChannelSearchInput" oninput="filterTvChannels(this.value)" placeholder="🔍 Hledat ve všech kanálech…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
         <div class="tv-viewmode-toggle">
             <button class="tv-viewmode-btn" data-mode="tiles" onclick="tvSetViewMode('tiles')">🔲 Dlaždice</button>
@@ -16766,8 +16778,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
     <!-- Alternativa 2: samostatný kompletní seznam -->
     <div id="tvAlt2Wrap" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
-        <div class="tv-group-tabs" id="tvAlt2GroupTabs"></div>
-        <div style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
+        <div class="tv-chrome-row">
+            <div class="tv-group-tabs tv-chrome-item" id="tvAlt2GroupTabs"></div>
+            <button type="button" class="tv-chrome-toggle" onclick="toggleTvChrome()" title="Schovat nabídku">▲</button>
+        </div>
+        <div class="tv-chrome-item" style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
             <input type="text" id="tvAlt2SearchInput" oninput="filterAlt2Channels(this.value)" placeholder="🔍 Hledat kanál…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
             <div class="tv-viewmode-toggle">
                 <button class="tv-viewmode-btn" data-mode="tiles" onclick="tvSetViewMode('tiles')">🔲 Dlaždice</button>
@@ -16781,8 +16796,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
     <!-- Alternativa 3: samostatný kompletní seznam -->
     <div id="tvAlt3Wrap" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
-        <div class="tv-group-tabs" id="tvAlt3GroupTabs"></div>
-        <div style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
+        <div class="tv-chrome-row">
+            <div class="tv-group-tabs tv-chrome-item" id="tvAlt3GroupTabs"></div>
+            <button type="button" class="tv-chrome-toggle" onclick="toggleTvChrome()" title="Schovat nabídku">▲</button>
+        </div>
+        <div class="tv-chrome-item" style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
             <input type="text" id="tvAlt3SearchInput" oninput="filterAlt3Channels(this.value)" placeholder="🔍 Hledat kanál…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
             <div class="tv-viewmode-toggle">
                 <button class="tv-viewmode-btn" data-mode="tiles" onclick="tvSetViewMode('tiles')">🔲 Dlaždice</button>
@@ -16824,8 +16842,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
     <!-- Alternativa tab: další playlisty (CZ/SK/DE/HU/IT/NL/FR/ES/PL/PT/US/UK/Vše) -->
     <div id="tvAltWrap" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
-        <div class="tv-group-tabs" id="tvAltPlaylistTabs" style="flex-shrink:0;"></div>
-        <div style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
+        <div class="tv-chrome-row">
+            <div class="tv-group-tabs tv-chrome-item" id="tvAltPlaylistTabs" style="flex-shrink:0;"></div>
+            <button type="button" class="tv-chrome-toggle" onclick="toggleTvChrome()" title="Schovat nabídku">▲</button>
+        </div>
+        <div class="tv-chrome-item" style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
             <input type="text" id="tvAltSearchInput" oninput="filterAltChannels(this.value)" placeholder="🔍 Hledat kanál…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;">
             <div class="tv-viewmode-toggle">
                 <button class="tv-viewmode-btn" data-mode="tiles" onclick="tvSetViewMode('tiles')">🔲 Dlaždice</button>
@@ -16876,6 +16897,7 @@ function openTvModal() {
     const tvM = document.getElementById('tvModal');
     tvM.style.display = '';  // reset případného display:none
     tvM.classList.add('open');
+    applyTvChromeState(_store.getItem('sinator_tv_chrome_collapsed') === '1');
     startTvClock();
     switchTvTab('channels');  // vždy začni na záložce Kanály
     if (typeof tvUpdateViewModeButtons === 'function') tvUpdateViewModeButtons();
@@ -31303,6 +31325,25 @@ function playAlt3Channel(idx) {
     updateTvQuickAltRow(ch.name, ch.url);
 }
 window.playAlt3Channel = playAlt3Channel;
+
+// ── Schování celé TV nabídky (Program/Kanály/kategorie/VLC info/hledání),
+//    aby seznam kanálů zabral celou obrazovku. Šipka je vždy vpravo vedle
+//    kategorie kanálů (na všech záložkách Kanály/2/3/4), stav se pamatuje. ──
+function toggleTvChrome() {
+    const collapsed = _store.getItem('sinator_tv_chrome_collapsed') === '1';
+    applyTvChromeState(!collapsed);
+}
+window.toggleTvChrome = toggleTvChrome;
+
+function applyTvChromeState(collapsed) {
+    const modal = document.getElementById('tvModal');
+    if (modal) modal.classList.toggle('tv-chrome-collapsed', collapsed);
+    document.querySelectorAll('.tv-chrome-toggle').forEach(btn => {
+        btn.textContent = collapsed ? '▼' : '▲';
+        btn.title = collapsed ? 'Zobrazit nabídku' : 'Schovat nabídku';
+    });
+    _store.setItem('sinator_tv_chrome_collapsed', collapsed ? '1' : '0');
+}
 
 function renderTvGroups() {
     tvDdCloseAll();
