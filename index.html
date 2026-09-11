@@ -1063,7 +1063,8 @@
                         <button class="settings-btn-small" onclick="saveTraktClientKeys()">💾 Uložit</button>
                         <button class="settings-btn-small settings-btn-remove" onclick="clearTraktClientKeys()">🗑️ Smazat</button>
                     </div>
-                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Založ appku na <a href="https://trakt.tv/oauth/applications/new" target="_blank" style="color:#1db954;">trakt.tv/oauth/applications/new</a> — Redirect URI: <span class="code" style="font-size:0.68rem;">urn:ietf:wg:oauth:2.0:oob</span></div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Necháš-li prázdné, použije se sdílená appka (může být nespolehlivá — Trakt free appky občas ruší). Vlastní appka vyžaduje <b>Trakt VIP</b>: <a href="https://trakt.tv/oauth/applications/new" target="_blank" style="color:#1db954;">trakt.tv/oauth/applications/new</a> — Redirect URI: <span class="code" style="font-size:0.68rem;">urn:ietf:wg:oauth:2.0:oob</span></div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">Nechceš zadávat nic vlastního? Klikni rovnou na „📟 Připojit (kód na trakt.tv)" níže.</div>
                 </div>
                 <div class="settings-actions">
                     <button class="settings-btn-small" onclick="connectTrakt()">🔑 Připojit (prohlížeč)</button>
@@ -1736,7 +1737,7 @@
     if (_store.getItem('sinator_adult_content') === null) _store.setItem('sinator_adult_content', 'false');
     let adultContent = _store.getItem('sinator_adult_content') === 'true';
     let _aiAbortController = null;
-    let TRAKT_CLIENT_ID = _store.getItem('sinator_trakt_client_id') || '';
+    let TRAKT_CLIENT_ID = _store.getItem('sinator_trakt_client_id') || 'QOfvLB35_eg1LkJ-51VM7NckrgnWrCAe2xH5EbsumqE';
 
     // ── Vlastní backend (náhrada za Trakt, viz sinator-backend) ─────────────
     // Adresa je napevno (stejný princip jako TRAKT_BASE) — uživatel zadává jen klíč.
@@ -3253,7 +3254,7 @@
     };
 
 
-    let TRAKT_CLIENT_SECRET = _store.getItem('sinator_trakt_client_secret') || '';
+    let TRAKT_CLIENT_SECRET = _store.getItem('sinator_trakt_client_secret') || 'rIukoJbVTROcnT9W0-B3Ns3D7dkxN57uuzqsRJAYQVc';
     const REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob';
     const SIMKL_CLIENT_ID = 'a4b20739a0cbf73cfd54302fe2be81088b840262b9554059f180b91df334e545';
     const SIMKL_BASE = 'https://api.simkl.com';
@@ -6549,11 +6550,16 @@
     window.clearTraktClientKeys = clearTraktClientKeys;
 
     // Předvyplní pole hodnotami z paměti (volá se při otevření panelu Trakt).
+    // Pokud uživatel vlastní klíč nezadal (jen se používá sdílená appka jako
+    // fallback), pole se nechají prázdná s placeholderem — ne aby to vypadalo,
+    // že sdílený klíč "patří" uživateli.
     function updateTraktClientKeyStatus() {
         const idInput = $('traktClientIdInput');
         const secInput = $('traktClientSecretInput');
-        if (idInput) idInput.value = TRAKT_CLIENT_ID || '';
-        if (secInput) secInput.value = TRAKT_CLIENT_SECRET || '';
+        const ownId = _store.getItem('sinator_trakt_client_id') || '';
+        const ownSecret = _store.getItem('sinator_trakt_client_secret') || '';
+        if (idInput) { idInput.value = ownId; idInput.placeholder = ownId ? 'Client ID' : 'Client ID (nevyplněno — používá se sdílená appka)'; }
+        if (secInput) { secInput.value = ownSecret; secInput.placeholder = ownSecret ? 'Client Secret' : 'Client Secret (nevyplněno — používá se sdílená appka)'; }
     }
     window.updateTraktClientKeyStatus = updateTraktClientKeyStatus;
 
