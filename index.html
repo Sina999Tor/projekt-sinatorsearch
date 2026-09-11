@@ -1066,7 +1066,8 @@
                     <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Založ appku na <a href="https://trakt.tv/oauth/applications/new" target="_blank" style="color:#1db954;">trakt.tv/oauth/applications/new</a> — Redirect URI: <span class="code" style="font-size:0.68rem;">urn:ietf:wg:oauth:2.0:oob</span></div>
                 </div>
                 <div class="settings-actions">
-                    <button class="settings-btn-small" onclick="connectTrakt()">🔑 Připojit</button>
+                    <button class="settings-btn-small" onclick="connectTrakt()">🔑 Připojit (prohlížeč)</button>
+                    <button class="settings-btn-small" style="border-color:#00b4d8;color:#00b4d8;" onclick="connectTraktDevice()">📟 Připojit (kód na trakt.tv)</button>
                     <button class="settings-btn-small settings-btn-remove" onclick="disconnectTrakt()">❌ Odhlásit</button>
                 </div>
                 <div class="settings-actions" style="margin-top:6px;">
@@ -6496,6 +6497,24 @@
         $('modal').classList.add('open');
     }
     window.connectTrakt = connectTrakt;
+
+    // Alternativní metoda přes device-code flow — kód se zadává PŘÍMO na
+    // trakt.tv/activate (nekopíruje se nic zpátky do appky). Užitečné, když
+    // prohlížečová metoda (connectTrakt) skončí na trakt.tv bez zobrazení
+    // kódu k opsání (viz Trakt Web V3).
+    function connectTraktDevice() {
+        if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
+        if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
+            alert('Nejprve vyplň vlastní Trakt Client ID a Client Secret (sekce "🔑 Vlastní Trakt API aplikace" výše) a klikni "💾 Uložit".');
+            return;
+        }
+        closeSettingsModal();
+        const content = $('modalContent');
+        content.innerHTML = `<div style="padding: 40px; text-align: center;"><h2 style="margin-bottom: 20px;">Připojení k Trakt.tv</h2><p style="color: var(--text-muted);">Generuji kód…</p></div>`;
+        $('modal').classList.add('open');
+        startTraktDeviceFlow();
+    }
+    window.connectTraktDevice = connectTraktDevice;
 
     // Vlastní Trakt Client ID/Secret zadané uživatelem v Nastavení > Klíče —
     // uloží se do localStorage a od teď se používají místo (mrtvého) natvrdo
