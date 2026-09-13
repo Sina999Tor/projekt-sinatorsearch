@@ -11800,9 +11800,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const someWatched = watchedEps > 0 && !allWatched;
             const indicator = allWatched ? ' ✅' : someWatched ? ` (${watchedEps}/${total})` : '';
             const borderStyle = allWatched ? 'border-left:3px solid #1db954;' : someWatched ? 'border-left:3px solid #f5c518;' : '';
-            return `<div class="season-item" style="${borderStyle}">
-                <button class="season-toggle" onclick="toggleEpisodes(${tvId}, ${season.season_number}, this)" style="${allWatched?'color:#1db954;':''}">
-                    <span>📺 Sezóna ${season.season_number}: ${season.name || 'Neznámá'}${indicator}</span>
+            return `<div class="season-item" id="seasonItem_${tvId}_${season.season_number}" style="${borderStyle}">
+                <button class="season-toggle" id="seasonToggleBtn_${tvId}_${season.season_number}" onclick="toggleEpisodes(${tvId}, ${season.season_number}, this)" style="${allWatched?'color:#1db954;':''}">
+                    <span id="seasonIndicatorText_${tvId}_${season.season_number}">📺 Sezóna ${season.season_number}: ${season.name || 'Neznámá'}${indicator}</span>
                     <span class="toggle-icon">▼</span>
                     <span style="font-size:0.8rem;color:var(--text-muted);margin-left:8px;">${total} epizod</span>
                 </button>
@@ -11866,6 +11866,31 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         container.dataset.seasons = JSON.stringify(seasons.map(s=>({season_number:s.season_number,episode_count:s.episode_count,name:s.name})));
     }
 
+    // Aktualizuje jen hlavičku dané sezóny (barevný pruh, "✅"/počet odškrtnutých
+    // epizod) přímo v DOM — beze změny scroll pozice a bez zavření/znovuotevření
+    // už rozbaleného seznamu epizod (na rozdíl od plného přerenderování celého
+    // #seasons-container, které dřív posouvalo pohled nahoru).
+    function refreshSeasonHeader(tvId, seasonNumber) {
+        const container = document.getElementById('seasons-container');
+        if (!container?.dataset.seasons) return;
+        let seasons;
+        try { seasons = JSON.parse(container.dataset.seasons); } catch (e) { return; }
+        const season = seasons.find(s => s.season_number === seasonNumber);
+        if (!season) return;
+        const watchedEps = Object.keys(state.watched).filter(k => k.startsWith(`ep_${tvId}_${seasonNumber}_`)).length;
+        const total = season.episode_count || 0;
+        const allWatched = total > 0 && watchedEps >= total;
+        const someWatched = watchedEps > 0 && !allWatched;
+        const indicator = allWatched ? ' ✅' : someWatched ? ` (${watchedEps}/${total})` : '';
+        const item = document.getElementById(`seasonItem_${tvId}_${seasonNumber}`);
+        if (item) item.style.borderLeft = allWatched ? '3px solid #1db954' : someWatched ? '3px solid #f5c518' : 'none';
+        const toggleBtn = document.getElementById(`seasonToggleBtn_${tvId}_${seasonNumber}`);
+        if (toggleBtn) toggleBtn.style.color = allWatched ? '#1db954' : '';
+        const indicatorSpan = document.getElementById(`seasonIndicatorText_${tvId}_${seasonNumber}`);
+        if (indicatorSpan) indicatorSpan.textContent = `📺 Sezóna ${seasonNumber}: ${season.name || 'Neznámá'}${indicator}`;
+    }
+    window.refreshSeasonHeader = refreshSeasonHeader;
+
     async function toggleEpisodeWatched(tvId, seasonNumber, epNumber, epName, btn) {
         const key = `ep_${tvId}_${seasonNumber}_${epNumber}`;
         const wasWatched = !!state.watched[key];
@@ -11895,17 +11920,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         // Update episode row border
         const row = document.getElementById(`epItem_${key}`);
         if(row) row.style.borderLeft = isNowWatched ? '3px solid #1db954' : 'none';
-        // Refresh season header color
-        const container = document.getElementById('seasons-container');
-        if(container?.dataset.seasons) {
-            const seasons = JSON.parse(container.dataset.seasons);
-            container.innerHTML = renderSeasons(seasons, tvId);
-            container.dataset.tvid = tvId;
-            container.dataset.seasons = JSON.stringify(seasons);
-            // Re-open season
-            const seasonBtn = container.querySelector(`[onclick*="toggleEpisodes(${tvId}, ${seasonNumber}"]`);
-            if(seasonBtn) toggleEpisodes(tvId, seasonNumber, seasonBtn);
-        }
+        // Refresh jen hlavičky sezóny (barva/odznak) — beze změny scroll pozice
+        // a bez zavírání/znovuotevírání seznamu epizod (viz refreshSeasonHeader výš).
+        refreshSeasonHeader(tvId, seasonNumber);
     }
 
     async function openEpisodeDetail(tvId, seasonNumber, episodeNumber, episodeTitle) {
