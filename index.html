@@ -17909,12 +17909,79 @@ function tvListRowHtml(entry, onclickForChannel, isActive, subtitle) {
         ? '<span class="tv-ch-row-prog">▶ ' + nowTitle.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>'
         : '';
     const subHtml = subtitle ? '<span class="tv-ch-row-sub">' + subtitle + '</span>' : '';
-    return '<div class="tv-ch-row' + (isActive ? ' active' : '') + '" onclick="' + onclickForChannel(ch) + '" title="' + safeTitle + '">'
+    const progAttr = nowTitle ? ' data-progtitle="' + nowTitle.replace(/"/g, '&quot;') + '"' : '';
+    return '<div class="tv-ch-row' + (isActive ? ' active' : '') + '" onclick="' + onclickForChannel(ch) + '" title="' + safeTitle + '"' + progAttr + '>'
         + '<span class="tv-ch-row-main"><span class="tv-ch-row-name">' + label + '</span>' + progHtml + subHtml + '</span>'
         + (isActive ? '<span class="tv-ch-row-live">▶ ŽIVĚ</span>' : '')
         + '</div>';
 }
 window.tvListRowHtml = tvListRowHtml;
+
+// === Dlouhý stisk na řádku EPG seznamu -> otevře info o filmu/seriálu ====
+// v Sinator Search (podle názvu právě běžícího pořadu). Krátký klik/tap se
+// chová jako dřív (spustí kanál) — long-press ho potlačí, aby se kanál
+// omylem nespustil.
+(function () {
+    const LP_MS = 550;
+    let lpTimer = null;
+    let lpFired = false;
+    let lpSuppressClick = false;
+
+    function lpClearTimer() {
+        if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+    }
+    function lpStart(e) {
+        const row = e.target.closest ? e.target.closest('.tv-ch-row[data-progtitle]') : null;
+        if (!row) return;
+        lpFired = false;
+        lpClearTimer();
+        lpTimer = setTimeout(() => {
+            lpFired = true;
+            lpSuppressClick = true;
+            if (navigator.vibrate) { try { navigator.vibrate(30); } catch (err) {} }
+            tvOpenSearchForProgram(row.getAttribute('data-progtitle'));
+        }, LP_MS);
+    }
+    function lpEnd(e) {
+        lpClearTimer();
+        if (lpFired) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        lpFired = false;
+    }
+    function lpCancel() {
+        lpClearTimer();
+        lpFired = false;
+    }
+    document.addEventListener('touchstart', lpStart, { passive: true });
+    document.addEventListener('touchend', lpEnd, { passive: false });
+    document.addEventListener('touchmove', lpCancel, { passive: true });
+    document.addEventListener('touchcancel', lpCancel, { passive: true });
+    document.addEventListener('mousedown', lpStart);
+    document.addEventListener('mouseup', lpEnd);
+    document.addEventListener('click', function (e) {
+        if (lpSuppressClick) {
+            lpSuppressClick = false;
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, true);
+    document.addEventListener('contextmenu', function (e) {
+        if (e.target.closest && e.target.closest('.tv-ch-row[data-progtitle]')) e.preventDefault();
+    });
+})();
+
+// Zavře TV modal a spustí hlavní vyhledávání Sinator Search podle názvu
+// pořadu z EPG (dlouhý stisk na řádku kanálu).
+function tvOpenSearchForProgram(title) {
+    if (!title) return;
+    if (typeof closeTvModal === 'function') { try { closeTvModal(); } catch (e) {} }
+    const inp = document.getElementById('searchInput');
+    if (inp) inp.value = title;
+    if (typeof startSearch === 'function') startSearch();
+}
+window.tvOpenSearchForProgram = tvOpenSearchForProgram;
 
 // Po dokončení načtení EPG (viz loadLocalXmlEpg) znovu vykresli právě
 // viditelný seznam kanálů, ať se v režimu "Seznam" doplní "právě běží".
