@@ -32431,9 +32431,11 @@ function tvUpdateTestInfo(total, offlineCount) {
     if (!total) { info.textContent = ''; return; }
     const testedInThisList = tvTestState.lastTestedCount || 0;
     if (!testedInThisList) { info.textContent = total + ' kanálů — zatím netestováno'; return; }
-    info.textContent = offlineCount
+    const skipped = tvTestState.lastSkippedCount || 0;
+    const skipNote = skipped ? (' · ' + skipped + '× nelze ověřit (http, nechá se nahoře)') : '';
+    info.textContent = (offlineCount
         ? '⚠️ ' + offlineCount + ' kanálů mimo provoz (přesunuto dolů)'
-        : '✅ otestované kanály jsou funkční';
+        : '✅ otestované kanály jsou funkční') + skipNote;
 }
 
 // ── Test funkčnosti streamů (tlačítko "🧪 Otestovat kanály" nahoře v
@@ -32447,20 +32449,44 @@ function tvUpdateTestInfo(total, offlineCount) {
 // mezi kategoriemi (dokud se stránka znovu nenačte). ──────────────────
 const tvTestState = { cache: {}, running: false, offlineCollapsed: true, lastTestedCount: 0 };
 
-function tvTestStreamUrl(url, timeoutMs) {
+// Stream na http:// z https:// stránky prohlížeč zablokuje jako "mixed
+// content" ještě PŘED odesláním požadavku na server — fetch tak vždy
+// skončí chybou bez ohledu na to, jestli kanál doopravdy funguje (VLC to
+// otevře v pořádku, protože nejde o prohlížeč). Takové URL se tedy vůbec
+// netestují přes fetch a berou se jako "nelze ověřit" (zůstanou nahoře).
+function tvIsMixedContentBlocked(url) {
+    try {
+        return location.protocol === 'https:' && /^http:\/\//i.test(String(url || '').trim());
+    } catch(e) { return false; }
+}
+window.tvIsMixedContentBlocked = tvIsMixedContentBlocked;
+
+function tvTestStreamUrlOnce(url, timeoutMs) {
     return new Promise(resolve => {
         if (!url) { resolve(false); return; }
         let done = false;
         const finish = ok => { if (!done) { done = true; resolve(ok); } };
         let ctrl = null;
         try { ctrl = new AbortController(); } catch(e) {}
-        const timer = setTimeout(() => { if (ctrl) try { ctrl.abort(); } catch(e) {} finish(false); }, timeoutMs || 7000);
+        const timer = setTimeout(() => { if (ctrl) try { ctrl.abort(); } catch(e) {} finish(false); }, timeoutMs || 10000);
         try {
             fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
                 .then(() => { clearTimeout(timer); finish(true); })
                 .catch(() => { clearTimeout(timer); finish(false); });
         } catch(e) { clearTimeout(timer); finish(false); }
     });
+}
+
+// Skutečný test jedné URL — http:// na https:// stránce se vůbec
+// nezkouší (nedá se ověřit z prohlížeče, viz výše, vrací null = "neznámo").
+// U https:// se kvůli živým streamům (pomalý první byte, dočasný výpadek)
+// zkouší 2× — jako mrtvý se označí, jen když selžou OBĚ pokusy.
+async function tvTestStreamUrl(url) {
+    if (tvIsMixedContentBlocked(url)) return null;
+    const first = await tvTestStreamUrlOnce(url);
+    if (first) return true;
+    const second = await tvTestStreamUrlOnce(url);
+    return second;
 }
 window.tvTestStreamUrl = tvTestStreamUrl;
 
@@ -32482,6 +32508,7 @@ async function tvRunGenreTest() {
 
     tvTestState.running = true;
     let doneCount = 0;
+    let skippedCount = 0;
     if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.textContent = '⏳ Testuji 0/' + targets.length + '…'; }
 
     const CONCURRENCY = 8;
@@ -32490,8 +32517,11 @@ async function tvRunGenreTest() {
         while (idx < targets.length) {
             const i = idx++;
             const ch = targets[i];
-            const ok = await tvTestStreamUrl(ch.url);
-            tvTestState.cache[ch.url] = ok ? 'ok' : 'fail';
+            const result = await tvTestStreamUrl(ch.url);
+            // null = nelze ověřit (mixed content) -> nechá se jako netestované,
+            // nikdy se neoznačí jako "mimo provoz" jen kvůli tomu.
+            if (result !== null) tvTestState.cache[ch.url] = result ? 'ok' : 'fail';
+            else skippedCount++;
             doneCount++;
             if (btn) btn.textContent = '⏳ Testuji ' + doneCount + '/' + targets.length + '…';
         }
@@ -32502,6 +32532,7 @@ async function tvRunGenreTest() {
 
     tvTestState.running = false;
     tvTestState.lastTestedCount = targets.length;
+    tvTestState.lastSkippedCount = skippedCount;
     tvTestState.offlineCollapsed = true;
     if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '🧪 Otestovat kanály'; }
     renderGenresChannelList();
