@@ -252,6 +252,22 @@
     flex-shrink:0; font-size:0.6rem; font-weight:800; letter-spacing:.02em; color:#fff;
     background:#e50914; padding:2px 8px; border-radius:20px;
 }
+/* Nefunkční streamy — tlačítko na označení (jen Admin level 2, vidí ho jen
+   admin) a sekce se seznamem odškrtnutých kanálů (viditelná všem, dokud je
+   admin neodznačí zpět). Uloženo lokálně, napříč všemi seznamy kanálů. */
+.tv-broken-btn{
+    position:absolute; top:8px; left:8px; width:26px; height:26px; border-radius:50%;
+    background:rgba(200,0,0,0.75) !important; border:1px solid rgba(255,255,255,0.25) !important;
+    color:#fff !important; font-size:0.78rem; display:flex !important; align-items:center; justify-content:center;
+    cursor:pointer; z-index:2; padding:0 !important;
+}
+.tv-ch-row .tv-broken-btn{ position:static !important; width:22px !important; height:22px !important; flex-shrink:0; }
+.tv-broken-toggle-btn{ border-color:rgba(229,9,20,0.45) !important; color:#ff8a8a !important; }
+.tv-ch-broken-item{ display:flex !important; align-items:center; justify-content:space-between !important; opacity:0.75; }
+.tv-broken-restore-btn{
+    flex-shrink:0; background:rgba(0,150,80,0.25) !important; border:1px solid rgba(0,200,120,0.4) !important;
+    color:#9CFFCB !important; font-size:0.68rem; font-weight:700; border-radius:8px; padding:4px 8px !important; cursor:pointer;
+}
 </style>
   <script>
     (function() {
@@ -11571,149 +11587,26 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const overlay = document.createElement('div');
         overlay.id = 'collectionOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-card);z-index:10600;display:flex;flex-direction:column;overflow:hidden;';
-        overlay.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);gap:8px;">
-                <span style="font-weight:700;font-size:1.1rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📦 ${collectionName}</span>
-                <button id="collSinatorBtn" onclick="toggleCollSelectMode()" title="Přidat filmy z kolekce do watchlistu / seznamu" style="flex-shrink:0;padding:8px 12px;border-radius:20px;border:1px solid #8b5cf6;background:rgba(139,92,246,0.15);color:#c4a4ff;cursor:pointer;font-size:0.8rem;font-weight:700;white-space:nowrap;">🧩 Sinator</button>
-                <button onclick="document.getElementById('collectionOverlay')?.remove();document.body.style.overflow=''" style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);color:#fff;cursor:pointer;font-size:1.1rem;">✕</button>
+        overlay.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+                <span style="font-weight:700;font-size:1.1rem;">📦 ${collectionName}</span>
+                <button onclick="document.getElementById('collectionOverlay')?.remove();document.body.style.overflow=''" style="width:36px;height:36px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);color:#fff;cursor:pointer;font-size:1.1rem;">✕</button>
             </div>
-            <div style="flex:1;overflow-y:auto;padding:16px;"><div class="loading"><div class="spinner"></div>Načítám kolekci...</div></div>
-            <div id="collSelectBar" style="display:none;flex-shrink:0;border-top:1px solid var(--border);background:var(--bg-card);padding:10px 12px;"></div>`;
+            <div style="flex:1;overflow-y:auto;padding:16px;"><div class="loading"><div class="spinner"></div>Načítám kolekci...</div></div>`;
         overlay.addEventListener('click', e => { if(e.target === overlay) { overlay.remove(); document.body.style.overflow=''; } });
         document.body.appendChild(overlay);
         document.body.style.overflow = 'hidden';
         const bodyEl = overlay.querySelector('div[style*="overflow-y:auto"]');
-        window._collOverlayParts = [];
-        window._collSelected = new Set();
-        window._collSelectMode = false;
         try {
             const res = await fetch(`${BASE}/collection/${collectionId}?api_key=${tmdbApiKey}&language=cs-CZ`);
             const collection = await res.json();
             const parts = collection.parts || [];
             if(parts.length === 0) { bodyEl.innerHTML = '<div class="empty">😕 Kolekce je prázdná</div>'; return; }
             parts.sort((a, b) => new Date(a.release_date).getTime() - new Date(b.release_date).getTime());
-            window._collOverlayParts = parts;
-            bodyEl.innerHTML = `<p style="color:var(--text-muted); margin-bottom:20px;">${parts.length} filmů v kolekci (řazeno od nejstaršího)</p><div class="person-grid" id="collGrid">${_collRenderGridItems(parts)}</div>`;
+            const grid = parts.map(p => { const img = p.poster_path ? `<img class="card-image" src="${IMG}w500${p.poster_path}">` : `<div class="card-placeholder">🎬</div>`; const watched = isWatched(p.id, 'movie'); return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('collectionOverlay')?.remove();document.body.style.overflow='';openDetail(${p.id}, 'movie')">${img}<div class="card-info"><div class="card-title">${p.title}</div><div class="card-meta"><span>${(p.release_date||'').slice(0,4)||'—'}</span></div></div></div>`; }).join('');
+            bodyEl.innerHTML = `<p style="color:var(--text-muted); margin-bottom:20px;">${parts.length} filmů v kolekci (řazeno od nejstaršího)</p><div class="person-grid">${grid}</div>`;
         } catch(e) {
             bodyEl.innerHTML = '<div class="empty">⚠️ Chyba načtení kolekce</div>';
         }
-    }
-
-    // ── "🧩 Sinator" tlačítko v přehledu kolekce (schované, dokud se na něj
-    // neklikne) — po kliku se karty filmů přepnou do výběrového režimu se
-    // zaškrtávátky a dole se objeví lišta pro hromadné přidání vybraných
-    // filmů do Sinator watchlistu nebo do vlastního seznamu. ──────────────
-    function _collRenderGridItems(parts) {
-        const selectMode = window._collSelectMode;
-        return parts.map(p => {
-            const img = p.poster_path ? `<img class="card-image" src="${IMG}w500${p.poster_path}">` : `<div class="card-placeholder">🎬</div>`;
-            const watched = isWatched(p.id, 'movie');
-            const checked = window._collSelected.has(p.id);
-            const clickAttr = selectMode
-                ? `onclick="toggleCollItemSelected(${p.id})"`
-                : `onclick="document.getElementById('collectionOverlay')?.remove();document.body.style.overflow='';openDetail(${p.id}, 'movie')"`;
-            // Výrazná viditelná indikace výběru: fialový rámeček kolem celé
-            // karty + fialový přísvit přes poster + velká zaškrtávací značka
-            // v pravém horním rohu — aby bylo na první pohled jasné, co je
-            // vybrané, i při rychlém výběru z více filmů.
-            const overlay = selectMode ? `<div style="position:absolute;inset:0;background:${checked?'rgba(139,92,246,0.38)':'transparent'};border-radius:8px;transition:background 0.12s;pointer-events:none;display:flex;align-items:flex-start;justify-content:flex-end;padding:7px;">
-                    <div style="width:28px;height:28px;border-radius:6px;background:${checked?'#8b5cf6':'rgba(0,0,0,0.6)'};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:900;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.6);">${checked?'✓':''}</div>
-                </div>` : '';
-            const posterWrap = `<div style="position:relative;">${img}${overlay}</div>`;
-            const cardBorder = selectMode ? `border:3px solid ${checked?'#8b5cf6':'rgba(255,255,255,0.12)'};` : '';
-            return `<div class="card${watched?' is-watched':''}" style="position:relative;cursor:pointer;border-radius:10px;${cardBorder}" ${clickAttr}>${posterWrap}<div class="card-info"><div class="card-title">${p.title}</div><div class="card-meta"><span>${(p.release_date||'').slice(0,4)||'—'}</span></div></div></div>`;
-        }).join('');
-    }
-
-    function toggleCollSelectMode() {
-        const btn = document.getElementById('collSinatorBtn');
-        const grid = document.getElementById('collGrid');
-        const bar = document.getElementById('collSelectBar');
-        if (!grid) return;
-        if (!window._collSelectMode) {
-            if (typeof myBackendReady === 'function' && !myBackendReady()) { alert('Nejprve připoj Sinator backend v nastavení (⚙️).'); return; }
-            window._collSelectMode = true;
-            window._collSelected = new Set();
-            if (btn) { btn.style.background = 'rgba(139,92,246,0.35)'; btn.textContent = '🧩 Zrušit výběr'; }
-            if (bar) bar.style.display = 'block';
-            _collRenderSelectBar();
-        } else {
-            window._collSelectMode = false;
-            window._collSelected = new Set();
-            if (btn) { btn.style.background = 'rgba(139,92,246,0.15)'; btn.textContent = '🧩 Sinator'; }
-            if (bar) bar.style.display = 'none';
-        }
-        grid.innerHTML = _collRenderGridItems(window._collOverlayParts);
-    }
-
-    function toggleCollItemSelected(id) {
-        if (window._collSelected.has(id)) window._collSelected.delete(id); else window._collSelected.add(id);
-        const grid = document.getElementById('collGrid');
-        if (grid) grid.innerHTML = _collRenderGridItems(window._collOverlayParts);
-        _collRenderSelectBar();
-    }
-
-    async function _collRenderSelectBar() {
-        const bar = document.getElementById('collSelectBar');
-        if (!bar) return;
-        const selectedIds = Array.from(window._collSelected || []);
-        const n = selectedIds.length;
-        if (!window._collListsCache) {
-            try { window._collListsCache = await myListsGet(); } catch(e) { window._collListsCache = []; }
-        }
-        const listsOptions = (window._collListsCache || []).map(l => `<option value="${l.id}">${l.name}</option>`).join('');
-        const selectedTitles = (window._collOverlayParts || []).filter(p => window._collSelected.has(p.id));
-        const chips = n ? `<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:2px;">${selectedTitles.map(p => `<span onclick="toggleCollItemSelected(${p.id})" style="flex-shrink:0;padding:5px 10px;border-radius:20px;background:rgba(139,92,246,0.2);border:1px solid #8b5cf6;color:#c4a4ff;font-size:0.72rem;white-space:nowrap;cursor:pointer;">${p.title} ✕</span>`).join('')}</div>` : '';
-        bar.innerHTML = `${chips}<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-                <button onclick="collSelectAll()" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:#fff;font-size:0.75rem;cursor:pointer;">☑ Vše</button>
-                <button onclick="collSelectNone()" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:#fff;font-size:0.75rem;cursor:pointer;">☐ Nic</button>
-                <span style="font-size:0.78rem;color:var(--text-muted);">Vybráno: ${n}</span>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button ${n?'':'disabled'} onclick="collAddSelectedToWatchlist()" style="flex:1;min-width:150px;padding:10px;border-radius:8px;border:1px solid #1db954;background:rgba(29,185,84,0.15);color:#1db954;font-weight:700;font-size:0.8rem;cursor:pointer;opacity:${n?1:0.5};">🔖 Do watchlistu (${n})</button>
-            </div>
-            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-                <select id="collListSelect" style="flex:1;min-width:140px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:#fff;font-size:0.8rem;">
-                    <option value="">— Vyber seznam —</option>${listsOptions}
-                </select>
-                <button ${n?'':'disabled'} onclick="collAddSelectedToList()" style="padding:10px 14px;border-radius:8px;border:1px solid #8b5cf6;background:rgba(139,92,246,0.15);color:#c4a4ff;font-weight:700;font-size:0.8rem;cursor:pointer;opacity:${n?1:0.5};white-space:nowrap;">➕ Přidat</button>
-            </div>`;
-    }
-
-    function collSelectAll() {
-        window._collSelected = new Set((window._collOverlayParts || []).map(p => p.id));
-        const grid = document.getElementById('collGrid'); if (grid) grid.innerHTML = _collRenderGridItems(window._collOverlayParts);
-        _collRenderSelectBar();
-    }
-    function collSelectNone() {
-        window._collSelected = new Set();
-        const grid = document.getElementById('collGrid'); if (grid) grid.innerHTML = _collRenderGridItems(window._collOverlayParts);
-        _collRenderSelectBar();
-    }
-
-    async function collAddSelectedToWatchlist() {
-        const ids = Array.from(window._collSelected || []);
-        if (!ids.length) return;
-        const parts = (window._collOverlayParts || []).filter(p => ids.includes(p.id));
-        let ok = 0, fail = 0;
-        for (const p of parts) {
-            try { await myWatchlistAdd(p.id, 'movie', p.title, (p.release_date || '').slice(0, 4) || null, p.poster_path || null); ok++; }
-            catch(e) { fail++; }
-        }
-        alert(`✅ Přidáno do watchlistu: ${ok}` + (fail ? `\n❌ Chyby: ${fail}` : ''));
-    }
-
-    async function collAddSelectedToList() {
-        const sel = document.getElementById('collListSelect');
-        const listId = sel && sel.value;
-        if (!listId) { alert('Nejprve vyber cílový seznam.'); return; }
-        const ids = Array.from(window._collSelected || []);
-        if (!ids.length) return;
-        let ok = 0, fail = 0;
-        for (const id of ids) {
-            try { await myListItemAdd(listId, id, 'movie'); ok++; }
-            catch(e) { fail++; }
-        }
-        alert(`✅ Přidáno do seznamu: ${ok}` + (fail ? `\n❌ Chyby: ${fail}` : ''));
     }
 
     async function showCollection(collectionId, collectionName) {
@@ -17006,10 +16899,6 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             </div>
         </div>
         <div id="tvGenresListWrap" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0;">
-            <div id="tvGenresTestBar" style="flex-shrink:0;padding:7px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg-dark);">
-                <button id="tvGenresTestBtn" type="button" onclick="tvRunGenreTest()" style="background:rgba(0,180,216,0.12);border:1px solid rgba(0,180,216,0.4);color:#00b4d8;font-size:0.75rem;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;">🧪 Otestovat kanály</button>
-                <span id="tvGenresTestInfo" style="font-size:0.7rem;color:var(--text-muted);"></span>
-            </div>
             <div class="tv-channel-list" id="tvGenresList"></div>
         </div>
     </div>
@@ -17962,7 +17851,75 @@ window.tvSortChannels = tvSortChannels;
 // zobrazí se jako 1 dlaždice (nejkratší/nejčistší název) + tlačítko se šipkou
 // s ostatními variantami (alternativy). Pokud skupina nemá logo vůbec,
 // nezobrazí se v hlavní mřížce, ale skryje se pod tlačítko "Další TV".
+// === Nefunkční streamy — jen Admin level 2 může označit/odznačit ==========
+// Uloženo lokálně (localStorage, klíč sinator_broken_tv), klíčováno stejným
+// normalizovaným názvem kanálu, jaký používá tvGroupChannels pro deduplikaci
+// (funguje tedy napříč VŠEMI zdroji — Kanály 1–6 i Podle žánru). Stav přežije
+// restart appky, dokud ho admin ručně neodznačí.
+function tvChannelKey(ch) {
+    return (typeof _tvNormalizeName === 'function' ? _tvNormalizeName(ch.name) : tvSortKey(ch.name)) || ((ch && ch.name) || '').toLowerCase();
+}
+window.tvChannelKey = tvChannelKey;
+
+function tvBrokenLoad() {
+    try { return JSON.parse((window._store && window._store.getItem('sinator_broken_tv')) || '{}'); }
+    catch(e) { return {}; }
+}
+function tvBrokenSave(map) {
+    try { window._store && window._store.setItem('sinator_broken_tv', JSON.stringify(map)); } catch(e) {}
+}
+
+function tvMarkBroken(btnEl) {
+    if (!(typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2())) return;
+    const key = btnEl.getAttribute('data-key');
+    if (!key) return;
+    const map = tvBrokenLoad();
+    map[key] = { name: btnEl.getAttribute('data-name') || '', ts: Date.now() };
+    tvBrokenSave(map);
+    tvRerenderAllChannelLists();
+}
+window.tvMarkBroken = tvMarkBroken;
+
+function tvUnmarkBroken(btnEl) {
+    if (!(typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2())) return;
+    const key = btnEl.getAttribute('data-key');
+    if (!key) return;
+    const map = tvBrokenLoad();
+    delete map[key];
+    tvBrokenSave(map);
+    tvRerenderAllChannelLists();
+}
+window.tvUnmarkBroken = tvUnmarkBroken;
+
+// Tlačítko 🚫 na dlaždici/řádku kanálu — vidí a používá jen Admin level 2.
+function tvBrokenMarkButtonHtml(entry) {
+    if (!(typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2())) return '';
+    const key = (entry._brokenKey || tvChannelKey(entry.ch) || '').replace(/"/g, '&quot;');
+    const name = ((entry.ch && entry.ch.name) || '').replace(/"/g, '&quot;');
+    return '<button class="tv-broken-btn" data-key="' + key + '" data-name="' + name + '" onclick="event.stopPropagation();tvMarkBroken(this)" title="Označit jako nefunkční">🚫</button>';
+}
+window.tvBrokenMarkButtonHtml = tvBrokenMarkButtonHtml;
+
+// Sbalitelná sekce "❌ Nefunkční streamy (N)" na konci seznamu — viditelná
+// všem, tlačítko ↺ Obnovit jen pro Admin level 2.
+function tvBrokenSectionHtml(brokenEntries, onclickForChannel, panelId) {
+    if (!brokenEntries || !brokenEntries.length) return '';
+    const isAdmin2 = (typeof window._isAdminLevel2 === 'function') && window._isAdminLevel2();
+    const items = brokenEntries.map(entry => {
+        const label = tvDisplayName(entry.ch.name);
+        const key = (entry._brokenKey || tvChannelKey(entry.ch) || '').replace(/"/g, '&quot;');
+        const restoreBtn = isAdmin2
+            ? '<button class="tv-broken-restore-btn" data-key="' + key + '" onclick="event.stopPropagation();tvUnmarkBroken(this)" title="Obnovit (funguje zase)">↺ Obnovit</button>'
+            : '';
+        return '<div class="tv-ch-nologo-item tv-ch-broken-item" onclick="' + onclickForChannel(entry.ch) + '"><span>❌ ' + label + '</span>' + restoreBtn + '</div>';
+    }).join('');
+    return '<button class="tv-more-btn tv-broken-toggle-btn" onclick="event.stopPropagation();tvToggleAlts(\'' + panelId + '\')">❌ Nefunkční streamy (' + brokenEntries.length + ')</button>'
+        + '<div class="tv-ch-nologo-panel" id="' + panelId + '" style="display:none;">' + items + '</div>';
+}
+window.tvBrokenSectionHtml = tvBrokenSectionHtml;
+
 function tvGroupChannels(list) {
+    const brokenMap = tvBrokenLoad();
     const groups = new Map();
     const order = [];
     (list || []).forEach(ch => {
@@ -17972,17 +17929,26 @@ function tvGroupChannels(list) {
     });
     const shown = [];
     const noLogo = [];
+    const broken = [];
     order.forEach(key => {
         const arr = groups.get(key);
         const withLogo = arr.filter(c => c.logo);
+        let entry;
         if (withLogo.length) {
             const primary = withLogo.slice().sort((a, b) => tvDisplayName(a.name).length - tvDisplayName(b.name).length)[0];
-            shown.push({ ch: primary, alts: arr.filter(c => c !== primary) });
+            entry = { ch: primary, alts: arr.filter(c => c !== primary), _brokenKey: key };
         } else {
-            noLogo.push({ ch: arr[0], alts: arr.slice(1) });
+            entry = { ch: arr[0], alts: arr.slice(1), _brokenKey: key };
+        }
+        if (brokenMap[key]) {
+            broken.push(entry);
+        } else if (withLogo.length) {
+            shown.push(entry);
+        } else {
+            noLogo.push(entry);
         }
     });
-    return { shown, noLogo };
+    return { shown, noLogo, broken };
 }
 window.tvGroupChannels = tvGroupChannels;
 
@@ -18013,9 +17979,11 @@ function tvTileHtml(entry, onclickForChannel, isActive) {
             return '<div class="tv-ch-alt-item" onclick="event.stopPropagation();' + onclickForChannel(a) + '">' + tvDisplayName(a.name) + (a.logo ? '' : ' <span style="opacity:.55;">(bez loga)</span>') + '</div>';
         }).join('') + '</div>'
         : '';
+    const brokenBtn = tvBrokenMarkButtonHtml(entry);
     return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + ' has-logo" onclick="' + onclickForChannel(ch) + '" title="' + safeTitle + '">'
         + '<img class="tv-ch-logo" src="' + ch.logo + '" data-chname="' + safeTitle + '" onerror="tvLogoFallback(this)">'
         + altBtn
+        + brokenBtn
         + '<div class="tv-ch-name">' + shortName + '</div>'
         + (isActive ? '<div class="tv-ch-live-badge">▶ ŽIVĚ</div>' : '')
         + altPanel
@@ -18052,11 +18020,10 @@ function tvUpdateViewModeButtons() {
 }
 window.tvUpdateViewModeButtons = tvUpdateViewModeButtons;
 
-function tvSetViewMode(mode) {
-    if (mode !== 'tiles' && mode !== 'list') return;
-    tvViewMode = mode;
-    try { window._store && window._store.setItem('sinator_tv_view_mode', mode); } catch(e) {}
-    tvUpdateViewModeButtons();
+// Znovu vykreslí seznam kanálů ve VŠECH aktuálně existujících záložkách
+// (Kanály 1–6, Podle žánru) — sdíleno mezi přepínačem Dlaždice/Seznam a
+// označováním/odznačováním nefunkčních streamů.
+function tvRerenderAllChannelLists() {
     if (typeof renderTvChannelList === 'function') renderTvChannelList();
     if (typeof renderAlt2ChannelList === 'function') renderAlt2ChannelList();
     if (typeof renderAlt3ChannelList === 'function') renderAlt3ChannelList();
@@ -18068,6 +18035,15 @@ function tvSetViewMode(mode) {
     } else if (typeof renderAltChannelList === 'function') {
         renderAltChannelList();
     }
+}
+window.tvRerenderAllChannelLists = tvRerenderAllChannelLists;
+
+function tvSetViewMode(mode) {
+    if (mode !== 'tiles' && mode !== 'list') return;
+    tvViewMode = mode;
+    try { window._store && window._store.setItem('sinator_tv_view_mode', mode); } catch(e) {}
+    tvUpdateViewModeButtons();
+    tvRerenderAllChannelLists();
 }
 window.tvSetViewMode = tvSetViewMode;
 
@@ -18115,9 +18091,11 @@ function tvListRowHtml(entry, onclickForChannel, isActive, subtitle) {
         : '';
     const subHtml = subtitle ? '<span class="tv-ch-row-sub">' + subtitle + '</span>' : '';
     const progAttr = nowTitle ? ' data-progtitle="' + nowTitle.replace(/"/g, '&quot;') + '"' : '';
+    const brokenBtn = tvBrokenMarkButtonHtml(entry);
     return '<div class="tv-ch-row' + (isActive ? ' active' : '') + '" onclick="' + onclickForChannel(ch) + '" title="' + safeTitle + '"' + progAttr + '>'
         + '<span class="tv-ch-row-main"><span class="tv-ch-row-name">' + label + '</span>' + progHtml + subHtml + '</span>'
         + (isActive ? '<span class="tv-ch-row-live">▶ ŽIVĚ</span>' : '')
+        + brokenBtn
         + '</div>';
 }
 window.tvListRowHtml = tvListRowHtml;
@@ -18206,16 +18184,20 @@ window.tvRefreshChannelListsForEpg = tvRefreshChannelListsForEpg;
 // Vykreslí kanály podle aktuálního tvViewMode: "tiles" = jen loga v mřížce +
 // zbytek pod "Další TV"; "list" = úplně všechny stanice pod sebou v seznamu.
 function tvRenderChannelsHtml(grouped, onclickForChannel, isActiveFn, panelId, subtitleFn) {
+    const brokenEntries = grouped.broken || [];
+    const brokenPanelId = (panelId || 'tvNoLogoPanel') + '_broken';
     if (tvViewMode === 'list') {
         const all = grouped.shown.concat(grouped.noLogo);
         all.sort((a, b) => {
             const ka = tvSortKey(a.ch.name), kb = tvSortKey(b.ch.name);
             return ka < kb ? -1 : (ka > kb ? 1 : 0);
         });
-        return all.map(entry => tvListRowHtml(entry, onclickForChannel, isActiveFn(entry), subtitleFn ? subtitleFn(entry) : '')).join('');
+        return all.map(entry => tvListRowHtml(entry, onclickForChannel, isActiveFn(entry), subtitleFn ? subtitleFn(entry) : '')).join('')
+            + tvBrokenSectionHtml(brokenEntries, onclickForChannel, brokenPanelId);
     }
     return grouped.shown.map(entry => tvTileHtml(entry, onclickForChannel, isActiveFn(entry))).join('')
-        + tvNoLogoSectionHtml(grouped.noLogo, onclickForChannel, panelId);
+        + tvNoLogoSectionHtml(grouped.noLogo, onclickForChannel, panelId)
+        + tvBrokenSectionHtml(brokenEntries, onclickForChannel, brokenPanelId);
 }
 window.tvRenderChannelsHtml = tvRenderChannelsHtml;
 
@@ -31741,7 +31723,8 @@ function renderAltChannelListSearch() {
         return tile.replace('<div class="tv-ch-name">' + tvDisplayName(entry.ch.name) + '</div>',
             '<div class="tv-ch-name">' + tvDisplayName(entry.ch.name) + '<span style="font-size:0.65rem;color:var(--text-muted);display:block;">' + label + '</span></div>');
     }).join('')
-    + tvNoLogoSectionHtml(grouped.noLogo, onclickFor, 'tvNoLogoPanel_altsearch');
+    + tvNoLogoSectionHtml(grouped.noLogo, onclickFor, 'tvNoLogoPanel_altsearch')
+    + tvBrokenSectionHtml(grouped.broken, onclickFor, 'tvNoLogoPanel_altsearch_broken');
 }
 
 function playAltChannelDirect(encoded) {
@@ -32447,23 +32430,14 @@ function renderGenresGroupTabs() {
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
     const visible = genresState.channels.filter(ch => adultAllowed || !isAdultChannel(ch));
     const counts = {};
-    let czskCount = 0, ostCount = 0;
-    visible.forEach(ch => {
-        const k = unifiedGenreDisplayKey(ch);
-        counts[k] = (counts[k] || 0) + 1;
-        if(channelIsCzSk(ch)) czskCount++; else ostCount++;
-    });
+    visible.forEach(ch => { const k = unifiedGenreDisplayKey(ch); counts[k] = (counts[k] || 0) + 1; });
     const order = [];
     GENRE_ORDER.forEach(base => {
         if(counts[base]) order.push(base);
         const ostKey = 'OST_' + base;
         if(!GENRE_LANG_EXEMPT.has(base) && counts[ostKey]) order.push(ostKey);
     });
-    const opts = [
-        { value: 'all', label: `📋 Vše (${visible.length})` },
-        { value: 'all_czsk', label: `🇨🇿🇸🇰 Vše CZ/SK (${czskCount})` },
-        { value: 'all_ost', label: `🌍 OST Vše (${ostCount})` }
-    ].concat(order.map(k => ({ value: k, label: `${genreLabelFor(k)} (${counts[k]})` })));
+    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${genreLabelFor(k)} (${counts[k]})` })));
     tabs.innerHTML = tvDdBuildHtml('tvGenresGroupDD', 'switchGenresGroup', opts, genresState.activeGroup);
 }
 
@@ -32482,17 +32456,6 @@ function filterGenresChannels(text) {
 }
 window.filterGenresChannels = filterGenresChannels;
 
-// Rozhodne, jestli kanál patří do aktuálně vybrané položky dropdownu —
-// kromě jednotlivých žánrových skupin řeší i souhrnné volby "Vše CZ/SK"
-// (všechny CZ/SK kanály napříč žánry) a "OST Vše" (všechny cizojazyčné).
-function genresMatchesActiveGroup(ch) {
-    const g = genresState.activeGroup;
-    if(g === 'all') return true;
-    if(g === 'all_czsk') return channelIsCzSk(ch);
-    if(g === 'all_ost') return !channelIsCzSk(ch);
-    return unifiedGenreDisplayKey(ch) === g;
-}
-
 function renderGenresChannelList() {
     const listEl = document.getElementById('tvGenresList');
     if(!listEl) return;
@@ -32500,167 +32463,16 @@ function renderGenresChannelList() {
     const searchText = genresState.searchText;
     let filtered = genresState.channels.filter(ch =>
         (adultAllowed || !isAdultChannel(ch)) &&
-        (searchText ? ch.name.toLowerCase().includes(searchText) : genresMatchesActiveGroup(ch))
+        (searchText ? ch.name.toLowerCase().includes(searchText) : (genresState.activeGroup === 'all' || unifiedGenreDisplayKey(ch) === genresState.activeGroup))
     );
     filtered = tvSortChannels(filtered);
-    if(!filtered.length) {
-        listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>';
-        tvUpdateTestInfo(0, 0);
-        return;
-    }
-
-    // Rozdělí na funkční/netestované (nahoře, normálně) a otestované jako
-    // nefunkční (dolů, do sbalitelné sekce "TV mimo provoz") — viz
-    // tvRunGenreTest().
-    const offline = filtered.filter(ch => ch.url && tvTestState.cache[ch.url] === 'fail');
-    const working = filtered.filter(ch => !(ch.url && tvTestState.cache[ch.url] === 'fail'));
-
+    if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>'; return; }
+    const grouped = tvGroupChannels(filtered);
     const onclickFor = (c) => 'playGenresChannel(' + genresState.channels.indexOf(c) + ')';
     const isActiveFor = (entry) => !!(genresState.currentChannel && (genresState.currentChannel.url === entry.ch.url || entry.alts.some(a => genresState.currentChannel.url === a.url)));
     listEl.classList.toggle('list-mode', tvViewMode === 'list');
-
-    const groupedWorking = tvGroupChannels(working);
-    let html = tvRenderChannelsHtml(groupedWorking, onclickFor, isActiveFor, 'tvNoLogoPanel_genres');
-
-    if (offline.length) {
-        const groupedOffline = tvGroupChannels(offline);
-        const offlineHtml = tvRenderChannelsHtml(groupedOffline, onclickFor, isActiveFor, 'tvNoLogoPanel_genres_offline');
-        const collapsed = tvTestState.offlineCollapsed !== false;
-        html += '<div style="margin-top:10px;border-top:1px dashed var(--border);">'
-            + '<div onclick="tvToggleOfflineSection()" style="display:flex;align-items:center;gap:6px;padding:10px 12px;cursor:pointer;color:#ff5c5c;font-weight:700;font-size:0.82rem;">'
-            + '<span id="tvOfflineArrow">' + (collapsed ? '▶' : '▼') + '</span> 📴 TV mimo provoz (' + offline.length + ')'
-            + '</div>'
-            + '<div id="tvOfflineList" style="display:' + (collapsed ? 'none' : 'block') + ';opacity:0.6;">' + offlineHtml + '</div>'
-            + '</div>';
-    }
-    listEl.innerHTML = html;
-    tvUpdateTestInfo(filtered.length, offline.length);
+    listEl.innerHTML = tvRenderChannelsHtml(grouped, onclickFor, isActiveFor, 'tvNoLogoPanel_genres');
 }
-
-function tvToggleOfflineSection() {
-    const el = document.getElementById('tvOfflineList');
-    const arrow = document.getElementById('tvOfflineArrow');
-    if (!el) return;
-    const show = el.style.display === 'none';
-    el.style.display = show ? 'block' : 'none';
-    if (arrow) arrow.textContent = show ? '▼' : '▶';
-    tvTestState.offlineCollapsed = !show;
-}
-window.tvToggleOfflineSection = tvToggleOfflineSection;
-
-function tvUpdateTestInfo(total, offlineCount) {
-    const info = document.getElementById('tvGenresTestInfo');
-    if (!info) return;
-    if (!total) { info.textContent = ''; return; }
-    const testedInThisList = tvTestState.lastTestedCount || 0;
-    if (!testedInThisList) { info.textContent = total + ' kanálů — zatím netestováno'; return; }
-    const skipped = tvTestState.lastSkippedCount || 0;
-    const skipNote = skipped ? (' · ' + skipped + '× nelze ověřit (http, nechá se nahoře)') : '';
-    info.textContent = (offlineCount
-        ? '⚠️ ' + offlineCount + ' kanálů mimo provoz (přesunuto dolů)'
-        : '✅ otestované kanály jsou funkční') + skipNote;
-}
-
-// ── Test funkčnosti streamů (tlačítko "🧪 Otestovat kanály" nahoře v
-// "Podle žánru"). Otestuje kanály aktuálně zobrazené kategorie na pozadí
-// (paralelně, s limitem souběžných požadavků) a nefunkční přesune do sekce
-// "TV mimo provoz" dole. Kvůli CORS omezením prohlížeče nejde ze stránky
-// 100 % spolehlivě ověřit HTTP stav vzdáleného streamu — test proto
-// spolehlivě odhalí hlavně mrtvé/nedostupné servery (DNS chyba, spojení
-// odmítnuto, timeout); zbytek se bere jako funkční, dokud se neprokáže
-// opak. Výsledky se cachují podle URL a zůstávají platné i při přepnutí
-// mezi kategoriemi (dokud se stránka znovu nenačte). ──────────────────
-const tvTestState = { cache: {}, running: false, offlineCollapsed: true, lastTestedCount: 0 };
-
-// Stream na http:// z https:// stránky prohlížeč zablokuje jako "mixed
-// content" ještě PŘED odesláním požadavku na server — fetch tak vždy
-// skončí chybou bez ohledu na to, jestli kanál doopravdy funguje (VLC to
-// otevře v pořádku, protože nejde o prohlížeč). Takové URL se tedy vůbec
-// netestují přes fetch a berou se jako "nelze ověřit" (zůstanou nahoře).
-function tvIsMixedContentBlocked(url) {
-    try {
-        return location.protocol === 'https:' && /^http:\/\//i.test(String(url || '').trim());
-    } catch(e) { return false; }
-}
-window.tvIsMixedContentBlocked = tvIsMixedContentBlocked;
-
-function tvTestStreamUrlOnce(url, timeoutMs) {
-    return new Promise(resolve => {
-        if (!url) { resolve(false); return; }
-        let done = false;
-        const finish = ok => { if (!done) { done = true; resolve(ok); } };
-        let ctrl = null;
-        try { ctrl = new AbortController(); } catch(e) {}
-        const timer = setTimeout(() => { if (ctrl) try { ctrl.abort(); } catch(e) {} finish(false); }, timeoutMs || 10000);
-        try {
-            fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
-                .then(() => { clearTimeout(timer); finish(true); })
-                .catch(() => { clearTimeout(timer); finish(false); });
-        } catch(e) { clearTimeout(timer); finish(false); }
-    });
-}
-
-// Skutečný test jedné URL — http:// na https:// stránce se vůbec
-// nezkouší (nedá se ověřit z prohlížeče, viz výše, vrací null = "neznámo").
-// U https:// se kvůli živým streamům (pomalý první byte, dočasný výpadek)
-// zkouší 2× — jako mrtvý se označí, jen když selžou OBĚ pokusy.
-async function tvTestStreamUrl(url) {
-    if (tvIsMixedContentBlocked(url)) return null;
-    const first = await tvTestStreamUrlOnce(url);
-    if (first) return true;
-    const second = await tvTestStreamUrlOnce(url);
-    return second;
-}
-window.tvTestStreamUrl = tvTestStreamUrl;
-
-async function tvRunGenreTest() {
-    if (tvTestState.running) return;
-    const btn = document.getElementById('tvGenresTestBtn');
-    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
-    const searchText = genresState.searchText;
-    const listSource = genresState.channels.filter(ch =>
-        (adultAllowed || !isAdultChannel(ch)) &&
-        (searchText ? ch.name.toLowerCase().includes(searchText) : genresMatchesActiveGroup(ch))
-    );
-    const targets = [];
-    const seen = new Set();
-    listSource.forEach(ch => {
-        if (ch && ch.url && !seen.has(ch.url)) { seen.add(ch.url); targets.push(ch); }
-    });
-    if (!targets.length) return;
-
-    tvTestState.running = true;
-    let doneCount = 0;
-    let skippedCount = 0;
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.textContent = '⏳ Testuji 0/' + targets.length + '…'; }
-
-    const CONCURRENCY = 8;
-    let idx = 0;
-    async function worker() {
-        while (idx < targets.length) {
-            const i = idx++;
-            const ch = targets[i];
-            const result = await tvTestStreamUrl(ch.url);
-            // null = nelze ověřit (mixed content) -> nechá se jako netestované,
-            // nikdy se neoznačí jako "mimo provoz" jen kvůli tomu.
-            if (result !== null) tvTestState.cache[ch.url] = result ? 'ok' : 'fail';
-            else skippedCount++;
-            doneCount++;
-            if (btn) btn.textContent = '⏳ Testuji ' + doneCount + '/' + targets.length + '…';
-        }
-    }
-    const workers = [];
-    for (let w = 0; w < Math.min(CONCURRENCY, targets.length); w++) workers.push(worker());
-    await Promise.all(workers);
-
-    tvTestState.running = false;
-    tvTestState.lastTestedCount = targets.length;
-    tvTestState.lastSkippedCount = skippedCount;
-    tvTestState.offlineCollapsed = true;
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '🧪 Otestovat kanály'; }
-    renderGenresChannelList();
-}
-window.tvRunGenreTest = tvRunGenreTest;
 
 function playGenresChannel(idx) {
     const ch = genresState.channels[idx];
@@ -33349,17 +33161,6 @@ function _tvBuildAllChannelsForEpg() {
             } catch(e) {}
         });
     }
-    // Dedup podle URL streamu — stejný kanál (identická URL) napříč více
-    // zdroji/seznamy se dřív počítal a zobrazoval vícekrát, což způsobovalo
-    // nesedící počty v dropdownu "Podle žánru" i duplicitní řádky v seznamu.
-    const seenUrl = new Set();
-    result = result.filter(ch => {
-        if (!ch || !ch.url) return true;
-        const u = String(ch.url).trim();
-        if (!u || seenUrl.has(u)) return false;
-        seenUrl.add(u);
-        return true;
-    });
     window._epgAllChannelsCache = result;
     return result;
 }
