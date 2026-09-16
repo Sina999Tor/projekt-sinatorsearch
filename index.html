@@ -11571,26 +11571,138 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const overlay = document.createElement('div');
         overlay.id = 'collectionOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-card);z-index:10600;display:flex;flex-direction:column;overflow:hidden;';
-        overlay.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
-                <span style="font-weight:700;font-size:1.1rem;">📦 ${collectionName}</span>
-                <button onclick="document.getElementById('collectionOverlay')?.remove();document.body.style.overflow=''" style="width:36px;height:36px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);color:#fff;cursor:pointer;font-size:1.1rem;">✕</button>
+        overlay.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);gap:8px;">
+                <span style="font-weight:700;font-size:1.1rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📦 ${collectionName}</span>
+                <button id="collSinatorBtn" onclick="toggleCollSelectMode()" title="Přidat filmy z kolekce do watchlistu / seznamu" style="flex-shrink:0;padding:8px 12px;border-radius:20px;border:1px solid #8b5cf6;background:rgba(139,92,246,0.15);color:#c4a4ff;cursor:pointer;font-size:0.8rem;font-weight:700;white-space:nowrap;">🧩 Sinator</button>
+                <button onclick="document.getElementById('collectionOverlay')?.remove();document.body.style.overflow=''" style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);color:#fff;cursor:pointer;font-size:1.1rem;">✕</button>
             </div>
-            <div style="flex:1;overflow-y:auto;padding:16px;"><div class="loading"><div class="spinner"></div>Načítám kolekci...</div></div>`;
+            <div style="flex:1;overflow-y:auto;padding:16px;"><div class="loading"><div class="spinner"></div>Načítám kolekci...</div></div>
+            <div id="collSelectBar" style="display:none;flex-shrink:0;border-top:1px solid var(--border);background:var(--bg-card);padding:10px 12px;"></div>`;
         overlay.addEventListener('click', e => { if(e.target === overlay) { overlay.remove(); document.body.style.overflow=''; } });
         document.body.appendChild(overlay);
         document.body.style.overflow = 'hidden';
         const bodyEl = overlay.querySelector('div[style*="overflow-y:auto"]');
+        window._collOverlayParts = [];
+        window._collSelected = new Set();
+        window._collSelectMode = false;
         try {
             const res = await fetch(`${BASE}/collection/${collectionId}?api_key=${tmdbApiKey}&language=cs-CZ`);
             const collection = await res.json();
             const parts = collection.parts || [];
             if(parts.length === 0) { bodyEl.innerHTML = '<div class="empty">😕 Kolekce je prázdná</div>'; return; }
             parts.sort((a, b) => new Date(a.release_date).getTime() - new Date(b.release_date).getTime());
-            const grid = parts.map(p => { const img = p.poster_path ? `<img class="card-image" src="${IMG}w500${p.poster_path}">` : `<div class="card-placeholder">🎬</div>`; const watched = isWatched(p.id, 'movie'); return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('collectionOverlay')?.remove();document.body.style.overflow='';openDetail(${p.id}, 'movie')">${img}<div class="card-info"><div class="card-title">${p.title}</div><div class="card-meta"><span>${(p.release_date||'').slice(0,4)||'—'}</span></div></div></div>`; }).join('');
-            bodyEl.innerHTML = `<p style="color:var(--text-muted); margin-bottom:20px;">${parts.length} filmů v kolekci (řazeno od nejstaršího)</p><div class="person-grid">${grid}</div>`;
+            window._collOverlayParts = parts;
+            bodyEl.innerHTML = `<p style="color:var(--text-muted); margin-bottom:20px;">${parts.length} filmů v kolekci (řazeno od nejstaršího)</p><div class="person-grid" id="collGrid">${_collRenderGridItems(parts)}</div>`;
         } catch(e) {
             bodyEl.innerHTML = '<div class="empty">⚠️ Chyba načtení kolekce</div>';
         }
+    }
+
+    // ── "🧩 Sinator" tlačítko v přehledu kolekce (schované, dokud se na něj
+    // neklikne) — po kliku se karty filmů přepnou do výběrového režimu se
+    // zaškrtávátky a dole se objeví lišta pro hromadné přidání vybraných
+    // filmů do Sinator watchlistu nebo do vlastního seznamu. ──────────────
+    function _collRenderGridItems(parts) {
+        const selectMode = window._collSelectMode;
+        return parts.map(p => {
+            const img = p.poster_path ? `<img class="card-image" src="${IMG}w500${p.poster_path}">` : `<div class="card-placeholder">🎬</div>`;
+            const watched = isWatched(p.id, 'movie');
+            const checked = window._collSelected.has(p.id);
+            const clickAttr = selectMode
+                ? `onclick="toggleCollItemSelected(${p.id})"`
+                : `onclick="document.getElementById('collectionOverlay')?.remove();document.body.style.overflow='';openDetail(${p.id}, 'movie')"`;
+            const checkbox = selectMode ? `<div style="position:absolute;top:8px;left:8px;width:26px;height:26px;border-radius:50%;background:${checked?'#8b5cf6':'rgba(0,0,0,0.55)'};border:2px solid ${checked?'#8b5cf6':'#fff'};display:flex;align-items:center;justify-content:center;font-size:0.9rem;z-index:2;color:#fff;">${checked?'✓':''}</div>` : '';
+            return `<div class="card${watched?' is-watched':''}" style="position:relative;cursor:pointer;" ${clickAttr}>${checkbox}${img}<div class="card-info"><div class="card-title">${p.title}</div><div class="card-meta"><span>${(p.release_date||'').slice(0,4)||'—'}</span></div></div></div>`;
+        }).join('');
+    }
+
+    function toggleCollSelectMode() {
+        const btn = document.getElementById('collSinatorBtn');
+        const grid = document.getElementById('collGrid');
+        const bar = document.getElementById('collSelectBar');
+        if (!grid) return;
+        if (!window._collSelectMode) {
+            if (typeof myBackendReady === 'function' && !myBackendReady()) { alert('Nejprve připoj Sinator backend v nastavení (⚙️).'); return; }
+            window._collSelectMode = true;
+            window._collSelected = new Set();
+            if (btn) { btn.style.background = 'rgba(139,92,246,0.35)'; btn.textContent = '🧩 Zrušit výběr'; }
+            if (bar) bar.style.display = 'block';
+            _collRenderSelectBar();
+        } else {
+            window._collSelectMode = false;
+            window._collSelected = new Set();
+            if (btn) { btn.style.background = 'rgba(139,92,246,0.15)'; btn.textContent = '🧩 Sinator'; }
+            if (bar) bar.style.display = 'none';
+        }
+        grid.innerHTML = _collRenderGridItems(window._collOverlayParts);
+    }
+
+    function toggleCollItemSelected(id) {
+        if (window._collSelected.has(id)) window._collSelected.delete(id); else window._collSelected.add(id);
+        const grid = document.getElementById('collGrid');
+        if (grid) grid.innerHTML = _collRenderGridItems(window._collOverlayParts);
+        _collRenderSelectBar();
+    }
+
+    async function _collRenderSelectBar() {
+        const bar = document.getElementById('collSelectBar');
+        if (!bar) return;
+        const n = window._collSelected.size;
+        if (!window._collListsCache) {
+            try { window._collListsCache = await myListsGet(); } catch(e) { window._collListsCache = []; }
+        }
+        const listsOptions = (window._collListsCache || []).map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+        bar.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                <button onclick="collSelectAll()" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:#fff;font-size:0.75rem;cursor:pointer;">☑ Vše</button>
+                <button onclick="collSelectNone()" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:#fff;font-size:0.75rem;cursor:pointer;">☐ Nic</button>
+                <span style="font-size:0.78rem;color:var(--text-muted);">Vybráno: ${n}</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button ${n?'':'disabled'} onclick="collAddSelectedToWatchlist()" style="flex:1;min-width:150px;padding:10px;border-radius:8px;border:1px solid #1db954;background:rgba(29,185,84,0.15);color:#1db954;font-weight:700;font-size:0.8rem;cursor:pointer;opacity:${n?1:0.5};">🔖 Do watchlistu (${n})</button>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                <select id="collListSelect" style="flex:1;min-width:140px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:#fff;font-size:0.8rem;">
+                    <option value="">— Vyber seznam —</option>${listsOptions}
+                </select>
+                <button ${n?'':'disabled'} onclick="collAddSelectedToList()" style="padding:10px 14px;border-radius:8px;border:1px solid #8b5cf6;background:rgba(139,92,246,0.15);color:#c4a4ff;font-weight:700;font-size:0.8rem;cursor:pointer;opacity:${n?1:0.5};white-space:nowrap;">➕ Přidat</button>
+            </div>`;
+    }
+
+    function collSelectAll() {
+        window._collSelected = new Set((window._collOverlayParts || []).map(p => p.id));
+        const grid = document.getElementById('collGrid'); if (grid) grid.innerHTML = _collRenderGridItems(window._collOverlayParts);
+        _collRenderSelectBar();
+    }
+    function collSelectNone() {
+        window._collSelected = new Set();
+        const grid = document.getElementById('collGrid'); if (grid) grid.innerHTML = _collRenderGridItems(window._collOverlayParts);
+        _collRenderSelectBar();
+    }
+
+    async function collAddSelectedToWatchlist() {
+        const ids = Array.from(window._collSelected || []);
+        if (!ids.length) return;
+        const parts = (window._collOverlayParts || []).filter(p => ids.includes(p.id));
+        let ok = 0, fail = 0;
+        for (const p of parts) {
+            try { await myWatchlistAdd(p.id, 'movie', p.title, (p.release_date || '').slice(0, 4) || null, p.poster_path || null); ok++; }
+            catch(e) { fail++; }
+        }
+        alert(`✅ Přidáno do watchlistu: ${ok}` + (fail ? `\n❌ Chyby: ${fail}` : ''));
+    }
+
+    async function collAddSelectedToList() {
+        const sel = document.getElementById('collListSelect');
+        const listId = sel && sel.value;
+        if (!listId) { alert('Nejprve vyber cílový seznam.'); return; }
+        const ids = Array.from(window._collSelected || []);
+        if (!ids.length) return;
+        let ok = 0, fail = 0;
+        for (const id of ids) {
+            try { await myListItemAdd(listId, id, 'movie'); ok++; }
+            catch(e) { fail++; }
+        }
+        alert(`✅ Přidáno do seznamu: ${ok}` + (fail ? `\n❌ Chyby: ${fail}` : ''));
     }
 
     async function showCollection(collectionId, collectionName) {
