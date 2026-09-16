@@ -16883,6 +16883,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             </div>
         </div>
         <div id="tvGenresListWrap" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0;">
+            <div id="tvGenresTestBar" style="flex-shrink:0;padding:7px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg-dark);">
+                <button id="tvGenresTestBtn" type="button" onclick="tvRunGenreTest()" style="background:rgba(0,180,216,0.12);border:1px solid rgba(0,180,216,0.4);color:#00b4d8;font-size:0.75rem;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;">🧪 Otestovat kanály</button>
+                <span id="tvGenresTestInfo" style="font-size:0.7rem;color:var(--text-muted);"></span>
+            </div>
             <div class="tv-channel-list" id="tvGenresList"></div>
         </div>
     </div>
@@ -32376,13 +32380,133 @@ function renderGenresChannelList() {
         (searchText ? ch.name.toLowerCase().includes(searchText) : genresMatchesActiveGroup(ch))
     );
     filtered = tvSortChannels(filtered);
-    if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>'; return; }
-    const grouped = tvGroupChannels(filtered);
+    if(!filtered.length) {
+        listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>';
+        tvUpdateTestInfo(0, 0);
+        return;
+    }
+
+    // Rozdělí na funkční/netestované (nahoře, normálně) a otestované jako
+    // nefunkční (dolů, do sbalitelné sekce "TV mimo provoz") — viz
+    // tvRunGenreTest().
+    const offline = filtered.filter(ch => ch.url && tvTestState.cache[ch.url] === 'fail');
+    const working = filtered.filter(ch => !(ch.url && tvTestState.cache[ch.url] === 'fail'));
+
     const onclickFor = (c) => 'playGenresChannel(' + genresState.channels.indexOf(c) + ')';
     const isActiveFor = (entry) => !!(genresState.currentChannel && (genresState.currentChannel.url === entry.ch.url || entry.alts.some(a => genresState.currentChannel.url === a.url)));
     listEl.classList.toggle('list-mode', tvViewMode === 'list');
-    listEl.innerHTML = tvRenderChannelsHtml(grouped, onclickFor, isActiveFor, 'tvNoLogoPanel_genres');
+
+    const groupedWorking = tvGroupChannels(working);
+    let html = tvRenderChannelsHtml(groupedWorking, onclickFor, isActiveFor, 'tvNoLogoPanel_genres');
+
+    if (offline.length) {
+        const groupedOffline = tvGroupChannels(offline);
+        const offlineHtml = tvRenderChannelsHtml(groupedOffline, onclickFor, isActiveFor, 'tvNoLogoPanel_genres_offline');
+        const collapsed = tvTestState.offlineCollapsed !== false;
+        html += '<div style="margin-top:10px;border-top:1px dashed var(--border);">'
+            + '<div onclick="tvToggleOfflineSection()" style="display:flex;align-items:center;gap:6px;padding:10px 12px;cursor:pointer;color:#ff5c5c;font-weight:700;font-size:0.82rem;">'
+            + '<span id="tvOfflineArrow">' + (collapsed ? '▶' : '▼') + '</span> 📴 TV mimo provoz (' + offline.length + ')'
+            + '</div>'
+            + '<div id="tvOfflineList" style="display:' + (collapsed ? 'none' : 'block') + ';opacity:0.6;">' + offlineHtml + '</div>'
+            + '</div>';
+    }
+    listEl.innerHTML = html;
+    tvUpdateTestInfo(filtered.length, offline.length);
 }
+
+function tvToggleOfflineSection() {
+    const el = document.getElementById('tvOfflineList');
+    const arrow = document.getElementById('tvOfflineArrow');
+    if (!el) return;
+    const show = el.style.display === 'none';
+    el.style.display = show ? 'block' : 'none';
+    if (arrow) arrow.textContent = show ? '▼' : '▶';
+    tvTestState.offlineCollapsed = !show;
+}
+window.tvToggleOfflineSection = tvToggleOfflineSection;
+
+function tvUpdateTestInfo(total, offlineCount) {
+    const info = document.getElementById('tvGenresTestInfo');
+    if (!info) return;
+    if (!total) { info.textContent = ''; return; }
+    const testedInThisList = tvTestState.lastTestedCount || 0;
+    if (!testedInThisList) { info.textContent = total + ' kanálů — zatím netestováno'; return; }
+    info.textContent = offlineCount
+        ? '⚠️ ' + offlineCount + ' kanálů mimo provoz (přesunuto dolů)'
+        : '✅ otestované kanály jsou funkční';
+}
+
+// ── Test funkčnosti streamů (tlačítko "🧪 Otestovat kanály" nahoře v
+// "Podle žánru"). Otestuje kanály aktuálně zobrazené kategorie na pozadí
+// (paralelně, s limitem souběžných požadavků) a nefunkční přesune do sekce
+// "TV mimo provoz" dole. Kvůli CORS omezením prohlížeče nejde ze stránky
+// 100 % spolehlivě ověřit HTTP stav vzdáleného streamu — test proto
+// spolehlivě odhalí hlavně mrtvé/nedostupné servery (DNS chyba, spojení
+// odmítnuto, timeout); zbytek se bere jako funkční, dokud se neprokáže
+// opak. Výsledky se cachují podle URL a zůstávají platné i při přepnutí
+// mezi kategoriemi (dokud se stránka znovu nenačte). ──────────────────
+const tvTestState = { cache: {}, running: false, offlineCollapsed: true, lastTestedCount: 0 };
+
+function tvTestStreamUrl(url, timeoutMs) {
+    return new Promise(resolve => {
+        if (!url) { resolve(false); return; }
+        let done = false;
+        const finish = ok => { if (!done) { done = true; resolve(ok); } };
+        let ctrl = null;
+        try { ctrl = new AbortController(); } catch(e) {}
+        const timer = setTimeout(() => { if (ctrl) try { ctrl.abort(); } catch(e) {} finish(false); }, timeoutMs || 7000);
+        try {
+            fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
+                .then(() => { clearTimeout(timer); finish(true); })
+                .catch(() => { clearTimeout(timer); finish(false); });
+        } catch(e) { clearTimeout(timer); finish(false); }
+    });
+}
+window.tvTestStreamUrl = tvTestStreamUrl;
+
+async function tvRunGenreTest() {
+    if (tvTestState.running) return;
+    const btn = document.getElementById('tvGenresTestBtn');
+    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
+    const searchText = genresState.searchText;
+    const listSource = genresState.channels.filter(ch =>
+        (adultAllowed || !isAdultChannel(ch)) &&
+        (searchText ? ch.name.toLowerCase().includes(searchText) : genresMatchesActiveGroup(ch))
+    );
+    const targets = [];
+    const seen = new Set();
+    listSource.forEach(ch => {
+        if (ch && ch.url && !seen.has(ch.url)) { seen.add(ch.url); targets.push(ch); }
+    });
+    if (!targets.length) return;
+
+    tvTestState.running = true;
+    let doneCount = 0;
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.65'; btn.textContent = '⏳ Testuji 0/' + targets.length + '…'; }
+
+    const CONCURRENCY = 8;
+    let idx = 0;
+    async function worker() {
+        while (idx < targets.length) {
+            const i = idx++;
+            const ch = targets[i];
+            const ok = await tvTestStreamUrl(ch.url);
+            tvTestState.cache[ch.url] = ok ? 'ok' : 'fail';
+            doneCount++;
+            if (btn) btn.textContent = '⏳ Testuji ' + doneCount + '/' + targets.length + '…';
+        }
+    }
+    const workers = [];
+    for (let w = 0; w < Math.min(CONCURRENCY, targets.length); w++) workers.push(worker());
+    await Promise.all(workers);
+
+    tvTestState.running = false;
+    tvTestState.lastTestedCount = targets.length;
+    tvTestState.offlineCollapsed = true;
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '🧪 Otestovat kanály'; }
+    renderGenresChannelList();
+}
+window.tvRunGenreTest = tvRunGenreTest;
 
 function playGenresChannel(idx) {
     const ch = genresState.channels[idx];
@@ -33071,6 +33195,17 @@ function _tvBuildAllChannelsForEpg() {
             } catch(e) {}
         });
     }
+    // Dedup podle URL streamu — stejný kanál (identická URL) napříč více
+    // zdroji/seznamy se dřív počítal a zobrazoval vícekrát, což způsobovalo
+    // nesedící počty v dropdownu "Podle žánru" i duplicitní řádky v seznamu.
+    const seenUrl = new Set();
+    result = result.filter(ch => {
+        if (!ch || !ch.url) return true;
+        const u = String(ch.url).trim();
+        if (!u || seenUrl.has(u)) return false;
+        seenUrl.add(u);
+        return true;
+    });
     window._epgAllChannelsCache = result;
     return result;
 }
