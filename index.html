@@ -16758,6 +16758,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 <div class="tv-dd-opt" data-value="alt">📺 Kanály 2</div>
                 <div class="tv-dd-opt" data-value="alt2">📺 Kanály 3</div>
                 <div class="tv-dd-opt" data-value="alt3">📺 Kanály 4</div>
+                <div class="tv-dd-opt" data-value="alt4">📺 Kanály 5</div>
+                <div class="tv-dd-opt" data-value="alt5">📺 Kanály 6</div>
             </div>
         </div>
     </div>
@@ -16826,6 +16828,42 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         </div>
         <div id="tvAlt3ListWrap" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0;">
             <div class="tv-channel-list" id="tvAlt3List"></div>
+        </div>
+    </div>
+
+    <!-- Alternativa 4: samostatný kompletní seznam -->
+    <div id="tvAlt4Wrap" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
+        <div class="tv-chrome-row">
+            <div class="tv-group-tabs tv-chrome-item" id="tvAlt4GroupTabs"></div>
+            <button type="button" class="tv-chrome-toggle" onclick="toggleTvChrome()" title="Schovat nabídku">▲</button>
+        </div>
+        <div class="tv-chrome-item" style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
+            <input type="text" id="tvAlt4SearchInput" oninput="filterAlt4Channels(this.value)" placeholder="🔍 Hledat kanál…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
+            <div class="tv-viewmode-toggle">
+                <button class="tv-viewmode-btn" data-mode="tiles" onclick="tvSetViewMode('tiles')">🔲 Dlaždice</button>
+                <button class="tv-viewmode-btn" data-mode="list" onclick="tvSetViewMode('list')">☰ Seznam</button>
+            </div>
+        </div>
+        <div id="tvAlt4ListWrap" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0;">
+            <div class="tv-channel-list" id="tvAlt4List"></div>
+        </div>
+    </div>
+
+    <!-- Alternativa 5: samostatný kompletní seznam -->
+    <div id="tvAlt5Wrap" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
+        <div class="tv-chrome-row">
+            <div class="tv-group-tabs tv-chrome-item" id="tvAlt5GroupTabs"></div>
+            <button type="button" class="tv-chrome-toggle" onclick="toggleTvChrome()" title="Schovat nabídku">▲</button>
+        </div>
+        <div class="tv-chrome-item" style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
+            <input type="text" id="tvAlt5SearchInput" oninput="filterAlt5Channels(this.value)" placeholder="🔍 Hledat kanál…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
+            <div class="tv-viewmode-toggle">
+                <button class="tv-viewmode-btn" data-mode="tiles" onclick="tvSetViewMode('tiles')">🔲 Dlaždice</button>
+                <button class="tv-viewmode-btn" data-mode="list" onclick="tvSetViewMode('list')">☰ Seznam</button>
+            </div>
+        </div>
+        <div id="tvAlt5ListWrap" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0;">
+            <div class="tv-channel-list" id="tvAlt5List"></div>
         </div>
     </div>
 
@@ -30949,6 +30987,529 @@ https://cdn-us-east-prod-ingest-infra-dacast-com.akamaized.net/624ff8f9-db18-da9
 https://d39g1vxj2ef6in.cloudfront.net/v1/manifest/3fec3e5cac39a52b2132f9c66c83dae043dc17d4/prod-rakuten-stitched/54947915-6504-4548-aaef-eabd451f8607/1.m3u8
 #EXTINF:-1 tvg-id="DisneyChannel.us@East" group-title="🇺🇸 USA",Disney Channel
 https://moveonjoy-scan.vercel.app/api/scan?url=https://fl25.moveonjoy.com/DISNEY/index.m3u8` },
+    alt4: { label: `📂 Kanály 5`, m3u: `#EXTM3U x-tvg-url="https://iptv-org.github.io/epg/guides/cz/cz.xml"
+#EXTINF:50 tvg-id="AMC.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/AMCCzechia.png",AMC
+http://88.212.15.19/live/test_amc_25p/playlist.m3u8
+#EXTINF:50 tvg-id="AXN.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/AXNCzechia.png",AXN
+http://88.212.15.19/live/test_axn/playlist.m3u8
+#EXTINF:0 tvg-id="AXNBlack.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/AXNBlackCzechia.png",AXN Black
+http://88.212.15.19/live/test_black/playlist.m3u8
+#EXTINF:5 tvg-id="AXNWhite.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/AXNWhiteCzechia.png",AXN White
+http://82.78.243.219:45739/play/a00n/index.m3u8
+#EXTINF:49 tvg-id="BarrandovKrimi.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/BarrandovKrimi.png",Barrandov Krimi
+https://dash4.antik.sk/live/test_barrandov_plus_atk_1200/playlist.m3u8
+#EXTINF:50 tvg-id="CNNPrimaNews.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/CNNPrimaNews.png",CNN Prima News
+http://88.212.15.19/live/test_cnn_pirma_news/playlist.m3u8
+#EXTINF:50 tvg-id="CT1.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/CT1.png",ČT 1
+http://88.212.15.19/live/test_ct1_25p/playlist.m3u8
+#EXTINF:0 tvg-id="CT2.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/CT2.png",ČT 2
+http://88.212.15.19/live/test_ct2_25p/playlist.m3u8
+#EXTINF:0 tvg-id="CT24.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/CT24.png",ČT 24
+http://88.212.15.19/live/test_ct24_hevc/playlist.m3u8
+#EXTINF:0 tvg-id="CTArt.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/CTArt.png",ČT Art
+http://88.212.15.19/live/ct_art_avc_25p/playlist.m3u8
+#EXTINF:0 tvg-id="CTSport.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/CTSport.png",ČT Sport
+http://88.212.15.19/live/test_ctsport_25p/playlist.m3u8
+#EXTINF:50 tvg-id="DisneyChannel.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/DisneyChannelCzechia.png",Disney Channel
+http://88.212.15.19/live/test_disney/playlist.m3u8
+#EXTINF:29 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/ElektrikaCZ.png",Elektrika CZ
+https://rtmp.elektrika.cz/live/myStream.sdp/playlist.m3u8
+#EXTINF:0 tvg-id="FilmBoxEmotion.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/FilmBoxEmotion.png",FilmBox Emotion
+http://88.212.15.19/live/test_film_boxextra_hd_hevc/playlist.m3u8
+#EXTINF:49 tvg-id="FilmBoxHits.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/FilmBoxHits.png",FilmBox Hits
+http://88.212.15.19/live/test_film_boxpremium_hd_hevc/playlist.m3u8
+#EXTINF:0 tvg-id="FilmBox.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/FilmBox.png",FilmBox One
+http://88.212.15.19/live/test_filmbox/playlist.m3u8
+#EXTINF:0 tvg-id="FilmBoxPlus.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/FilmBoxPlus.png",FilmBox Plus
+http://88.212.15.19/live/test_filmbox_plus_atk_1200/playlist.m3u8
+#EXTINF:0 tvg-id="GolfChannel.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/GolfChannelCzechia.png",Golf Channel
+https://dash4.antik.sk/live/test_golf_channel/playlist.m3u8
+#EXTINF:0 tvg-id="History.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/HistoryCzechia.png",History Channel
+http://88.212.15.19/live/test_history/playlist.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/HomeTV.png",Home TV
+http://88.212.15.19/live/test_home_hevc/playlist.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/JC1TV.png",JC1 TV
+https://stream.jc1.cz/hls/jc1.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/JTV.png",JTV
+https://vysilani.zaktv.cz/broadcast/hls/jtv/index.m3u8
+#EXTINF:51 tvg-id="UpNetwork.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/UpNetwork.png",Kanal 1
+https://dash.antik.sk/live/test_upnetwork/playlist.m3u8
+#EXTINF:0 tvg-id="KinoBarrandov.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/KinoBarrandov.png",Kino Barrandov
+http://88.212.15.19/live/test_kino_barrandov_sd_hevc50/playlist.m3u8
+#EXTINF:0 tvg-id="Minimax.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/MinimaxCzechia.png",Minimax
+http://88.212.15.19/live/test_minimax/playlist.m3u8
+#EXTINF:0 tvg-id="MnauTV.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/MnauTV.png",Mňau TV
+https://5ca49f2417d90.streamlock.net/mnau/livestream/playlist.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/MusicBoxClassic.png",MusicBox Classic
+http://88.212.15.19/live/mb_classic/index.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/MusicBoxDance.png",MusicBox Dance
+http://88.212.15.19/live/mb_dance/index.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/MusicBoxHits.png",MusicBox Hits
+http://88.212.15.19/live/mb_hits/index.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/MusicBoxSexy.png",MusicBox Sexy
+http://88.212.15.19/live/mb_sexy/index.m3u8
+#EXTINF:0 tvg-id="Nicktoons.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/NicktoonsCzechia.png",Nicktoons
+http://88.212.15.19/live/test_nicktoons/playlist.m3u8
+#EXTINF:0 tvg-id="NoeTV.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/NoeTV.png",Noe TV
+https://n105.quickmedia.tv/noetv/live/noetv/Ifd4_1_4/chunks_dvr_timeshift-0-7200.m3u8
+#EXTINF:7194 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/NoeTVPlus.png",Noe TV Plus
+https://n105.quickmedia.tv/noetvplus/live/noetvplus/Shz3_1_1/chunks_dvr_timeshift-0-7200.m3u8
+#EXTINF:20 tvg-id="TVNova.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/TVNova.png",Nova
+http://74.208.44.158:5000/live/507/507.m3u8
+#EXTINF:0 tvg-id="NovaAction.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/NovaAction.png",Nova Action
+http://74.208.44.158:5000/live/508/508.m3u8
+#EXTINF:0 tvg-id="NovaCinema.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/NovaCinema.png",Nova Cinema
+http://74.208.44.158:5000/live/509/509.m3u8
+#EXTINF:0 tvg-id="NovaFun.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/NovaFun.png",Nova Fun
+http://74.208.44.158:5000/live/510/510.m3u8
+#EXTINF:0 tvg-id="NovaGold.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/NovaGold.png",Nova Gold
+http://74.208.44.158:5000/live/511/511.m3u8
+#EXTINF:0 tvg-id="NovaLady.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/NovaLady.png",Nova Lady
+http://74.208.44.158:5000/live/512/512.m3u8
+#EXTINF:0 tvg-id="Ocko.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/Ocko.png",Óčko
+https://ocko-live-dash.ssl.cdn.cra.cz/cra_live2/ocko.stream.1.smil/playlist.m3u8
+#EXTINF:0 tvg-id="OckoBlack.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/OckoBlack.png",Óčko Black
+https://dash2.antik.sk/live/test_ocko_black/playlist.m3u8
+#EXTINF:0 tvg-id="OckoExpres.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/OckoExpres.png",Óčko Expres
+https://ocko-live.ssl.cdn.cra.cz/channels/ocko_expres/playlist.m3u8
+#EXTINF:0 tvg-id="OckoGold.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/OckoGold.png",Óčko Gold
+https://ocko-live.ssl.cdn.cra.cz/channels/ocko_gold/playlist.m3u8
+#EXTINF:0 tvg-id="OckoStar.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/OckoStar.png",Óčko Star-impulsem
+https://dash4.antik.sk/live/test_ocko_star/playlist.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/Plzentv.png",Plzen.tv
+https://vysilani.zaktv.cz/broadcast/hls/ptv/index.m3u8
+#EXTINF:0 tvg-id="Polar.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/Polar.png",Polar
+https://stream.polar.cz/polar/polarlive-1/playlist.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/Polar2.png",Polar 2
+https://stream.polar.cz/polar2/polarlive2-1/playlist.m3u8
+#EXTINF:0 tvg-id="TVPrima.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/Prima.png",Prima
+http://88.212.15.19/live/prima_avc_25p/playlist.m3u8
+#EXTINF:0 tvg-id="PrimaCool.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/PrimaCool.png",Prima Cool
+http://st02.lab.cho01.iptv.grapesc.cz/60-tv-stb.m3u8
+#EXTINF:0 tvg-id="PrimaLove.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/PrimaLove.png",Prima Love
+http://88.212.15.19/live/prima_love_avc_25p/playlist.m3u8
+#EXTINF:0 tvg-id="PrimaMax.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/PrimaMax.png",Prima Max
+http://74.208.44.158:5000/live/518/518.m3u8
+#EXTINF:0 tvg-id="PrimaShow.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/PrimaShow.png",Prima Show
+http://88.212.15.19/live/test_prima_show_hevc_25p/playlist.m3u8
+#EXTINF:0 tvg-id="PrimaStar.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/PrimaStar.png",Prima Star
+http://88.212.15.19/live/test_prima_star_hevc_25p/playlist.m3u8
+#EXTINF:0 tvg-id="PrimaZoom.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/PrimaZoom.png",Prima Zoom
+http://88.212.15.19/live/prima_zoom_avc_25p/playlist.m3u8
+#EXTINF:0 tvg-id="Relax.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/Relax.png",Relax
+https://tvopen.poda.cz/hls/tv_relax/index.m3u8
+#EXTINF:0 tvg-id="RetroMusicTelevision.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/RetroMusicTelevision.png",Retro Music Television
+https://stream.mediawork.cz/retrotv/retrotvHQ1/playlist.m3u8
+#EXTINF:0 tvg-id="TelevizeSeznam.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/SeznamTV.png",Seznam TV
+http://88.212.15.19/live/test_seznam_hevc_25p/playlist.m3u8
+#EXTINF:0 tvg-id="SlagrMuzika.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/SlagrMuzika.png",Šlágr Muzika
+https://stream-23.mazana.tv/slagrmuzika.m3u8s
+#EXTINF:0 tvg-id="SlagrOriginal.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/SlagrOriginal.png",Šlágr Originál
+https://stream-13.mazana.tv/slagroriginal.m3u8s
+#EXTINF:0 tvg-id="Spektrum.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/SpektrumCzechia.png",Spektrum
+http://88.212.15.19/live/test_spektrum/playlist.m3u8
+#EXTINF:0 tvg-id="Sport1.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/Sport1Czechia.png",Sport 1
+http://88.212.15.19/live/test_sport1_25p/playlist.m3u8
+#EXTINF:0 tvg-id="Sport2.cz" tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/Sport2Czechia.png",Sport 2
+http://88.212.15.19/live/test_sport_2/playlist.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/SportyTV.png",Sporty TV
+https://dash2.antik.sk/live/sporty_tv/index.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/TVBrno1.png",TV Brno 1
+https://stream.polar.cz/tvbrno1/tvbrno1live-1/playlist.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/UTV.png",UTV
+https://vysilani.zaktv.cz/broadcast/hls/utv/index.m3u8
+#EXTINF:0 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/VCTV.png",VCTV
+https://stream.polar.cz/vctv/vctvlive-1/playlist.m3u8
+#EXTINF:50 tvg-logo="https://raw.githubusercontent.com/iptv-org/iptv/master/logos/channels/White.png",White
+http://88.212.15.19/live/test_white/playlist.m3u8` },
+    alt5: { label: `📂 Kanály 6`, m3u: `#EXTM3U url-tvg="https://raw.githubusercontent.com/kozmali/sk-cz-epg/refs/heads/main/epg.xml.gz"
+#EXTINF:-1 tvg-id="RTVS.SPORT.cz" tvg-name=":Šport" tvg-logo="https://i.imgur.com/oAtcxNZ.png" group-title="Sports",:Šport
+http://88.212.15.27/live/test_rtvs_sport_hevc/playlist.m3u8
+#EXTINF:-1 tvg-id=":24.HD.sk" tvg-name=":24" tvg-logo="https://i.imgur.com/tTCuczU.png" group-title="News",:24
+http://88.212.15.27/live/test_trojka_25p/playlist.m3u8
+#EXTINF:-1 tvg-id="AMC.cz" tvg-name="AMC Europe Czech Republic" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/AMC_logo_2019.svg/960px-AMC_logo_2019.svg.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",AMC Europe Czech Republic
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_amc_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Antik Info TV" tvg-logo="https://i.imgur.com/Q0qL60o.png" group-title="News",Antik Info TV
+https://dash4.antik.sk/live/test_infokanal_tizen/playlist.m3u8
+#EXTINF:-1 tvg-name="Arena Sport 1" tvg-logo="https://i.imgur.com/2qf67zW.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Sports",Arena Sport 1
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_arenasport/playlist.m3u8
+#EXTINF:-1 tvg-name="Arena Sport 2" tvg-logo="https://i.imgur.com/Yq3Jf19.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Sports",Arena Sport 2
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_arenasport_dva/playlist.m3u8
+#EXTINF:-1 tvg-id="AXN.White.ro" tvg-name="AXN White" tvg-logo="https://i.imgur.com/47IKxmt.png" http-referrer="https://cool-tv.net/" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 VLC/3.0.18 LibVLC/3.0.18" group-title="Entertainment",AXN White
+#EXTVLCOPT:http-referrer=https://cool-tv.net/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 VLC/3.0.18 LibVLC/3.0.18
+https://onyx1.mofta1.cfd/axwhite/usergenx23rnd.m3u8
+#EXTINF:-1 tvg-id="BARRANDOVKRIMI.cz" tvg-name="Barrandov Krimi" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Logo-krimi-barrandov-color.svg/960px-Logo-krimi-barrandov-color.svg.png" group-title="General",Barrandov Krimi
+https://dash4.antik.sk/live/test_barrandov_plus_atk_1200/playlist.m3u8
+#EXTINF:-1 tvg-name="Canal+ Action Europe Czechia" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Canal%2B_Action_2024.svg/1920px-Canal%2B_Action_2024.svg.png" group-title="Movies",Canal+ Action Europe Czechia
+http://46.149.191.219:9106/play/a01g
+#EXTINF:-1 tvg-name="Canal+ Action Europe Slovakia" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Canal%2B_Action_2024.svg/1920px-Canal%2B_Action_2024.svg.png" group-title="Movies",Canal+ Action Europe Slovakia
+http://151.80.18.177:86/Canal+_Family_HD/index.m3u8
+#EXTINF:-1 tvg-name="Disney Channel" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/3/3d/2022_Disney_Channel_logo.svg" group-title="Kids",Disney Channel
+http://88.212.15.19/live/test_disney/playlist.m3u8
+#EXTINF:-1 tvg-name="ducktv PLUS" tvg-logo="https://i.imgur.com/RFhxfOx.png" group-title="Kids",ducktv PLUS
+https://dash3.antik.sk/live/test_duck_plus/playlist.m3u8
+#EXTINF:-1 tvg-id="Dvojka.HD.sk" tvg-name="Dvojka" tvg-logo="https://i.imgur.com/ft10wQn.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" group-title="Documentary",Dvojka
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_dvojka_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Film+" tvg-logo="https://i.imgur.com/OBYuY3S.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Movies",Film+
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_film_plus_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="FILMBOX+ Comedy Czechia" tvg-logo="https://spiintl.com/data/files/kcfinderUploadDir/images/filmboxplus/filmbox%2Bcomedy.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",FILMBOX+ Comedy Czechia
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_filmbox_family_atk_1200/playlist.m3u8
+#EXTINF:-1 tvg-name="FILMBOX+ Emotion Czechia" tvg-logo="https://spiintl.com/data/files/kcfinderUploadDir/images/filmboxplus/filmbox%2Bemotion.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",FILMBOX+ Emotion Czechia
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_film_boxextra_hd_hevc/playlist.m3u8
+#EXTINF:-1 tvg-name="FILMBOX+ Hits Czechia" tvg-logo="https://spiintl.com/data/files/kcfinderUploadDir/images/filmboxplus/filmbox%2Bhits.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",FILMBOX+ Hits Czechia
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_film_boxpremium_hd_hevc/playlist.m3u8
+#EXTINF:-1 tvg-name="FILMBOX+ Love & Crime" tvg-logo="https://spiintl.com/data/files/kcfinderUploadDir/images/filmboxplus/filmbox%2Blove-and-crime.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",FILMBOX+ Love & Crime
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_filmbox_plus_atk_1200/playlist.m3u8
+#EXTINF:-1 tvg-name="FILMBOX+ One Czechia" tvg-logo="https://spiintl.com/data/files/kcfinderUploadDir/images/filmboxplus/filmbox%2Bone.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",FILMBOX+ One Czechia
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_filmbox/playlist.m3u8
+#EXTINF:-1 tvg-name="HAHA TV" tvg-logo="" group-title="Comedy",HAHA TV
+https://dash3.antik.sk/live/test_haha_tv/playlist.m3u8
+#EXTINF:-1 tvg-id="Jednotka.HD.sk" tvg-name="Jednotka" tvg-logo="https://i.imgur.com/aqVki9i.png" group-title="General",Jednotka
+http://88.212.15.19/live/test_jednotka_25p/playlist.m3u8
+#EXTINF:-1 tvg-id="Kino.Barrandov.HD.sk" tvg-name="Kino Barrandov" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Kino_Barrandov_logo.png/960px-Kino_Barrandov_logo.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36" group-title="Movies",Kino Barrandov
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_kino_barrandov_sd_hevc50/playlist.m3u8
+#EXTINF:-1 tvg-id="LifeTV.sk" tvg-name="LifeTv" tvg-logo="https://i.imgur.com/jO8kAY2.png" group-title="Religious",LifeTv
+https://lifetv.mpks.sk/s.m3u8
+#EXTINF:-1 tvg-name="Minimax" tvg-logo="https://i.imgur.com/WWOlm1x.png" group-title="Kids",Minimax
+http://88.212.15.19/live/test_minimax/playlist.m3u8
+#EXTINF:-1 tvg-id="Mestská.televízia.Ružomberok.cz" tvg-name="MTR" tvg-logo="https://www.mtr.sk/img/logo-mtr-0.png" group-title="General",MTR
+https://cdnsk003.panaccess.com/local/Ruzomberok/index.m3u8
+#EXTINF:-1 tvg-name="National Geographic" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Natgeologo.svg/960px-Natgeologo.svg.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Documentary",National Geographic
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_ngc/playlist.m3u8
+#EXTINF:-1 tvg-name="National Geographic Wild" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/National_Geographic_Wild_logo.svg/960px-National_Geographic_Wild_logo.svg.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Documentary",National Geographic Wild
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.29/live/test_ngw/playlist.m3u8
+#EXTINF:-1 tvg-name="NZTV" tvg-logo="https://i.imgur.com/jGZlnzT.png" group-title="General",NZTV
+https://dash2.antik.sk/live/test_nove_zamky/playlist.m3u8
+#EXTINF:-1 tvg-name="Óčko" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/%C3%93%C4%8Dko_logo_2012.png/960px-%C3%93%C4%8Dko_logo_2012.png" group-title="Music",Óčko
+https://ocko-live-dash.ssl.cdn.cra.cz/cra_live2/ocko.stream.1.smil/playlist.m3u8
+#EXTINF:-1 tvg-name="Prima Cool SK" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/0/06/Prima_COOL_SK_logo.png" group-title="Undefined",Prima Cool SK
+http://88.212.15.19/live/prima_cool_avc_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Prima Krimi SK" tvg-logo="https://www.jojgroup.sk/wp-content/uploads/PRIMA-KRIMI-SK-2-scaled.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Undefined",Prima Krimi SK
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+http://88.212.15.19/live/prima_krimi_avc_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Prima love SK" tvg-logo="https://www.jojgroup.sk/wp-content/uploads/PRIMA-LOVE-1.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Undefined",Prima love SK
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+http://88.212.15.19/live/prima_love_avc_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Prima SK" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/f/fc/PRIMA_SK_logo_RGB.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Undefined",Prima SK
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_prima_plus_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Raj TV" tvg-logo="https://i.imgur.com/CGckMyx.png" group-title="Undefined",Raj TV
+https://ottst05.flexitv.sk/2827-tv-pc.m3u8
+#EXTINF:-1 tvg-id="Régió.TV.cz" tvg-name="Régió TV" tvg-logo="https://i.imgur.com/WlF6tlZ.png" group-title="General",Régió TV
+http://tv.geniusnet.sk:8081/regiotv/pl.m3u8
+#EXTINF:-1 tvg-id="RETRO.Music.TV.sk" tvg-name="Retro Music Television" tvg-logo="https://i.imgur.com/pyOjdZs.png" group-title="Music",Retro Music Television
+https://stream.mediawork.cz/retrotv/retrotvHQ1/playlist.m3u8
+#EXTINF:-1 tvg-id="RTGINT.ru" tvg-name="RTG int." tvg-logo="https://i.imgur.com/ZpUNou4.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Travel",RTG int.
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://213.91.179.28:8000/play/a0bw
+#EXTINF:-1 tvg-name="Senzi" tvg-logo="https://i.imgur.com/1qJMmBu.png" group-title="Undefined",Senzi
+http://lb.streaming.sk/senzi/stream/playlist.m3u8
+#EXTINF:-1 tvg-id="Šláger.Muzika.HD.sk" tvg-name="Slager Muzika" tvg-logo="https://i.imgur.com/hKdXwrW.png" group-title="Music",Slager Muzika
+https://stream-23.mazana.tv/slagrmuzika.m3u8s
+#EXTINF:-1 tvg-id="Šláger.Originál.HD.sk" tvg-name="Slager Original" tvg-logo="https://i.imgur.com/0YjeWcq.png" group-title="Music",Slager Original
+https://stream-13.mazana.tv/slagroriginal.m3u8s
+#EXTINF:-1 tvg-name="Spektrum" tvg-logo="https://i.imgur.com/F5Uosum.png" group-title="Documentary",Spektrum
+http://88.212.15.19/live/test_spektrum/playlist.m3u8
+#EXTINF:-1 tvg-name="Spektrum Home" tvg-logo="https://i.imgur.com/VaVi65F.png" group-title="Entertainment",Spektrum Home
+http://88.212.15.19/live/test_home_hevc/playlist.m3u8
+#EXTINF:-1 tvg-name="Sport1" tvg-logo="https://i.imgur.com/X5X3tKC.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" group-title="Sports",Sport1
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_sport1_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Sport2" tvg-logo="https://i.imgur.com/UxflVoU.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" group-title="Sports",Sport2
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_sport_2/playlist.m3u8
+#EXTINF:-1 tvg-name="Televízia Močenok" tvg-logo="https://i.imgur.com/psb8GxZ.png" group-title="General",Televízia Močenok
+https://5ca49f2417d90.streamlock.net/mocenok/livestream/playlist.m3u8
+#EXTINF:-1 tvg-id="TV.OSEM.cz" tvg-name="Televízia OSEM" tvg-logo="https://i.imgur.com/Z7URrp1.png" group-title="Undefined",Televízia OSEM
+http://109.74.145.11:1935/tv8/ngrp:tv8.stream_all/playlist.m3u8
+#EXTINF:-1 tvg-name="Turbo TV" tvg-logo="https://i.imgur.com/HI7bCHq.png" group-title="Undefined",Turbo TV
+https://dash3.antik.sk/live/turbo_tv_avc_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="TV9" tvg-logo="https://i.imgur.com/Sco4x8t.png" group-title="Undefined",TV9
+https://dash4.antik.sk/live/test_tv9/playlist.m3u8
+#EXTINF:-1 tvg-name="TV Brezová" tvg-logo="https://i.imgur.com/59LpYoF.png" group-title="General",TV Brezová
+http://95.105.193.219:88/hls/tvb.m3u8
+#EXTINF:-1 tvg-name="TV Central" tvg-logo="https://i.imgur.com/LqGT8o9.png" group-title="Undefined",TV Central
+https://arenasportslovakia.ddns.net/hls/cetv2.m3u8
+#EXTINF:-1 tvg-name="TV DK" tvg-logo="https://i.imgur.com/qTOnPXe.png" group-title="Undefined",TV DK
+http://80.94.54.11:1935/live/dolnykubin1/playlist.m3u8
+#EXTINF:-1 tvg-name="TV Liptov" tvg-logo="https://i.imgur.com/CkvB3af.png" group-title="General",TV Liptov
+http://95.105.255.137:1935/tvturiec/tvliptov.stream/playlist.m3u8
+#EXTINF:-1 tvg-id="TV.LocAll.sk" tvg-name="TV LocAll" tvg-logo="https://i.imgur.com/xN1CJol.png" group-title="Undefined",TV LocAll
+http://tv.geniusnet.sk:8081/localltv/pl.m3u8
+#EXTINF:-1 tvg-id="Lux.TV.HD.sk" tvg-name="TV Lux" tvg-logo="https://i.imgur.com/mAMyTkq.png" group-title="Undefined",TV Lux
+https://stream.tvlux.sk/lux/ngrp:lux.stream_all/playlist.m3u8
+#EXTINF:-1 tvg-name="TV Mistral" tvg-logo="https://i.imgur.com/IOJ6rcb.jpeg" group-title="General",TV Mistral
+https://dash3.antik.sk/live/test_mistral_atktv/playlist.m3u8
+#EXTINF:-1 tvg-name="TV Myjava" tvg-logo="https://i.imgur.com/9f9VmvF.png" group-title="General",TV Myjava
+http://95.105.193.219:88/hls/tvm.m3u8
+#EXTINF:-1 tvg-id="TV.Nitricka.sk" tvg-name="TV Nitricka" tvg-logo="https://i.imgur.com/iwWyG1A.png" group-title="General",TV Nitricka
+https://dash4.antik.sk/live/test_nitricka/playlist.m3u8
+#EXTINF:-1 tvg-id="tv.NRSR.sk" tvg-name="TV NRSR" tvg-logo="https://i.imgur.com/hsJsu3I.png" group-title="Legislative",TV NRSR
+https://n11.stv.livebox.sk/stv-tv/stv4.stream/playlist.m3u8
+#EXTINF:-1 tvg-name="TV Panorama" tvg-logo="https://i.imgur.com/0YtCG4Y.png" group-title="General",TV Panorama
+https://public.live.rebit.tv/live/20750f0b-e12d-4915-a4c3-47c5db9ccbf6/main.m3u8
+#EXTINF:-1 tvg-name="TV Paprika" tvg-logo="https://i.imgur.com/NSabYyT.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Lifestyle;Travel",TV Paprika
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_parpika_tv_sd_hevc/playlist.m3u8
+#EXTINF:-1 tvg-name="TV Poprad" tvg-logo="https://i.imgur.com/x6ZvOp6.png" group-title="General",TV Poprad
+http://213.81.153.221:8080/poprad
+#EXTINF:-1 tvg-id="TV.Považie.cz" tvg-name="TV Povazie" tvg-logo="https://i.imgur.com/JRD9YIY.png" group-title="Undefined",TV Povazie
+https://dash3.antik.sk/live/test_povazie/playlist.m3u8
+#EXTINF:-1 tvg-name="TV Romana" tvg-logo="https://i.imgur.com/r7avFBX.png" group-title="Undefined",TV Romana
+http://88.212.7.11/live/test_tv_romana_web_player/playlist.m3u8
+#EXTINF:-1 tvg-id="TV.Ružinov.cz" tvg-name="TV Ružinov" tvg-logo="https://i.imgur.com/bUGuntH.png" group-title="Undefined",TV Ružinov
+http://lb.streaming.sk/tvruzinov/stream/playlist.m3u8
+#EXTINF:-1 tvg-name="TV Sen" tvg-logo="https://i.imgur.com/ckm2oLD.png" group-title="General",TV Sen
+http://95.105.193.219:88/hls/tvsen.m3u8
+#EXTINF:-1 tvg-name="TV Severka" tvg-logo="https://i.imgur.com/oQSee9S.png" group-title="Undefined",TV Severka
+http://88.212.7.11/live/test_severka_web_player/playlist.m3u8
+#EXTINF:-1 tvg-name="TV Skalica" tvg-logo="https://i.imgur.com/GB8fMoJ.png" group-title="General",TV Skalica
+http://95.105.193.219:88/hls/tvs.m3u8
+#EXTINF:-1 tvg-name="TV Stará Turá" tvg-logo="https://i.imgur.com/kerkvRX.png" group-title="General",TV Stará Turá
+http://95.105.193.219:88/hls/tvst.m3u8
+#EXTINF:-1 tvg-name="TV Vega" tvg-logo="https://i.imgur.com/Qw3NeLA.png" group-title="Undefined",TV Vega
+http://88.212.7.11/live/test_tv_vega_web_player/playlist.m3u8
+#EXTINF:-1 tvg-name="TV Vita" tvg-logo="https://i.imgur.com/Cx1GLbo.png" group-title="Culture",TV Vita
+https://dash3.antik.sk/live/test_vita/playlist.m3u8
+#EXTINF:-1 tvg-id="TVT.cz" tvg-name="TVT" tvg-logo="https://i.imgur.com/QG0iZlG.png" group-title="Undefined",TVT
+https://5ca49f2417d90.streamlock.net/live/turzovka/playlist.m3u8
+#EXTINF:-1 tvg-name="Viasat Explore" tvg-logo="https://i.imgur.com/DyT5pKB.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Documentary",Viasat Explore
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.29/live/test_viasat_explore_atk_tv/playlist.m3u8
+#EXTINF:-1 tvg-name="Viasat History" tvg-logo="https://i.imgur.com/wRP9XA7.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Documentary",Viasat History
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.29/live/test_viasat_history_atk_tv/playlist.m3u8
+#EXTINF:-1 tvg-name="Viasat Nature" tvg-logo="https://i.imgur.com/ousRqqD.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Documentary",Viasat Nature
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.29/live/test_viasat_nature_atk_tv/playlist.m3u8
+#EXTINF:-1 tvg-name="VIO TV" tvg-logo="https://i.imgur.com/7EL3VZ5.png" group-title="Undefined",VIO TV
+http://slovanet-livestream.ceelabs.com:1935/live/VioTV.stream_transcoded/playlist.m3u8
+#EXTINF:-1 tvg-id="Západoslovenská.televízia.cz" tvg-name="Zapadoslovenska TV" tvg-logo="https://i.imgur.com/D72Y1IB.png" group-title="General",Zapadoslovenska TV
+https://dash2.antik.sk/live/test_zapadoslovenska/playlist.m3u8
+#EXTINF:-1 tvg-id="AMC.cz" tvg-name="AMC Europe Czech Republic" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/AMC_logo_2019.svg/960px-AMC_logo_2019.svg.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",AMC Europe Czech Republic
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_amc_25p/playlist.m3u8
+#EXTINF:-1 tvg-id="AXN.Black.cz" tvg-name="AXN Black Czech Republic" tvg-logo="https://i.imgur.com/Peo1QiZ.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",AXN Black Czech Republic
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_black/playlist.m3u8
+#EXTINF:-1 tvg-id="AXN.cz" tvg-name="AXN CEE Czech Republic" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/AXN_logo_%282015%29.svg/960px-AXN_logo_%282015%29.svg.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",AXN CEE Czech Republic
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_axn/playlist.m3u8
+#EXTINF:-1 tvg-id="AXN.White.ro" tvg-name="AXN White" tvg-logo="https://i.imgur.com/47IKxmt.png" http-referrer="https://cool-tv.net/" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 VLC/3.0.18 LibVLC/3.0.18" group-title="Entertainment",AXN White
+#EXTVLCOPT:http-referrer=https://cool-tv.net/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 VLC/3.0.18 LibVLC/3.0.18
+https://onyx1.mofta1.cfd/axwhite/usergenx23rnd.m3u8
+#EXTINF:-1 tvg-id="AXN.White.cz" tvg-name="AXN White Czech Republic" tvg-logo="https://i.imgur.com/47IKxmt.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Entertainment",AXN White Czech Republic
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_white/playlist.m3u8
+#EXTINF:-1 tvg-name="Ballcasterz" tvg-logo="https://web02.antik.sk/assets/img/channels/59cd3407a28c122f4abbc7b01eff7a0c.svg" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Undefined",Ballcasterz
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+http://antik.streaming.tivio.studio/channels/yXDwkH0CbFfkhU7ZnHlT/index.m3u8
+#EXTINF:-1 tvg-id="BARRANDOVKRIMI.cz" tvg-name="Barrandov Krimi" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Logo-krimi-barrandov-color.svg/960px-Logo-krimi-barrandov-color.svg.png" group-title="General",Barrandov Krimi
+https://dash4.antik.sk/live/test_barrandov_plus_atk_1200/playlist.m3u8
+#EXTINF:-1 tvg-name="BBC Earth Czechia" tvg-logo="https://i.imgur.com/nGSsUd4.png" group-title="Documentary",BBC Earth Czechia
+http://88.212.15.29/live/test_bbc_eartch_hevc/playlist.m3u8
+#EXTINF:-1 tvg-name="Canal+ Action Europe Czechia" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Canal%2B_Action_2024.svg/1920px-Canal%2B_Action_2024.svg.png" group-title="Movies",Canal+ Action Europe Czechia
+http://46.149.191.219:9106/play/a01g
+#EXTINF:-1 tvg-name="CNN Prima News" tvg-logo="https://i.imgur.com/elZyUjX.png" group-title="News",CNN Prima News
+http://88.212.15.19/live/test_cnn_pirma_news/playlist.m3u8
+#EXTINF:-1 tvg-id="ČT1.HD.sk" tvg-name="ČT 1" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/%C4%8CT1_logo_2012.svg/960px-%C4%8CT1_logo_2012.svg.png" group-title="General",ČT 1
+http://88.212.15.19/live/test_ct1_25p/playlist.m3u8
+#EXTINF:-1 tvg-id="ČT2.HD.sk" tvg-name="ČT 2" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/%C4%8CT2_logo_2012.svg/960px-%C4%8CT2_logo_2012.svg.png" group-title="Documentary",ČT 2
+http://88.212.15.19/live/test_ct2_25p/playlist.m3u8
+#EXTINF:-1 tvg-id="ČT24.HD.sk" tvg-name="ČT24" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/%C4%8CT24_logo.png/960px-%C4%8CT24_logo.png" group-title="News",ČT24
+http://88.212.15.19/live/test_ct24_hevc/playlist.m3u8
+#EXTINF:-1 tvg-name="ČT Sport" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/%C4%8CT_sport_logo.png/960px-%C4%8CT_sport_logo.png" group-title="Sports",ČT Sport
+http://88.212.15.19/live/test_ctsport_25p/playlist.m3u8
+#EXTINF:-1 tvg-id="ČT:D/ČTart.cz" tvg-name="ČT:D/ČT art" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/%C4%8CT-D_logo.svg/960px-%C4%8CT-D_logo.svg.png" group-title="Kids",ČT:D/ČT art
+http://88.212.15.19/live/ct_art_avc_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Disney Channel" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/3/3d/2022_Disney_Channel_logo.svg" group-title="Kids",Disney Channel
+http://88.212.15.19/live/test_disney/playlist.m3u8
+#EXTINF:-1 tvg-name="Disney Channel" tvg-logo="https://i.imgur.com/aOa73uT.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Kids",Disney Channel
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+http://88.212.15.19/live/disney_channel_hun/index.m3u8
+#EXTINF:-1 tvg-name="Disney Junior" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/e/e3/2024_Disney_Jr._Logo.svg" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Kids",Disney Junior
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_disney_junior/playlist.m3u8
+#EXTINF:-1 tvg-name="DVTV Extra" tvg-logo="https://web02.antik.sk/assets/img/channels/615631fb7d93832cdf7a2d85be336c4e.svg" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Undefined",DVTV Extra
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+https://antik.streaming.tivio.studio/channels/IxLi19VRasgu94bIaXbH/index.m3u8
+#EXTINF:-1 tvg-name="Elektrika TV" tvg-logo="https://i.imgur.com/OLd5od5.png" group-title="Undefined",Elektrika TV
+https://rtmp.elektrika.cz/live/myStream.sdp/playlist.m3u8
+#EXTINF:-1 tvg-name="Eurosport 4K Czechia" tvg-logo="https://i.imgur.com/0o3zjC7.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Sports",Eurosport 4K Czechia
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+http://88.212.15.19/live/esp_4k_atk/playlist.m3u8
+#EXTINF:-1 tvg-name="Film+" tvg-logo="https://i.imgur.com/OBYuY3S.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Movies",Film+
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_film_plus_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="FILMBOX+ Comedy Czechia" tvg-logo="https://spiintl.com/data/files/kcfinderUploadDir/images/filmboxplus/filmbox%2Bcomedy.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",FILMBOX+ Comedy Czechia
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_filmbox_family_atk_1200/playlist.m3u8
+#EXTINF:-1 tvg-name="FILMBOX+ Emotion Czechia" tvg-logo="https://spiintl.com/data/files/kcfinderUploadDir/images/filmboxplus/filmbox%2Bemotion.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",FILMBOX+ Emotion Czechia
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_film_boxextra_hd_hevc/playlist.m3u8
+#EXTINF:-1 tvg-name="FILMBOX+ Hits Czechia" tvg-logo="https://spiintl.com/data/files/kcfinderUploadDir/images/filmboxplus/filmbox%2Bhits.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",FILMBOX+ Hits Czechia
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_film_boxpremium_hd_hevc/playlist.m3u8
+#EXTINF:-1 tvg-name="FILMBOX+ Love & Crime" tvg-logo="https://spiintl.com/data/files/kcfinderUploadDir/images/filmboxplus/filmbox%2Blove-and-crime.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",FILMBOX+ Love & Crime
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_filmbox_plus_atk_1200/playlist.m3u8
+#EXTINF:-1 tvg-name="FILMBOX+ One Czechia" tvg-logo="https://spiintl.com/data/files/kcfinderUploadDir/images/filmboxplus/filmbox%2Bone.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Movies",FILMBOX+ One Czechia
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_filmbox/playlist.m3u8
+#EXTINF:-1 tvg-name="Golf Channel" tvg-logo="https://www.sms.cz/kategorie/televize/bmp/loga/velka/golfchannel.png" group-title="Sports",Golf Channel
+https://dash4.antik.sk/live/test_golf_channel/playlist.m3u8
+#EXTINF:-1 tvg-name="HAHA TV" tvg-logo="" group-title="Comedy",HAHA TV
+https://dash3.antik.sk/live/test_haha_tv/playlist.m3u8
+#EXTINF:-1 tvg-id="THEHISTORYCHANNEL.cz" tvg-name="History" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/History_%282021%29.svg/500px-History_%282021%29.svg.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3" group-title="Documentary",History
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.3
+http://88.212.15.19/live/test_history/playlist.m3u8
+#EXTINF:-1 tvg-name="History2" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/History2_logo_%282022%29.svg/960px-History2_logo_%282022%29.svg.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Undefined",History2
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_h2/playlist.m3u8
+#EXTINF:-1 tvg-name="JČ1" tvg-logo="https://i.imgur.com/AM8YtcV.png" group-title="General",JČ1
+https://stream.jc1.cz/hls/jc1.m3u8
+#EXTINF:-1 tvg-name="Jihočeská televize" tvg-logo="https://i.imgur.com/Hi8hZzl.png" group-title="General",Jihočeská televize
+https://vysilani.zaktv.cz/broadcast/hls/jtv/index.m3u8
+#EXTINF:-1 tvg-id="Kino.Barrandov.HD.sk" tvg-name="Kino Barrandov" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Kino_Barrandov_logo.png/960px-Kino_Barrandov_logo.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36" group-title="Movies",Kino Barrandov
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_kino_barrandov_sd_hevc50/playlist.m3u8
+#EXTINF:-1 tvg-name="KVIFF TV" tvg-logo="https://web02.antik.sk/assets/img/channels/0d824abdc4c21ab5d35cf946847cedee.svg" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Undefined",KVIFF TV
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+http://antik.streaming.tivio.studio/channels/HC7JIqyyvQMl0mnqbbnI/index.m3u8
+#EXTINF:-1 tvg-name="Minimax" tvg-logo="https://i.imgur.com/WWOlm1x.png" group-title="Kids",Minimax
+http://88.212.15.19/live/test_minimax/playlist.m3u8
+#EXTINF:-1 tvg-id="MŇAU.cz" tvg-name="Mňau TV" tvg-logo="https://i.imgur.com/deVHJKS.png" group-title="Undefined",Mňau TV
+https://5ca49f2417d90.streamlock.net/mnau/livestream/playlist.m3u8
+#EXTINF:-1 tvg-name="Music Box Classic" tvg-logo="https://musicboxclassic.com/music_box_classic_logo.png" group-title="Music",Music Box Classic
+http://88.212.15.19/live/mb_classic/index.m3u8
+#EXTINF:-1 tvg-name="Music Box Dance" tvg-logo="https://musicboxdance.com/music_box_dance_logo.png" group-title="Music",Music Box Dance
+http://88.212.15.19/live/mb_dance/index.m3u8
+#EXTINF:-1 tvg-name="Music Box Hits" tvg-logo="https://musicboxhits.com/music_box_hits_logo.png" group-title="Music",Music Box Hits
+http://88.212.15.19/live/mb_hits/index.m3u8
+#EXTINF:-1 tvg-name="Music Box Sexy" tvg-logo="https://musicboxsexy.com/music_box_sexy_logo.png" group-title="Music",Music Box Sexy
+http://88.212.15.19/live/mb_sexy/index.m3u8
+#EXTINF:-1 tvg-name="National Geographic" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Natgeologo.svg/960px-Natgeologo.svg.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Documentary",National Geographic
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_ngc/playlist.m3u8
+#EXTINF:-1 tvg-name="National Geographic Wild" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/National_Geographic_Wild_logo.svg/960px-National_Geographic_Wild_logo.svg.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Documentary",National Geographic Wild
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.29/live/test_ngw/playlist.m3u8
+#EXTINF:-1 tvg-name="Nick Jr." tvg-logo="https://i.imgur.com/KT4tdQs.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Kids",Nick Jr.
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_nick_jr/playlist.m3u8
+#EXTINF:-1 tvg-name="Nickelodeon" tvg-logo="https://i.imgur.com/E84jnP8.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Kids",Nickelodeon
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_nickelodeon_hevc_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Nicktoons" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/d/d8/Nicktoons_UK_Logo_2014.png" group-title="Kids",Nicktoons
+http://88.212.15.19/live/test_nicktoons/playlist.m3u8
+#EXTINF:-1 tvg-name="Óčko" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/%C3%93%C4%8Dko_logo_2012.png/960px-%C3%93%C4%8Dko_logo_2012.png" group-title="Music",Óčko
+https://ocko-live-dash.ssl.cdn.cra.cz/cra_live2/ocko.stream.1.smil/playlist.m3u8
+#EXTINF:-1 tvg-id="ÓČKOBlack.cz" tvg-name="Ocko Black" tvg-logo="https://i.imgur.com/5rw9tWy.png" group-title="Music",Ocko Black
+https://dash2.antik.sk/live/test_ocko_black/playlist.m3u8
+#EXTINF:-1 tvg-id="ÓČKOEXPRES.cz" tvg-name="Óčko Expres" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/%C3%93%C4%8Dko_Expres_logo.png/960px-%C3%93%C4%8Dko_Expres_logo.png" group-title="Music",Óčko Expres
+https://ocko-live.ssl.cdn.cra.cz/channels/ocko_expres/playlist.m3u8
+#EXTINF:-1 tvg-id="Óčko.Star.cz" tvg-name="Óčko Gold" tvg-logo="https://i.imgur.com/nrWNyLc.jpg" group-title="Music",Óčko Gold
+https://ocko-live.ssl.cdn.cra.cz/channels/ocko_gold/playlist.m3u8
+#EXTINF:-1 tvg-id="Óčko.Star.cz" tvg-name="Ocko Star" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/%C3%93%C4%8Dko_Star_logo.png/960px-%C3%93%C4%8Dko_Star_logo.png" group-title="Music",Ocko Star
+https://dash4.antik.sk/live/test_ocko_star/playlist.m3u8
+#EXTINF:-1 tvg-id="ČRoPlzeň.cz" tvg-name="Plzeň TV" tvg-logo="https://i.imgur.com/TxLKSqL.png" group-title="General",Plzeň TV
+https://vysilani.zaktv.cz/broadcast/hls/ptv/index.m3u8
+#EXTINF:-1 tvg-id="POLAR.cz" tvg-name="Polar TV" tvg-logo="https://i.imgur.com/pTJHIX1.png" group-title="General",Polar TV
+https://stream.polar.cz/polar/polarlive-1/playlist.m3u8
+#EXTINF:-1 tvg-id="Prima.cz" tvg-name="Prima" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Prima_2013.png/960px-Prima_2013.png" group-title="Undefined",Prima
+http://88.212.15.19/live/prima_avc_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Prima Cool" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Prima_Cool_logo_zelen%C3%A9.png/960px-Prima_Cool_logo_zelen%C3%A9.png" group-title="Undefined",Prima Cool
+http://88.212.15.19/live/prima_cool_cz_avc/index.m3u8
+#EXTINF:-1 tvg-name="Prima Krimi" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/Prima_Krimi.png/960px-Prima_Krimi.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Undefined",Prima Krimi
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_prima_krimi_cz/playlist.m3u8
+#EXTINF:-1 tvg-name="Prima Love" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Prima_Love_logo_2018.png/960px-Prima_Love_logo_2018.png" group-title="Undefined",Prima Love
+http://88.212.15.19/live/prima_love_cz_avc/index.m3u8
+#EXTINF:-1 tvg-name="Prima Max" tvg-logo="https://i.imgur.com/ePrdyLi.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Undefined",Prima Max
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_prima_max_cz/playlist.m3u8
+#EXTINF:-1 tvg-name="Prima Show" tvg-logo="https://i.imgur.com/XbwAwkp.png" group-title="Undefined",Prima Show
+http://88.212.15.19/live/test_prima_show_hevc_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Prima Star" tvg-logo="https://i.imgur.com/ppqgNDA.png" group-title="Undefined",Prima Star
+http://88.212.15.19/live/test_prima_star_hevc_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Prima Zoom" tvg-logo="https://i.imgur.com/uNJqZ6p.png" group-title="Undefined",Prima Zoom
+http://88.212.15.19/live/prima_zoom_avc_25p/playlist.m3u8
+#EXTINF:-1 tvg-id="RETRO.Music.TV.sk" tvg-name="Retro Music Television" tvg-logo="https://i.imgur.com/pyOjdZs.png" group-title="Music",Retro Music Television
+https://stream.mediawork.cz/retrotv/retrotvHQ1/playlist.m3u8
+#EXTINF:-1 tvg-id="RTM.plus.Liberecko.cz" tvg-name="RTM Plus" tvg-logo="https://i.imgur.com/RNdcP2J.png" group-title="Undefined",RTM Plus
+https://www.rtmplus.cz/live/1-playlist.m3u8
+#EXTINF:-1 tvg-id="Šláger.Muzika.HD.sk" tvg-name="Slager Muzika" tvg-logo="https://i.imgur.com/hKdXwrW.png" group-title="Music",Slager Muzika
+https://stream-23.mazana.tv/slagrmuzika.m3u8s
+#EXTINF:-1 tvg-id="Šláger.Originál.HD.sk" tvg-name="Slager Original" tvg-logo="https://i.imgur.com/0YjeWcq.png" group-title="Music",Slager Original
+https://stream-13.mazana.tv/slagroriginal.m3u8s
+#EXTINF:-1 tvg-name="Spektrum" tvg-logo="https://i.imgur.com/F5Uosum.png" group-title="Documentary",Spektrum
+http://88.212.15.19/live/test_spektrum/playlist.m3u8
+#EXTINF:-1 tvg-name="Spektrum Home" tvg-logo="https://i.imgur.com/VaVi65F.png" group-title="Entertainment",Spektrum Home
+http://88.212.15.19/live/test_home_hevc/playlist.m3u8
+#EXTINF:-1 tvg-name="Sport1" tvg-logo="https://i.imgur.com/X5X3tKC.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" group-title="Sports",Sport1
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_sport1_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="Sport2" tvg-logo="https://i.imgur.com/UxflVoU.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" group-title="Sports",Sport2
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_sport_2/playlist.m3u8
+#EXTINF:-1 tvg-name="Sporty TV" tvg-logo="https://i.imgur.com/Wz5bQKx.jpeg" group-title="Sports",Sporty TV
+https://dash2.antik.sk/live/sporty_tv/index.m3u8
+#EXTINF:-1 tvg-name="Story4 Czechia" tvg-logo="https://i.imgur.com/pJsLyiv.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Undefined",Story4 Czechia
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+http://88.212.15.19/live/story_4_cze_atk/index.m3u8
+#EXTINF:-1 tvg-name="Televize Prerov" tvg-logo="https://i.imgur.com/opuhDX9.png" http-referrer="https://tvprerov.cz/" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/132.0.0.0" group-title="General",Televize Prerov
+#EXTVLCOPT:http-referrer=https://tvprerov.cz/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/132.0.0.0
+https://173.212.247.21/live/tvprerov.m3u8
+#EXTINF:-1 tvg-id="Televize.Seznam.HD.sk" tvg-name="Televize Seznam" tvg-logo="https://i.imgur.com/TpQ8PRb.png" group-title="Undefined",Televize Seznam
+http://88.212.15.19/live/test_seznam_hevc_25p/playlist.m3u8
+#EXTINF:-1 tvg-name="TV Barrandov" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Logo_TV_Barrandov.png/960px-Logo_TV_Barrandov.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" group-title="Undefined",TV Barrandov
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_barrandov/playlist.m3u8
+#EXTINF:-1 tvg-id="TV.Brno.1.cz" tvg-name="TV Brno 1" tvg-logo="https://i.imgur.com/8Xm3WSn.png" group-title="General",TV Brno 1
+https://stream.polar.cz/tvbrno1/tvbrno1live-1/playlist.m3u8
+#EXTINF:-1 tvg-id="Noe.cz" tvg-name="TV Noe" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Noe-logo-2016.png/500px-Noe-logo-2016.png" group-title="Undefined",TV Noe
+https://n105.quickmedia.tv/noetv/live/noetv/Ifd4_1_4/chunks_dvr_timeshift-0-7200.m3u8
+#EXTINF:-1 tvg-id="Noe+.cz" tvg-name="TV Noe+" tvg-logo="https://i.imgur.com/p4FtFUl.png" group-title="General",TV Noe+
+https://n105.quickmedia.tv/noetvplus/live/noetvplus/Shz3_1_1/chunks_dvr_timeshift-0-7200.m3u8
+#EXTINF:-1 tvg-name="TV Paprika" tvg-logo="https://i.imgur.com/NSabYyT.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Lifestyle;Travel",TV Paprika
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.19/live/test_parpika_tv_sd_hevc/playlist.m3u8
+#EXTINF:-1 tvg-name="Up Network" tvg-logo="https://i.imgur.com/cwlHDjh.png" group-title="Undefined",Up Network
+https://dash.antik.sk/live/test_upnetwork/playlist.m3u8
+#EXTINF:-1 tvg-name="ÚTV" tvg-logo="https://i.imgur.com/ulfeIwM.png" group-title="Undefined",ÚTV
+https://vysilani.zaktv.cz/broadcast/hls/utv/index.m3u8
+#EXTINF:-1 tvg-name="Viasat Epic Drama Czechia" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/e/e1/Viasat_Epic_Drama_2026.svg" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Series",Viasat Epic Drama Czechia
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.29/live/test_epic_drama_atk_tv/playlist.m3u8
+#EXTINF:-1 tvg-name="Viasat Explore" tvg-logo="https://i.imgur.com/DyT5pKB.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Documentary",Viasat Explore
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.29/live/test_viasat_explore_atk_tv/playlist.m3u8
+#EXTINF:-1 tvg-name="Viasat History" tvg-logo="https://i.imgur.com/wRP9XA7.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Documentary",Viasat History
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.29/live/test_viasat_history_atk_tv/playlist.m3u8
+#EXTINF:-1 tvg-name="Viasat Nature" tvg-logo="https://i.imgur.com/ousRqqD.png" http-user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" group-title="Documentary",Viasat Nature
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+http://88.212.15.29/live/test_viasat_nature_atk_tv/playlist.m3u8
+#EXTINF:-1 tvg-id="V1.cz" tvg-name="Východočeská TV" tvg-logo="https://i.imgur.com/4Wwptd3.png" group-title="Undefined",Východočeská TV
+https://stream.polar.cz/vctv/vctvlive-1/playlist.m3u8
+#EXTINF:-1 tvg-name="Yachting TV" tvg-logo="https://i.imgur.com/YxO60B1.png" group-title="Lifestyle",Yachting TV
+https://streams2.sofast.tv/vglive-sk-461164/index.m3u8` },
 };
 
 let altState = window.altState = { activeCode: null, channels: [], filtered: [], filterText: '', currentChannel: null, parsedCache: {} };
@@ -31183,7 +31744,7 @@ window.addEventListener('resize', function() { tvDdCloseAll(); });
 
 function switchTvTab(tab) {
     // Při přepnutí na jakoukoliv nabídku (i opětovném kliknutí na stejnou) vždy vymaž vyhledávací pole
-    ['tvChannelSearchInput','tvAltSearchInput','tvAlt2SearchInput','tvAlt3SearchInput'].forEach(id => {
+    ['tvChannelSearchInput','tvAltSearchInput','tvAlt2SearchInput','tvAlt3SearchInput','tvAlt4SearchInput','tvAlt5SearchInput'].forEach(id => {
         const el = document.getElementById(id);
         if(el && el.value) el.value = '';
     });
@@ -31191,17 +31752,23 @@ function switchTvTab(tab) {
     if(typeof filterAltChannels === 'function') filterAltChannels('');
     if(typeof filterAlt2Channels === 'function') filterAlt2Channels('');
     if(typeof filterAlt3Channels === 'function') filterAlt3Channels('');
+    if(typeof filterAlt4Channels === 'function') filterAlt4Channels('');
+    if(typeof filterAlt5Channels === 'function') filterAlt5Channels('');
     const isEpg = tab === 'epg';
     const isAlt = tab === 'alt';
     const isAlt2 = tab === 'alt2';
     const isAlt3 = tab === 'alt3';
-    const isAnyAlt = isEpg || isAlt || isAlt2 || isAlt3;
+    const isAlt4 = tab === 'alt4';
+    const isAlt5 = tab === 'alt5';
+    const isAnyAlt = isEpg || isAlt || isAlt2 || isAlt3 || isAlt4 || isAlt5;
     document.getElementById('tvSearchWrap').style.display = isAnyAlt ? 'none' : '';
     document.getElementById('tvChannelListWrap').style.display = isAnyAlt ? 'none' : '';
     document.getElementById('tvEpgWrap').style.display = isEpg ? 'flex' : 'none';
     document.getElementById('tvAltWrap').style.display = isAlt ? 'flex' : 'none';
     document.getElementById('tvAlt2Wrap').style.display = isAlt2 ? 'flex' : 'none';
     document.getElementById('tvAlt3Wrap').style.display = isAlt3 ? 'flex' : 'none';
+    document.getElementById('tvAlt4Wrap').style.display = isAlt4 ? 'flex' : 'none';
+    document.getElementById('tvAlt5Wrap').style.display = isAlt5 ? 'flex' : 'none';
     document.getElementById('tvGroupTabs').style.display = isAnyAlt ? 'none' : '';
     const tvGroupTabsRow = document.getElementById('tvGroupTabsRow');
     if(tvGroupTabsRow) tvGroupTabsRow.style.display = isAnyAlt ? 'none' : '';
@@ -31211,11 +31778,15 @@ function switchTvTab(tab) {
     const btnAlt = document.getElementById('tvTabAlt');
     const btnAlt2 = document.getElementById('tvTabAlt2');
     const btnAlt3 = document.getElementById('tvTabAlt3');
+    const btnAlt4 = document.getElementById('tvTabAlt4');
+    const btnAlt5 = document.getElementById('tvTabAlt5');
     if(btnCh) { btnCh.style.background = isAnyAlt ? 'transparent' : 'var(--accent)'; btnCh.style.color = isAnyAlt ? 'var(--text-muted)' : '#fff'; }
     if(btnEpg) { btnEpg.style.background = isEpg ? 'var(--accent)' : 'transparent'; btnEpg.style.color = isEpg ? '#fff' : 'var(--accent)'; }
     if(btnAlt) { btnAlt.style.background = isAlt ? 'var(--accent)' : 'transparent'; btnAlt.style.color = isAlt ? '#fff' : 'var(--text-muted)'; }
     if(btnAlt2) { btnAlt2.style.background = isAlt2 ? 'var(--accent)' : 'transparent'; btnAlt2.style.color = isAlt2 ? '#fff' : 'var(--text-muted)'; }
     if(btnAlt3) { btnAlt3.style.background = isAlt3 ? 'var(--accent)' : 'transparent'; btnAlt3.style.color = isAlt3 ? '#fff' : 'var(--text-muted)'; }
+    if(btnAlt4) { btnAlt4.style.background = isAlt4 ? 'var(--accent)' : 'transparent'; btnAlt4.style.color = isAlt4 ? '#fff' : 'var(--text-muted)'; }
+    if(btnAlt5) { btnAlt5.style.background = isAlt5 ? 'var(--accent)' : 'transparent'; btnAlt5.style.color = isAlt5 ? '#fff' : 'var(--text-muted)'; }
     const tvTabDD = document.getElementById('tvTabDD');
     if(tvTabDD && !isEpg) {
         tvTabDD.querySelectorAll('.tv-dd-opt').forEach(o => o.classList.toggle('active', o.getAttribute('data-value') === tab));
@@ -31237,6 +31808,12 @@ function switchTvTab(tab) {
     }
     if(isAlt3) {
         loadAlt3Channels();
+    }
+    if(isAlt4) {
+        loadAlt4Channels();
+    }
+    if(isAlt5) {
+        loadAlt5Channels();
     }
 }
 
@@ -31412,6 +31989,126 @@ function playAlt3Channel(idx) {
 }
 window.playAlt3Channel = playAlt3Channel;
 
+// Kanály 5 — pátý (doplňkový) zdroj kanálů. Playlist neobsahuje group-title,
+// takže se nedělí do zemí jako Kanály 3/4 — je to jeden plochý seznam.
+const alt4State = { channels: [], searchText: '' };
+
+function loadAlt4Channels() {
+    if(!alt4State.channels.length) {
+        alt4State.channels = parseM3U(ALT_PLAYLISTS.alt4.m3u);
+    }
+    renderAlt4GroupTabs();
+    renderAlt4ChannelList();
+}
+
+function renderAlt4GroupTabs() {
+    tvDdCloseAll();
+    const tabs = document.getElementById('tvAlt4GroupTabs');
+    if(!tabs) return;
+    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
+    const visible = alt4State.channels.filter(ch => adultAllowed || !isAdultChannel(ch));
+    tabs.innerHTML = tvDdBuildHtml('tvAlt4GroupDD', 'switchAlt4Group', [{ value: 'all', label: `📋 Vše (${visible.length})` }], 'all');
+}
+
+function switchAlt4Group(id) {
+    // Jediná skupina ("Vše") — funkce existuje jen pro konzistenci s ostatními záložkami.
+    renderAlt4ChannelList();
+}
+window.switchAlt4Group = switchAlt4Group;
+
+function filterAlt4Channels(text) {
+    alt4State.searchText = (text || '').toLowerCase().trim();
+    renderAlt4ChannelList();
+}
+window.filterAlt4Channels = filterAlt4Channels;
+
+function renderAlt4ChannelList() {
+    const listEl = document.getElementById('tvAlt4List');
+    if(!listEl) return;
+    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
+    const searchText = alt4State.searchText;
+    let filtered = alt4State.channels.filter(ch =>
+        (adultAllowed || !isAdultChannel(ch)) &&
+        (!searchText || ch.name.toLowerCase().includes(searchText))
+    );
+    filtered = tvSortChannels(filtered);
+    if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>'; return; }
+    const grouped = tvGroupChannels(filtered);
+    const onclickFor = (c) => 'playAlt4Channel(' + alt4State.channels.indexOf(c) + ')';
+    const isActiveFor = (entry) => !!(alt4State.currentChannel && (alt4State.currentChannel.url === entry.ch.url || entry.alts.some(a => alt4State.currentChannel.url === a.url)));
+    listEl.classList.toggle('list-mode', tvViewMode === 'list');
+    listEl.innerHTML = tvRenderChannelsHtml(grouped, onclickFor, isActiveFor, 'tvNoLogoPanel_alt4');
+}
+
+function playAlt4Channel(idx) {
+    const ch = alt4State.channels[idx];
+    if(!ch) return;
+    alt4State.currentChannel = ch;
+    renderAlt4ChannelList();
+    openInVlcUrl(ch.url);
+    updateTvQuickAltRow(ch.name, ch.url);
+}
+window.playAlt4Channel = playAlt4Channel;
+
+const alt5State = { channels: [], searchText: '' };
+
+function loadAlt5Channels() {
+    if(!alt5State.channels.length) {
+        alt5State.channels = parseM3U(ALT_PLAYLISTS.alt5.m3u);
+    }
+    renderAlt5GroupTabs();
+    renderAlt5ChannelList();
+}
+
+function renderAlt5GroupTabs() {
+    tvDdCloseAll();
+    const tabs = document.getElementById('tvAlt5GroupTabs');
+    if(!tabs) return;
+    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
+    const visible = alt5State.channels.filter(ch => adultAllowed || !isAdultChannel(ch));
+    tabs.innerHTML = tvDdBuildHtml('tvAlt5GroupDD', 'switchAlt5Group', [{ value: 'all', label: `📋 Vše (${visible.length})` }], 'all');
+}
+
+function switchAlt5Group(id) {
+    // Jediná skupina ("Vše") — funkce existuje jen pro konzistenci s ostatními záložkami.
+    renderAlt5ChannelList();
+}
+window.switchAlt5Group = switchAlt5Group;
+
+function filterAlt5Channels(text) {
+    alt5State.searchText = (text || '').toLowerCase().trim();
+    renderAlt5ChannelList();
+}
+window.filterAlt5Channels = filterAlt5Channels;
+
+function renderAlt5ChannelList() {
+    const listEl = document.getElementById('tvAlt5List');
+    if(!listEl) return;
+    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
+    const searchText = alt5State.searchText;
+    let filtered = alt5State.channels.filter(ch =>
+        (adultAllowed || !isAdultChannel(ch)) &&
+        (!searchText || ch.name.toLowerCase().includes(searchText))
+    );
+    filtered = tvSortChannels(filtered);
+    if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>'; return; }
+    const grouped = tvGroupChannels(filtered);
+    const onclickFor = (c) => 'playAlt5Channel(' + alt5State.channels.indexOf(c) + ')';
+    const isActiveFor = (entry) => !!(alt5State.currentChannel && (alt5State.currentChannel.url === entry.ch.url || entry.alts.some(a => alt5State.currentChannel.url === a.url)));
+    listEl.classList.toggle('list-mode', tvViewMode === 'list');
+    listEl.innerHTML = tvRenderChannelsHtml(grouped, onclickFor, isActiveFor, 'tvNoLogoPanel_alt5');
+}
+
+function playAlt5Channel(idx) {
+    const ch = alt5State.channels[idx];
+    if(!ch) return;
+    alt5State.currentChannel = ch;
+    renderAlt5ChannelList();
+    openInVlcUrl(ch.url);
+    updateTvQuickAltRow(ch.name, ch.url);
+}
+window.playAlt5Channel = playAlt5Channel;
+
 // ── Schování celé TV nabídky (Program/Kanály/kategorie/VLC info/hledání),
 //    aby seznam kanálů zabral celou obrazovku. Šipka je vždy vpravo vedle
 //    kategorie kanálů (na všech záložkách Kanály/2/3/4), stav se pamatuje. ──
@@ -31566,8 +32263,8 @@ function _tvNormalizeName(name) {
         .trim();
 }
 
-// Najde stejnojmenné kanály napříč VŠEMI 4 zdroji (Kanály / Kanály 2 —
-// všechny země / Kanály 3 / Kanály 4), kromě právě přehrávaného URL.
+// Najde stejnojmenné kanály napříč VŠEMI 5 zdroji (Kanály / Kanály 2 —
+// všechny země / Kanály 3 / Kanály 4 / Kanály 5), kromě právě přehrávaného URL.
 // Kanály 2 se parsují lazy (a cachují do altState.parsedCache), protože
 // tam je desítky zemí a nemá smysl je parsovat, dokud nejsou potřeba.
 function findTvAltSources(name, excludeUrl) {
@@ -31589,7 +32286,7 @@ function findTvAltSources(name, excludeUrl) {
     addFrom(tvState.channels, '📺 Kanály');
     if (typeof ALT_PLAYLISTS === 'object') {
         Object.keys(ALT_PLAYLISTS).forEach(code => {
-            if (code === 'alt2' || code === 'alt3') return; // ty patří Kanály 3/4, řeší se zvlášť níže
+            if (code === 'alt2' || code === 'alt3' || code === 'alt4' || code === 'alt5') return; // ty patří Kanály 3/4/5/6, řeší se zvlášť níže
             try {
                 if (!altState.parsedCache[code]) altState.parsedCache[code] = parseM3U(ALT_PLAYLISTS[code].m3u);
                 addFrom(altState.parsedCache[code], '📺 K2 · ' + (ALT_PLAYLISTS[code].label || code));
@@ -31598,6 +32295,8 @@ function findTvAltSources(name, excludeUrl) {
     }
     addFrom(typeof alt2State !== 'undefined' ? alt2State.channels : null, '📺 Kanály 3');
     addFrom(typeof alt3State !== 'undefined' ? alt3State.channels : null, '📺 Kanály 4');
+    addFrom(typeof alt4State !== 'undefined' ? alt4State.channels : null, '📺 Kanály 5');
+    addFrom(typeof alt5State !== 'undefined' ? alt5State.channels : null, '📺 Kanály 6');
     return results.slice(0, 10);
 }
 
