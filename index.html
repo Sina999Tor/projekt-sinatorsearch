@@ -11611,8 +11611,16 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const clickAttr = selectMode
                 ? `onclick="toggleCollItemSelected(${p.id})"`
                 : `onclick="document.getElementById('collectionOverlay')?.remove();document.body.style.overflow='';openDetail(${p.id}, 'movie')"`;
-            const checkbox = selectMode ? `<div style="position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:6px;background:${checked?'#8b5cf6':'rgba(0,0,0,0.55)'};border:2px solid ${checked?'#8b5cf6':'#fff'};display:flex;align-items:center;justify-content:center;font-size:0.95rem;font-weight:800;z-index:2;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);">${checked?'✓':''}</div>` : '';
-            return `<div class="card${watched?' is-watched':''}" style="position:relative;cursor:pointer;overflow:visible;" ${clickAttr}>${checkbox}${img}<div class="card-info"><div class="card-title">${p.title}</div><div class="card-meta"><span>${(p.release_date||'').slice(0,4)||'—'}</span></div></div></div>`;
+            // Výrazná viditelná indikace výběru: fialový rámeček kolem celé
+            // karty + fialový přísvit přes poster + velká zaškrtávací značka
+            // v pravém horním rohu — aby bylo na první pohled jasné, co je
+            // vybrané, i při rychlém výběru z více filmů.
+            const overlay = selectMode ? `<div style="position:absolute;inset:0;background:${checked?'rgba(139,92,246,0.38)':'transparent'};border-radius:8px;transition:background 0.12s;pointer-events:none;display:flex;align-items:flex-start;justify-content:flex-end;padding:7px;">
+                    <div style="width:28px;height:28px;border-radius:6px;background:${checked?'#8b5cf6':'rgba(0,0,0,0.6)'};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:900;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.6);">${checked?'✓':''}</div>
+                </div>` : '';
+            const posterWrap = `<div style="position:relative;">${img}${overlay}</div>`;
+            const cardBorder = selectMode ? `border:3px solid ${checked?'#8b5cf6':'rgba(255,255,255,0.12)'};` : '';
+            return `<div class="card${watched?' is-watched':''}" style="position:relative;cursor:pointer;border-radius:10px;${cardBorder}" ${clickAttr}>${posterWrap}<div class="card-info"><div class="card-title">${p.title}</div><div class="card-meta"><span>${(p.release_date||'').slice(0,4)||'—'}</span></div></div></div>`;
         }).join('');
     }
 
@@ -11647,12 +11655,15 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     async function _collRenderSelectBar() {
         const bar = document.getElementById('collSelectBar');
         if (!bar) return;
-        const n = window._collSelected.size;
+        const selectedIds = Array.from(window._collSelected || []);
+        const n = selectedIds.length;
         if (!window._collListsCache) {
             try { window._collListsCache = await myListsGet(); } catch(e) { window._collListsCache = []; }
         }
         const listsOptions = (window._collListsCache || []).map(l => `<option value="${l.id}">${l.name}</option>`).join('');
-        bar.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        const selectedTitles = (window._collOverlayParts || []).filter(p => window._collSelected.has(p.id));
+        const chips = n ? `<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:2px;">${selectedTitles.map(p => `<span onclick="toggleCollItemSelected(${p.id})" style="flex-shrink:0;padding:5px 10px;border-radius:20px;background:rgba(139,92,246,0.2);border:1px solid #8b5cf6;color:#c4a4ff;font-size:0.72rem;white-space:nowrap;cursor:pointer;">${p.title} ✕</span>`).join('')}</div>` : '';
+        bar.innerHTML = `${chips}<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
                 <button onclick="collSelectAll()" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:#fff;font-size:0.75rem;cursor:pointer;">☑ Vše</button>
                 <button onclick="collSelectNone()" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:#fff;font-size:0.75rem;cursor:pointer;">☐ Nic</button>
                 <span style="font-size:0.78rem;color:var(--text-muted);">Vybráno: ${n}</span>
