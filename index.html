@@ -32209,6 +32209,19 @@ const GENRE_LABELS = {
     ENTERTAINMENT: '🎭 Zábava', RELIGIOUS: '⛪ Duchovní', CULTURE: '🎨 Kultura',
     TRAVEL: '✈️ Cestování', GENERAL: '📺 Obecné', OTHER: '📋 Ostatní'
 };
+// Pořadí zobrazení skupin (základní CZ/SK skupina hned následovaná svou
+// "OST" variantou pro ostatní jazyky).
+const GENRE_ORDER = ['NEWS','SPORT','MOVIES','SERIES','KIDS','MUSIC','DOCUMENTARY','ENTERTAINMENT','RELIGIOUS','CULTURE','TRAVEL','GENERAL','OTHER'];
+// U těchto žánrů se jazyky neřeší — patří tam kanály ve všech jazycích.
+const GENRE_LANG_EXEMPT = new Set(['SPORT', 'MUSIC', 'KIDS']);
+
+function genreLabelFor(key) {
+    if(key.indexOf('OST_') === 0) {
+        const base = key.slice(4);
+        return 'OST ' + (GENRE_LABELS[base] || base);
+    }
+    return GENRE_LABELS[key] || key;
+}
 
 // Rozpozná žánr přímo z group-title (funguje pro Kanály 2,3,6 a případné
 // další zdroje s group-title) — nejdřív odstraní "XX| " prefix země
@@ -32259,6 +32272,36 @@ function unifiedGenreKey(ch) {
     return genreKeyFromGroup(ch.group) || genreKeyFromName(ch.name) || 'OTHER';
 }
 
+// ── Rozpoznání jazyka/země kanálu — potřeba, aby se u žánrů kromě
+// Sport/Hudba/Děti oddělily CZ/SK stanice od ostatních jazyků (ty jdou
+// do "OST" varianty skupiny). ──────────────────────────────────────────
+// Zdroje, které jsou celé (výhradně) česko-slovenské, resp. výhradně
+// cizojazyčné — u nich se jazyk pozná už jen podle toho, ze kterého
+// seznamu (ALT_PLAYLISTS klíče) kanál pochází.
+const CZSK_ONLY_SOURCES = new Set(['cz', 'sk', 'alt4', 'alt5', 'main']);
+const OTHER_LANG_SOURCES = new Set(['de', 'hu', 'it', 'nl', 'fr', 'es', 'pl', 'pt', 'us', 'uk']);
+function channelIsCzSk(ch) {
+    const src = ch._src;
+    if(CZSK_ONLY_SOURCES.has(src)) return true;
+    if(OTHER_LANG_SOURCES.has(src)) return false;
+    // Zbývá např. Kanály 3/4 ("all"-typ seznamy) a případné budoucí smíšené
+    // zdroje — u těch se země pozná z metadat konkrétního kanálu.
+    const g = (ch.group || '').trim();
+    if(/^(cz|sk)\s*\|/i.test(g)) return true; // "CZ| ...", "SK| ..." (Kanály 3)
+    if(/^(Czech Republic|Slovakia)\b/i.test(g)) return true; // (Kanály 4)
+    const id = (ch.id || '').toLowerCase();
+    if(/\.(cz|sk)\d*(@|$)/.test(id)) return true; // tvg-id "...cz", "...sk"
+    return false;
+}
+
+// Finální klíč skupiny pro zobrazení — u žánrů mimo Sport/Hudba/Děti
+// rozdělí kanály na CZ/SK a "OST" (ostatní jazyky).
+function unifiedGenreDisplayKey(ch) {
+    const base = unifiedGenreKey(ch);
+    if(GENRE_LANG_EXEMPT.has(base)) return base;
+    return channelIsCzSk(ch) ? base : ('OST_' + base);
+}
+
 // Sjednotí kanály ze VŠECH zdrojů (hlavní seznam + všechny ALT_PLAYLISTS
 // položky) do jednoho pole — sdílí cache s Programem (_tvBuildAllChannelsForEpg),
 // takže se nic neparsuje zbytečně dvakrát.
@@ -32277,9 +32320,14 @@ function renderGenresGroupTabs() {
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
     const visible = genresState.channels.filter(ch => adultAllowed || !isAdultChannel(ch));
     const counts = {};
-    visible.forEach(ch => { const k = unifiedGenreKey(ch); counts[k] = (counts[k] || 0) + 1; });
-    const order = Object.keys(GENRE_LABELS).filter(k => counts[k]);
-    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${GENRE_LABELS[k]} (${counts[k]})` })));
+    visible.forEach(ch => { const k = unifiedGenreDisplayKey(ch); counts[k] = (counts[k] || 0) + 1; });
+    const order = [];
+    GENRE_ORDER.forEach(base => {
+        if(counts[base]) order.push(base);
+        const ostKey = 'OST_' + base;
+        if(!GENRE_LANG_EXEMPT.has(base) && counts[ostKey]) order.push(ostKey);
+    });
+    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${genreLabelFor(k)} (${counts[k]})` })));
     tabs.innerHTML = tvDdBuildHtml('tvGenresGroupDD', 'switchGenresGroup', opts, genresState.activeGroup);
 }
 
@@ -32305,7 +32353,7 @@ function renderGenresChannelList() {
     const searchText = genresState.searchText;
     let filtered = genresState.channels.filter(ch =>
         (adultAllowed || !isAdultChannel(ch)) &&
-        (searchText ? ch.name.toLowerCase().includes(searchText) : (genresState.activeGroup === 'all' || unifiedGenreKey(ch) === genresState.activeGroup))
+        (searchText ? ch.name.toLowerCase().includes(searchText) : (genresState.activeGroup === 'all' || unifiedGenreDisplayKey(ch) === genresState.activeGroup))
     );
     filtered = tvSortChannels(filtered);
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>'; return; }
@@ -32990,11 +33038,15 @@ async function loadEpgData() {
 // by jinak zbytečně brzdilo každé otevření záložky Program).
 function _tvBuildAllChannelsForEpg() {
     if (window._epgAllChannelsCache) return window._epgAllChannelsCache;
-    let result = Array.isArray(tvState.channels) ? tvState.channels.slice() : [];
+    // Označí kanály zdrojovým klíčem (_src) — používá se pro rozpoznání
+    // jazyka/země v žánrovém třídění ("Podle žánru").
+    const tagSrc = (list, src) => { (list || []).forEach(ch => { if (ch && ch._src === undefined) ch._src = src; }); return list; };
+    let result = Array.isArray(tvState.channels) ? tagSrc(tvState.channels, 'main').slice() : [];
     if (typeof ALT_PLAYLISTS === 'object') {
         Object.keys(ALT_PLAYLISTS).forEach(code => {
             try {
                 if (!altState.parsedCache[code]) altState.parsedCache[code] = parseM3U(ALT_PLAYLISTS[code].m3u);
+                tagSrc(altState.parsedCache[code], code);
                 result = result.concat(altState.parsedCache[code]);
             } catch(e) {}
         });
