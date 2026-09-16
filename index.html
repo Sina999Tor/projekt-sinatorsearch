@@ -17913,6 +17913,8 @@ function tvSetViewMode(mode) {
     if (typeof renderTvChannelList === 'function') renderTvChannelList();
     if (typeof renderAlt2ChannelList === 'function') renderAlt2ChannelList();
     if (typeof renderAlt3ChannelList === 'function') renderAlt3ChannelList();
+    if (typeof renderAlt4ChannelList === 'function') renderAlt4ChannelList();
+    if (typeof renderAlt5ChannelList === 'function') renderAlt5ChannelList();
     if (typeof altState !== 'undefined' && altState.filterText && typeof renderAltChannelListSearch === 'function') {
         renderAltChannelListSearch();
     } else if (typeof renderAltChannelList === 'function') {
@@ -31991,7 +31993,32 @@ window.playAlt3Channel = playAlt3Channel;
 
 // Kanály 5 — pátý (doplňkový) zdroj kanálů. Playlist neobsahuje group-title,
 // takže se nedělí do zemí jako Kanály 3/4 — je to jeden plochý seznam.
-const alt4State = { channels: [], searchText: '' };
+const alt4State = { channels: [], searchText: '', activeGroup: 'all' };
+
+// Playlist "Kanály 5" neobsahuje group-title, takže kanály třídíme do skupin
+// (Zprávy/Filmy/Obecné/Sport/Hudba/Děti/Duchovní/Dokumenty/Regionální/Ostatní)
+// podle názvu kanálu.
+const ALT4_GROUP_LABELS = {
+    NEWS: '📰 Zprávy', MOVIES: '🎬 Filmy', GENERAL: '📺 Obecné', SPORT: '⚽ Sport',
+    MUSIC: '🎵 Hudba', KIDS: '🧒 Děti', RELIGION: '⛪ Duchovní', DOC: '🎓 Dokumenty',
+    REGIONAL: '📍 Regionální', OTHER: '📋 Ostatní'
+};
+const ALT4_GROUP_RULES = [
+    [/cnn prima news|čt\s*24|ct\s*24/i, 'NEWS'],
+    [/^amc$|^axn\b|filmbox|barrandov|nova action|nova cinema|^white$/i, 'MOVIES'],
+    [/^čt\s*1$|^čt\s*2$|^nova$|nova fun|nova gold|nova lady|^prima$|prima cool|prima love|prima max|prima show|prima star|prima zoom|kanal\s*1|seznam tv/i, 'GENERAL'],
+    [/čt sport|golf channel|^sport\s*1$|^sport\s*2$|sporty tv/i, 'SPORT'],
+    [/óčko|musicbox|retro music|šlágr/i, 'MUSIC'],
+    [/disney channel|minimax|nicktoons|čt art/i, 'KIDS'],
+    [/noe tv/i, 'RELIGION'],
+    [/history channel|spektrum/i, 'DOC'],
+    [/home tv|jc1 tv|^jtv$|mňau tv|plzen\.tv|^polar(\s*2)?$|tv brno 1|^utv$|^vctv$|elektrika/i, 'REGIONAL'],
+];
+function alt4GroupKey(ch) {
+    const name = ch.name || '';
+    for (const rule of ALT4_GROUP_RULES) { if (rule[0].test(name)) return rule[1]; }
+    return 'OTHER';
+}
 
 function loadAlt4Channels() {
     if(!alt4State.channels.length) {
@@ -32007,11 +32034,18 @@ function renderAlt4GroupTabs() {
     if(!tabs) return;
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
     const visible = alt4State.channels.filter(ch => adultAllowed || !isAdultChannel(ch));
-    tabs.innerHTML = tvDdBuildHtml('tvAlt4GroupDD', 'switchAlt4Group', [{ value: 'all', label: `📋 Vše (${visible.length})` }], 'all');
+    const counts = {};
+    visible.forEach(ch => { const k = alt4GroupKey(ch); counts[k] = (counts[k] || 0) + 1; });
+    const order = Object.keys(ALT4_GROUP_LABELS).filter(k => counts[k]);
+    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${ALT4_GROUP_LABELS[k]} (${counts[k]})` })));
+    tabs.innerHTML = tvDdBuildHtml('tvAlt4GroupDD', 'switchAlt4Group', opts, alt4State.activeGroup);
 }
 
 function switchAlt4Group(id) {
-    // Jediná skupina ("Vše") — funkce existuje jen pro konzistenci s ostatními záložkami.
+    alt4State.activeGroup = id;
+    const si = document.getElementById('tvAlt4SearchInput');
+    if(si) { si.value = ''; alt4State.searchText = ''; }
+    renderAlt4GroupTabs();
     renderAlt4ChannelList();
 }
 window.switchAlt4Group = switchAlt4Group;
@@ -32029,7 +32063,7 @@ function renderAlt4ChannelList() {
     const searchText = alt4State.searchText;
     let filtered = alt4State.channels.filter(ch =>
         (adultAllowed || !isAdultChannel(ch)) &&
-        (!searchText || ch.name.toLowerCase().includes(searchText))
+        (searchText ? ch.name.toLowerCase().includes(searchText) : (alt4State.activeGroup === 'all' || alt4GroupKey(ch) === alt4State.activeGroup))
     );
     filtered = tvSortChannels(filtered);
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>'; return; }
@@ -32050,7 +32084,25 @@ function playAlt4Channel(idx) {
 }
 window.playAlt4Channel = playAlt4Channel;
 
-const alt5State = { channels: [], searchText: '' };
+const alt5State = { channels: [], searchText: '', activeGroup: 'all' };
+
+// Playlist "Kanály 6" obsahuje group-title (Sports/News/Movies/Kids/...) —
+// skupiny stavíme dynamicky podle toho, co se v datech reálně objeví.
+const ALT5_GROUP_LABELS = {
+    Sports: '⚽ Sport', News: '📰 Zprávy', Movies: '🎬 Filmy', Kids: '🧒 Děti',
+    Documentary: '🎓 Dokumenty', Entertainment: '🎭 Zábava', General: '📺 Obecné',
+    Comedy: '😂 Komedie', Religious: '⛪ Duchovní', Music: '🎵 Hudba',
+    Travel: '✈️ Cestování', Legislative: '🏛️ Legislativa', Culture: '🎨 Kultura',
+    Series: '📼 Seriály', Lifestyle: '🌿 Lifestyle', Undefined: '📋 Ostatní'
+};
+function alt5GroupKey(ch) {
+    const raw = (ch.group || '').split(';')[0].trim();
+    return raw || 'OTHER';
+}
+function alt5GroupLabel(key) {
+    if (key === 'OTHER') return '📋 Ostatní';
+    return ALT5_GROUP_LABELS[key] || ('📁 ' + key);
+}
 
 function loadAlt5Channels() {
     if(!alt5State.channels.length) {
@@ -32066,11 +32118,18 @@ function renderAlt5GroupTabs() {
     if(!tabs) return;
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
     const visible = alt5State.channels.filter(ch => adultAllowed || !isAdultChannel(ch));
-    tabs.innerHTML = tvDdBuildHtml('tvAlt5GroupDD', 'switchAlt5Group', [{ value: 'all', label: `📋 Vše (${visible.length})` }], 'all');
+    const counts = {};
+    visible.forEach(ch => { const k = alt5GroupKey(ch); counts[k] = (counts[k] || 0) + 1; });
+    const order = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${alt5GroupLabel(k)} (${counts[k]})` })));
+    tabs.innerHTML = tvDdBuildHtml('tvAlt5GroupDD', 'switchAlt5Group', opts, alt5State.activeGroup);
 }
 
 function switchAlt5Group(id) {
-    // Jediná skupina ("Vše") — funkce existuje jen pro konzistenci s ostatními záložkami.
+    alt5State.activeGroup = id;
+    const si = document.getElementById('tvAlt5SearchInput');
+    if(si) { si.value = ''; alt5State.searchText = ''; }
+    renderAlt5GroupTabs();
     renderAlt5ChannelList();
 }
 window.switchAlt5Group = switchAlt5Group;
@@ -32088,7 +32147,7 @@ function renderAlt5ChannelList() {
     const searchText = alt5State.searchText;
     let filtered = alt5State.channels.filter(ch =>
         (adultAllowed || !isAdultChannel(ch)) &&
-        (!searchText || ch.name.toLowerCase().includes(searchText))
+        (searchText ? ch.name.toLowerCase().includes(searchText) : (alt5State.activeGroup === 'all' || alt5GroupKey(ch) === alt5State.activeGroup))
     );
     filtered = tvSortChannels(filtered);
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>'; return; }
@@ -32765,6 +32824,28 @@ async function loadEpgData() {
     buildEpgView();
 }
 
+// Sjednotí kanály ze VŠECH zdrojů (hlavní seznam + všechny záložky Kanály
+// 2–6) do jednoho pole — Program tak zobrazuje program i pro kanály, které
+// uživatel v této relaci ještě neotevřel. Využívá stejnou parsedCache jako
+// findTvAltSources, takže se nic neparsuje zbytečně dvakrát. Výsledek se
+// spočítá jen jednou a uloží do cache (parsování ~2000 kanálů z Alternativy 3
+// by jinak zbytečně brzdilo každé otevření záložky Program).
+function _tvBuildAllChannelsForEpg() {
+    if (window._epgAllChannelsCache) return window._epgAllChannelsCache;
+    let result = Array.isArray(tvState.channels) ? tvState.channels.slice() : [];
+    if (typeof ALT_PLAYLISTS === 'object') {
+        Object.keys(ALT_PLAYLISTS).forEach(code => {
+            try {
+                if (!altState.parsedCache[code]) altState.parsedCache[code] = parseM3U(ALT_PLAYLISTS[code].m3u);
+                result = result.concat(altState.parsedCache[code]);
+            } catch(e) {}
+        });
+    }
+    window._epgAllChannelsCache = result;
+    return result;
+}
+window._tvBuildAllChannelsForEpg = _tvBuildAllChannelsForEpg;
+
 async function buildEpgView() {
     const selDate = tvState._epgSelectedDate || epgStartOfDay(new Date());
     const now = new Date();
@@ -32788,8 +32869,9 @@ async function buildEpgView() {
     // předtím, než se níže rozhoduje o kompaktním "Vše" okně vs. celém dni.
     restoreEpgFilterState();
 
-    // EPG záložka zobrazuje VŠECHNY kanály z playlistu (ne jen aktuální skupinu)
-    const filtered = tvState.channels || [];
+    // EPG záložka zobrazuje VŠECHNY kanály ze VŠECH zdrojů (Kanály 1–6), ne jen
+    // hlavní seznam a ne jen aktuální skupinu.
+    const filtered = _tvBuildAllChannelsForEpg();
 
     const fmt = t => t instanceof Date
         ? t.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'})
