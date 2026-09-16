@@ -32320,14 +32320,23 @@ function renderGenresGroupTabs() {
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
     const visible = genresState.channels.filter(ch => adultAllowed || !isAdultChannel(ch));
     const counts = {};
-    visible.forEach(ch => { const k = unifiedGenreDisplayKey(ch); counts[k] = (counts[k] || 0) + 1; });
+    let czskCount = 0, ostCount = 0;
+    visible.forEach(ch => {
+        const k = unifiedGenreDisplayKey(ch);
+        counts[k] = (counts[k] || 0) + 1;
+        if(channelIsCzSk(ch)) czskCount++; else ostCount++;
+    });
     const order = [];
     GENRE_ORDER.forEach(base => {
         if(counts[base]) order.push(base);
         const ostKey = 'OST_' + base;
         if(!GENRE_LANG_EXEMPT.has(base) && counts[ostKey]) order.push(ostKey);
     });
-    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${genreLabelFor(k)} (${counts[k]})` })));
+    const opts = [
+        { value: 'all', label: `📋 Vše (${visible.length})` },
+        { value: 'all_czsk', label: `🇨🇿🇸🇰 Vše CZ/SK (${czskCount})` },
+        { value: 'all_ost', label: `🌍 OST Vše (${ostCount})` }
+    ].concat(order.map(k => ({ value: k, label: `${genreLabelFor(k)} (${counts[k]})` })));
     tabs.innerHTML = tvDdBuildHtml('tvGenresGroupDD', 'switchGenresGroup', opts, genresState.activeGroup);
 }
 
@@ -32346,6 +32355,17 @@ function filterGenresChannels(text) {
 }
 window.filterGenresChannels = filterGenresChannels;
 
+// Rozhodne, jestli kanál patří do aktuálně vybrané položky dropdownu —
+// kromě jednotlivých žánrových skupin řeší i souhrnné volby "Vše CZ/SK"
+// (všechny CZ/SK kanály napříč žánry) a "OST Vše" (všechny cizojazyčné).
+function genresMatchesActiveGroup(ch) {
+    const g = genresState.activeGroup;
+    if(g === 'all') return true;
+    if(g === 'all_czsk') return channelIsCzSk(ch);
+    if(g === 'all_ost') return !channelIsCzSk(ch);
+    return unifiedGenreDisplayKey(ch) === g;
+}
+
 function renderGenresChannelList() {
     const listEl = document.getElementById('tvGenresList');
     if(!listEl) return;
@@ -32353,7 +32373,7 @@ function renderGenresChannelList() {
     const searchText = genresState.searchText;
     let filtered = genresState.channels.filter(ch =>
         (adultAllowed || !isAdultChannel(ch)) &&
-        (searchText ? ch.name.toLowerCase().includes(searchText) : (genresState.activeGroup === 'all' || unifiedGenreDisplayKey(ch) === genresState.activeGroup))
+        (searchText ? ch.name.toLowerCase().includes(searchText) : genresMatchesActiveGroup(ch))
     );
     filtered = tvSortChannels(filtered);
     if(!filtered.length) { listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>'; return; }
