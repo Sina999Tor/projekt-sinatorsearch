@@ -1473,6 +1473,22 @@
             <div class="settings-section" id="adminUsersNoLvl2Msg" style="display:none;font-size:0.78rem;color:#888;margin-top:8px;padding:10px;background:rgba(0,0,0,0.25);border-radius:8px;">
                 Přehled a správa uživatelů (zobrazení, úpravy, mazání) jsou dostupné jen pro Admin level 2.
             </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section" id="tvBrokenSettingsBox" style="display:none;background:rgba(229,9,20,0.06);border:1px solid rgba(229,9,20,0.2);border-radius:12px;padding:14px 16px;">
+                <span class="settings-label" style="color:#ff6b6b;">🚫 Značení nefunkčních TV streamů</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 10px;line-height:1.4;">
+                    Sdíleno pro všechny uživatele appky — co jeden Admin level 2 označí (nebo obnoví), uvidí a mají vyfiltrované i ostatní. Tímto přepínačem lze značení jako celek dočasně vypnout (tlačítko 🚫 pak zmizí i pro Admin level 2, dokud ho zase nezapneš).
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div onclick="toggleTvBrokenMarkingEnabled()" id="tvBrokenToggle" style="width:44px;height:24px;border-radius:12px;background:#333;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
+                        <div id="tvBrokenToggleKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;pointer-events:none;"></div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.88rem;color:#eee;font-weight:600;">Povolit označování kanálů jako nefunkčních</div>
+                        <div id="tvBrokenToggleLabel" style="font-size:0.72rem;color:#888;">—</div>
+                    </div>
+                </div>
+            </div>
             </div>
         </div>
     </div>
@@ -17852,28 +17868,53 @@ window.tvSortChannels = tvSortChannels;
 // s ostatními variantami (alternativy). Pokud skupina nemá logo vůbec,
 // nezobrazí se v hlavní mřížce, ale skryje se pod tlačítko "Další TV".
 // === Nefunkční streamy — jen Admin level 2 může označit/odznačit ==========
-// Uloženo lokálně (localStorage, klíč sinator_broken_tv), klíčováno stejným
-// normalizovaným názvem kanálu, jaký používá tvGroupChannels pro deduplikaci
-// (funguje tedy napříč VŠEMI zdroji — Kanály 1–6 i Podle žánru). Stav přežije
-// restart appky, dokud ho admin ručně neodznačí.
+// Sdíleno mezi VŠEMI uživateli přes Firebase Realtime Database (viz sync
+// blok u inicializace Firebase) — klíčováno stejným normalizovaným názvem
+// kanálu, jaký používá tvGroupChannels pro deduplikaci (funguje tedy napříč
+// VŠEMI zdroji — Kanály 1–6 i Podle žánru). Do příchodu dat z Firebase (nebo
+// offline) se používá lokální kopie (window._store, klíč sinator_broken_tv)
+// jako okamžitý fallback; jakmile Firebase odpoví, přepíše se sdíleným
+// stavem, takže ho vidí a mají vyfiltrovaný úplně všichni uživatelé stejně.
+// Značení lze navíc jako celek vypnout/zapnout přepínačem v Nastavení →
+// Admin (jen Admin level 2) — i tenhle přepínač je sdílený přes Firebase.
 function tvChannelKey(ch) {
     return (typeof _tvNormalizeName === 'function' ? _tvNormalizeName(ch.name) : tvSortKey(ch.name)) || ((ch && ch.name) || '').toLowerCase();
 }
 window.tvChannelKey = tvChannelKey;
 
+// In-memory cache — zdroj pravdy pro synchronní čtení (render funkce). Init
+// z lokální kopie hned při načtení skriptu, později přepsáno Firebase listenerem.
+if (typeof window._tvBrokenCache === 'undefined') {
+    window._tvBrokenCache = (function() {
+        try { return JSON.parse((window._store && window._store.getItem('sinator_broken_tv')) || '{}'); }
+        catch(e) { return {}; }
+    })();
+}
+if (typeof window._tvBrokenMarkingEnabled === 'undefined') {
+    window._tvBrokenMarkingEnabled = !(window._store && window._store.getItem('sinator_tv_broken_enabled') === '0');
+}
+
 function tvBrokenLoad() {
-    try { return JSON.parse((window._store && window._store.getItem('sinator_broken_tv')) || '{}'); }
-    catch(e) { return {}; }
+    return window._tvBrokenCache || {};
 }
 function tvBrokenSave(map) {
+    window._tvBrokenCache = map;
     try { window._store && window._store.setItem('sinator_broken_tv', JSON.stringify(map)); } catch(e) {}
+    // Promítni změnu i všem ostatním uživatelům přes Firebase (pokud je init hotová).
+    if (typeof window._fbSetBrokenTv === 'function') window._fbSetBrokenTv(map);
 }
+
+// Je značení jako celek povolené? (přepínatelné jen Admin level 2 v Nastavení)
+window._isTvBrokenMarkingEnabled = function() {
+    return window._tvBrokenMarkingEnabled !== false;
+};
 
 function tvMarkBroken(btnEl) {
     if (!(typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2())) return;
+    if (!window._isTvBrokenMarkingEnabled()) return;
     const key = btnEl.getAttribute('data-key');
     if (!key) return;
-    const map = tvBrokenLoad();
+    const map = Object.assign({}, tvBrokenLoad());
     map[key] = { name: btnEl.getAttribute('data-name') || '', ts: Date.now() };
     tvBrokenSave(map);
     tvRerenderAllChannelLists();
@@ -17884,16 +17925,18 @@ function tvUnmarkBroken(btnEl) {
     if (!(typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2())) return;
     const key = btnEl.getAttribute('data-key');
     if (!key) return;
-    const map = tvBrokenLoad();
+    const map = Object.assign({}, tvBrokenLoad());
     delete map[key];
     tvBrokenSave(map);
     tvRerenderAllChannelLists();
 }
 window.tvUnmarkBroken = tvUnmarkBroken;
 
-// Tlačítko 🚫 na dlaždici/řádku kanálu — vidí a používá jen Admin level 2.
+// Tlačítko 🚫 na dlaždici/řádku kanálu — vidí a používá jen Admin level 2,
+// a jen pokud značení není v Nastavení vypnuté.
 function tvBrokenMarkButtonHtml(entry) {
     if (!(typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2())) return '';
+    if (!window._isTvBrokenMarkingEnabled()) return '';
     const key = (entry._brokenKey || tvChannelKey(entry.ch) || '').replace(/"/g, '&quot;');
     const name = ((entry.ch && entry.ch.name) || '').replace(/"/g, '&quot;');
     return '<button class="tv-broken-btn" data-key="' + key + '" data-name="' + name + '" onclick="event.stopPropagation();tvMarkBroken(this)" title="Označit jako nefunkční">🚫</button>';
@@ -36720,6 +36763,42 @@ const rtdb = getDatabase(fbApp);
   });
 })();
 
+// ---- NEFUNKČNÍ TV STREAMY (sdíleno pro VŠECHNY uživatele) ----
+// Uloženo pod "presence/_broken_tv" a "presence/_settings/tvBrokenEnabled" —
+// stejná větev "presence" jako presence/admin-příkazy výše, protože jen ta
+// má v pravidlech Firebase povolený veřejný zápis/čtení na dálku (viz
+// poznámka u "_cmd_" u admin příkazů). Samostatná nová větev by narazila na
+// PERMISSION_DENIED, dokud by se ručně nepřidalo pravidlo v konzoli Firebase.
+(function initSharedTvBroken() {
+  const brokenRef = ref(rtdb, 'presence/_broken_tv');
+  const enabledRef = ref(rtdb, 'presence/_settings/tvBrokenEnabled');
+
+  // Zápis — volá tvBrokenSave() z TV sekce, kdykoliv Admin level 2 něco označí/odznačí.
+  window._fbSetBrokenTv = function(map) {
+    set(brokenRef, map || {}).catch(() => {});
+  };
+  // Zápis stavu přepínače "povoleno/zakázáno" — volá se z Nastavení → Admin.
+  window._fbSetTvBrokenEnabled = function(enabled) {
+    set(enabledRef, !!enabled).catch(() => {});
+  };
+
+  // Čtení v reálném čase — jakmile kdokoliv (jiný uživatel/admin) něco změní,
+  // promítne se to okamžitě do seznamů kanálů u všech ostatních.
+  onValue(brokenRef, (snap) => {
+    const map = snap.exists() ? (snap.val() || {}) : {};
+    window._tvBrokenCache = map;
+    try { window._store && window._store.setItem('sinator_broken_tv', JSON.stringify(map)); } catch(e) {}
+    if (typeof window.tvRerenderAllChannelLists === 'function') window.tvRerenderAllChannelLists();
+  });
+  onValue(enabledRef, (snap) => {
+    const enabled = snap.exists() ? (snap.val() !== false) : true;
+    window._tvBrokenMarkingEnabled = enabled;
+    try { window._store && window._store.setItem('sinator_tv_broken_enabled', enabled ? '1' : '0'); } catch(e) {}
+    if (typeof window._updateTvBrokenToggleUI === 'function') window._updateTvBrokenToggleUI();
+    if (typeof window.tvRerenderAllChannelLists === 'function') window.tvRerenderAllChannelLists();
+  });
+})();
+
 // ---- STATE ----
 let _dTab = 'movie';
 let _dActiveTag = null;
@@ -37100,7 +37179,35 @@ function updateAdminStatus() {
   if (usersBox) usersBox.style.display = isLvl2 ? 'block' : 'none';
   if (usersMsg) usersMsg.style.display = (active && !isLvl2) ? 'block' : 'none';
   if (isLvl2 && typeof attachAdminUsersListener === 'function') attachAdminUsersListener();
+  // Přepínač "Značení nefunkčních TV streamů" — vidí a mění jen Admin level 2
+  const tvBrokenBox = document.getElementById('tvBrokenSettingsBox');
+  if (tvBrokenBox) tvBrokenBox.style.display = isLvl2 ? 'block' : 'none';
+  if (isLvl2 && typeof window._updateTvBrokenToggleUI === 'function') window._updateTvBrokenToggleUI();
 }
+
+// ---- Přepínač "Povolit označování TV kanálů jako nefunkčních" (Admin level 2, sdíleno přes Firebase) ----
+window.toggleTvBrokenMarkingEnabled = function() {
+  if (!(typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2())) return;
+  const next = !(window._tvBrokenMarkingEnabled !== false);
+  window._tvBrokenMarkingEnabled = next;
+  try { window._store && window._store.setItem('sinator_tv_broken_enabled', next ? '1' : '0'); } catch(e) {}
+  if (typeof window._fbSetTvBrokenEnabled === 'function') window._fbSetTvBrokenEnabled(next);
+  window._updateTvBrokenToggleUI();
+  if (typeof window.tvRerenderAllChannelLists === 'function') window.tvRerenderAllChannelLists();
+};
+
+window._updateTvBrokenToggleUI = function() {
+  const toggle = document.getElementById('tvBrokenToggle');
+  const knob = document.getElementById('tvBrokenToggleKnob');
+  const lbl = document.getElementById('tvBrokenToggleLabel');
+  if (!toggle) return;
+  const enabled = window._tvBrokenMarkingEnabled !== false;
+  toggle.style.background = enabled ? '#1db954' : '#333';
+  if (knob) knob.style.left = enabled ? '22px' : '2px';
+  if (lbl) lbl.textContent = enabled
+    ? '✅ Zapnuto — Admin level 2 může kanály označovat tlačítkem 🚫'
+    : '⛔ Vypnuto — tlačítko 🚫 je teď skryté i pro Admin level 2';
+};
 
 // Init admin status on settings open
 const _origOpenSettings = window.openSettingsModal;
