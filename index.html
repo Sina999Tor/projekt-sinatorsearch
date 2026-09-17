@@ -3392,6 +3392,10 @@
         simkl: (()=>{ try { return JSON.parse(_store.getItem('sinator_simkl')||'{}'); } catch(e) { return {}; } })(),
         myBackend: (()=>{ try { return JSON.parse(_store.getItem('sinator_mybackend')||'{}'); } catch(e) { return {}; } })(),
         watched: (()=>{ try { const w=JSON.parse(_store.getItem('sinator_watched') || _WATCHED_DATA_SAVED || '{}'); return (w && !Array.isArray(w) && typeof w==='object') ? w : {}; } catch{ try { const w=JSON.parse(_WATCHED_DATA_SAVED||'{}'); return (w && !Array.isArray(w) && typeof w==='object') ? w : {}; } catch{ return {}; } } })(),
+        // Počet zhlédnutí u jednotlivých epizod (ep_<tvId>_<sezóna>_<epizoda> -> číslo).
+        // Na rozdíl od "watched" se při odškrtnutí NEMAŽE — pamatuje si tak i historii
+        // předchozích zhlédnutí, i když je epizoda teď zrovna odškrtnutá.
+        epWatchCounts: (()=>{ try { const w=JSON.parse(_store.getItem('sinator_ep_watch_counts')||'{}'); return (w && !Array.isArray(w) && typeof w==='object') ? w : {}; } catch(e) { return {}; } })(),
         collFavs: (()=>{ try { return JSON.parse(_store.getItem('sinator_coll_favs')||'[]'); } catch(e) { return []; } })(),
         traktLists: [], genres: [],
         searchOpen: false,
@@ -11905,6 +11909,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         return episodes.map(ep => {
             const epKey = `ep_${tvId}_${seasonNumber}_${ep.episode_number}`;
             const watched = !!state.watched[epKey];
+            const epWatchCount = state.epWatchCounts[epKey] || 0;
+            const epWatchCountLabel = (watched && epWatchCount > 0) ? ` (${epWatchCount}×)` : '';
             const epName = (ep.name || 'Neznámá epizoda').replace(/'/g, "\\'");
             return `
             <div class="episode-item" id="epItem_${epKey}" style="${watched?'border-left:3px solid #1db954;':''}">
@@ -11919,7 +11925,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                         </div>
                         <button onclick="toggleEpisodeWatched(${tvId}, ${seasonNumber}, ${ep.episode_number}, '${epName.replace(/'/g,'')}', this)" 
                             style="padding:4px 10px;border-radius:12px;border:1px solid ${watched?'#1db954':'var(--border)'};background:${watched?'rgba(29,185,84,0.2)':'var(--bg-elevated)'};color:${watched?'#1db954':'var(--text-muted)'};font-size:0.75rem;cursor:pointer;font-weight:600;">
-                            ${watched?'✅ Shlédnuto':'○ Označit'}
+                            ${watched?`✅ Shlédnuto${epWatchCountLabel}`:'○ Označit'}
                         </button>
                     </div>
                 </div>
@@ -11966,7 +11972,14 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const key = `ep_${tvId}_${seasonNumber}_${epNumber}`;
         const wasWatched = !!state.watched[key];
         if(wasWatched) { delete state.watched[key]; }
-        else { state.watched[key] = { id: key, type: 'episode', title: epName, year: '', posterPath: '', addedAt: Date.now(), tvId, seasonNumber, epNumber }; }
+        else {
+            state.watched[key] = { id: key, type: 'episode', title: epName, year: '', posterPath: '', addedAt: Date.now(), tvId, seasonNumber, epNumber };
+            // Počítadlo zhlédnutí téhle epizody — připočte se při každém novém
+            // označení "Shlédnuto" (přechod z neshlédnuté) a zůstává i po
+            // pozdějším odškrtnutí, ať appka pamatuje kolikrát jsi díl viděl.
+            state.epWatchCounts[key] = (state.epWatchCounts[key] || 0) + 1;
+            saveEpWatchCounts();
+        }
         saveWatched();
         syncEpisodeToTrakt(tvId, seasonNumber, epNumber, !wasWatched);
         if (typeof myBackendReady === 'function' && myBackendReady()) {
@@ -11984,7 +11997,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         }
         // Update button
         const isNowWatched = !wasWatched;
-        btn.textContent = isNowWatched ? '✅ Shlédnuto' : '○ Označit';
+        const epCount = state.epWatchCounts[key] || 0;
+        const epCountLabel = epCount > 0 ? ` (${epCount}×)` : '';
+        btn.textContent = isNowWatched ? `✅ Shlédnuto${epCountLabel}` : '○ Označit';
         btn.style.borderColor = isNowWatched ? '#1db954' : 'var(--border)';
         btn.style.background = isNowWatched ? 'rgba(29,185,84,0.2)' : 'var(--bg-elevated)';
         btn.style.color = isNowWatched ? '#1db954' : 'var(--text-muted)';
@@ -12036,12 +12051,16 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const seriesTitleJs = jsq(series.name || '');
             const seriesOrigNameJs = jsq(series.original_name || series.name || '');
             const czSeriesNameJs = jsq(czSeriesName || '');
+            const epDetailKey = `ep_${tvId}_${seasonNumber}_${episodeNumber}`;
+            const epDetailWatched = !!state.watched[epDetailKey];
+            const epDetailCount = state.epWatchCounts[epDetailKey] || 0;
+            const epDetailCountLabel = (epDetailWatched && epDetailCount > 0) ? ` (${epDetailCount}×)` : '';
             $('modalScrollBody').innerHTML = `${modalNav(safeSeriesTitle, hasBack)}
                 ${bg}
                 <div class="modal-body">
                     <h2 class="modal-title">${safeSeriesTitle}</h2>
                     <p style="color:var(--accent);font-size:1.1rem;margin-bottom:8px;">📺 S${seasonNumber}E${episodeNumber}: ${safeTitle}</p>
-                    <div class="modal-chips">${airDate ? `<div class="modal-chip"><b>📅 Premiéra:</b> <strong>${airDate}</strong></div>` : ''}${runtime ? `<div class="modal-chip"><b>⏱</b> ${runtime} min</div>` : ''}<div class="modal-chip"><b>★</b> ${rating}/10</div><button id="epWatchedBtn_${tvId}_${seasonNumber}_${episodeNumber}" class="modal-chip" style="cursor:pointer;border:1px solid ${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'#1db954':'var(--border)'};background:${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'rgba(29,185,84,0.15)':'transparent'};color:${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'#1db954':'var(--text-muted)'};font-weight:600;" onclick="window.toggleEpWatchedInModal(${tvId},${seasonNumber},${episodeNumber},'${titleJs}',this)">${state.watched[`ep_${tvId}_${seasonNumber}_${episodeNumber}`]?'✅ Shlédnuto':'☐ Shlédnuto'}</button></div>
+                    <div class="modal-chips">${airDate ? `<div class="modal-chip"><b>📅 Premiéra:</b> <strong>${airDate}</strong></div>` : ''}${runtime ? `<div class="modal-chip"><b>⏱</b> ${runtime} min</div>` : ''}<div class="modal-chip"><b>★</b> ${rating}/10</div><button id="epWatchedBtn_${tvId}_${seasonNumber}_${episodeNumber}" class="modal-chip" style="cursor:pointer;border:1px solid ${epDetailWatched?'#1db954':'var(--border)'};background:${epDetailWatched?'rgba(29,185,84,0.15)':'transparent'};color:${epDetailWatched?'#1db954':'var(--text-muted)'};font-weight:600;" onclick="window.toggleEpWatchedInModal(${tvId},${seasonNumber},${episodeNumber},'${titleJs}',this)">${epDetailWatched?`✅ Shlédnuto${epDetailCountLabel}`:'☐ Shlédnuto'}</button></div>
                     <p class="modal-overview">${ep.overview || 'Popis není dostupný.'}</p>
                     <div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/tv/${tvId}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_ep_${tvId}" style="cursor:pointer;" title="Načítám..."><span class="rating-value" id="csfdRatingVal_ep_${tvId}">…</span><span class="rating-source">Trakt</span></div></div>
                     ${(typeof getEnabledExternalPlayApps === 'function' && getEnabledExternalPlayApps().length) ? `<button class="action-btn-modal" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#c4b5fd;font-size:1em;font-weight:700;padding:14px;width:100%;margin:0 0 14px;display:block;" onclick="window.playInExternalApp('${seriesTitleJs} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}')">📱 Přehrát v externí aplikaci</button>` : ''}
@@ -14231,6 +14250,13 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         updateWatchedCount();
     }
 
+    // Uloží persistentní počítadlo zhlédnutí epizod (state.epWatchCounts) —
+    // samostatně od "watched", protože se nemaže při odškrtnutí (viz komentář u state.epWatchCounts výš).
+    function saveEpWatchCounts() {
+        try { _store.setItem('sinator_ep_watch_counts', JSON.stringify(state.epWatchCounts)); } catch(e) {}
+    }
+    window.saveEpWatchCounts = saveEpWatchCounts;
+
     function updateWatchedCount() {
         const count = Object.keys(state.watched).length;
         const badge = $('watchedBadgeCount');
@@ -14262,7 +14288,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                         if(!isAired) fullyAired = false;
                         if(willMark) {
                             if(isAired) {
+                                const wasEpWatched = !!state.watched[epKey];
                                 state.watched[epKey] = { id: epKey, type: 'episode', title: `${title} S${season.season_number}E${ep.episode_number}`, year: year||'', posterPath: '', addedAt: Date.now(), tvId: id, seasonNumber: season.season_number, epNumber: ep.episode_number };
+                                // Stejná logika počítadla jako u ručního odškrtávání jednotlivých
+                                // epizod — připočte se jen při přechodu z neshlédnuté.
+                                if (!wasEpWatched) state.epWatchCounts[epKey] = (state.epWatchCounts[epKey] || 0) + 1;
                                 airedNums.push(ep.episode_number);
                             } else {
                                 delete state.watched[epKey];
@@ -14289,8 +14319,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             delete state.watched[key];
         }
         saveWatched();
-
-        const nowFullyWatched = !!state.watched[key];
+        saveEpWatchCounts();
         if(btnEl) {
             btnEl.className = 'action-btn-modal watched-btn' + (nowFullyWatched ? ' is-watched' : '');
             btnEl.textContent = nowFullyWatched ? '✅ Shlédnuto' : '☐ Shlédnuto';
@@ -16053,7 +16082,9 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         // Sync styl chipu
         const key = `ep_${tvId}_${season}_${ep}`;
         const isNow = !!state.watched[key];
-        btn.textContent = isNow ? '✅ Shlédnuto' : '☐ Shlédnuto';
+        const cnt = state.epWatchCounts[key] || 0;
+        const cntLabel = (isNow && cnt > 0) ? ` (${cnt}×)` : '';
+        btn.textContent = isNow ? `✅ Shlédnuto${cntLabel}` : '☐ Shlédnuto';
         btn.style.borderColor = isNow ? '#1db954' : 'var(--border)';
         btn.style.background = isNow ? 'rgba(29,185,84,0.15)' : 'transparent';
         btn.style.color = isNow ? '#1db954' : 'var(--text-muted)';
