@@ -11909,7 +11909,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         return episodes.map(ep => {
             const epKey = `ep_${tvId}_${seasonNumber}_${ep.episode_number}`;
             const watched = !!state.watched[epKey];
-            const epWatchCount = state.epWatchCounts[epKey] || 0;
+            const epWatchCount = getEpWatchCount(epKey);
             const epWatchCountLabel = (watched && epWatchCount > 0) ? ` (${epWatchCount}×)` : '';
             const epName = (ep.name || 'Neznámá epizoda').replace(/'/g, "\\'");
             return `
@@ -11997,7 +11997,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         }
         // Update button
         const isNowWatched = !wasWatched;
-        const epCount = state.epWatchCounts[key] || 0;
+        const epCount = getEpWatchCount(key);
         const epCountLabel = epCount > 0 ? ` (${epCount}×)` : '';
         btn.textContent = isNowWatched ? `✅ Shlédnuto${epCountLabel}` : '○ Označit';
         btn.style.borderColor = isNowWatched ? '#1db954' : 'var(--border)';
@@ -12053,7 +12053,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const czSeriesNameJs = jsq(czSeriesName || '');
             const epDetailKey = `ep_${tvId}_${seasonNumber}_${episodeNumber}`;
             const epDetailWatched = !!state.watched[epDetailKey];
-            const epDetailCount = state.epWatchCounts[epDetailKey] || 0;
+            const epDetailCount = getEpWatchCount(epDetailKey);
             const epDetailCountLabel = (epDetailWatched && epDetailCount > 0) ? ` (${epDetailCount}×)` : '';
             $('modalScrollBody').innerHTML = `${modalNav(safeSeriesTitle, hasBack)}
                 ${bg}
@@ -14257,6 +14257,23 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     }
     window.saveEpWatchCounts = saveEpWatchCounts;
 
+    // Vrátí počet zhlédnutí dané epizody pro zobrazení. Epizody označené
+    // "Shlédnuto" ještě PŘED zavedením počítadla v appce nemají v
+    // state.epWatchCounts žádný záznam (0) — dopočítáme jim tedy při prvním
+    // vykreslení aspoň 1 (musely být viděné alespoň jednou, jinak by nebyly
+    // označené) a rovnou to i uložíme, ať se to příště nemusí dopočítávat znovu.
+    function getEpWatchCount(epKey) {
+        const watched = !!state.watched[epKey];
+        let cnt = state.epWatchCounts[epKey] || 0;
+        if (watched && cnt === 0) {
+            cnt = 1;
+            state.epWatchCounts[epKey] = 1;
+            saveEpWatchCounts();
+        }
+        return cnt;
+    }
+    window.getEpWatchCount = getEpWatchCount;
+
     function updateWatchedCount() {
         const count = Object.keys(state.watched).length;
         const badge = $('watchedBadgeCount');
@@ -16082,7 +16099,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         // Sync styl chipu
         const key = `ep_${tvId}_${season}_${ep}`;
         const isNow = !!state.watched[key];
-        const cnt = state.epWatchCounts[key] || 0;
+        const cnt = getEpWatchCount(key);
         const cntLabel = (isNow && cnt > 0) ? ` (${cnt}×)` : '';
         btn.textContent = isNow ? `✅ Shlédnuto${cntLabel}` : '☐ Shlédnuto';
         btn.style.borderColor = isNow ? '#1db954' : 'var(--border)';
