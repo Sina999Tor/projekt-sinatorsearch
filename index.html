@@ -5643,6 +5643,57 @@
         if(m) m.style.display = 'none';
     }
     window.closeZabavaPrehledyModal = closeZabavaPrehledyModal;
+    // 📱 Zábava → Externí aplikace: appky zapnuté v Nastavení → Ostatní, jen pro
+    // rychlé spuštění (bez konkrétního titulu/vyhledávání jako u "Přehrát v
+    // externí aplikaci" u detailu filmu/seriálu).
+    function openZabavaExternalAppsModal() {
+        renderZabavaExternalAppsList();
+        const m = $('zabavaExternalAppsModal');
+        if(m) m.style.display = 'flex';
+    }
+    window.openZabavaExternalAppsModal = openZabavaExternalAppsModal;
+    function closeZabavaExternalAppsModal() {
+        const m = $('zabavaExternalAppsModal');
+        if(m) m.style.display = 'none';
+    }
+    window.closeZabavaExternalAppsModal = closeZabavaExternalAppsModal;
+    // Vrátí URL jen pro OTEVŘENÍ appky, bez konkrétního vyhledávání/titulu.
+    // Šablony s {query}/{title} (Stremio, Streamlet…) ořízne na holý kořen
+    // schématu (např. "stremio:///search?search={query}" → "stremio://"),
+    // což appku spolehlivě otevře. Šablony bez placeholderu (např. Nuviin
+    // intent:// odkaz) appku otevírají samy o sobě, použijí se beze změny.
+    function getAppOpenOnlyUrl(app) {
+        if (!app.urlTemplate) return null;
+        if (!/\{query\}|\{title\}/.test(app.urlTemplate)) return app.urlTemplate;
+        const m = app.urlTemplate.match(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)/);
+        return m ? m[1] : app.urlTemplate;
+    }
+    window.getAppOpenOnlyUrl = getAppOpenOnlyUrl;
+    function renderZabavaExternalAppsList() {
+        const box = $('zabavaExternalAppsList');
+        if (!box) return;
+        const apps = (typeof getEnabledExternalPlayApps === 'function') ? getEnabledExternalPlayApps() : [];
+        if (!apps.length) {
+            box.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.88rem;">Žádná aplikace není zapnutá.<br>Zapni si appku v <b>Nastavení → Ostatní → Přehrávání v externí aplikaci</b>.</div>`;
+            return;
+        }
+        box.innerHTML = apps.map(app => `
+            <button onclick="window.launchAppOpenOnly('${app.id}')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+                <span style="font-size:1.6rem;">${app.emoji || '📱'}</span>
+                <div><div style="font-weight:700;color:#8b5cf6;">${_copyTitleEsc(app.name)}</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Spustit aplikaci</div></div>
+            </button>
+        `).join('');
+    }
+    window.renderZabavaExternalAppsList = renderZabavaExternalAppsList;
+    window.launchAppOpenOnly = function(id) {
+        const apps = (typeof getExternalPlayApps === 'function') ? getExternalPlayApps() : [];
+        const app = apps.find(a => a.id === id);
+        if (!app) return;
+        const url = getAppOpenOnlyUrl(app);
+        if (!url) { try { showToast(`${app.name}: appku najdi a spusť v telefonu ručně.`); } catch(e) {} return; }
+        try { if (navigator.vibrate) navigator.vibrate(12); } catch(e) {}
+        window.location.href = url;
+    };
     window._returnToZabava = function() {
         const m = $('zabavaModal');
         if(m) m.style.display = 'flex';
@@ -16991,6 +17042,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             <span style="font-size:1.6rem;">🏆</span>
             <div><div style="font-weight:700;color:#22c55e;">Přehledy a statistiky</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Žebříčky, tvá knihovna, dnešní výročí</div></div>
         </button>
+        <button onclick="pushModalAndOpen('zabavaModal', openZabavaModal, openZabavaExternalAppsModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📱</span>
+            <div><div style="font-weight:700;color:#8b5cf6;">Externí aplikace</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Rychlé spuštění Stremio, Nuvio a dalších</div></div>
+        </button>
         <button onclick="closeZabavaModal();openWebsitesModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🌐</span>
             <div><div style="color:#00b4d8;font-weight:700;">Weby</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmové magazíny, recenze, tipy</div></div>
@@ -17072,6 +17127,19 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             <span style="font-size:1.6rem;">🗓️</span>
             <div><div style="font-weight:700;color:#63cab7;">Tento den v historii</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co vyšlo přesně dnes před lety</div></div>
         </button>
+    </div>
+</div>
+
+<!-- 📱 ZÁBAVA: EXTERNÍ APLIKACE (rychlé spuštění appek zapnutých v Nastavení → Ostatní) -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4200;flex-direction:column;overflow:hidden;" id="zabavaExternalAppsModal" onclick="if(event.target===this)closeZabavaExternalAppsModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <button onclick="closeZabavaExternalAppsModal();openZabavaModal()" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;">← Zpět</button>
+        <h3 style="flex:1;font-family:'Playfair Display',serif;font-size:1.05rem;color:#fff;">📱 Externí aplikace</h3>
+        <button onclick="closeZabavaExternalAppsModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
+        <p style="color:var(--text-muted);font-size:0.82rem;margin:0 0 4px;">Appky zapnuté v Nastavení → Ostatní → Přehrávání v externí aplikaci. Tady se jen spustí, bez konkrétního vyhledávání.</p>
+        <div id="zabavaExternalAppsList" style="display:flex;flex-direction:column;gap:10px;"></div>
     </div>
 </div>
 
