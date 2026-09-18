@@ -11002,6 +11002,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             // později doběhlý fetch mohl přepsat čerstvě smazaný stav zpátky.
             if (_loadSeq !== window._myBackendLoadSeq) return;
             window._myBackendCurrentItems = items;
+            window._myBackendCurrentItemsTab = tab;
             window._myBackendCurrentEmptyMsg = emptyMsg;
             window._myBackendCurrentLetterFilter = '';
             const sortBar = $('myBackendSortBarWrap');
@@ -11109,8 +11110,12 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
 
         // Pokud se vracíme na tab, který už máme jednou načtený (a nejde o
         // vynucený refresh), jen ho znovu vykreslíme z cache - bez fetch
-        // a bez "Načítám…" blikání.
-        if (!forceRefresh && window._myBackendActiveTab === tab && window._myBackendCurrentItems) {
+        // a bez "Načítám…" blikání. Porovnává se proti _myBackendCurrentItemsTab
+        // (tab, pro který byla data OPRAVDU načtena), ne proti _myBackendActiveTab
+        // — to se totiž někdy nastavuje dopředu ještě před samotným vykreslením
+        // (např. prokliky ze statistik) a dřív tak tahle podmínka mylně vyhodnotila
+        // starý obsah z jiného tabu jako "už načtený" pro ten nový.
+        if (!forceRefresh && window._myBackendCurrentItemsTab === tab && window._myBackendCurrentItems) {
             document.querySelectorAll('#myBackendListTabs button.ts-list-tab-btn').forEach(b => {
                 const active = b.dataset.tab === tab;
                 b.style.background = active ? 'rgba(96,144,255,0.2)' : 'var(--bg-elevated)';
@@ -15279,6 +15284,151 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     window.openRatedMoviesMenu = openRatedMoviesMenu;
     window.openRatedMoviesByRange = openRatedMoviesByRange;
 
+    // ══ HODNOCENÉ SERIÁLY (podle vlastního hodnocení 1–10) ═════════════════
+    // Zrcadlí logiku "Hodnocené filmy" výše, jen pro seriály (TMDB /tv).
+    async function getMyShowRatings() {
+        if (typeof myBackendReady === 'function' && myBackendReady()) {
+            try {
+                const list = await myRatingsGet('shows');
+                return (list || []).map(r => ({ tmdbId: r.id, rating: Number(r.rating), ratedAt: (typeof r.rated_at === 'number' ? r.rated_at : (r.rated_at ? Date.parse(r.rated_at) : 0)) || 0 })).filter(r => r.tmdbId && r.rating);
+            } catch (e) { console.warn('Sinator ratings load error:', e); }
+        }
+        if (state.trakt && state.trakt.accessToken) {
+            try {
+                await ensureTraktToken();
+                const res = await fetchWithRetry(`${TRAKT_BASE}/sync/ratings/shows`, { headers: getTraktHeaders() });
+                if (res.ok) {
+                    const items = await res.json();
+                    return (items || []).map(it => ({ tmdbId: it.show?.ids?.tmdb, rating: Number(it.rating), ratedAt: it.rated_at ? (Date.parse(it.rated_at) || 0) : 0 })).filter(r => r.tmdbId && r.rating);
+                }
+            } catch (e) { console.warn('Trakt ratings load error:', e); }
+        }
+        return null;
+    }
+
+    function openRatedShowsMenu() {
+        const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
+        if (nav && left && right) {
+            left.innerHTML = `<span class="modal-nav-title" style="background:none;-webkit-text-fill-color:#ffcc33;color:#ffcc33;">⭐ Hodnocené seriály</span>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openListsModal();" title="Zpět na Seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            nav.style.display = 'flex';
+        }
+        $('modal')?.classList.add('open');
+        $('modalScrollBody').innerHTML = `<div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+            <p style="color:var(--text-muted);font-size:0.85rem;margin:0 0 4px;">Seriály roztříděné podle tvého vlastního hodnocení.</p>
+            <button onclick="openRatedShowsByRange(8,10,'👍 Pozitivní (8–10)')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+                <span style="font-size:1.6rem;">👍</span>
+                <div><div style="color:#1db954;font-weight:700;">Pozitivní</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Hodnocení 8–10</div></div>
+            </button>
+            <button onclick="openRatedShowsByRange(4,7,'😐 Průměr (4–7)')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+                <span style="font-size:1.6rem;">😐</span>
+                <div><div style="color:#f5a623;font-weight:700;">Průměr</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Hodnocení 4–7</div></div>
+            </button>
+            <button onclick="openRatedShowsByRange(1,3,'🗑️ Odpad (1–3)')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+                <span style="font-size:1.6rem;">🗑️</span>
+                <div><div style="color:#e74c3c;font-weight:700;">Odpad</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Hodnocení 1–3</div></div>
+            </button>
+        </div>`;
+    }
+
+    async function openRatedShowsByRange(min, max, label) {
+        const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
+        if (nav && left && right) {
+            left.innerHTML = `<span class="modal-nav-title" style="background:none;-webkit-text-fill-color:#ffcc33;color:#ffcc33;">⭐ ${label}</span>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openRatedShowsMenu();" title="Zpět" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Hodnocené seriály</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            nav.style.display = 'flex';
+        }
+        $('modal')?.classList.add('open');
+        $('modalScrollBody').innerHTML = `<div class="loading"><div class="spinner"></div>Načítám hodnocení…</div>`;
+        const ratings = await getMyShowRatings();
+        if (ratings === null) {
+            $('modalScrollBody').innerHTML = `<div class="empty" style="padding:30px;text-align:center;">Nejsou nastavená žádná hodnocení seriálů — pro tuhle funkci potřebuješ mít připojený vlastní Sinator backend, nebo Trakt.</div>`;
+            return;
+        }
+        const filtered = ratings.filter(r => r.rating >= min && r.rating <= max);
+        if (!filtered.length) {
+            $('modalScrollBody').innerHTML = `<div class="empty" style="padding:30px;text-align:center;">Žádné seriály s hodnocením ${min}–${max}.</div>`;
+            return;
+        }
+        const mapped = filtered.map(r => ({ id: r.tmdbId, title: '', year: '', poster_path: null, vote_average: 0, userRating: r.rating, ratedAt: r.ratedAt || 0 }));
+        window._ratedShowsAllItems = mapped;
+        window._ratedShowsLabel = label;
+        window._ratedShowsSortMode = 'rating_desc';
+        window._ratedShowsLetter = '';
+        $('modalScrollBody').innerHTML = `
+            <div id="ratedShowsSortBarWrap" style="padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg-card);display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="ratedShowsSortSelect" onchange="applyRatedShowsSort(this.value)" style="background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px;font-size:0.8rem;">
+                    <option value="rating_desc">Hodnocení (nejvyšší)</option>
+                    <option value="rating_asc">Hodnocení (nejnižší)</option>
+                    <option value="date_desc">Dle data hodnocení (nejnovější)</option>
+                    <option value="date_asc">Dle data hodnocení (nejstarší)</option>
+                    <option value="alpha_asc">Abecedně A-Z</option>
+                    <option value="alpha_desc">Abecedně Z-A</option>
+                    <option value="year_desc">Rok (nejnovější)</option>
+                    <option value="year_asc">Rok (nejstarší)</option>
+                </select>
+                <input type="text" id="ratedShowsLetterFilter" placeholder="Hledat podle počátečního písmene (např. D)" oninput="applyRatedShowsLetterFilter(this.value)" style="flex:1;min-width:180px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:0.8rem;">
+            </div>
+            <div id="ratedShowsResultsContainer"></div>`;
+        const gen = (window._ratedShowsGen = (window._ratedShowsGen || 0) + 1);
+        renderRatedShowsGrid(getRatedShowsSortedFiltered(), label);
+        const batchSize = 10;
+        for (let i = 0; i < mapped.length; i += batchSize) {
+            if (window._ratedShowsGen !== gen) return;
+            await Promise.all(mapped.slice(i, i + batchSize).map(async item => {
+                try {
+                    const d = await (await fetch(`${BASE}/tv/${item.id}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
+                    item.poster_path = d.poster_path || null;
+                    item.vote_average = d.vote_average || 0;
+                    item.year = (d.first_air_date || '').slice(0, 4);
+                    const csTitle = d.name || '';
+                    if (csTitle) item.title = csTitle;
+                } catch (e) {}
+            }));
+            if (window._ratedShowsGen !== gen) return;
+            renderRatedShowsGrid(getRatedShowsSortedFiltered(), label);
+        }
+    }
+    window.openRatedShowsMenu = openRatedShowsMenu;
+    window.openRatedShowsByRange = openRatedShowsByRange;
+
+    function getRatedShowsSortedFiltered() {
+        let items = (window._ratedShowsAllItems || []).slice();
+        const letter = (window._ratedShowsLetter || '').trim().toLocaleLowerCase('cs-CZ');
+        if (letter) items = items.filter(it => (it.title || '').trim().toLocaleLowerCase('cs-CZ').startsWith(letter));
+        const mode = window._ratedShowsSortMode || 'rating_desc';
+        if (mode === 'rating_desc') items.sort((a, b) => b.userRating - a.userRating);
+        else if (mode === 'rating_asc') items.sort((a, b) => a.userRating - b.userRating);
+        else if (mode === 'date_desc') items.sort((a, b) => (b.ratedAt || 0) - (a.ratedAt || 0));
+        else if (mode === 'date_asc') items.sort((a, b) => (a.ratedAt || 0) - (b.ratedAt || 0));
+        else if (mode === 'alpha_asc') items.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'cs'));
+        else if (mode === 'alpha_desc') items.sort((a, b) => (b.title || '').localeCompare(a.title || '', 'cs'));
+        else if (mode === 'year_desc') items.sort((a, b) => (Number(b.year) || 0) - (Number(a.year) || 0));
+        else if (mode === 'year_asc') items.sort((a, b) => (Number(a.year) || 0) - (Number(b.year) || 0));
+        return items;
+    }
+    window.applyRatedShowsSort = function(mode) {
+        window._ratedShowsSortMode = mode;
+        renderRatedShowsGrid(getRatedShowsSortedFiltered(), window._ratedShowsLabel);
+    };
+    window.applyRatedShowsLetterFilter = function(val) {
+        window._ratedShowsLetter = val;
+        renderRatedShowsGrid(getRatedShowsSortedFiltered(), window._ratedShowsLabel);
+    };
+
+    function renderRatedShowsGrid(items, label) {
+        const c = $('ratedShowsResultsContainer');
+        if (!c) return;
+        const count = `<div style="padding:14px 16px 6px;font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;background:linear-gradient(135deg,#fff,var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">${items.length} položek</div>`;
+        const grid = `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;padding:0 0 16px;">${items.map(it => {
+            const img = it.poster_path ? `<img class="card-image" src="${IMG}w500${it.poster_path}" loading="lazy">` : `<div class="card-placeholder">📺</div>`;
+            const liked = state.favs.some(f => Number(f.id) === Number(it.id) && f.type === 'tv');
+            const watched = isWatched(it.id, 'tv');
+            return `<div class="card${watched?' is-watched':''}" onclick="closeModal();openDetail(${it.id},'tv')">${img}<button class="card-fav ${liked?'liked':''}" onclick="event.stopPropagation();window.toggleFav(${it.id},'${jsq(it.title||'')}','${it.year||''}',${it.vote_average||0},'tv','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${it.title || ('#' + it.id)}</div><div class="card-meta"><span>${it.year || '—'}</span><span class="card-rating">★ ${it.vote_average ? it.vote_average.toFixed(1) : '—'}</span><span class="card-rating" style="color:#ffcc33;">👤 ${it.userRating}/10</span></div></div></div>`;
+        }).join('')}</div>`;
+        c.innerHTML = count + grid;
+    }
+
     // Vrátí aktuální sadu (window._ratedMoviesAllItems) přefiltrovanou podle
     // počátečního písmene a seřazenou podle zvoleného režimu — bez nutnosti
     // znovu cokoliv stahovat.
@@ -16622,6 +16772,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <button onclick="closeListsModal();openRatedMoviesMenu()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">⭐</span>
             <div><div style="color:#ffcc33;font-weight:700;">Hodnocené filmy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Podle tvého hodnocení: pozitivní / průměr / odpad</div></div>
+        </button>
+        <button onclick="closeListsModal();openRatedShowsMenu()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">⭐</span>
+            <div><div style="color:#ffcc33;font-weight:700;">Hodnocené seriály</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Podle tvého hodnocení: pozitivní / průměr / odpad</div></div>
         </button>
         <button onclick="closeListsModal();openThematicListsModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🧵</span>
@@ -38877,14 +39031,12 @@ function renderMyStats() {
   const openWatchedMovies = `closeMyStatsModal();setTimeout(()=>window._openWatchedModalTab&&window._openWatchedModalTab('movie'),80)`;
   const openWatchedTv = `closeMyStatsModal();setTimeout(()=>window._openWatchedModalTab&&window._openWatchedModalTab('tv'),80)`;
   const _sinatorReady = typeof window.myBackendReady === 'function' && window.myBackendReady();
-  // Otevře přímo danou záložku ve statistikách — pokud je propojen Sinator backend,
-  // vždy z něj (protože statistiky teď z něj i počítají), jinak fallback na Trakt/Simkl modal.
-  const openRatedMovies = _sinatorReady
-    ? `closeMyStatsModal();setTimeout(()=>{window._myBackendActiveTab='ratings-movies';window.openTraktModal&&window.openTraktModal('own');},80)`
-    : `closeMyStatsModal();setTimeout(()=>window.openTraktRatingsList&&window.openTraktRatingsList('movies'),80)`;
-  const openRatedShows = _sinatorReady
-    ? `closeMyStatsModal();setTimeout(()=>{window._myBackendActiveTab='ratings-shows';window.openTraktModal&&window.openTraktModal('own');},80)`
-    : `closeMyStatsModal();setTimeout(()=>window.openTraktRatingsList&&window.openTraktRatingsList('shows'),80)`;
+  // Prokliknutí ze statistik jde rovnou na "Hodnocené filmy" / "Hodnocené seriály"
+  // roztříděné podle vlastního hodnocení (pozitivní/průměr/odpad) — stejná
+  // obrazovka jako v menu Seznamy, ne přes záložky Trakt/Sinator modalu
+  // (ty se dřív při návratu na stejný tab uměly zaseknout na starém obsahu z cache).
+  const openRatedMovies = `closeMyStatsModal();setTimeout(()=>window.openRatedMoviesMenu&&window.openRatedMoviesMenu(),80)`;
+  const openRatedShows = `closeMyStatsModal();setTimeout(()=>window.openRatedShowsMenu&&window.openRatedShowsMenu(),80)`;
   const openHistMovies = _sinatorReady
     ? `closeMyStatsModal();setTimeout(()=>{window._myBackendActiveTab='history-movies';window.openTraktModal&&window.openTraktModal('own');},80)`
     : `closeMyStatsModal();setTimeout(()=>window.openTraktHistoryList&&window.openTraktHistoryList('movies'),80)`;
