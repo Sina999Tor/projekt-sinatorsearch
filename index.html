@@ -3469,6 +3469,10 @@
     const DEFAULT_EXTERNAL_PLAY_APPS = [
         { id:'stremio',   name:'Stremio',   emoji:'🟣', urlTemplate:'stremio:///search?search={query}', enabled:false, builtin:true },
         { id:'nuvio',     name:'Nuvio',     emoji:'🎬', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.nuvio.app;end', enabled:false, builtin:true },
+        // Nuvio Enhanced (komunitní fork, https://github.com/NuvioMedia/NuvioMobile a jeho enhanced větve) se na
+        // Androidu instaluje se STEJNÝM package názvem com.nuvio.app jako oficiální Nuvio (nejdou mít nainstalované
+        // obě zároveň) — proto stejný intent odkaz, jen samostatná položka pro ty, co mají místo oficiální appky Enhanced.
+        { id:'nuvio_enhanced', name:'Nuvio Enhanced', emoji:'🎞️', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2FNuvioMedia%2FNuvioMobile-Enhanced%2Freleases;end', enabled:false, builtin:true },
         { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, builtin:true }
     ];
     // Migrace: pokud má uživatel uložené staré (nefunkční) odhady odkazů
