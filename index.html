@@ -1860,7 +1860,7 @@
     // Cílený dotaz na konkrétní film/seriál — mnohem rychlejší než stahovat celou historii
     // a filtrovat na klientovi (u velké historie by to jinak trvalo velmi dlouho).
     const myHistoryGetForId = (type, id) => myApi(`/history?type=${type}&id=${encodeURIComponent(id)}`);
-    const myHistoryAdd = (id, type, season, episode) => myApi('/history', { method: 'POST', body: JSON.stringify({ id, type, season, episode }) });
+    const myHistoryAdd = (id, type, season, episode, watched_at) => myApi('/history', { method: 'POST', body: JSON.stringify({ id, type, season, episode, ...(watched_at != null ? { watched_at } : {}) }) });
     const myHistoryRemove = (id, type, season, episode) => myApi('/history', { method: 'DELETE', body: JSON.stringify({ id, type, season, episode }) });
     // Smaže jen JEDEN konkrétní záznam v historii (podle přesného watched_at),
     // ne všechny watch-eventy daného id — používá se u mazání jednotlivých
@@ -14534,7 +14534,28 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             if (!isComplete) return;
             const existing = await myHistoryGetForId('shows', tvId).catch(() => []);
             if (Array.isArray(existing) && existing.length > 0) return; // už tam je, nic nedělat
-            await myHistoryAdd(tvId, 'tv');
+
+            // Datum dokoukání = datum SKUTEČNÉHO zhlédnutí poslední epizody, ne "teď".
+            // Tahle funkce se často spustí až dodatečně (např. při pouhém otevření
+            // detailu dávno dokoukaného seriálu), takže "teď" by do historie zapsalo
+            // úplně nesmyslné datum. Primárně bereme nejnovější watched_at z reálné
+            // historie epizod na Sinator backendu (ten je "sole source of truth"),
+            // fallback je lokální čas zaškrtnutí poslední epizody, a teprve jako
+            // úplně poslední možnost dnešní datum.
+            let watchedAt = null;
+            try {
+                const epHistory = await myHistoryGetForId('episodes', tvId);
+                if (Array.isArray(epHistory) && epHistory.length) {
+                    const maxTs = Math.max(...epHistory.map(e => Number(e.watched_at) || 0));
+                    if (maxTs > 0) watchedAt = maxTs;
+                }
+            } catch (e) {}
+            if (!watchedAt) {
+                const localTimes = epKeys.map(k => state.watched[k]?.addedAt).filter(t => typeof t === 'number' && t > 0);
+                if (localTimes.length) watchedAt = Math.max(...localTimes);
+            }
+
+            await myHistoryAdd(tvId, 'tv', undefined, undefined, watchedAt || undefined);
             if (typeof refreshMySinatorWatchedCache === 'function') refreshMySinatorWatchedCache();
             if (typeof initMySinatorWatchedBadge === 'function') initMySinatorWatchedBadge(tvId, 'tv');
         } catch (e) { console.warn('maybeMarkShowCompleteOnBackend error:', e); }
@@ -14734,7 +14755,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                         const isLocalComplete = totalEps > 0 && watchedEps >= totalEps && !nextEpisode && !(totalSeasons > 0 && totalSeasons > effectiveMaxSeason);
                         if (isLocalComplete) {
                             if (!state.watched[`tv_${tmdbId}`]) {
-                                state.watched[`tv_${tmdbId}`] = { id: tmdbId, type: 'tv', title: showName, year: showYear, posterPath, addedAt: Date.now() };
+                                state.watched[`tv_${tmdbId}`] = { id: tmdbId, type: 'tv', title: showName, year: showYear, posterPath, addedAt: s.last_watched_at ? new Date(s.last_watched_at).getTime() : Date.now() };
                                 autoMarkedComplete = true;
                             }
                             return;
@@ -14756,7 +14777,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                     const isEndedNoNext = !nextEpisode && (airStatus === 'Ended' || airStatus === 'Canceled');
                     if (noEpisodeDetail && isEndedNoNext) {
                         if (!state.watched[`tv_${tmdbId}`]) {
-                            state.watched[`tv_${tmdbId}`] = { id: tmdbId, type: 'tv', title: showName, year: showYear, posterPath, addedAt: Date.now() };
+                            state.watched[`tv_${tmdbId}`] = { id: tmdbId, type: 'tv', title: showName, year: showYear, posterPath, addedAt: s.last_watched_at ? new Date(s.last_watched_at).getTime() : Date.now() };
                             autoMarkedComplete = true;
                         }
                         return;
