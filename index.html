@@ -11909,7 +11909,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         return episodes.map(ep => {
             const epKey = `ep_${tvId}_${seasonNumber}_${ep.episode_number}`;
             const watched = !!state.watched[epKey];
-            const epWatchCount = getEpWatchCount(epKey);
+            const epWatchCount = getEpWatchCount(epKey, tvId);
             const epWatchCountLabel = (watched && epWatchCount > 0) ? ` (${epWatchCount}×)` : '';
             const epName = (ep.name || 'Neznámá epizoda').replace(/'/g, "\\'");
             return `
@@ -11936,6 +11936,10 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     async function loadSeasonsForDetail(tvId) {
         const container = document.getElementById('seasons-container'); if(!container) return;
         container.innerHTML = '<div style="padding:12px;color:var(--text-muted)">Načítám sezóny...</div>';
+        // Rovnou na pozadí natáhni skutečnou historii zhlédnutí epizod ze
+        // Sinator backendu (pokud je nastavený) — než se stihne rozbalit
+        // první sezóna, bude už mít appka přesné počty místo lokálního odhadu.
+        if (typeof loadEpHistoryCounts === 'function') loadEpHistoryCounts(tvId);
         const seasons = await fetchSeasons(tvId); 
         container.innerHTML = renderSeasons(seasons, tvId);
         // Store tvId for season refresh
@@ -11992,12 +11996,16 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     // Pokud tahle epizoda byla poslední chybějící, zkusí se rovnou
                     // založit i show-level záznam (rozsvítí badge "🧩 Shlédnuto (Sinator)").
                     if (!wasWatched && typeof maybeMarkShowCompleteOnBackend === 'function') maybeMarkShowCompleteOnBackend(tvId);
+                    // Historie na backendu se právě změnila (přibyl/zmizel záznam) —
+                    // dotáhni ji znovu, ať je počet u epizody přesně podle skutečné
+                    // historie, ne jen podle lokálního odhadu.
+                    if (typeof loadEpHistoryCounts === 'function') loadEpHistoryCounts(tvId, true);
                 } catch (e) { console.warn('Sinator episode sync error:', e); }
             })();
         }
         // Update button
         const isNowWatched = !wasWatched;
-        const epCount = getEpWatchCount(key);
+        const epCount = getEpWatchCount(key, tvId);
         const epCountLabel = epCount > 0 ? ` (${epCount}×)` : '';
         btn.textContent = isNowWatched ? `✅ Shlédnuto${epCountLabel}` : '○ Označit';
         btn.style.borderColor = isNowWatched ? '#1db954' : 'var(--border)';
@@ -12027,6 +12035,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const _navBar = $('modalNavBar');
         if(_navBar && !$('modalNavLeft')) { _navBar.innerHTML = '<div class="modal-nav-left" id="modalNavLeft"></div><div class="modal-nav-right" id="modalNavRight"></div>'; }
         $('modalNavBar').style.display='none'; $('modalScrollBody').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+        // Pro případ, že se sem přišlo přímo (bez předchozího rozbalení sezóny) — ať má detail epizody hned k dispozici skutečnou historii zhlédnutí.
+        if (typeof loadEpHistoryCounts === 'function') loadEpHistoryCounts(tvId);
         setTimeout(() => { const sb = $('modalContent')?.querySelector('.modal-scroll-body'); if(sb) sb.scrollTop = 0; }, 100);
         try {
             const epRes = await fetch(`${BASE}/tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${tmdbApiKey}&language=cs-CZ`);
@@ -12053,7 +12063,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const czSeriesNameJs = jsq(czSeriesName || '');
             const epDetailKey = `ep_${tvId}_${seasonNumber}_${episodeNumber}`;
             const epDetailWatched = !!state.watched[epDetailKey];
-            const epDetailCount = getEpWatchCount(epDetailKey);
+            const epDetailCount = getEpWatchCount(epDetailKey, tvId);
             const epDetailCountLabel = (epDetailWatched && epDetailCount > 0) ? ` (${epDetailCount}×)` : '';
             $('modalScrollBody').innerHTML = `${modalNav(safeSeriesTitle, hasBack)}
                 ${bg}
@@ -14257,12 +14267,19 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     }
     window.saveEpWatchCounts = saveEpWatchCounts;
 
-    // Vrátí počet zhlédnutí dané epizody pro zobrazení. Epizody označené
-    // "Shlédnuto" ještě PŘED zavedením počítadla v appce nemají v
-    // state.epWatchCounts žádný záznam (0) — dopočítáme jim tedy při prvním
-    // vykreslení aspoň 1 (musely být viděné alespoň jednou, jinak by nebyly
-    // označené) a rovnou to i uložíme, ať se to příště nemusí dopočítávat znovu.
-    function getEpWatchCount(epKey) {
+    // Vrátí počet zhlédnutí dané epizody pro zobrazení. Pokud appka používá
+    // vlastní Sinator backend, bere se přesně z JEHO historie sledování (viz
+    // "🧩 Historie sledování – Sinator" v detailu seriálu) — tam je každé
+    // zhlédnutí samostatný záznam s časem, takže je to nejpřesnější zdroj.
+    // Bez backendu (nebo dokud se historie ještě nenačetla) se použije
+    // lokální odhad: epizody označené "Shlédnuto" ještě PŘED zavedením
+    // počítadla nemají v state.epWatchCounts žádný záznam (0) — dopočítáme
+    // jim tedy aspoň 1 (musely být viděné alespoň jednou, jinak by nebyly
+    // označené) a rovnou to i uložíme.
+    window._epHistoryCountsCache = window._epHistoryCountsCache || {};
+    function getEpWatchCount(epKey, tvId) {
+        const histCache = (tvId != null) ? window._epHistoryCountsCache[tvId] : null;
+        if (histCache) return histCache[epKey] || 0;
         const watched = !!state.watched[epKey];
         let cnt = state.epWatchCounts[epKey] || 0;
         if (watched && cnt === 0) {
@@ -14273,6 +14290,54 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         return cnt;
     }
     window.getEpWatchCount = getEpWatchCount;
+
+    // Načte skutečnou historii zhlédnutí epizod daného seriálu ze Sinator
+    // backendu a spočítá z ní přesný počet zhlédnutí na epizodu (klíčováno
+    // stejně jako state.watched — "ep_<tvId>_<sezóna>_<epizoda>"). Výsledek
+    // se cachuje podle tvId; force=true vynutí nové stažení (po ručním
+    // označení/odznačení, kdy se historie na backendu právě změnila).
+    async function loadEpHistoryCounts(tvId, force) {
+        if (!(typeof myBackendReady === 'function' && myBackendReady())) return null;
+        if (!force && window._epHistoryCountsCache[tvId]) return window._epHistoryCountsCache[tvId];
+        try {
+            const items = await myHistoryGetForId('episodes', tvId);
+            const counts = {};
+            (items || []).forEach(it => {
+                if (it.season == null || it.episode == null) return;
+                const key = `ep_${tvId}_${it.season}_${it.episode}`;
+                counts[key] = (counts[key] || 0) + 1;
+            });
+            window._epHistoryCountsCache[tvId] = counts;
+            refreshOpenEpisodeCounts(tvId);
+            return counts;
+        } catch (e) { console.warn('Ep. history counts load error:', e); return null; }
+    }
+    window.loadEpHistoryCounts = loadEpHistoryCounts;
+
+    // Přepíše čísla zhlédnutí v už vykreslených místech (rozbalený seznam
+    // epizod dané sezóny + otevřený detail jedné epizody), ať se čerstvě
+    // stažená historie promítne i bez nutnosti zavřít/znovu otevřít modal.
+    function refreshOpenEpisodeCounts(tvId) {
+        const prefix = `episodes-${tvId}-`;
+        document.querySelectorAll(`[id^="${prefix}"]`).forEach(container => {
+            if (!container.dataset.loaded || container.style.display === 'none') return;
+            const seasonNumber = Number(container.id.slice(prefix.length));
+            if (Number.isNaN(seasonNumber)) return;
+            fetchEpisodes(tvId, seasonNumber).then(episodes => {
+                container.innerHTML = renderEpisodes(episodes, tvId, seasonNumber);
+            });
+        });
+        document.querySelectorAll(`button[id^="epWatchedBtn_${tvId}_"]`).forEach(btn => {
+            const m = btn.id.match(/^epWatchedBtn_\d+_(\d+)_(\d+)$/);
+            if (!m) return;
+            const key = `ep_${tvId}_${m[1]}_${m[2]}`;
+            const watched = !!state.watched[key];
+            const cnt = getEpWatchCount(key, tvId);
+            const label = (watched && cnt > 0) ? ` (${cnt}×)` : '';
+            btn.textContent = watched ? `✅ Shlédnuto${label}` : '☐ Shlédnuto';
+        });
+    }
+    window.refreshOpenEpisodeCounts = refreshOpenEpisodeCounts;
 
     function updateWatchedCount() {
         const count = Object.keys(state.watched).length;
@@ -16099,7 +16164,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         // Sync styl chipu
         const key = `ep_${tvId}_${season}_${ep}`;
         const isNow = !!state.watched[key];
-        const cnt = getEpWatchCount(key);
+        const cnt = getEpWatchCount(key, tvId);
         const cntLabel = (isNow && cnt > 0) ? ` (${cnt}×)` : '';
         btn.textContent = isNow ? `✅ Shlédnuto${cntLabel}` : '☐ Shlédnuto';
         btn.style.borderColor = isNow ? '#1db954' : 'var(--border)';
