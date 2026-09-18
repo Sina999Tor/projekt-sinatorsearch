@@ -12036,11 +12036,15 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         // Pro případ, že se sem přišlo přímo (bez předchozího rozbalení sezóny) — ať má detail epizody hned k dispozici skutečnou historii zhlédnutí.
         if (typeof loadEpHistoryCounts === 'function') loadEpHistoryCounts(tvId);
         setTimeout(() => { const sb = $('modalContent')?.querySelector('.modal-scroll-body'); if(sb) sb.scrollTop = 0; }, 100);
+        // "series" musí být deklarovaná MIMO try/catch (ne "const" uvnitř) — jinak
+        // je po try bloku mimo dosah (ReferenceError) a přeruší se tím i vše, co
+        // po try/catch následuje (loadCsfdRating i nová historie sledování epizody).
+        let series = null;
         try {
             const epRes = await fetch(`${BASE}/tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${tmdbApiKey}&language=cs-CZ`);
             const ep = await epRes.json();
             const seriesRes = await fetch(`${BASE}/tv/${tvId}?api_key=${tmdbApiKey}&language=cs-CZ`);
-            const series = await seriesRes.json();
+            series = await seriesRes.json();
             let czSeriesName = '';
             try {
                 const transRes = await fetch(`${BASE}/tv/${tvId}/translations?api_key=${tmdbApiKey}`);
@@ -12071,6 +12075,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     <div class="modal-chips">${airDate ? `<div class="modal-chip"><b>📅 Premiéra:</b> <strong>${airDate}</strong></div>` : ''}${runtime ? `<div class="modal-chip"><b>⏱</b> ${runtime} min</div>` : ''}<div class="modal-chip"><b>★</b> ${rating}/10</div><button id="epWatchedBtn_${tvId}_${seasonNumber}_${episodeNumber}" class="modal-chip" style="cursor:pointer;border:1px solid ${epDetailWatched?'#1db954':'var(--border)'};background:${epDetailWatched?'rgba(29,185,84,0.15)':'transparent'};color:${epDetailWatched?'#1db954':'var(--text-muted)'};font-weight:600;" onclick="window.toggleEpWatchedInModal(${tvId},${seasonNumber},${episodeNumber},'${titleJs}',this)">${epDetailWatched?`✅ Shlédnuto${epDetailCountLabel}`:'☐ Shlédnuto'}</button></div>
                     <p class="modal-overview">${ep.overview || 'Popis není dostupný.'}</p>
                     <div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/tv/${tvId}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_ep_${tvId}" style="cursor:pointer;" title="Načítám..."><span class="rating-value" id="csfdRatingVal_ep_${tvId}">…</span><span class="rating-source">Trakt</span></div></div>
+                    <div id="mySinatorEpWatchHistorySlot_${tvId}_${seasonNumber}_${episodeNumber}"></div>
                     ${(typeof getEnabledExternalPlayApps === 'function' && getEnabledExternalPlayApps().length) ? `<button class="action-btn-modal" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#c4b5fd;font-size:1em;font-weight:700;padding:14px;width:100%;margin:0 0 14px;display:block;" onclick="window.playInExternalApp('${seriesTitleJs} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}')">📱 Přehrát v externí aplikaci</button>` : ''}
                     <div class="action-buttons">
                         <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${seriesTitleJs} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}'))">▶️ Přehrát</button>
@@ -12091,6 +12096,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 </div></div>`;
         } catch(e) { console.error(e); $('modalScrollBody').innerHTML = `<div class="empty">Chyba načtení epizody: ${e.message}</div>`; }
         loadCsfdRating(tvId, 'tv', series?.name || episodeTitle, '', 'ep_');
+        if (typeof initMySinatorEpisodeWatchHistory === 'function') initMySinatorEpisodeWatchHistory(tvId, seasonNumber, episodeNumber);
     }
 
     async function openDetail(id, type) {
@@ -12924,6 +12930,71 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const isOpen = older.style.display !== 'none';
         older.style.display = isOpen ? 'none' : 'block';
         if (arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+    };
+
+    // ── Historie sledování na Sinator backendu — v detailu JEDNÉ epizody ──────
+    // Stejné jako výš u filmu/seriálu, jen vyfiltrované na konkrétní S/E
+    // (myHistoryGetForId('episodes', tvId) vrací historii celého seriálu).
+    async function initMySinatorEpisodeWatchHistory(tvId, seasonNumber, episodeNumber) {
+        const box = document.getElementById(`mySinatorEpWatchHistorySlot_${tvId}_${seasonNumber}_${episodeNumber}`);
+        if (!box) return;
+        if (!myBackendReady()) { box.innerHTML = ''; return; }
+        try {
+            const all = await myHistoryGetForId('episodes', tvId);
+            const items = (all || []).filter(it => Number(it.season) === Number(seasonNumber) && Number(it.episode) === Number(episodeNumber));
+            items.sort((a, b) => (b.watched_at || 0) - (a.watched_at || 0));
+            renderMySinatorEpisodeWatchHistory(tvId, seasonNumber, episodeNumber, items);
+        } catch (e) { console.warn('Sinator episode watch history load error:', e); box.innerHTML = ''; }
+    }
+    window.initMySinatorEpisodeWatchHistory = initMySinatorEpisodeWatchHistory;
+
+    function renderMySinatorEpisodeWatchHistory(tvId, seasonNumber, episodeNumber, items) {
+        const box = document.getElementById(`mySinatorEpWatchHistorySlot_${tvId}_${seasonNumber}_${episodeNumber}`);
+        if (!box) return;
+        if (!items.length) { box.innerHTML = ''; return; }
+        const rowHtml = it => {
+            const d = new Date(it.watched_at);
+            if (isNaN(d)) return '';
+            const dateStr = `${d.getDate()}. ${d.getMonth()+1}. ${d.getFullYear()}`;
+            const timeStr = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);">
+                <span style="opacity:0.8;">🕓</span><span style="flex:1;">${dateStr} – ${timeStr}</span>
+                <button onclick="window.deleteMySinatorEpisodeHistoryEntry(${tvId},${seasonNumber},${episodeNumber},${it.watched_at})" title="Smazat tento záznam" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;padding:2px 6px;">✕</button>
+            </div>`;
+        };
+        const latestHtml = rowHtml(items[0]);
+        const olderHtml = items.slice(1).map(rowHtml).join('');
+        const toggleBtn = items.length > 1
+            ? `<button onclick="window.toggleMySinatorEpisodeWatchHistory(${tvId},${seasonNumber},${episodeNumber})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.8rem;display:flex;align-items:center;gap:4px;padding:4px 0;">
+                 <span id="mySinatorEpHistArrow_${tvId}_${seasonNumber}_${episodeNumber}" style="display:inline-block;transition:transform 0.2s;">▸</span> Zobrazit celou historii (${items.length - 1} další${items.length - 1 === 1 ? '' : items.length - 1 < 5 ? 'í' : 'ch'})
+               </button>`
+            : '';
+        box.innerHTML = `<div class="sinator-watch-history" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+            <div style="font-weight:700;margin-bottom:8px;font-size:0.95rem;color:var(--gold);">🧩 Historie sledování – Sinator${items.length > 1 ? ` <span style="opacity:0.6;font-weight:500;font-size:0.8rem;">(${items.length}×)</span>` : ''}</div>
+            ${latestHtml}
+            ${toggleBtn}
+            <div id="mySinatorEpHistOlder_${tvId}_${seasonNumber}_${episodeNumber}" style="display:none;">${olderHtml}</div>
+        </div>`;
+    }
+    window.renderMySinatorEpisodeWatchHistory = renderMySinatorEpisodeWatchHistory;
+
+    window.toggleMySinatorEpisodeWatchHistory = (tvId, seasonNumber, episodeNumber) => {
+        const older = document.getElementById(`mySinatorEpHistOlder_${tvId}_${seasonNumber}_${episodeNumber}`);
+        const arrow = document.getElementById(`mySinatorEpHistArrow_${tvId}_${seasonNumber}_${episodeNumber}`);
+        if (!older) return;
+        const isOpen = older.style.display !== 'none';
+        older.style.display = isOpen ? 'none' : 'block';
+        if (arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+    };
+
+    window.deleteMySinatorEpisodeHistoryEntry = async function(tvId, seasonNumber, episodeNumber, watchedAt) {
+        if (!confirm('Smazat tento záznam z historie sledování?')) return;
+        try {
+            await myHistoryRemoveEntry(tvId, 'tv', watchedAt, seasonNumber, episodeNumber);
+            if (typeof refreshMySinatorWatchedCache === 'function') await refreshMySinatorWatchedCache();
+            if (typeof loadEpHistoryCounts === 'function') loadEpHistoryCounts(tvId, true);
+            if (typeof initMySinatorEpisodeWatchHistory === 'function') initMySinatorEpisodeWatchHistory(tvId, seasonNumber, episodeNumber);
+        } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
     };
 
     window.toggleModalProviders = (id) => {
