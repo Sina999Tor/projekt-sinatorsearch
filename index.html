@@ -3475,12 +3475,14 @@
         // na Enhanced verzi.
         { id:'nuvio_enhanced', name:'Nuvio Enhanced', emoji:'🎞️', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.enhanced;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2FNuvioMedia%2FNuvioMobile-Enhanced%2Freleases;end', enabled:false, builtin:true },
         { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, builtin:true },
-        // Kodi a ModernTV nemají žádné veřejné URI schéma pro vyhledávání ani otevření
-        // (na rozdíl od Nuvia, které aspoň "nuvio://" má) — spouští se proto obecným
-        // Android intentem přes jejich package name (ověřeno v Podrobnostech o aplikaci:
-        // org.xbmc.kodi a eu.moderntv.android), bez konkrétního vyhledávání/titulu.
-        { id:'kodi',      name:'Kodi',      emoji:'📀', urlTemplate:'intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=org.xbmc.kodi;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dorg.xbmc.kodi;end', enabled:false, builtin:true },
-        { id:'moderntv',  name:'ModernTV',  emoji:'📡', urlTemplate:'intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=eu.moderntv.android;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Deu.moderntv.android;end', enabled:false, builtin:true }
+        // Kodi ani ModernTV nemají žádné veřejné/BROWSABLE URI schéma zaregistrované
+        // v manifestu appky (na rozdíl od Nuvia, které "nuvio://" má) — bez toho Chrome
+        // intent:// odkaz na appku vůbec nepustí, ať je zapsaný jakkoliv (to je pevné
+        // bezpečnostní pravidlo Chromu, ne otázka formátu odkazu). urlTemplate proto
+        // necháváme prázdný — appka jen zkopíruje název do schránky a appku otevřeš ručně,
+        // stejně jako to dřív fungovalo u Nuvia bez odkazu.
+        { id:'kodi',      name:'Kodi',      emoji:'📀', urlTemplate:'', enabled:false, builtin:true },
+        { id:'moderntv',  name:'ModernTV',  emoji:'📡', urlTemplate:'', enabled:false, builtin:true }
     ];
     // Migrace: pokud má uživatel uložené staré (nefunkční) odhady odkazů
     // z dřívější verze, potichu je nahradíme opravenými výchozími hodnotami —
@@ -3490,7 +3492,11 @@
         nuvio:   ['nuvio://search?q={query}', 'nuvio://', 'intent://search?query={query}#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.nuvio.app;end'],
         // Nuvio Enhanced se v prvním nasazení omylem mířil na stejný package jako
         // obyčejné Nuvio (com.nuvio.app) — oprava na jeho skutečný com.nuvio.enhanced.
-        nuvio_enhanced: 'intent://open#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2FNuvioMedia%2FNuvioMobile-Enhanced%2Freleases;end'
+        nuvio_enhanced: 'intent://open#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2FNuvioMedia%2FNuvioMobile-Enhanced%2Freleases;end',
+        // Kodi/ModernTV: první verze zkoušela obecný LAUNCHER intent, který Chrome
+        // bez BROWSABLE aktivity v appce ignoruje — nahrazeno prázdným odkazem.
+        kodi: 'intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=org.xbmc.kodi;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dorg.xbmc.kodi;end',
+        moderntv: 'intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=eu.moderntv.android;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Deu.moderntv.android;end'
     };
 
     function getExternalPlayApps() {
