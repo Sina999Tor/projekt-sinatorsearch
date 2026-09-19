@@ -4097,8 +4097,8 @@
         if ($('sortFilter')) $('sortFilter').value = state.filters.sortBy;
         state.filters.year = '';
         state.aiDiscoverExtra = state.view === 'movies'
-            ? { 'primary_release_date.gte': todayStr }
-            : { 'first_air_date.gte': todayStr };
+            ? { 'primary_release_date.gte': todayStr, 'vote_count.gte': 0 }
+            : { 'first_air_date.gte': todayStr, 'vote_count.gte': 0 };
         state.page = 1; state._allItems = []; state._loadingMore = false;
         loadFilteredContent(true);
     };
