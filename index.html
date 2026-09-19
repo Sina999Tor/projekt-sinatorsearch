@@ -3474,15 +3474,7 @@
         // Nuvio výš, obě jdou mít nainstalované vedle sebe a tenhle intent cílí přesně
         // na Enhanced verzi.
         { id:'nuvio_enhanced', name:'Nuvio Enhanced', emoji:'🎞️', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.enhanced;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2FNuvioMedia%2FNuvioMobile-Enhanced%2Freleases;end', enabled:false, builtin:true },
-        { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, builtin:true },
-        // Kodi ani ModernTV nemají žádné veřejné/BROWSABLE URI schéma zaregistrované
-        // v manifestu appky (na rozdíl od Nuvia, které "nuvio://" má) — bez toho Chrome
-        // intent:// odkaz na appku vůbec nepustí, ať je zapsaný jakkoliv (to je pevné
-        // bezpečnostní pravidlo Chromu, ne otázka formátu odkazu). urlTemplate proto
-        // necháváme prázdný — appka jen zkopíruje název do schránky a appku otevřeš ručně,
-        // stejně jako to dřív fungovalo u Nuvia bez odkazu.
-        { id:'kodi',      name:'Kodi',      emoji:'📀', urlTemplate:'', enabled:false, builtin:true },
-        { id:'moderntv',  name:'ModernTV',  emoji:'📡', urlTemplate:'', enabled:false, builtin:true }
+        { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, builtin:true }
     ];
     // Migrace: pokud má uživatel uložené staré (nefunkční) odhady odkazů
     // z dřívější verze, potichu je nahradíme opravenými výchozími hodnotami —
@@ -3492,20 +3484,25 @@
         nuvio:   ['nuvio://search?q={query}', 'nuvio://', 'intent://search?query={query}#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.nuvio.app;end'],
         // Nuvio Enhanced se v prvním nasazení omylem mířil na stejný package jako
         // obyčejné Nuvio (com.nuvio.app) — oprava na jeho skutečný com.nuvio.enhanced.
-        nuvio_enhanced: 'intent://open#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2FNuvioMedia%2FNuvioMobile-Enhanced%2Freleases;end',
-        // Kodi/ModernTV: první verze zkoušela obecný LAUNCHER intent, který Chrome
-        // bez BROWSABLE aktivity v appce ignoruje — nahrazeno prázdným odkazem.
-        kodi: 'intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=org.xbmc.kodi;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dorg.xbmc.kodi;end',
-        moderntv: 'intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=eu.moderntv.android;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Deu.moderntv.android;end'
+        nuvio_enhanced: 'intent://open#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2FNuvioMedia%2FNuvioMobile-Enhanced%2Freleases;end'
     };
+    // Kodi a ModernTV byly krátce v DEFAULT_EXTERNAL_PLAY_APPS výš, ale nešly
+    // spolehlivě spustit (nemají BROWSABLE schéma, Chrome/Brave to blokuje jako
+    // bezpečnostní opatření) — zpátky odstraněny. Komu se přesto uložily do
+    // localStorage, tomu je tenhle úklid tiše smaže, ať appka nenabízí appky,
+    // co beztak nejdou spustit.
+    const _REMOVED_EXTERNAL_PLAY_APP_IDS = ['kodi', 'moderntv'];
 
     function getExternalPlayApps() {
         try {
             const raw = localStorage.getItem('sinator_external_play_apps');
             if(!raw) return DEFAULT_EXTERNAL_PLAY_APPS.map(a => ({...a}));
-            const saved = JSON.parse(raw);
+            let saved = JSON.parse(raw);
             if(!Array.isArray(saved)) return DEFAULT_EXTERNAL_PLAY_APPS.map(a => ({...a}));
             let migrated = false;
+            const beforeLen = saved.length;
+            saved = saved.filter(a => !_REMOVED_EXTERNAL_PLAY_APP_IDS.includes(a.id));
+            if(saved.length !== beforeLen) migrated = true;
             saved.forEach(a => {
                 let oldTpls = _OLD_EXTERNAL_PLAY_APP_TEMPLATES[a.id];
                 if(!oldTpls) return;
