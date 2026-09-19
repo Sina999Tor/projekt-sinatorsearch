@@ -4075,12 +4075,32 @@
             `<button class="tab-sort-opt${curSort===o.val?' active':''}" onclick="applyTabSort('${o.val}')">${o.label}</button>`
         ).join('');
         if (state.view === 'movies') {
+            html += `<button class="tab-sort-opt" onclick="event.stopPropagation();applyAnticipatedFilter()">🔮 Nejvíc očekávané</button>`;
             html += `<button class="tab-sort-opt" onclick="event.stopPropagation();applyNovinkyFilter()">🆕 Novinky (VOD/Blu-ray)</button>`;
             html += `<button class="tab-sort-opt" onclick="event.stopPropagation();renderReleaseTypeOptions()">🎬 Typ vydání</button>`;
         } else if (state.view === 'tv' || state.view === 'miniseries' || state.view === 'anime') {
+            html += `<button class="tab-sort-opt" onclick="event.stopPropagation();applyAnticipatedFilter()">🔮 Nejvíc očekávané</button>`;
             html += `<button class="tab-sort-opt" onclick="event.stopPropagation();applyNovinkyFilter()">🆕 Novinky (${new Date().getFullYear()})</button>`;
         }
         dd.innerHTML = html;
+    };
+
+    // "Nejvíc očekávané" — tituly, které ještě nevyšly (datum premiéry v budoucnu),
+    // seřazené podle popularity. U filmů primary_release_date.gte, u seriálů/minisérií/
+    // anime first_air_date.gte = dnešek; obojí jde přes stejný aiDiscoverExtra mechanismus
+    // jako AI vyhledávání s datovým rozsahem.
+    window.applyAnticipatedFilter = function() {
+        $('tabSortDropdown').style.display = 'none';
+        $('globalSortBtn')?.classList.remove('active');
+        const todayStr = new Date().toISOString().slice(0, 10);
+        state.filters.sortBy = 'popularity.desc';
+        if ($('sortFilter')) $('sortFilter').value = state.filters.sortBy;
+        state.filters.year = '';
+        state.aiDiscoverExtra = state.view === 'movies'
+            ? { 'primary_release_date.gte': todayStr }
+            : { 'first_air_date.gte': todayStr };
+        state.page = 1; state._allItems = []; state._loadingMore = false;
+        loadFilteredContent(true);
     };
 
     // "Novinky" — u filmů jen tituly, které v aktuálním roce vyšly na VOD/Blu-ray
