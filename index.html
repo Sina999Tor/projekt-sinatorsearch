@@ -1489,9 +1489,29 @@
                     </div>
                 </div>
             </div>
+            <div class="settings-section" id="tvChannelAdminSettingsBox" style="display:none;background:rgba(52,152,219,0.06);border:1px solid rgba(52,152,219,0.2);border-radius:12px;padding:14px 16px;margin-top:10px;">
+                <span class="settings-label" style="color:#5dade2;">📡 Správa IPTV kanálů</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 10px;line-height:1.4;">
+                    Zapínání/vypínání kanálů, přesun mezi kategoriemi, pořadí a přejmenování kategorií — sdíleno pro všechny uživatele appky přes Firebase, stejně jako značení nefunkčních streamů výš.
+                </div>
+                <button class="settings-btn-small" style="width:100%;border-color:#5dade2;color:#5dade2;" onclick="openTvChannelAdminModal()">📡 Spravovat kanály</button>
+            </div>
             </div>
         </div>
     </div>
+</div>
+
+<!-- 📡 Správa IPTV kanálů (Admin level 2) -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.94);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" id="tvChannelAdminModal" onclick="if(event.target===this)closeTvChannelAdminModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <button onclick="closeTvChannelAdminModal()" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;">← Zpět</button>
+        <h3 style="flex:1;font-family:'Playfair Display',serif;font-size:1.05rem;color:#5dade2;">📡 Správa IPTV kanálů</h3>
+        <button onclick="closeTvChannelAdminModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg-card);">
+        <input type="text" id="tvAdminSearchInput" placeholder="Hledat kanál napříč všemi kategoriemi…" oninput="_tvAdminOnSearch(this.value)" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:8px;font-size:0.85rem;box-sizing:border-box;">
+    </div>
+    <div style="flex:1;overflow-y:auto;overscroll-behavior:contain;" id="tvChannelAdminBody"></div>
 </div>
 
 <!-- 📡 iVysílání ČT modal -->
@@ -17599,6 +17619,58 @@ const TV_GROUPS = [
     { id: 'all',   label: '📋 Vše',     match: ch => true },
 ];
 
+// ══ SPRÁVA IPTV KANÁLŮ (Admin level 2) ═══════════════════════════════════
+// Jeden sdílený objekt v presence/_tv_admin (stejná větev jako _broken_tv
+// výš, protože jen ta má ve Firebase pravidlech povolený veřejný zápis na
+// dálku): { disabled: {klíč:true}, categoryOverride: {klíč:catId},
+// order: {klíč:číslo}, categoryLabels: {catId:vlastní název} }. Klíč kanálu
+// je vždy tvChannelKey(ch) — stejný normalizovaný název, jaký používá i
+// mapa nefunkčních streamů, takže se to chová konzistentně napříč SD/HD/4K
+// variantami téhož kanálu.
+window._tvAdminOverrides = (function() {
+    try { return JSON.parse((window._store && window._store.getItem('sinator_tv_admin_overrides')) || '{}'); }
+    catch(e) { return {}; }
+})();
+function _tvAdminOv() {
+    const o = window._tvAdminOverrides || {};
+    if (!o.disabled) o.disabled = {};
+    if (!o.categoryOverride) o.categoryOverride = {};
+    if (!o.order) o.order = {};
+    if (!o.categoryLabels) o.categoryLabels = {};
+    return o;
+}
+function tvAdminSaveOverrides() {
+    const o = _tvAdminOv();
+    window._tvAdminOverrides = o;
+    try { window._store && window._store.setItem('sinator_tv_admin_overrides', JSON.stringify(o)); } catch(e) {}
+    if (typeof window._fbSetTvAdminOverrides === 'function') window._fbSetTvAdminOverrides(o);
+}
+
+// Zabalí každou match() funkci tak, aby nejdřív zkontrolovala ruční přesun
+// do jiné kategorie (categoryOverride) — teprve když kanál žádný override
+// nemá, rozhodne původní pravidlo podle názvu/group-title. Uloženo, aby šel
+// pro admin panel dohledat i "přirozený" (automaticky určený) tab kanálu.
+TV_GROUPS.forEach(g => {
+    g._origMatch = g.match;
+    g.match = ch => {
+        const ov = _tvAdminOv().categoryOverride[tvChannelKey(ch)];
+        if (ov) return ov === g.id;
+        return g._origMatch(ch);
+    };
+});
+// Zobrazovaný název kategorie — vlastní přejmenování (categoryLabels) má
+// přednost před výchozím emoji+názvem.
+function tvGroupDisplayLabel(g) {
+    return _tvAdminOv().categoryLabels[g.id] || g.label;
+}
+window.tvGroupDisplayLabel = tvGroupDisplayLabel;
+// Kategorie, do které by kanál patřil BEZ ručního přesunu — pro předvyplnění
+// selectu v admin panelu.
+function tvNaturalGroupId(ch) {
+    const g = TV_GROUPS.find(g => g._origMatch(ch));
+    return g ? g.id : 'all';
+}
+
 let tvState = window.tvState = { channels: [], activeGroup: 'cz', currentChannel: null, hls: null, clockInterval: null, epgData: {}, epgLoaded: false };
 
 function openTvModal() {
@@ -18564,12 +18636,20 @@ function tvBrokenSectionHtml(brokenEntries, onclickForChannel, panelId) {
 }
 window.tvBrokenSectionHtml = tvBrokenSectionHtml;
 
-function tvGroupChannels(list) {
+function tvGroupChannels(list, opts) {
+    opts = opts || {};
     const brokenMap = tvBrokenLoad();
+    const disabledMap = _tvAdminOv().disabled;
+    const orderMap = _tvAdminOv().order;
     const groups = new Map();
     const order = [];
     (list || []).forEach(ch => {
         const key = (typeof _tvNormalizeName === 'function' ? _tvNormalizeName(ch.name) : tvSortKey(ch.name)) || ch.name;
+        // Vypnuté kanály (Admin level 2, "Správa IPTV kanálů") se pro běžné
+        // seznamy skryjí úplně — na rozdíl od "nefunkčních", ty se jen
+        // přesunou do sbalené sekce dole. Admin panel volá s
+        // includeDisabled:true, aby je pořád viděl a mohl zase zapnout.
+        if (disabledMap[key] && !opts.includeDisabled) return;
         if (!groups.has(key)) { groups.set(key, []); order.push(key); }
         groups.get(key).push(ch);
     });
@@ -18582,21 +18662,32 @@ function tvGroupChannels(list) {
         let entry;
         if (withLogo.length) {
             const primary = withLogo.slice().sort((a, b) => tvDisplayName(a.name).length - tvDisplayName(b.name).length)[0];
-            entry = { ch: primary, alts: arr.filter(c => c !== primary), _brokenKey: key };
+            entry = { ch: primary, alts: arr.filter(c => c !== primary), _brokenKey: key, _disabled: !!disabledMap[key] };
         } else {
-            entry = { ch: arr[0], alts: arr.slice(1), _brokenKey: key };
+            entry = { ch: arr[0], alts: arr.slice(1), _brokenKey: key, _disabled: !!disabledMap[key] };
         }
-        if (brokenMap[key]) {
+        if (brokenMap[key] && !opts.includeDisabled) {
             broken.push(entry);
+        } else if (brokenMap[key]) {
+            // admin panel: nefunkční kanály chceme vidět rovnou v seznamu (ne
+            // schované), ať je jde přímo odznačit / testovat
+            shown.push(entry);
         } else if (withLogo.length) {
             shown.push(entry);
         } else {
             noLogo.push(entry);
         }
     });
+    // Ruční pořadí (šipky ↑/↓ v admin panelu) — kanály beze změny pořadí mají
+    // váhu 0 a stabilní řazení (JS Array.sort je stabilní) je nechá na
+    // původním místě; jen ručně přeřazené kanály se posunou podle váhy.
+    const byOrder = (a, b) => (orderMap[a._brokenKey] || 0) - (orderMap[b._brokenKey] || 0);
+    shown.sort(byOrder);
+    noLogo.sort(byOrder);
     return { shown, noLogo, broken };
 }
 window.tvGroupChannels = tvGroupChannels;
+
 
 function tvToggleAlts(id) {
     const el = document.getElementById(id);
@@ -18683,6 +18774,191 @@ function tvRerenderAllChannelLists() {
     }
 }
 window.tvRerenderAllChannelLists = tvRerenderAllChannelLists;
+
+// ══ ADMIN PANEL: SPRÁVA IPTV KANÁLŮ (jen Admin level 2) ═══════════════════
+window._tvAdminState = { expandedCat: null, search: '' };
+
+async function openTvChannelAdminModal() {
+    if (!(typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2())) return;
+    const m = document.getElementById('tvChannelAdminModal');
+    if (!m) return;
+    m.style.display = 'flex';
+    if (!tvState.channels || !tvState.channels.length) {
+        document.getElementById('tvChannelAdminBody').innerHTML = '<div class="loading" style="padding:30px;"><div class="spinner"></div>Načítám kanály…</div>';
+        await loadTvPlaylist();
+    }
+    _renderTvChannelAdminModal();
+}
+window.openTvChannelAdminModal = openTvChannelAdminModal;
+
+function closeTvChannelAdminModal() {
+    const m = document.getElementById('tvChannelAdminModal');
+    if (m) m.style.display = 'none';
+}
+window.closeTvChannelAdminModal = closeTvChannelAdminModal;
+
+function _tvAdminOnSearch(val) {
+    window._tvAdminState.search = (val || '').toLowerCase().trim();
+    _renderTvChannelAdminModal();
+}
+window._tvAdminOnSearch = _tvAdminOnSearch;
+
+function _esc(s) { return (s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+
+// Jeden řádek kanálu — přepínač zapnuto/vypnuto, 🚫 nefunkční, ▶️ test
+// (spustí přímo ve VLC, stejně jako běžné kliknutí na kanál), ↑/↓ pořadí
+// v rámci aktuální kategorie, a select pro přesun do jiné kategorie.
+function _tvAdminChannelRowHtml(entry, catId, brokenFlag) {
+    const key = entry._brokenKey;
+    const idx = tvState.channels.indexOf(entry.ch);
+    const enabled = !entry._disabled;
+    const name = tvDisplayName(entry.ch.name);
+    const logo = entry.ch.logo ? `<img src="${entry.ch.logo}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;background:#111;flex-shrink:0;" onerror="this.style.display='none'">` : `<div style="width:28px;height:28px;flex-shrink:0;"></div>`;
+    const catOptions = TV_GROUPS.filter(g => g.id !== 'all').map(g =>
+        `<option value="${g.id}" ${catId === g.id ? 'selected' : ''}>${tvGroupDisplayLabel(g)}</option>`
+    ).join('');
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);${enabled ? '' : 'opacity:0.45;'}">
+        ${logo}
+        <div style="flex:1;min-width:0;">
+            <div style="font-size:0.85rem;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(name)}${brokenFlag ? ' <span style="color:#ff6b6b;font-size:0.7rem;">🚫 nefunkční</span>' : ''}</div>
+            ${entry.alts && entry.alts.length ? `<div style="font-size:0.68rem;color:var(--text-muted);">+${entry.alts.length} variant kvality</div>` : ''}
+        </div>
+        <select onchange="_tvAdminChangeCategory('${_esc(key)}', this.value)" style="background:var(--bg-elevated);border:1px solid var(--border);color:#ccc;font-size:0.72rem;border-radius:6px;padding:3px 4px;max-width:90px;">${catOptions}</select>
+        <button onclick="_tvAdminMoveOrder('${_esc(key)}', '${catId}', -1)" title="Posunout nahoru" style="background:none;border:1px solid var(--border);color:#ccc;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:0.8rem;">↑</button>
+        <button onclick="_tvAdminMoveOrder('${_esc(key)}', '${catId}', 1)" title="Posunout dolů" style="background:none;border:1px solid var(--border);color:#ccc;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:0.8rem;">↓</button>
+        <button onclick="_tvAdminToggleBroken('${_esc(key)}', '${_esc(entry.ch.name)}')" title="${brokenFlag ? 'Obnovit (funguje zase)' : 'Označit jako nefunkční'}" style="background:none;border:1px solid ${brokenFlag ? '#ff6b6b' : 'var(--border)'};color:${brokenFlag ? '#ff6b6b' : '#ccc'};width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;">${brokenFlag ? '↺' : '🚫'}</button>
+        <button onclick="playTvChannel(${idx})" title="Spustit / otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;">▶️</button>
+        <div onclick="_tvAdminToggleEnabled('${_esc(key)}')" style="width:38px;height:22px;border-radius:11px;background:${enabled ? '#1db954' : '#444'};position:relative;cursor:pointer;flex-shrink:0;transition:background 0.15s;">
+            <div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${enabled ? '18px' : '2px'};transition:left 0.15s;"></div>
+        </div>
+    </div>`;
+}
+
+function _renderTvChannelAdminModal() {
+    const body = document.getElementById('tvChannelAdminBody');
+    if (!body) return;
+    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
+    const search = window._tvAdminState.search;
+
+    if (search) {
+        const matched = tvState.channels.filter(ch => ch.name.toLowerCase().includes(search) && (adultAllowed || !isAdultChannel(ch)));
+        const grouped = tvGroupChannels(tvSortChannels(matched), { includeDisabled: true });
+        const all = [...grouped.shown, ...grouped.broken, ...grouped.noLogo];
+        if (!all.length) { body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);">Žádné kanály neodpovídají hledání.</div>'; return; }
+        const brokenKeys = new Set(grouped.broken.map(e => e._brokenKey));
+        body.innerHTML = `<div style="padding:8px 0;">` + all.map(entry => {
+            const catId = TV_GROUPS.find(g => g.id !== 'all' && g.match(entry.ch))?.id || 'all';
+            return _tvAdminChannelRowHtml(entry, catId, brokenKeys.has(entry._brokenKey));
+        }).join('') + `</div>`;
+        return;
+    }
+
+    const expandedCat = window._tvAdminState.expandedCat;
+    const catsHtml = TV_GROUPS.filter(g => g.id !== 'all').map(g => {
+        const matched = tvState.channels.filter(ch => g.match(ch) && (adultAllowed || !isAdultChannel(ch)));
+        const isOpen = expandedCat === g.id;
+        let inner = '';
+        if (isOpen) {
+            const grouped = tvGroupChannels(tvSortChannels(matched), { includeDisabled: true });
+            const brokenKeys = new Set(grouped.broken.map(e => e._brokenKey));
+            const all = [...grouped.shown, ...grouped.broken, ...grouped.noLogo];
+            inner = `<div>${all.length ? all.map(entry => _tvAdminChannelRowHtml(entry, g.id, brokenKeys.has(entry._brokenKey))).join('') : '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.82rem;">Žádné kanály v této kategorii.</div>'}</div>`;
+        }
+        return `<div style="border-bottom:1px solid var(--border);">
+            <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;" onclick="_tvAdminExpandCategory('${g.id}')">
+                <span style="font-size:0.72rem;color:var(--text-muted);transition:transform 0.15s;display:inline-block;transform:rotate(${isOpen ? '90deg' : '0deg'});">▸</span>
+                <input type="text" value="${_esc(tvGroupDisplayLabel(g))}" onclick="event.stopPropagation()" onchange="_tvAdminRenameCategory('${g.id}', this.value)" style="flex:1;background:none;border:none;color:#eee;font-weight:700;font-size:0.92rem;padding:2px 4px;border-radius:4px;" onfocus="this.style.background='var(--bg-elevated)'" onblur="this.style.background='none'">
+                <span style="font-size:0.78rem;color:var(--text-muted);">${matched.length}</span>
+            </div>
+            ${inner}
+        </div>`;
+    }).join('');
+    body.innerHTML = catsHtml;
+}
+window._renderTvChannelAdminModal = _renderTvChannelAdminModal;
+
+function _tvAdminExpandCategory(catId) {
+    window._tvAdminState.expandedCat = window._tvAdminState.expandedCat === catId ? null : catId;
+    _renderTvChannelAdminModal();
+}
+window._tvAdminExpandCategory = _tvAdminExpandCategory;
+
+function _tvAdminToggleEnabled(key) {
+    const ov = _tvAdminOv();
+    if (ov.disabled[key]) delete ov.disabled[key]; else ov.disabled[key] = true;
+    tvAdminSaveOverrides();
+    tvRerenderAllChannelLists();
+    if (typeof renderTvGroups === 'function' && document.getElementById('tvGroupTabs')) renderTvGroups();
+    _renderTvChannelAdminModal();
+}
+window._tvAdminToggleEnabled = _tvAdminToggleEnabled;
+
+function _tvAdminToggleBroken(key, name) {
+    const map = Object.assign({}, tvBrokenLoad());
+    if (map[key]) delete map[key]; else map[key] = { name: name || '', ts: Date.now() };
+    tvBrokenSave(map);
+    tvRerenderAllChannelLists();
+    _renderTvChannelAdminModal();
+}
+window._tvAdminToggleBroken = _tvAdminToggleBroken;
+
+function _tvAdminChangeCategory(key, newCatId) {
+    const ov = _tvAdminOv();
+    ov.categoryOverride[key] = newCatId;
+    tvAdminSaveOverrides();
+    tvRerenderAllChannelLists();
+    if (typeof renderTvGroups === 'function' && document.getElementById('tvGroupTabs')) renderTvGroups();
+    _renderTvChannelAdminModal();
+}
+window._tvAdminChangeCategory = _tvAdminChangeCategory;
+
+function _tvAdminRenameCategory(catId, newLabel) {
+    const ov = _tvAdminOv();
+    const g = TV_GROUPS.find(x => x.id === catId);
+    const defaultLabel = g ? g.label : '';
+    newLabel = (newLabel || '').trim();
+    if (!newLabel || newLabel === defaultLabel) delete ov.categoryLabels[catId];
+    else ov.categoryLabels[catId] = newLabel;
+    tvAdminSaveOverrides();
+    if (typeof renderTvGroups === 'function' && document.getElementById('tvGroupTabs')) renderTvGroups();
+    _renderTvChannelAdminModal();
+}
+window._tvAdminRenameCategory = _tvAdminRenameCategory;
+
+// Posun nahoru/dolů — přiřadí kanálu váhu mezi jeho dva sousedy v AKTUÁLNĚ
+// zobrazeném pořadí dané kategorie (klasický trik s "plovoucí" váhou mezi
+// sousedy, funguje bez nutnosti přečíslovávat celý seznam).
+function _tvAdminMoveOrder(key, catId, dir) {
+    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
+    const g = TV_GROUPS.find(x => x.id === catId);
+    if (!g) return;
+    const matched = tvState.channels.filter(ch => g.match(ch) && (adultAllowed || !isAdultChannel(ch)));
+    const grouped = tvGroupChannels(tvSortChannels(matched), { includeDisabled: true });
+    const all = [...grouped.shown, ...grouped.broken, ...grouped.noLogo];
+    const i = all.findIndex(e => e._brokenKey === key);
+    if (i === -1) return;
+    const j = i + dir;
+    if (j < 0 || j >= all.length) return;
+    const ov = _tvAdminOv();
+    const orderMap = ov.order;
+    const wA = orderMap[all[i]._brokenKey] || 0;
+    const wB = orderMap[all[j]._brokenKey] || 0;
+    // Prohodit váhy sousedů — nejjednodušší způsob, jak spolehlivě prohodit
+    // pořadí dvou sousedících položek bez zásahu do zbytku seznamu.
+    orderMap[all[i]._brokenKey] = wB;
+    orderMap[all[j]._brokenKey] = wA;
+    // Pokud měly stejnou (typicky nulovou) váhu, prohození nic nezmění —
+    // dorovnat explicitním posunem o 1, ať se opravdu prohodí.
+    if (wA === wB) {
+        orderMap[all[i]._brokenKey] = wA + dir;
+        orderMap[all[j]._brokenKey] = wB - dir;
+    }
+    tvAdminSaveOverrides();
+    tvRerenderAllChannelLists();
+    _renderTvChannelAdminModal();
+}
+window._tvAdminMoveOrder = _tvAdminMoveOrder;
+
 
 function tvSetViewMode(mode) {
     if (mode !== 'tiles' && mode !== 'list') return;
@@ -33155,7 +33431,7 @@ function renderTvGroups() {
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
     const opts = TV_GROUPS.map(g => {
         const count = tvState.channels.filter(ch => g.match(ch) && (adultAllowed || !isAdultChannel(ch))).length;
-        return { value: g.id, label: `${g.label} (${count})` };
+        return { value: g.id, label: `${tvGroupDisplayLabel(g)} (${count})` };
     });
     tabs.innerHTML = tvDdBuildHtml('tvGroupDD', 'switchTvGroup', opts, tvState.activeGroup);
 }
@@ -37402,6 +37678,32 @@ const rtdb = getDatabase(fbApp);
   });
 })();
 
+// ---- SPRÁVA IPTV KANÁLŮ (sdíleno pro VŠECHNY uživatele, Admin level 2) ----
+// Stejný princip a stejná větev "presence/" jako nefunkční streamy výš —
+// jeden objekt {disabled, categoryOverride, order, categoryLabels} pod
+// presence/_tv_admin, čtený/zapisovaný v reálném čase přes Firebase.
+(function initSharedTvAdminOverrides() {
+  const tvAdminRef = ref(rtdb, 'presence/_tv_admin');
+
+  window._fbSetTvAdminOverrides = function(overrides) {
+    set(tvAdminRef, overrides || {}).catch(() => {});
+  };
+
+  onValue(tvAdminRef, (snap) => {
+    const o = snap.exists() ? (snap.val() || {}) : {};
+    if (!o.disabled) o.disabled = {};
+    if (!o.categoryOverride) o.categoryOverride = {};
+    if (!o.order) o.order = {};
+    if (!o.categoryLabels) o.categoryLabels = {};
+    window._tvAdminOverrides = o;
+    try { window._store && window._store.setItem('sinator_tv_admin_overrides', JSON.stringify(o)); } catch(e) {}
+    if (typeof window.tvRerenderAllChannelLists === 'function') window.tvRerenderAllChannelLists();
+    if (typeof window.renderTvGroups === 'function' && document.getElementById('tvGroupTabs')) window.renderTvGroups();
+    if (typeof window._renderTvChannelAdminModal === 'function' && document.getElementById('tvChannelAdminModal')?.style.display !== 'none') window._renderTvChannelAdminModal();
+  });
+})();
+
+
 // ---- STATE ----
 let _dTab = 'movie';
 let _dActiveTag = null;
@@ -37786,6 +38088,9 @@ function updateAdminStatus() {
   const tvBrokenBox = document.getElementById('tvBrokenSettingsBox');
   if (tvBrokenBox) tvBrokenBox.style.display = isLvl2 ? 'block' : 'none';
   if (isLvl2 && typeof window._updateTvBrokenToggleUI === 'function') window._updateTvBrokenToggleUI();
+  // Sekce "Správa IPTV kanálů" — vidí jen Admin level 2
+  const tvChAdminBox = document.getElementById('tvChannelAdminSettingsBox');
+  if (tvChAdminBox) tvChAdminBox.style.display = isLvl2 ? 'block' : 'none';
 }
 
 // ---- Přepínač "Povolit označování TV kanálů jako nefunkčních" (Admin level 2, sdíleno přes Firebase) ----
