@@ -18936,6 +18936,13 @@ function _tvMvRefreshTabs() {
 }
 window._tvMvRefreshTabs = _tvMvRefreshTabs;
 
+// Přejmenování / vypnutí kategorií i v Kanály 2–6 (klíč = seznam|kategorie,
+// bez znaků zakázaných ve Firebase klíčích; prefix "x:" se nemůže střetnout s id z TV_GROUPS).
+function tvCatKey(listId, cat) { return ('x:' + listId + '|' + cat).replace(/[.#$\/\[\]]/g, '_'); }
+function tvCatLabel(listId, cat, def) { return _tvAdminOv().categoryLabels[tvCatKey(listId, cat)] || def; }
+function tvCatOff(listId, cat) { return !!_tvAdminOv().categoryDisabled[tvCatKey(listId, cat)]; }
+window.tvCatLabel = tvCatLabel; window.tvCatOff = tvCatOff;
+
 window._tvAdminState = { expandedCat: null, search: '', source: 'main', limits: {}, move: null };
 window._tvAdminRows = {};
 
@@ -19097,7 +19104,8 @@ function _tvAdminSourceCats(srcId, withCounts) {
     } else if (srcId === 'k2') {
         _tvMvK2Codes().forEach(code => {
             const chans = () => (altState.parsedCache[code] || []);
-            cats.push({ src: 'k2', listId: code, cat: '', label: (ALT_PLAYLISTS[code] && ALT_PLAYLISTS[code].label) || code, channels: chans,
+            const dl = (ALT_PLAYLISTS[code] && ALT_PLAYLISTS[code].label) || code;
+            cats.push({ src: 'k2', listId: code, cat: '', defLabel: dl, ckey: tvCatKey(code, ''), label: tvCatLabel(code, '', dl), channels: chans,
                         count: withCounts ? chans().filter(okAdult).length : 0, alwaysShow: true });
         });
     } else {
@@ -19118,7 +19126,7 @@ function _tvAdminSourceCats(srcId, withCounts) {
         } else {
             keys = Object.keys(cfg.labels);
         }
-        keys.forEach(k => cats.push({ src: srcId, listId: srcId, cat: k, label: cfg.dynamic ? alt5GroupLabel(k) : cfg.labels[k],
+        keys.forEach(k => cats.push({ src: srcId, listId: srcId, cat: k, defLabel: cfg.dynamic ? alt5GroupLabel(k) : cfg.labels[k], ckey: tvCatKey(srcId, k), label: tvCatLabel(srcId, k, cfg.dynamic ? alt5GroupLabel(k) : cfg.labels[k]),
             channels: () => arr.filter(ch => cfg.keyFn(ch) === k), count: counts[k] || 0 }));
     }
     return cats;
@@ -19251,7 +19259,7 @@ function _renderTvChannelAdminModal() {
     body.innerHTML = cats.map(c => {
         const openKey = srcId + '::' + c.listId + '|' + c.cat;
         const isOpen = st.expandedCat === openKey;
-        const catOff = c.isMain && !!catDisabledMap[c.gid];
+        const catOff = c.isMain ? !!catDisabledMap[c.gid] : !!catDisabledMap[c.ckey];
         let inner = '';
         if (isOpen) {
             const ce = _tvAdminCatEntries(c);
@@ -19261,11 +19269,14 @@ function _renderTvChannelAdminModal() {
         }
         const headLabel = c.isMain
             ? `<input type="text" value="${_esc(c.label)}" onclick="event.stopPropagation()" onchange="_tvAdminRenameCategory('${c.gid}', this.value)" style="flex:1;min-width:0;background:none;border:none;color:#eee;font-weight:700;font-size:0.92rem;padding:2px 4px;border-radius:4px;" onfocus="this.style.background='var(--bg-elevated)'" onblur="this.style.background='none'">`
-            : `<span style="flex:1;min-width:0;color:#eee;font-weight:700;font-size:0.92rem;padding:2px 4px;">${_esc(c.label)}</span>`;
+            : `<input type="text" value="${_esc(c.label)}" onclick="event.stopPropagation()" onchange="_tvAdminRenameCatX('${_tvAdminTok(openKey)}', this.value)" style="flex:1;min-width:0;background:none;border:none;color:#eee;font-weight:700;font-size:0.92rem;padding:2px 4px;border-radius:4px;" onfocus="this.style.background='var(--bg-elevated)'" onblur="this.style.background='none'">`;
         const catToggle = c.isMain
             ? `<span title="${catOff ? 'Kategorie je vypnutá — nezobrazí se v živé TV' : 'Vypnout celou kategorii'}" onclick="event.stopPropagation();_tvAdminToggleCategoryDisabled('${c.gid}')" style="width:34px;height:20px;border-radius:10px;background:${catOff ? '#444' : '#1db954'};position:relative;cursor:pointer;flex-shrink:0;">
                     <span style="width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${catOff ? '2px' : '16px'};transition:left .15s;display:block;"></span>
-                </span>` : '';
+                </span>`
+            : `<span title="${catOff ? 'Kategorie je vypnutá — nezobrazí se v nabídce' : 'Vypnout celou kategorii'}" onclick="event.stopPropagation();_tvAdminToggleCatX('${_tvAdminTok(openKey)}')" style="width:34px;height:20px;border-radius:10px;background:${catOff ? '#444' : '#1db954'};position:relative;cursor:pointer;flex-shrink:0;">
+                    <span style="width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${catOff ? '2px' : '16px'};transition:left .15s;display:block;"></span>
+                </span>`;
         return `<div style="border-bottom:1px solid var(--border);${catOff ? 'opacity:0.5;' : ''}">
             <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;" onclick="_tvAdminExpandCategory('${_tvAdminTok(openKey)}')">
                 <span style="font-size:0.72rem;color:var(--text-muted);transition:transform 0.15s;display:inline-block;transform:rotate(${isOpen ? '90deg' : '0deg'});">▸</span>
@@ -19389,6 +19400,28 @@ function _tvAdminExpandCategory(tok) {
     _renderTvChannelAdminModal();
 }
 window._tvAdminExpandCategory = _tvAdminExpandCategory;
+
+function _tvAdminRenameCatX(tok, newLabel) {
+    const c = _tvAdminFindCat(_tvAdminUntok(tok));
+    if (!c) return;
+    const ov = _tvAdminOv(), k = tvCatKey(c.listId, c.cat);
+    newLabel = (newLabel || '').trim();
+    if (!newLabel || newLabel === c.defLabel) delete ov.categoryLabels[k]; else ov.categoryLabels[k] = newLabel;
+    tvAdminSaveOverrides();
+    _tvMvRefreshTabs();
+    _renderTvChannelAdminModal();
+}
+window._tvAdminRenameCatX = _tvAdminRenameCatX;
+function _tvAdminToggleCatX(tok) {
+    const c = _tvAdminFindCat(_tvAdminUntok(tok));
+    if (!c) return;
+    const ov = _tvAdminOv(), k = tvCatKey(c.listId, c.cat);
+    if (ov.categoryDisabled[k]) delete ov.categoryDisabled[k]; else ov.categoryDisabled[k] = true;
+    tvAdminSaveOverrides();
+    _tvMvRefreshTabs();
+    _renderTvChannelAdminModal();
+}
+window._tvAdminToggleCatX = _tvAdminToggleCatX;
 
 function _tvAdminToggleEnabled(key) {
     const ov = _tvAdminOv();
@@ -33071,11 +33104,11 @@ function renderAltPlaylistTabs() {
     tvDdCloseAll();
     const tabs = document.getElementById('tvAltPlaylistTabs');
     if(!tabs) return;
-    const opts = Object.keys(ALT_PLAYLISTS).filter(code => code !== 'alt2').map(code => {
+    const opts = Object.keys(ALT_PLAYLISTS).filter(code => code !== 'alt2' && (code === altState.activeCode || !tvCatOff(code, ''))).map(code => {
         const pl = ALT_PLAYLISTS[code];
         if(pl._count === undefined) pl._count = (pl.m3u.match(/#EXTINF/g) || []).length;
         const _liveCnt = (altState.parsedCache[code] && altState.parsedCache[code]._mvNative) ? altState.parsedCache[code].length : pl._count;
-        return { value: code, label: `${pl.label} (${_liveCnt})` };
+        return { value: code, label: `${tvCatLabel(code, '', pl.label)} (${_liveCnt})` };
     });
     tabs.innerHTML = tvDdBuildHtml('tvAltPlaylistDD', 'selectAltPlaylist', opts, altState.activeCode);
 }
@@ -33411,8 +33444,9 @@ function renderAlt2GroupTabs() {
     const visible = alt2State.channels.filter(ch => adultAllowed || !isAdultChannel(ch));
     const counts = {};
     visible.forEach(ch => { const k = alt2GroupKey(ch); counts[k] = (counts[k] || 0) + 1; });
-    const order = Object.keys(ALT2_GROUP_LABELS).filter(k => (k !== '18' || adultAllowed) && counts[k]);
-    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${ALT2_GROUP_LABELS[k]} (${counts[k]})` })));
+    const order = Object.keys(ALT2_GROUP_LABELS).filter(k => (k !== '18' || adultAllowed) && counts[k] && !tvCatOff('alt2', k));
+    if (alt2State.activeGroup !== 'all' && tvCatOff('alt2', alt2State.activeGroup)) alt2State.activeGroup = 'all';
+    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${tvCatLabel('alt2', k, ALT2_GROUP_LABELS[k])} (${counts[k]})` })));
     tabs.innerHTML = tvDdBuildHtml('tvAlt2GroupDD', 'switchAlt2Group', opts, alt2State.activeGroup);
 }
 
@@ -33508,8 +33542,9 @@ function renderAlt3GroupTabs() {
     const visible = alt3State.channels.filter(ch => adultAllowed || !isAdultChannel(ch));
     const counts = {};
     visible.forEach(ch => { const k = alt3GroupKey(ch); counts[k] = (counts[k] || 0) + 1; });
-    const order = Object.keys(ALT3_GROUP_LABELS).filter(k => counts[k]);
-    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${ALT3_GROUP_LABELS[k]} (${counts[k]})` })));
+    const order = Object.keys(ALT3_GROUP_LABELS).filter(k => counts[k] && !tvCatOff('alt3', k));
+    if (alt3State.activeGroup !== 'all' && tvCatOff('alt3', alt3State.activeGroup)) alt3State.activeGroup = 'all';
+    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${tvCatLabel('alt3', k, ALT3_GROUP_LABELS[k])} (${counts[k]})` })));
     tabs.innerHTML = tvDdBuildHtml('tvAlt3GroupDD', 'switchAlt3Group', opts, alt3State.activeGroup);
 }
 
@@ -33604,8 +33639,9 @@ function renderAlt4GroupTabs() {
     const visible = alt4State.channels.filter(ch => adultAllowed || !isAdultChannel(ch));
     const counts = {};
     visible.forEach(ch => { const k = alt4GroupKey(ch); counts[k] = (counts[k] || 0) + 1; });
-    const order = Object.keys(ALT4_GROUP_LABELS).filter(k => counts[k]);
-    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${ALT4_GROUP_LABELS[k]} (${counts[k]})` })));
+    const order = Object.keys(ALT4_GROUP_LABELS).filter(k => counts[k] && !tvCatOff('alt4', k));
+    if (alt4State.activeGroup !== 'all' && tvCatOff('alt4', alt4State.activeGroup)) alt4State.activeGroup = 'all';
+    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${tvCatLabel('alt4', k, ALT4_GROUP_LABELS[k])} (${counts[k]})` })));
     tabs.innerHTML = tvDdBuildHtml('tvAlt4GroupDD', 'switchAlt4Group', opts, alt4State.activeGroup);
 }
 
@@ -33691,8 +33727,9 @@ function renderAlt5GroupTabs() {
     const visible = alt5State.channels.filter(ch => adultAllowed || !isAdultChannel(ch));
     const counts = {};
     visible.forEach(ch => { const k = alt5GroupKey(ch); counts[k] = (counts[k] || 0) + 1; });
-    const order = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${alt5GroupLabel(k)} (${counts[k]})` })));
+    const order = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).filter(k => !tvCatOff('alt5', k));
+    if (alt5State.activeGroup !== 'all' && tvCatOff('alt5', alt5State.activeGroup)) alt5State.activeGroup = 'all';
+    const opts = [{ value: 'all', label: `📋 Vše (${visible.length})` }].concat(order.map(k => ({ value: k, label: `${tvCatLabel('alt5', k, alt5GroupLabel(k))} (${counts[k]})` })));
     tabs.innerHTML = tvDdBuildHtml('tvAlt5GroupDD', 'switchAlt5Group', opts, alt5State.activeGroup);
 }
 
