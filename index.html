@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-07-03T00:58:00Z -->
+<!-- BUILD: 2026-09-20T20:16:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -1530,6 +1530,7 @@
     <div id="tvAdminMoveSheet" style="display:none;position:fixed;inset:0;z-index:30;background:rgba(0,0,0,0.65);align-items:flex-end;justify-content:center;" onclick="if(event.target===this)_tvAdminCloseMove()">
         <div style="width:100%;max-width:520px;background:var(--bg-card);border:1px solid var(--border);border-bottom:none;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;">
             <div id="tvAdminMoveTitle" style="font-weight:700;font-size:0.95rem;color:#eee;margin-bottom:12px;word-break:break-word;"></div>
+            <div id="tvAdminMoveNote" style="display:none;font-size:0.72rem;color:#1db954;margin:-4px 0 10px;line-height:1.4;">🔗 Kanál z vlastního playlistu se přidá do vybraného seznamu a uvidí ho všichni uživatelé. „↩ Vrátit“ ho zase odebere.</div>
             <label style="display:block;font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;">Kanály</label>
             <select id="tvAdminMoveSrc" onchange="_tvAdminMoveSrcChanged()" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;font-size:0.9rem;margin-bottom:10px;box-sizing:border-box;"></select>
             <label id="tvAdminMoveCatLabel" style="display:block;font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;">Kategorie</label>
@@ -1540,6 +1541,34 @@
             </div>
             <button id="tvAdminMoveReset" onclick="_tvAdminResetMove()" style="display:none;width:100%;margin-top:8px;background:none;border:1px solid #e6b800;color:#e6b800;padding:8px;border-radius:10px;cursor:pointer;font-size:0.82rem;">↩ Vrátit na původní místo</button>
         </div>
+    </div>
+</div>
+
+<!-- ➕ Přidat playlist (Kanály 7, 8, …): odkaz nebo vlastní soubor, uloží se jen lokálně -->
+<div id="tvUpAddModal" style="display:none;position:fixed;inset:0;z-index:2000001;background:rgba(0,0,0,0.75);align-items:flex-end;justify-content:center;" onclick="if(event.target===this)tvUpCloseAdd()">
+    <div style="width:100%;max-width:520px;max-height:90vh;overflow-y:auto;overscroll-behavior:contain;background:var(--bg-card);border:1px solid var(--border);border-bottom:none;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <div style="flex:1;font-family:'Playfair Display',serif;font-size:1.05rem;color:#5dade2;font-weight:700;">➕ Přidat playlist</div>
+            <button onclick="tvUpCloseAdd()" style="background:none;border:1px solid var(--border);color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:0.95rem;">✕</button>
+        </div>
+        <div style="font-size:0.74rem;color:var(--text-muted);line-height:1.45;margin-bottom:12px;">Playlist se uloží jen do tohoto zařízení a přibude jako další seznam (Kanály 7, 8, …). Kanály jdou pustit ve VLC, vypnout a přesunout do Kanály 1–6 — přesunuté kanály pak uvidí všichni uživatelé.</div>
+        <input type="text" id="tvUpName" maxlength="60" placeholder="Název (nepovinné)" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+        <div style="display:flex;gap:8px;margin:10px 0;">
+            <button id="tvUpModeUrl" onclick="tvUpSetMode('url')">🔗 Odkaz</button>
+            <button id="tvUpModeFile" onclick="tvUpSetMode('file')">📁 Nahrát soubor</button>
+        </div>
+        <div id="tvUpPaneUrl">
+            <input type="url" id="tvUpUrl" placeholder="https://…/playlist.m3u" autocapitalize="off" autocomplete="off" spellcheck="false" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+        </div>
+        <div id="tvUpPaneFile" style="display:none;">
+            <input type="file" id="tvUpFile" style="display:none;" onchange="tvUpFileChosen(this)">
+            <button onclick="document.getElementById('tvUpFile').click()" style="width:100%;background:var(--bg-elevated);border:1px dashed var(--border);color:#ccc;padding:12px;border-radius:8px;cursor:pointer;font-size:0.88rem;">📁 Vybrat soubor (.m3u / .m3u8)</button>
+            <div id="tvUpFileName" style="font-size:0.74rem;color:var(--text-muted);margin-top:6px;word-break:break-all;"></div>
+        </div>
+        <div id="tvUpStatus" style="min-height:18px;font-size:0.78rem;margin-top:10px;line-height:1.4;"></div>
+        <button id="tvUpAddBtn" onclick="tvUpDoAdd()" style="width:100%;margin-top:8px;background:#1db954;border:none;color:#000;font-weight:700;padding:11px;border-radius:10px;cursor:pointer;font-size:0.92rem;">➕ Přidat playlist</button>
+        <div style="margin-top:18px;font-size:0.7rem;color:var(--text-muted);font-weight:700;letter-spacing:0.05em;">MOJE PLAYLISTY</div>
+        <div id="tvUpMgrList"></div>
     </div>
 </div>
 
@@ -17551,6 +17580,25 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         </div>
     </div>
 
+    <!-- Vlastní playlist (Kanály 7, 8, …) — přidaný přes Správa IPTV kanálů → ➕ Přidat playlist -->
+    <div id="tvUpWrap" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
+        <div class="tv-chrome-row">
+            <div class="tv-group-tabs tv-chrome-item" id="tvUpGroupTabs"></div>
+            <button type="button" class="tv-chrome-toggle" onclick="toggleTvChrome()" title="Schovat nabídku">▲</button>
+        </div>
+        <div class="tv-chrome-item" style="flex-shrink:0;padding:6px 12px;border-bottom:1px solid var(--border);">
+            <input type="text" id="tvUpSearchInput" oninput="filterUpChannels(this.value)" placeholder="🔍 Hledat kanál…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
+            <div class="tv-viewmode-toggle">
+                <button class="tv-viewmode-btn" data-mode="tiles" onclick="tvSetViewMode('tiles')">🔲 Dlaždice</button>
+                <button class="tv-viewmode-btn" data-mode="list" onclick="tvSetViewMode('list')">☰ Seznam</button>
+            </div>
+            <div id="tvUpBar"></div>
+        </div>
+        <div id="tvUpListWrap" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0;">
+            <div class="tv-channel-list" id="tvUpList"></div>
+        </div>
+    </div>
+
     <!-- Podle žánru: sjednocený "vycuc" ze VŠECH zdrojů (Kanály 1–6 a jakékoliv
          další, které přibydou v ALT_PLAYLISTS), roztříděný do žánrových skupin. -->
     <!-- Správa kanálů: všechny kanály ze všech zdrojů pod sebou + zap/vyp (jen Admin level 2) -->
@@ -17690,6 +17738,8 @@ function _tvAdminOv() {
     if (!o.categoryDisabled) o.categoryDisabled = {};
     // Přesuny kanálů mezi Kanály/Kanály 2–6: {"<původní seznam>|<klíč kanálu>": "<cílový seznam>|<cílová kategorie>"}
     if (!o.moves) o.moves = {};
+    // Sdílené kanály přidané z vlastních playlistů (Kanály 7+): {hash: {n,u,l,g,i,t,s}}
+    if (!o.injected) o.injected = {};
     return o;
 }
 function tvAdminSaveOverrides() {
@@ -18943,6 +18993,7 @@ function tvRerenderAllChannelLists() {
     if (typeof renderAlt3ChannelList === 'function') renderAlt3ChannelList();
     if (typeof renderAlt4ChannelList === 'function') renderAlt4ChannelList();
     if (typeof renderAlt5ChannelList === 'function') renderAlt5ChannelList();
+    try { const _w = document.getElementById('tvUpWrap'); if (_w && _w.style.display === 'flex' && _tvUpState().active) { renderUpGroupTabs(); renderUpChannelList(); } } catch (e) {}
     if (typeof renderGenresChannelList === 'function') renderGenresChannelList();
     if (typeof altState !== 'undefined' && altState.filterText && typeof renderAltChannelListSearch === 'function') {
         renderAltChannelListSearch();
@@ -18986,6 +19037,8 @@ function _tvMvContainers() {
     list.push({ id: 'alt3', src: 'alt3', arr: () => alt3State.channels, ensure: () => { if (!alt3State.channels.length) alt3State.channels = parseM3U(ALT_PLAYLISTS.alt3.m3u); } });
     list.push({ id: 'alt4', src: 'alt4', arr: () => alt4State.channels, ensure: () => { if (!alt4State.channels.length) alt4State.channels = parseM3U(ALT_PLAYLISTS.alt4.m3u); } });
     list.push({ id: 'alt5', src: 'alt5', arr: () => alt5State.channels, ensure: () => { if (!alt5State.channels.length) alt5State.channels = parseM3U(ALT_PLAYLISTS.alt5.m3u); } });
+    // Vlastní playlisty (Kanály 7, 8, …) — lokální; přesuny z nich řeší _tvUpShareVariants.
+    _tvUpState().lists.forEach(l => list.push({ id: l.id, src: l.id, arr: () => l.channels, ensure: () => _tvUpEnsure(l) }));
     return list;
 }
 function _tvMvEnsureSource(srcId) {
@@ -19010,6 +19063,7 @@ function _tvMvTagAll() {
 let _tvMvSeq = 0, _tvMvLastSig = null;
 function tvApplyMoves() {
     try {
+        try { _tvInjSync(); } catch (e) { console.warn('inj sync', e); }
         const moves = _tvAdminOv().moves;
         const mkeys = Object.keys(moves);
         const conts = _tvMvContainers();
@@ -19061,6 +19115,7 @@ function _tvMvRefreshTabs() {
     try { if (document.getElementById('tvAlt4GroupTabs')) renderAlt4GroupTabs(); } catch (e) {}
     try { if (document.getElementById('tvAlt5GroupTabs')) renderAlt5GroupTabs(); } catch (e) {}
     try { if (document.getElementById('tvAltPlaylistTabs') && altState.activeCode) renderAltPlaylistTabs(); } catch (e) {}
+    try { const _w = document.getElementById('tvUpWrap'); if (_w && _w.style.display === 'flex' && _tvUpState().active) renderUpGroupTabs(); } catch (e) {}
 }
 window._tvMvRefreshTabs = _tvMvRefreshTabs;
 
@@ -19111,6 +19166,7 @@ function _esc(s) { return (s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;
 function _tvAdminSrcLabel(v) {
     const nat = v._mvNat;
     if (!nat) return '';
+    if (_tvUpIs(nat)) return _tvUpIdLabel(nat) || 'Kanály 7';
     if (nat === 'main') return 'Kanály';
     if (nat === 'alt2') return 'Kanály 3';
     if (nat === 'alt3') return 'Kanály 4';
@@ -19226,6 +19282,7 @@ function tvApplyCustomNameToLoadedChannels(key, newDisplayName) {
     if (typeof alt3State !== 'undefined') apply(alt3State.channels);
     if (typeof alt4State !== 'undefined') apply(alt4State.channels);
     if (typeof alt5State !== 'undefined') apply(alt5State.channels);
+    try { _tvUpState().lists.forEach(l => apply(l.all)); } catch (e) {}
 }
 window.tvApplyCustomNameToLoadedChannels = tvApplyCustomNameToLoadedChannels;
 
@@ -19253,6 +19310,7 @@ function _tvAdminAllSourceChannels() {
     if (typeof alt3State !== 'undefined') { if (!alt3State.channels.length && typeof loadAlt3Channels === 'function') loadAlt3Channels(); alt3State.channels.forEach(ch => all.push({ ch, source: '📺 Kanály 4' })); }
     if (typeof alt4State !== 'undefined') { if (!alt4State.channels.length && typeof loadAlt4Channels === 'function') loadAlt4Channels(); alt4State.channels.forEach(ch => all.push({ ch, source: '📺 Kanály 5' })); }
     if (typeof alt5State !== 'undefined') { if (!alt5State.channels.length && typeof loadAlt5Channels === 'function') loadAlt5Channels(); alt5State.channels.forEach(ch => all.push({ ch, source: '📺 Kanály 6' })); }
+    try { _tvUpState().lists.forEach(l => { _tvUpEnsure(l); l.channels.forEach(ch => all.push({ ch, source: '📺 ' + _tvUpLabel(l) })); }); } catch (e) {}
     return all;
 }
 window._tvAdminAllSourceChannels = _tvAdminAllSourceChannels;
@@ -19289,7 +19347,7 @@ function _tvAdminSourceCats(srcId, withCounts) {
             alt3: { arr: () => alt3State.channels, keyFn: alt3GroupKey, labels: ALT3_GROUP_LABELS },
             alt4: { arr: () => alt4State.channels, keyFn: alt4GroupKey, labels: ALT4_GROUP_LABELS },
             alt5: { arr: () => alt5State.channels, keyFn: alt5GroupKey, dynamic: true }
-        }[srcId];
+        }[srcId] || _tvUpCfg(srcId);
         if (!cfg) return cats;
         const arr = cfg.arr();
         const counts = {};
@@ -19334,7 +19392,7 @@ function _tvAdminChannelRowHtml(entry, ctx, brokenFlag, sourceLabel) {
     const rid = 'r' + _tvAdminRowUidSeq;
     window._tvAdminRows[rid] = { entry, ctx };
     const mv = _tvAdminOv().moves;
-    const movedFlag = [entry.ch].concat(entry.alts || []).some(v => v._mvNat && mv[v._mvNat + '|' + key]);
+    const movedFlag = [entry.ch].concat(entry.alts || []).some(v => v._injId || (v._mvNat && mv[v._mvNat + '|' + key]));
     const variantsBtn = totalVariants > 1
         ? `<button onclick="event.stopPropagation();_tvAdminToggleVariants('${uid}', '${_esc(key)}')" title="Zobrazit a spravovat kvalitní varianty" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:0.72rem;white-space:nowrap;flex-shrink:0;">🔀 ${totalVariants}×</button>`
         : '';
@@ -19374,7 +19432,7 @@ function _tvAdminRenderSourceBar() {
     bar.innerHTML = _TV_ADMIN_SOURCES.map(s => {
         const on = st.source === s.id && (s.id === 'all' || !st.search);
         return `<button onclick="_tvAdminSelectSource('${s.id}')" style="flex-shrink:0;padding:6px 13px;border-radius:16px;border:1px solid ${on ? '#5dade2' : 'var(--border)'};background:${on ? 'rgba(93,173,226,0.18)' : 'transparent'};color:${on ? '#5dade2' : '#ccc'};font-size:0.82rem;font-weight:${on ? '700' : '500'};cursor:pointer;white-space:nowrap;">${s.icon || '📺'} ${s.label}</button>`;
-    }).join('');
+    }).join('') + `<button onclick="tvUpOpenAdd()" style="flex-shrink:0;padding:6px 13px;border-radius:16px;border:1px dashed #1db954;background:transparent;color:#1db954;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;">➕ Přidat playlist</button>`;
 }
 function _tvAdminSelectSource(id) {
     const st = window._tvAdminState;
@@ -19499,11 +19557,15 @@ function _tvAdminOpenMove(rid) {
     if (_sh && _sh.parentNode !== document.body) { document.body.appendChild(_sh); _sh.style.zIndex = '2000000'; }   // aby šel použít i mimo admin modal
     document.getElementById('tvAdminMoveTitle').textContent = 'Přesunout: ' + tvDisplayName(entry.ch.name);
     if (curSrc === 'all') curSrc = 'main';
-    document.getElementById('tvAdminMoveSrc').innerHTML = _TV_ADMIN_SOURCES.filter(s => s.id !== 'all').map(s => `<option value="${s.id}"${s.id === curSrc ? ' selected' : ''}>📺 ${s.label}</option>`).join('');
+    const _fromUp = [entry.ch].concat(entry.alts || []).some(v => _tvUpIs(v._mvNat));
+    if (_tvUpIs(curSrc)) { curSrc = 'main'; curVal = null; }
+    document.getElementById('tvAdminMoveSrc').innerHTML = _TV_ADMIN_SOURCES.filter(s => s.id !== 'all' && !_tvUpIs(s.id)).map(s => `<option value="${s.id}"${s.id === curSrc ? ' selected' : ''}>📺 ${s.label}</option>`).join('');
     _tvAdminFillMoveCats(curSrc, curVal);
     const key = entry._brokenKey, mv = _tvAdminOv().moves;
-    const hasMove = [entry.ch].concat(entry.alts || []).some(v => v._mvNat && mv[v._mvNat + '|' + key]);
+    const hasMove = [entry.ch].concat(entry.alts || []).some(v => v._injId || (v._mvNat && mv[v._mvNat + '|' + key]));
     document.getElementById('tvAdminMoveReset').style.display = hasMove ? '' : 'none';
+    const _note = document.getElementById('tvAdminMoveNote');
+    if (_note) _note.style.display = _fromUp ? '' : 'none';
     document.getElementById('tvAdminMoveSheet').style.display = 'flex';
 }
 window._tvAdminOpenMove = _tvAdminOpenMove;
@@ -19551,7 +19613,10 @@ function _tvAdminDoMove() {
     const i = val.indexOf('|');
     const tl = val.slice(0, i), tc = val.slice(i + 1);
     const entry = row.entry, key = entry._brokenKey, ov = _tvAdminOv();
-    const nats = new Set([entry.ch].concat(entry.alts || []).map(v => v._mvNat).filter(Boolean));
+    const _mvVars = [entry.ch].concat(entry.alts || []);
+    const nats = new Set(_mvVars.map(v => v._mvNat).filter(n => n && !_tvUpIs(n)));
+    const _upVars = _mvVars.filter(v => _tvUpIs(v._mvNat));   // z vlastního playlistu → sdílené kanály
+    if (_upVars.length) _tvUpShareVariants(_upVars, key, tl, tc);
     nats.forEach(nat => {
         const mk = nat + '|' + key;
         if (nat === 'main' && tl === 'main') { delete ov.moves[mk]; ov.categoryOverride[key] = tc; }   // změna kategorie uvnitř Kanály (původní mechanismus)
@@ -19569,7 +19634,7 @@ function _tvAdminResetMove() {
     const row = window._tvAdminRows[st.move.rid];
     if (!row) { _tvAdminCloseMove(); return; }
     const entry = row.entry, key = entry._brokenKey, ov = _tvAdminOv();
-    [entry.ch].concat(entry.alts || []).forEach(v => { if (v._mvNat) delete ov.moves[v._mvNat + '|' + key]; });
+    [entry.ch].concat(entry.alts || []).forEach(v => { if (v._mvNat) delete ov.moves[v._mvNat + '|' + key]; if (v._injId && ov.injected) delete ov.injected[v._injId]; });
     _tvAdminCloseMove();
     _tvAdminAfterMoveChange();
 }
@@ -33693,8 +33758,9 @@ window.addEventListener('resize', function() { tvDdCloseAll(); });
 function switchTvTab(tab) {
     try { _tvMgrUpdateOptVisibility(); } catch (e) {}
     if (tab === 'mgr' && !_tvMgrIsAdmin()) tab = 'channels';
+    if (_tvUpIs(tab) && !_tvUpList(tab)) tab = 'channels';   // smazaný vlastní playlist
     // Při přepnutí na jakoukoliv nabídku (i opětovném kliknutí na stejnou) vždy vymaž vyhledávací pole
-    ['tvChannelSearchInput','tvAltSearchInput','tvAlt2SearchInput','tvAlt3SearchInput','tvAlt4SearchInput','tvAlt5SearchInput','tvGenresSearchInput'].forEach(id => {
+    ['tvChannelSearchInput','tvAltSearchInput','tvAlt2SearchInput','tvAlt3SearchInput','tvAlt4SearchInput','tvAlt5SearchInput','tvUpSearchInput','tvGenresSearchInput'].forEach(id => {
         const el = document.getElementById(id);
         if(el && el.value) el.value = '';
     });
@@ -33713,8 +33779,9 @@ function switchTvTab(tab) {
     const isAlt5 = tab === 'alt5';
     const isGenres = tab === 'genres';
     const isMgr = tab === 'mgr';
+    const isUp = _tvUpIs(tab);
     if (window._tvMgr) window._tvMgr.active = isMgr;
-    const isAnyAlt = isEpg || isAlt || isAlt2 || isAlt3 || isAlt4 || isAlt5 || isGenres || isMgr;
+    const isAnyAlt = isEpg || isAlt || isAlt2 || isAlt3 || isAlt4 || isAlt5 || isGenres || isMgr || isUp;
     document.getElementById('tvSearchWrap').style.display = isAnyAlt ? 'none' : '';
     document.getElementById('tvChannelListWrap').style.display = isAnyAlt ? 'none' : '';
     document.getElementById('tvEpgWrap').style.display = isEpg ? 'flex' : 'none';
@@ -33724,6 +33791,8 @@ function switchTvTab(tab) {
     document.getElementById('tvAlt4Wrap').style.display = isAlt4 ? 'flex' : 'none';
     document.getElementById('tvAlt5Wrap').style.display = isAlt5 ? 'flex' : 'none';
     document.getElementById('tvGenresWrap').style.display = isGenres ? 'flex' : 'none';
+    const _upWrap = document.getElementById('tvUpWrap');
+    if (_upWrap) _upWrap.style.display = isUp ? 'flex' : 'none';
     const _mgrWrap = document.getElementById('tvMgrWrap');
     if (_mgrWrap) _mgrWrap.style.display = isMgr ? 'flex' : 'none';
     document.getElementById('tvGroupTabs').style.display = isAnyAlt ? 'none' : '';
@@ -33777,6 +33846,9 @@ function switchTvTab(tab) {
     }
     if(isMgr) {
         _tvMgrOpen();
+    }
+    if(isUp) {
+        tvUpOpen(tab);
     }
 }
 
@@ -34144,6 +34216,544 @@ function playAlt5Channel(idx) {
     updateTvQuickAltRow(ch.name, ch.url);
 }
 window.playAlt5Channel = playAlt5Channel;
+
+// ══════════════════════════════════════════════════════════════════════════
+// ➕ VLASTNÍ PLAYLISTY („Kanály 7, 8, …") — rychlé testování playlistu
+// Správa IPTV kanálů → čip „➕ Přidat playlist" → odkaz (URL) nebo vlastní
+// soubor .m3u/.m3u8. Playlist se uloží LOKÁLNĚ (jen v tomto zařízení) a
+// přibude jako další číslovaný seznam (Kanály 7, 8, …) — v rozbalovací nabídce
+// živé TV, v čipech admin panelu i ve „Všechny kanály". Kanály se pouští ve
+// VLC stejně jako ve všech ostatních seznamech; playlist jde smazat.
+//
+// SDÍLENÍ: kanál z vlastního playlistu se přesune do některého z Kanály 1–6
+// přes ↪️ Přesunout (stejně jako jinde). Protože je vlastní playlist jen
+// lokální, uloží se přesunutý kanál (název, URL, logo, skupina) i do sdílené
+// větve presence/_tv_admin → ov.injected a všem ostatním uživatelům se přidá
+// do cílového seznamu/kategorie. „↩ Vrátit na původní místo" ho zase odebere
+// všem a vrátí do vlastního playlistu.
+// ══════════════════════════════════════════════════════════════════════════
+const _TV_UP_META_KEY = 'sinator_user_playlists';
+const _TV_UP_TXT_KEY = 'sinator_user_pl_txt_';
+let _tvUpBusy = false;
+window._tvUpAddMode = 'url';
+
+function _tvUpState() { return window._tvUpState || (window._tvUpState = { lists: [], active: null }); }
+function _tvUpIs(id) { return typeof id === 'string' && id.indexOf('up_') === 0; }
+function _tvUpEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function _tvUpList(id) { return _tvUpState().lists.find(l => l.id === id) || null; }
+function _tvUpNum(l) { return 7 + _tvUpState().lists.indexOf(l); }
+function _tvUpLabel(l) { return 'Kanály ' + _tvUpNum(l); }
+function _tvUpIdLabel(id) { const l = _tvUpList(id); return l ? _tvUpLabel(l) : ''; }
+function _tvUpActive() { return _tvUpList(_tvUpState().active); }
+function _tvUpCfg(srcId) {
+    const l = _tvUpList(srcId);
+    if (!l) return null;
+    return { arr: () => l.channels, keyFn: alt5GroupKey, dynamic: true };
+}
+
+// Krátký hash URL → stabilní klíč sdíleného kanálu (jen [a-z0-9], bezpečné pro Firebase).
+function _tvUpHash(str) {
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (let i = 0; i < str.length; i++) {
+        const c = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ c, 2654435761);
+        h2 = Math.imul(h2 ^ c, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return 'i' + (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+// ── Úložiště (jen lokálně; když se nevejde do localStorage, drží se v paměti) ──
+function _tvUpPut(key, val) {
+    let ok = true;
+    try { window.localStorage.setItem(key, val); } catch (e) { ok = false; }
+    if (!ok) { try { window._store.setItem(key, val); } catch (e) {} }   // aspoň do zavření appky
+    return ok;
+}
+function _tvUpSaveMeta() {
+    const meta = _tvUpState().lists.map(l => ({ id: l.id, name: l.name, kind: l.kind, url: l.url || '', count: l.count || 0, ts: l.ts || 0, persisted: l.persisted !== false }));
+    _tvUpPut(_TV_UP_META_KEY, JSON.stringify(meta));
+}
+function _tvUpLoad() {
+    let meta = [];
+    try { meta = JSON.parse(window._store.getItem(_TV_UP_META_KEY) || '[]'); } catch (e) { meta = []; }
+    if (!Array.isArray(meta)) meta = [];
+    _tvUpState().lists = meta.filter(m => m && _tvUpIs(m.id)).map(m => ({
+        id: m.id, name: m.name || 'Playlist', kind: m.kind === 'url' ? 'url' : 'file', url: m.url || '',
+        count: m.count || 0, ts: m.ts || 0, persisted: m.persisted !== false,
+        all: null, channels: [], activeGroup: 'all', searchText: ''
+    }));
+}
+function _tvUpText(l) { return window._store.getItem(_TV_UP_TXT_KEY + l.id) || ''; }
+
+// ── Stažení / normalizace / parsování ─────────────────────────────────────
+async function _tvUpFetchText(url) {
+    const tryFetch = async (u, ms) => {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), ms);
+        try {
+            const r = await fetch(u, { signal: ctrl.signal, cache: 'no-store' });
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return await r.text();
+        } finally { clearTimeout(t); }
+    };
+    const attempts = [
+        [url, 15000],
+        ['https://corsproxy.io/?url=' + encodeURIComponent(url), 20000],
+        ['https://api.allorigins.win/raw?url=' + encodeURIComponent(url), 20000],
+        ['https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(url), 20000]
+    ];
+    let lastErr = null;
+    for (const [u, ms] of attempts) {
+        try {
+            const t = await tryFetch(u, ms);
+            if (t && t.indexOf('#EXTINF') !== -1) return t;
+            lastErr = new Error('Odpověď není M3U playlist (chybí #EXTINF).');
+        } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('Playlist se nepodařilo stáhnout.');
+}
+
+// parseM3U() čeká URL hned na řádku za #EXTINF. Reálné playlisty mezi ně často
+// vkládají #EXTVLCOPT / #EXTGRP / #KODIPROP — takové kanály by se zahodily.
+// Tady je před uložením vyčistíme (a #EXTGRP převedeme na group-title).
+function _tvUpNormalizeM3U(text) {
+    const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/);
+    const out = ['#EXTM3U'];
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line.startsWith('#EXTINF')) continue;
+        let grp = '', url = '';
+        for (let j = i + 1; j < lines.length; j++) {
+            const nx = lines[j].trim();
+            if (!nx) continue;
+            if (nx.startsWith('#EXTINF')) break;
+            if (nx.startsWith('#')) { const m = nx.match(/^#EXTGRP:\s*(.+)$/i); if (m) grp = m[1].trim(); continue; }
+            url = nx; i = j; break;
+        }
+        if (!url) continue;
+        let info = line;
+        if (grp && !/group-title="/i.test(info) && /^#EXTINF:\s*-?[\d.]+/.test(info)) {
+            info = info.replace(/^#EXTINF:\s*(-?[\d.]+)/, '#EXTINF:$1 group-title="' + grp.replace(/["',]/g, ' ') + '"');
+        }
+        out.push(info, url);
+    }
+    return out.join('\n');
+}
+
+// Načte (a naparsuje) playlist při prvním použití; sdílené kanály se z něj skryjí.
+function _tvUpFilterShared(l) {
+    if (!l || !l.all) return;
+    const inj = (typeof _tvAdminOv === 'function' && _tvAdminOv().injected) || {};
+    const shared = new Set();
+    Object.keys(inj).forEach(k => { if (inj[k] && inj[k].s === l.id) shared.add(inj[k].u); });
+    l.channels.length = 0;
+    l.all.forEach(ch => { if (!shared.has(ch.url)) l.channels.push(ch); });
+}
+function _tvUpEnsure(l) {
+    if (!l) return;
+    if (!l.all) {
+        const text = _tvUpText(l);
+        if (!text) {
+            // odkaz bez uložené kopie (třeba se nevešla do úložiště) → stáhnout znovu
+            if (l.kind === 'url' && l.url && !l._fetching && !l._fetchTried) { l._fetchTried = true; _tvUpRefresh(l.id, true); }
+            return;
+        }
+        let arr = [];
+        try { arr = parseM3U(text); } catch (e) { arr = []; }
+        arr.forEach(ch => { ch._mvNat = l.id; ch._src = l.id; });
+        l.all = arr;
+    }
+    _tvUpFilterShared(l);
+}
+
+async function _tvUpRefresh(id, silent) {
+    const l = _tvUpList(id);
+    if (!l || l.kind !== 'url' || !l.url || l._fetching) return false;
+    l._fetching = true;
+    _tvUpRenderBar();
+    if (!silent) _tvUpRenderManager();
+    try {
+        const text = _tvUpNormalizeM3U(await _tvUpFetchText(l.url));
+        const parsed = parseM3U(text);
+        if (!parsed.length) throw new Error('Playlist neobsahuje žádné kanály.');
+        l.persisted = _tvUpPut(_TV_UP_TXT_KEY + l.id, text);
+        l.count = parsed.length;
+        l.ts = Date.now();
+        l.all = null;
+        _tvUpSaveMeta();
+        _tvUpEnsure(l);
+        l._fetching = false;
+        _tvUpAfterChange();
+        return true;
+    } catch (e) {
+        l._fetching = false;
+        if (!silent) alert('❌ Aktualizace playlistu selhala: ' + (e && e.message ? e.message : e));
+        _tvUpRenderBar();
+        _tvUpRenderManager();
+        try { if (document.getElementById('tvUpWrap').style.display === 'flex') renderUpChannelList(); } catch (e2) {}
+        return false;
+    }
+}
+
+// ── Sdílené (injektované) kanály — viz komentář nahoře ─────────────────────
+function _tvUpShareVariants(vars, key, tl, tc) {
+    const ov = _tvAdminOv();
+    if (!ov.injected) ov.injected = {};
+    vars.forEach(v => {
+        ov.injected[_tvUpHash(v.url)] = { n: v._origName || v.name || '', u: v.url, l: v.logo || '', g: v.group || '', i: v.id || '', t: tl, s: v._mvNat || '' };
+    });
+    if (tl === 'main') { if (tc) ov.categoryOverride[key] = tc; }
+    else if (tc) ov.moves[tl + '|' + key] = tl + '|' + tc;
+}
+
+// Volá se na začátku tvApplyMoves(): drží sdílené kanály (ov.injected) ve správných
+// seznamech — přidá chybějící, odebere ty, které admin vrátil zpět.
+function _tvInjSync() {
+    const ov = _tvAdminOv();
+    const inj = ov.injected || {};
+    const ids = Object.keys(inj);
+    if (!ids.length && !window._tvInjLive) return;
+    const conts = _tvMvContainers();
+    conts.forEach(c => {
+        let a = null; try { a = c.arr(); } catch (e) {}
+        if (!a) return;
+        const stale = ch => ch && ch._injId && !inj[ch._injId];
+        if (a._mvNative && a._mvNative.some(stale)) {
+            const keep = a._mvNative.filter(x => !stale(x));
+            a._mvNative.length = 0; keep.forEach(x => a._mvNative.push(x));
+        }
+        if (a.some(stale)) { for (let i = a.length - 1; i >= 0; i--) if (stale(a[i])) a.splice(i, 1); }
+    });
+    if (ids.length) {
+        const present = new Set();
+        conts.forEach(c => {
+            let a = null; try { a = c.arr(); } catch (e) {}
+            if (!a) return;
+            (a._mvNative || a).forEach(ch => { if (ch && ch._injId) present.add(ch._injId); });
+        });
+        const custom = ov.customName || {};
+        ids.forEach(id => {
+            if (present.has(id)) return;
+            const e = inj[id];
+            if (!e || !e.u) return;
+            const c = conts.find(x => x.id === e.t);
+            if (!c) return;
+            try { c.ensure(); } catch (err) {}
+            let a = null; try { a = c.arr(); } catch (err) {}
+            if (!a) return;
+            const raw = e.n || 'Kanál';
+            const ch = { name: raw, _origName: raw, url: e.u, logo: e.l || '', id: e.i || raw, group: e.g || '', _injId: id, _mvNat: c.id, _src: c.id };
+            const cn = custom[tvChannelKey(ch)];
+            if (cn) ch.name = cn;
+            (a._mvNative || a).push(ch);
+        });
+    }
+    window._tvInjLive = ids.length > 0;
+    _tvUpState().lists.forEach(l => { if (l.all) _tvUpFilterShared(l); });
+}
+
+// ── Zdroje: čipy admin panelu + položky rozbalovací nabídky živé TV ────────
+function _tvUpSyncSources() {
+    const st = _tvUpState();
+    for (let i = _TV_ADMIN_SOURCES.length - 1; i >= 0; i--) if (_tvUpIs(_TV_ADMIN_SOURCES[i].id)) _TV_ADMIN_SOURCES.splice(i, 1);
+    let at = _TV_ADMIN_SOURCES.findIndex(s => s.id === 'alt5') + 1;
+    if (at <= 0) at = _TV_ADMIN_SOURCES.length;
+    st.lists.forEach((l, i) => _TV_ADMIN_SOURCES.splice(at + i, 0, { id: l.id, label: _tvUpLabel(l) }));
+    const menu = document.querySelector('.tv-dd-menu[data-owner="tvTabDD"]');
+    if (menu) {
+        menu.querySelectorAll('.tv-dd-opt[data-up]').forEach(o => o.remove());
+        let anchor = menu.querySelector('.tv-dd-opt[data-value="alt5"]');
+        st.lists.forEach(l => {
+            const o = document.createElement('div');
+            o.className = 'tv-dd-opt';
+            o.setAttribute('data-value', l.id);
+            o.setAttribute('data-up', '1');
+            const nm = (l.name || '').length > 20 ? l.name.slice(0, 19) + '…' : (l.name || '');
+            o.textContent = '📺 ' + _tvUpLabel(l) + (nm ? ' · ' + nm : '');
+            if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(o, anchor.nextSibling);
+            else menu.appendChild(o);
+            anchor = o;
+        });
+    }
+}
+
+function _tvUpAfterChange() {
+    _tvUpSyncSources();
+    try { tvApplyMoves(); } catch (e) {}
+    try { tvRerenderAllChannelLists(); } catch (e) {}
+    try { if (document.getElementById('tvUpWrap').style.display === 'flex') { renderUpGroupTabs(); renderUpChannelList(); } } catch (e) {}
+    _tvUpRenderBar();
+    _tvUpRenderManager();
+    const m = document.getElementById('tvChannelAdminModal');
+    if (m && m.style.display === 'flex' && typeof _renderTvChannelAdminModal === 'function') { try { _renderTvChannelAdminModal(); } catch (e) {} }
+}
+
+// ── Záložka playlistu v živé TV ────────────────────────────────────────────
+function tvUpOpen(id) {
+    const st = _tvUpState();
+    const l = _tvUpList(id);
+    st.active = l ? id : null;
+    if (!l) return;
+    l.activeGroup = 'all';
+    l.searchText = '';
+    const si = document.getElementById('tvUpSearchInput');
+    if (si) si.value = '';
+    try { tvApplyMoves(); } catch (e) {}
+    _tvUpEnsure(l);
+    renderUpGroupTabs();
+    renderUpChannelList();
+    _tvUpRenderBar();
+    if (l.kind === 'url' && l.url && !l._autoRefreshed) { l._autoRefreshed = true; _tvUpRefresh(l.id, true); }   // odkaz → tiše aktualizovat 1× za spuštění
+}
+window.tvUpOpen = tvUpOpen;
+
+function renderUpGroupTabs() {
+    tvDdCloseAll();
+    const tabs = document.getElementById('tvUpGroupTabs');
+    if (!tabs) return;
+    const l = _tvUpActive();
+    if (!l) { tabs.innerHTML = ''; return; }
+    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
+    const counts = {};
+    l.channels.filter(ch => adultAllowed || !isAdultChannel(ch)).forEach(ch => { const k = alt5GroupKey(ch); counts[k] = (counts[k] || 0) + 1; });
+    const order = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).filter(k => !tvCatOff(l.id, k));
+    if (l.activeGroup !== 'all' && tvCatOff(l.id, l.activeGroup)) l.activeGroup = 'all';
+    const opts = [{ value: 'all', label: '📋 Vše' }].concat(order.map(k => ({ value: k, label: tvCatLabel(l.id, k, alt5GroupLabel(k)) })));
+    tabs.innerHTML = tvDdBuildHtml('tvUpGroupDD', 'switchUpGroup', opts, l.activeGroup);
+}
+window.renderUpGroupTabs = renderUpGroupTabs;
+
+function switchUpGroup(id) {
+    const l = _tvUpActive();
+    if (!l) return;
+    l.activeGroup = id;
+    l.searchText = '';
+    const si = document.getElementById('tvUpSearchInput');
+    if (si) si.value = '';
+    renderUpGroupTabs();
+    renderUpChannelList();
+}
+window.switchUpGroup = switchUpGroup;
+
+function filterUpChannels(text) {
+    const l = _tvUpActive();
+    if (!l) return;
+    l.searchText = (text || '').toLowerCase().trim();
+    renderUpChannelList();
+}
+window.filterUpChannels = filterUpChannels;
+
+function renderUpChannelList() {
+    try { tvApplyMoves(); } catch (e) {}
+    const listEl = document.getElementById('tvUpList');
+    if (!listEl) return;
+    const l = _tvUpActive();
+    if (!l) { listEl.innerHTML = ''; return; }
+    _tvUpEnsure(l);
+    if (l._fetching && !l.channels.length) {
+        listEl.innerHTML = '<div class="loading" style="padding:30px;"><div class="spinner"></div>Stahuji playlist…</div>';
+        return;
+    }
+    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
+    const searchText = l.searchText;
+    let filtered = l.channels.filter(ch =>
+        (adultAllowed || !isAdultChannel(ch)) &&
+        (searchText ? ch.name.toLowerCase().includes(searchText) : (l.activeGroup === 'all' || alt5GroupKey(ch) === l.activeGroup))
+    );
+    filtered = tvSortChannels(filtered);
+    if (!filtered.length) {
+        listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">' + (searchText ? 'Žádné kanály neodpovídají hledání.' : 'Žádné kanály.') + '</div>';
+        return;
+    }
+    const grouped = tvGroupChannels(filtered);
+    const onclickFor = (c) => 'playUpChannel(' + l.channels.indexOf(c) + ')';
+    const isActiveFor = (entry) => !!(l.currentChannel && (l.currentChannel.url === entry.ch.url || entry.alts.some(a => l.currentChannel.url === a.url)));
+    listEl.classList.toggle('list-mode', tvViewMode === 'list');
+    tvSetListHtml(listEl, tvRenderChannelsHtml(grouped, onclickFor, isActiveFor, 'tvNoLogoPanel_up'));
+}
+window.renderUpChannelList = renderUpChannelList;
+
+function playUpChannel(idx) {
+    const l = _tvUpActive();
+    if (!l) return;
+    const ch = l.channels[idx];
+    if (!ch) return;
+    l.currentChannel = ch;
+    renderUpChannelList();
+    openInVlcUrl(ch.url);
+    updateTvQuickAltRow(ch.name, ch.url);
+}
+window.playUpChannel = playUpChannel;
+
+function _tvUpRenderBar() {
+    const el = document.getElementById('tvUpBar');
+    if (!el) return;
+    const l = _tvUpActive();
+    if (!l) { el.innerHTML = ''; return; }
+    const btn = 'background:none;border:1px solid var(--border);color:#ccc;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:0.78rem;flex-shrink:0;';
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+        <div style="flex:1;min-width:0;font-size:0.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l.kind === 'url' ? '🔗' : '📁'} <b style="color:#5dade2;">${_tvUpEsc(_tvUpLabel(l))}</b> · ${_tvUpEsc(l.name)} · ${l.channels.length} kanálů${l._fetching ? ' · ⏳ stahuji…' : ''}${l.persisted === false ? ' · ⚠️ jen do zavření appky' : ''}</div>
+        ${l.kind === 'url' ? `<button onclick="tvUpRefresh('${l.id}')" title="Znovu stáhnout playlist" style="${btn}">🔄</button>` : ''}
+        <button onclick="tvUpRename('${l.id}')" title="Přejmenovat" style="${btn}">✏️</button>
+        <button onclick="tvUpDelete('${l.id}')" title="Smazat playlist" style="${btn}border-color:#ff6b6b;color:#ff6b6b;">🗑</button>
+        <button onclick="tvUpOpenAdd()" title="Přidat další playlist" style="${btn}border-color:#1db954;color:#1db954;">➕</button>
+    </div>`;
+}
+
+// ── Dialog „Přidat playlist" + přehled vlastních playlistů ─────────────────
+function tvUpOpenAdd() {
+    const m = document.getElementById('tvUpAddModal');
+    if (!m) return;
+    if (m.parentNode !== document.body) document.body.appendChild(m);
+    ['tvUpName', 'tvUpUrl'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const f = document.getElementById('tvUpFile'); if (f) f.value = '';
+    const fn = document.getElementById('tvUpFileName'); if (fn) fn.textContent = '';
+    tvUpSetMode('url');
+    _tvUpStatus('');
+    _tvUpRenderManager();
+    m.style.display = 'flex';
+}
+window.tvUpOpenAdd = tvUpOpenAdd;
+
+function tvUpCloseAdd() {
+    const m = document.getElementById('tvUpAddModal');
+    if (m) m.style.display = 'none';
+}
+window.tvUpCloseAdd = tvUpCloseAdd;
+
+function tvUpSetMode(mode) {
+    window._tvUpAddMode = mode === 'file' ? 'file' : 'url';
+    const on = 'background:rgba(93,173,226,0.18);border:1px solid #5dade2;color:#5dade2;font-weight:700;';
+    const off = 'background:transparent;border:1px solid var(--border);color:#ccc;font-weight:500;';
+    const b1 = document.getElementById('tvUpModeUrl'), b2 = document.getElementById('tvUpModeFile');
+    const base = 'flex:1;padding:10px 6px;border-radius:10px;cursor:pointer;font-size:0.85rem;';
+    if (b1) b1.style.cssText = base + (window._tvUpAddMode === 'url' ? on : off);
+    if (b2) b2.style.cssText = base + (window._tvUpAddMode === 'file' ? on : off);
+    const p1 = document.getElementById('tvUpPaneUrl'), p2 = document.getElementById('tvUpPaneFile');
+    if (p1) p1.style.display = window._tvUpAddMode === 'url' ? '' : 'none';
+    if (p2) p2.style.display = window._tvUpAddMode === 'file' ? '' : 'none';
+    _tvUpStatus('');
+}
+window.tvUpSetMode = tvUpSetMode;
+
+function tvUpFileChosen(inp) {
+    const fn = document.getElementById('tvUpFileName');
+    const f = inp && inp.files && inp.files[0];
+    if (fn) fn.textContent = f ? ('📄 ' + f.name + ' (' + Math.round(f.size / 1024) + ' kB)') : '';
+    _tvUpStatus('');
+}
+window.tvUpFileChosen = tvUpFileChosen;
+
+function _tvUpStatus(msg, isErr) {
+    const el = document.getElementById('tvUpStatus');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.style.color = isErr ? '#ff6b6b' : 'var(--text-muted)';
+}
+
+async function tvUpDoAdd() {
+    if (_tvUpBusy) return;
+    const mode = window._tvUpAddMode;
+    const btn = document.getElementById('tvUpAddBtn');
+    _tvUpBusy = true;
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+    try {
+        let text = '', url = '', defName = '';
+        if (mode === 'url') {
+            url = ((document.getElementById('tvUpUrl') || {}).value || '').trim();
+            if (!/^https?:\/\/\S+$/i.test(url)) throw new Error('Zadej platný odkaz začínající http:// nebo https://');
+            _tvUpStatus('⏳ Stahuji playlist…');
+            text = await _tvUpFetchText(url);
+            try { defName = new URL(url).hostname.replace(/^www\./, ''); } catch (e) {}
+        } else {
+            const f = document.getElementById('tvUpFile');
+            const file = f && f.files && f.files[0];
+            if (!file) throw new Error('Nejdřív vyber soubor s playlistem.');
+            _tvUpStatus('⏳ Čtu soubor…');
+            text = await file.text();
+            defName = (file.name || '').replace(/\.[^.]+$/, '');
+        }
+        const norm = _tvUpNormalizeM3U(text);
+        const parsed = parseM3U(norm);
+        if (!parsed.length) throw new Error('V playlistu nejsou žádné kanály (hledám #EXTINF + URL streamu).');
+        const st = _tvUpState();
+        const id = 'up_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+        const name = (((document.getElementById('tvUpName') || {}).value || '').trim() || defName || 'Playlist').slice(0, 60);
+        const l = { id, name, kind: mode === 'url' ? 'url' : 'file', url: mode === 'url' ? url : '', count: parsed.length, ts: Date.now(), persisted: true, all: null, channels: [], activeGroup: 'all', searchText: '' };
+        l.persisted = _tvUpPut(_TV_UP_TXT_KEY + id, norm);
+        st.lists.push(l);
+        _tvUpSaveMeta();
+        _tvUpAfterChange();
+        tvUpCloseAdd();
+        const adminM = document.getElementById('tvChannelAdminModal');
+        const tvM = document.getElementById('tvModal');
+        if (adminM && adminM.style.display === 'flex' && typeof _tvAdminSelectSource === 'function') _tvAdminSelectSource(id);
+        else if (tvM && tvM.classList.contains('open')) switchTvTab(id);
+        if (!l.persisted) alert('⚠️ Playlist se nevešel do úložiště zařízení — zůstane jen do zavření aplikace.' + (l.kind === 'url' ? ' (Odkaz se příště stáhne znovu.)' : ' Přidej ho příště znovu.'));
+    } catch (e) {
+        _tvUpStatus('❌ ' + (e && e.message ? e.message : e), true);
+    } finally {
+        _tvUpBusy = false;
+        if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+    }
+}
+window.tvUpDoAdd = tvUpDoAdd;
+
+function tvUpRefresh(id) { _tvUpRefresh(id, false); }
+window.tvUpRefresh = tvUpRefresh;
+
+function tvUpRename(id) {
+    const l = _tvUpList(id);
+    if (!l) return;
+    const n = prompt('Název playlistu:', l.name);
+    if (n === null) return;
+    l.name = (n.trim() || l.name).slice(0, 60);
+    _tvUpSaveMeta();
+    _tvUpAfterChange();
+}
+window.tvUpRename = tvUpRename;
+
+function tvUpDelete(id) {
+    const l = _tvUpList(id);
+    if (!l) return;
+    if (!confirm('Smazat playlist „' + l.name + '" (' + _tvUpLabel(l) + ')?\n\nKanály, které jsi z něj už přesunul do jiných seznamů (a vidí je ostatní), zůstanou.')) return;
+    const st = _tvUpState();
+    const wasShown = st.active === id && document.getElementById('tvUpWrap') && document.getElementById('tvUpWrap').style.display === 'flex';
+    st.lists = st.lists.filter(x => x.id !== id);
+    window._store.removeItem(_TV_UP_TXT_KEY + id);
+    _tvUpSaveMeta();
+    if (st.active === id) st.active = null;
+    if (window._tvAdminState && window._tvAdminState.source === id) { window._tvAdminState.source = 'main'; window._tvAdminState.expandedCat = null; }
+    if (window._tvMgr && window._tvMgr.src === id) window._tvMgr.src = 'all';
+    _tvUpAfterChange();
+    if (wasShown) switchTvTab('channels');
+}
+window.tvUpDelete = tvUpDelete;
+
+function _tvUpRenderManager() {
+    const box = document.getElementById('tvUpMgrList');
+    if (!box) return;
+    const ls = _tvUpState().lists;
+    if (!ls.length) { box.innerHTML = '<div style="font-size:0.78rem;color:var(--text-muted);padding:8px 0;">Zatím žádný vlastní playlist.</div>'; return; }
+    const btn = 'background:none;border:1px solid var(--border);color:#ccc;width:34px;height:30px;border-radius:8px;cursor:pointer;font-size:0.85rem;flex-shrink:0;';
+    box.innerHTML = ls.map(l => {
+        const when = l.ts ? new Date(l.ts).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--border);">
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:0.86rem;color:#eee;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📺 ${_tvUpEsc(_tvUpLabel(l))} · ${_tvUpEsc(l.name)}</div>
+                <div style="font-size:0.68rem;color:var(--text-muted);">${l.kind === 'url' ? '🔗 odkaz' : '📁 soubor'} · ${l.count} kanálů${when ? ' · ' + when : ''}${l._fetching ? ' · ⏳ stahuji…' : ''}${l.persisted === false ? ' · ⚠️ jen do zavření appky' : ''}</div>
+            </div>
+            ${l.kind === 'url' ? `<button onclick="tvUpRefresh('${l.id}')" title="Znovu stáhnout" style="${btn}">🔄</button>` : ''}
+            <button onclick="tvUpRename('${l.id}')" title="Přejmenovat" style="${btn}">✏️</button>
+            <button onclick="tvUpDelete('${l.id}')" title="Smazat" style="${btn}border-color:#ff6b6b;color:#ff6b6b;">🗑</button>
+        </div>`;
+    }).join('');
+}
+
+try { _tvUpLoad(); _tvUpSyncSources(); } catch (e) { console.warn('vlastní playlisty: init selhal', e); }
+
 
 // ══════════════════════════════════════════════════════════════════════════
 // "Podle žánru" — sjednocený vycuc ze VŠECH zdrojů (hlavní Kanály + Kanály
@@ -38639,6 +39249,7 @@ const rtdb = getDatabase(fbApp);
     else { const du = {}; Object.keys(o.disabledUrls).forEach(k => { du[_decUrlKey(k)] = true; }); o.disabledUrls = du; }
     if (!o.categoryDisabled) o.categoryDisabled = {};
     if (!o.moves) o.moves = {};
+    if (!o.injected) o.injected = {};
     window._tvAdminOverrides = o;
     try { window._store && window._store.setItem('sinator_tv_admin_overrides', JSON.stringify(o)); } catch(e) {}
     if (typeof window.tvRerenderAllChannelLists === 'function') window.tvRerenderAllChannelLists();
