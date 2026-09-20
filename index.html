@@ -1492,7 +1492,7 @@
             <div class="settings-section" id="tvChannelAdminSettingsBox" style="display:none;background:rgba(52,152,219,0.06);border:1px solid rgba(52,152,219,0.2);border-radius:12px;padding:14px 16px;margin-top:10px;">
                 <span class="settings-label" style="color:#5dade2;">📡 Správa IPTV kanálů</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 10px;line-height:1.4;">
-                    Zapínání/vypínání kanálů i celých kategorií, přesun mezi kategoriemi, pořadí, přejmenování kategorií i jednotlivých kanálů (funguje napříč Kanály i Kanály 2–6 přes vyhledávání), a správa kvalitních variant (nechat zapnutou jen jednu) — sdíleno pro všechny uživatele appky přes Firebase, stejně jako značení nefunkčních streamů výš.
+                    Zapínání/vypínání kanálů i celých kategorií, přesun mezi kategoriemi i mezi Kanály (Kanály ↔ Kanály 2–6), výběr, které Kanály upravuješ, pořadí, přejmenování kategorií i jednotlivých kanálů (funguje napříč Kanály i Kanály 2–6 přes vyhledávání), a správa kvalitních variant (nechat zapnutou jen jednu) — sdíleno pro všechny uživatele appky přes Firebase, stejně jako značení nefunkčních streamů výš.
                 </div>
                 <button class="settings-btn-small" style="width:100%;border-color:#5dade2;color:#5dade2;" onclick="openTvChannelAdminModal()">📡 Spravovat kanály</button>
             </div>
@@ -1511,7 +1511,24 @@
     <div style="padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg-card);">
         <input type="text" id="tvAdminSearchInput" placeholder="Hledat kanál napříč Kanály i Kanály 2–6…" oninput="_tvAdminOnSearch(this.value)" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:8px;font-size:0.85rem;box-sizing:border-box;">
     </div>
+    <div id="tvAdminSourceBar" style="display:flex;gap:6px;overflow-x:auto;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg-card);flex-shrink:0;"></div>
     <div style="flex:1;overflow-y:auto;overscroll-behavior:contain;" id="tvChannelAdminBody"></div>
+
+    <!-- ↪️ Přesun kanálu do jiné kategorie / jiných Kanálů -->
+    <div id="tvAdminMoveSheet" style="display:none;position:fixed;inset:0;z-index:30;background:rgba(0,0,0,0.65);align-items:flex-end;justify-content:center;" onclick="if(event.target===this)_tvAdminCloseMove()">
+        <div style="width:100%;max-width:520px;background:var(--bg-card);border:1px solid var(--border);border-bottom:none;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;">
+            <div id="tvAdminMoveTitle" style="font-weight:700;font-size:0.95rem;color:#eee;margin-bottom:12px;word-break:break-word;"></div>
+            <label style="display:block;font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;">Kanály</label>
+            <select id="tvAdminMoveSrc" onchange="_tvAdminMoveSrcChanged()" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;font-size:0.9rem;margin-bottom:10px;box-sizing:border-box;"></select>
+            <label id="tvAdminMoveCatLabel" style="display:block;font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;">Kategorie</label>
+            <select id="tvAdminMoveCat" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;font-size:0.9rem;margin-bottom:14px;box-sizing:border-box;"></select>
+            <div style="display:flex;gap:8px;">
+                <button onclick="_tvAdminCloseMove()" style="flex:1;background:none;border:1px solid var(--border);color:#ccc;padding:10px;border-radius:10px;cursor:pointer;font-size:0.9rem;">Zrušit</button>
+                <button onclick="_tvAdminDoMove()" style="flex:2;background:#5dade2;border:none;color:#000;font-weight:700;padding:10px;border-radius:10px;cursor:pointer;font-size:0.9rem;">↪️ Přesunout</button>
+            </div>
+            <button id="tvAdminMoveReset" onclick="_tvAdminResetMove()" style="display:none;width:100%;margin-top:8px;background:none;border:1px solid #e6b800;color:#e6b800;padding:8px;border-radius:10px;cursor:pointer;font-size:0.82rem;">↩ Vrátit na původní místo</button>
+        </div>
+    </div>
 </div>
 
 <!-- 📡 iVysílání ČT modal -->
@@ -17650,6 +17667,8 @@ function _tvAdminOv() {
     // Vypnuté celé kategorie (TV_GROUPS id -> true) — kategorie pak zmizí
     // z výběru v živé TV, dokud ji admin zase nezapne.
     if (!o.categoryDisabled) o.categoryDisabled = {};
+    // Přesuny kanálů mezi Kanály/Kanály 2–6: {"<původní seznam>|<klíč kanálu>": "<cílový seznam>|<cílová kategorie>"}
+    if (!o.moves) o.moves = {};
     return o;
 }
 function tvAdminSaveOverrides() {
@@ -17666,7 +17685,7 @@ function tvAdminSaveOverrides() {
 TV_GROUPS.forEach(g => {
     g._origMatch = g.match;
     g.match = ch => {
-        const ov = _tvAdminOv().categoryOverride[tvChannelKey(ch)];
+        const ov = ch._catOv || _tvAdminOv().categoryOverride[tvChannelKey(ch)];
         if (ov) return ov === g.id;
         return g._origMatch(ch);
     };
@@ -18791,6 +18810,7 @@ window.tvUpdateViewModeButtons = tvUpdateViewModeButtons;
 // (Kanály 1–6, Podle žánru) — sdíleno mezi přepínačem Dlaždice/Seznam a
 // označováním/odznačováním nefunkčních streamů.
 function tvRerenderAllChannelLists() {
+    try { tvApplyMoves(); _tvMvRefreshTabs(); } catch (e) {}
     if (typeof renderTvChannelList === 'function') renderTvChannelList();
     if (typeof renderAlt2ChannelList === 'function') renderAlt2ChannelList();
     if (typeof renderAlt3ChannelList === 'function') renderAlt3ChannelList();
@@ -18806,7 +18826,118 @@ function tvRerenderAllChannelLists() {
 window.tvRerenderAllChannelLists = tvRerenderAllChannelLists;
 
 // ══ ADMIN PANEL: SPRÁVA IPTV KANÁLŮ (jen Admin level 2) ═══════════════════
-window._tvAdminState = { expandedCat: null, search: '' };
+// ══ PŘESUNY KANÁLŮ MEZI KANÁLY (Kanály ↔ Kanály 2–6) ═════════════════════
+// Každý kanál patří "nativně" do jednoho seznamu (main = Kanály, kód země =
+// Kanály 2, alt2..alt5 = Kanály 3–6). Admin může kanál (podle klíče) přesunout
+// do jiného seznamu/kategorie: ov.moves["<nativní seznam>|<klíč>"] =
+// "<cílový seznam>|<cílová kategorie>". tvApplyMoves() pole kanálů v paměti
+// přeskládá IN-PLACE (reference zůstávají platné), takže všechny existující
+// render funkce (indexOf/play...) fungují beze změny. Původní obsah je uložen
+// v arr._mvNative, takže se přesun dá kdykoliv vrátit.
+const _TV_ADMIN_SOURCES = [
+    { id: 'main', label: 'Kanály' },
+    { id: 'k2',   label: 'Kanály 2' },
+    { id: 'alt2', label: 'Kanály 3' },
+    { id: 'alt3', label: 'Kanály 4' },
+    { id: 'alt4', label: 'Kanály 5' },
+    { id: 'alt5', label: 'Kanály 6' }
+];
+window._TV_ADMIN_SOURCES = _TV_ADMIN_SOURCES;
+
+function _tvMvK2Codes() {
+    if (typeof ALT_PLAYLISTS === 'undefined') return [];
+    return Object.keys(ALT_PLAYLISTS).filter(c => c !== 'alt2' && c !== 'alt3' && c !== 'alt4' && c !== 'alt5');
+}
+function _tvMvContainers() {
+    const list = [];
+    list.push({ id: 'main', src: 'main', arr: () => tvState.channels,
+        ensure: () => { if (!tvState.channels.length) tvState.channels = parseM3U(EMBEDDED_M3U); } });
+    _tvMvK2Codes().forEach(code => list.push({ id: code, src: 'k2', arr: () => altState.parsedCache[code],
+        ensure: () => { if (!altState.parsedCache[code]) { try { altState.parsedCache[code] = parseM3U(ALT_PLAYLISTS[code].m3u); } catch (e) { altState.parsedCache[code] = []; } } } }));
+    list.push({ id: 'alt2', src: 'alt2', arr: () => alt2State.channels, ensure: () => { if (!alt2State.channels.length) alt2State.channels = parseM3U(ALT_PLAYLISTS.alt2.m3u); } });
+    list.push({ id: 'alt3', src: 'alt3', arr: () => alt3State.channels, ensure: () => { if (!alt3State.channels.length) alt3State.channels = parseM3U(ALT_PLAYLISTS.alt3.m3u); } });
+    list.push({ id: 'alt4', src: 'alt4', arr: () => alt4State.channels, ensure: () => { if (!alt4State.channels.length) alt4State.channels = parseM3U(ALT_PLAYLISTS.alt4.m3u); } });
+    list.push({ id: 'alt5', src: 'alt5', arr: () => alt5State.channels, ensure: () => { if (!alt5State.channels.length) alt5State.channels = parseM3U(ALT_PLAYLISTS.alt5.m3u); } });
+    return list;
+}
+function _tvMvEnsureSource(srcId) {
+    _tvMvContainers().filter(c => c.src === srcId).forEach(c => { try { c.ensure(); } catch (e) {} });
+}
+function _tvMvEnsureAll() {
+    _tvMvContainers().forEach(c => { try { c.ensure(); } catch (e) {} });
+}
+// Označí každý načtený kanál jeho nativním seznamem (_mvNat) — podle toho admin
+// ví, odkud kanál pochází, i když je zrovna zobrazen jinde.
+function _tvMvTagAll() {
+    _tvMvContainers().forEach(c => {
+        let a; try { a = c.arr(); } catch (e) { a = null; }
+        if (!a) return;
+        for (let i = 0; i < a.length; i++) {
+            const ch = a[i];
+            if (ch._mvNat === undefined) ch._mvNat = c.id;
+            if (ch._src === undefined) ch._src = c.id;
+        }
+    });
+}
+let _tvMvSeq = 0, _tvMvLastSig = null;
+function tvApplyMoves() {
+    try {
+        const moves = _tvAdminOv().moves;
+        const mkeys = Object.keys(moves);
+        const conts = _tvMvContainers();
+        const need = new Set();
+        mkeys.forEach(k => {
+            const v = moves[k] || '';
+            need.add(k.slice(0, k.indexOf('|')));
+            need.add(v.slice(0, v.indexOf('|')));
+        });
+        conts.forEach(c => { if (need.has(c.id)) { try { c.ensure(); } catch (e) {} } });
+        const active = conts.filter(c => { const a = c.arr(); return a && (a._mvNative || need.has(c.id)); });
+        if (!active.length) return;
+        const sig = JSON.stringify(moves) + '#' + active.map(c => {
+            const a = c.arr();
+            if (!a._mvId) a._mvId = ++_tvMvSeq;
+            return c.id + ':' + a._mvId + ':' + (a._mvNative ? a._mvNative.length : a.length);
+        }).join(',');
+        if (sig === _tvMvLastSig) return;
+        active.forEach(c => { const a = c.arr(); if (!a._mvNative) a._mvNative = a.slice(); });
+        const eff = {};
+        active.forEach(c => { eff[c.id] = []; });
+        active.forEach(c => {
+            c.arr()._mvNative.forEach(ch => {
+                ch._mvNat = c.id;
+                if (ch._src === undefined) ch._src = c.id;
+                delete ch._catOv;
+                let tl = c.id, tc = '';
+                const v = moves[c.id + '|' + tvChannelKey(ch)];
+                if (v) {
+                    const i = v.indexOf('|');
+                    const t = v.slice(0, i);
+                    if (eff[t]) { tl = t; tc = v.slice(i + 1); }
+                }
+                if (tc) ch._catOv = tc;
+                eff[tl].push(ch);
+            });
+        });
+        active.forEach(c => { const a = c.arr(); a.length = 0; eff[c.id].forEach(ch => a.push(ch)); });
+        window._epgAllChannelsCache = null;
+        _tvMvLastSig = sig;
+    } catch (e) { /* TDZ při ranném volání / nenačtený zdroj — nic se neděje */ }
+}
+window.tvApplyMoves = tvApplyMoves;
+
+// Po změně přesunů přerenderuje i výběry kategorií (počty) v Kanály 2–6.
+function _tvMvRefreshTabs() {
+    try { if (document.getElementById('tvAlt2GroupTabs')) renderAlt2GroupTabs(); } catch (e) {}
+    try { if (document.getElementById('tvAlt3GroupTabs')) renderAlt3GroupTabs(); } catch (e) {}
+    try { if (document.getElementById('tvAlt4GroupTabs')) renderAlt4GroupTabs(); } catch (e) {}
+    try { if (document.getElementById('tvAlt5GroupTabs')) renderAlt5GroupTabs(); } catch (e) {}
+    try { if (document.getElementById('tvAltPlaylistTabs') && altState.activeCode) renderAltPlaylistTabs(); } catch (e) {}
+}
+window._tvMvRefreshTabs = _tvMvRefreshTabs;
+
+window._tvAdminState = { expandedCat: null, search: '', source: 'main', limits: {}, move: null };
+window._tvAdminRows = {};
 
 async function openTvChannelAdminModal() {
     if (!(typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2())) return;
@@ -18822,6 +18953,7 @@ async function openTvChannelAdminModal() {
 window.openTvChannelAdminModal = openTvChannelAdminModal;
 
 function closeTvChannelAdminModal() {
+    if (typeof _tvAdminCloseMove === 'function') _tvAdminCloseMove();
     const m = document.getElementById('tvChannelAdminModal');
     if (m) m.style.display = 'none';
 }
@@ -18921,6 +19053,7 @@ window.tvApplyCustomNameToLoadedChannels = tvApplyCustomNameToLoadedChannels;
 // samostatná data nemá — je to jen jiné zobrazení TĚCHTO stejných kanálů,
 // takže přejmenování/vypnutí se do něj promítne automaticky.
 function _tvAdminAllSourceChannels() {
+    try { _tvMvEnsureAll(); tvApplyMoves(); _tvMvTagAll(); } catch (e) {}
     const all = [];
     tvState.channels.forEach(ch => all.push({ ch, source: '📺 Kanály' }));
     if (typeof ALT_PLAYLISTS !== 'undefined') {
@@ -18943,35 +19076,102 @@ function _tvAdminAllSourceChannels() {
 window._tvAdminAllSourceChannels = _tvAdminAllSourceChannels;
 
 let _tvAdminRowUidSeq = 0;
-// catId === null → řádek z cross-source hledání (bez kategorie/pořadí, jen
-// přejmenování + kvalitní varianty + nefunkční + zapnuto/vypnuto). sourceLabel
-// se pak zobrazí místo toho, aby se ukazoval select kategorie.
-function _tvAdminChannelRowHtml(entry, catId, brokenFlag, sourceLabel) {
+
+// Bezpečný token pro vložení řetězce do inline onclick (apostrofy → %27).
+function _tvAdminTok(s) { return encodeURIComponent(s == null ? '' : String(s)).replace(/'/g, '%27'); }
+function _tvAdminUntok(s) { try { return decodeURIComponent(s); } catch (e) { return s; } }
+window._tvAdminTok = _tvAdminTok;
+
+// Kategorie daného zdroje (Kanály = TV_GROUPS, Kanály 2 = jednotlivé seznamy
+// zemí, Kanály 3–6 = jejich skupiny). listId|cat je cílová adresa přesunu.
+function _tvAdminSourceCats(srcId, withCounts) {
+    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
+    const okAdult = ch => adultAllowed || !isAdultChannel(ch);
+    const cats = [];
+    if (srcId === 'main') {
+        TV_GROUPS.filter(g => g.id !== 'all').forEach(g => {
+            const chans = () => tvState.channels.filter(ch => g.match(ch));
+            cats.push({ src: 'main', listId: 'main', cat: g.id, label: tvGroupDisplayLabel(g), channels: chans, isMain: true, gid: g.id,
+                        count: withCounts ? chans().filter(okAdult).length : 0, alwaysShow: true });
+        });
+    } else if (srcId === 'k2') {
+        _tvMvK2Codes().forEach(code => {
+            const chans = () => (altState.parsedCache[code] || []);
+            cats.push({ src: 'k2', listId: code, cat: '', label: (ALT_PLAYLISTS[code] && ALT_PLAYLISTS[code].label) || code, channels: chans,
+                        count: withCounts ? chans().filter(okAdult).length : 0, alwaysShow: true });
+        });
+    } else {
+        const cfg = {
+            alt2: { arr: () => alt2State.channels, keyFn: alt2GroupKey, labels: ALT2_GROUP_LABELS },
+            alt3: { arr: () => alt3State.channels, keyFn: alt3GroupKey, labels: ALT3_GROUP_LABELS },
+            alt4: { arr: () => alt4State.channels, keyFn: alt4GroupKey, labels: ALT4_GROUP_LABELS },
+            alt5: { arr: () => alt5State.channels, keyFn: alt5GroupKey, dynamic: true }
+        }[srcId];
+        if (!cfg) return cats;
+        const arr = cfg.arr();
+        const counts = {};
+        arr.forEach(ch => { if (okAdult(ch)) { const k = cfg.keyFn(ch); counts[k] = (counts[k] || 0) + 1; } });
+        let keys;
+        if (cfg.dynamic) {
+            keys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+            if (keys.indexOf('OTHER') === -1) keys.push('OTHER');
+        } else {
+            keys = Object.keys(cfg.labels);
+        }
+        keys.forEach(k => cats.push({ src: srcId, listId: srcId, cat: k, label: cfg.dynamic ? alt5GroupLabel(k) : cfg.labels[k],
+            channels: () => arr.filter(ch => cfg.keyFn(ch) === k), count: counts[k] || 0 }));
+    }
+    return cats;
+}
+
+function _tvAdminFindCat(ctx) {
+    const i = (ctx || '').indexOf('::');
+    if (i < 0) return null;
+    const src = ctx.slice(0, i), rest = ctx.slice(i + 2);
+    return _tvAdminSourceCats(src, false).find(c => (c.listId + '|' + c.cat) === rest) || null;
+}
+
+function _tvAdminCatEntries(cat) {
+    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
+    const matched = cat.channels().filter(ch => adultAllowed || !isAdultChannel(ch));
+    const grouped = tvGroupChannels(tvSortChannels(matched), { includeDisabled: true, includeDisabledUrls: true });
+    return { all: [...grouped.shown, ...grouped.broken, ...grouped.noLogo], brokenKeys: new Set(grouped.broken.map(e => e._brokenKey)) };
+}
+
+// Jeden řádek kanálu — přepínač zapnuto/vypnuto, 🚫 nefunkční, ▶️ test,
+// ↑/↓ pořadí v rámci kategorie, ↪️ přesun do jiné kategorie / jiných Kanálů.
+// ctx === null → řádek z cross-source hledání (bez pořadí, ukazuje zdroj).
+function _tvAdminChannelRowHtml(entry, ctx, brokenFlag, sourceLabel) {
     const key = entry._brokenKey;
     const enabled = !entry._disabled;
     const name = tvDisplayName(entry.ch.name);
     const logo = entry.ch.logo ? `<img src="${entry.ch.logo}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;background:#111;flex-shrink:0;" onerror="this.style.display='none'">` : `<div style="width:28px;height:28px;flex-shrink:0;"></div>`;
     const totalVariants = 1 + ((entry.alts && entry.alts.length) || 0);
     const uid = 'tvAdminVariants_' + (++_tvAdminRowUidSeq);
+    const rid = 'r' + _tvAdminRowUidSeq;
+    window._tvAdminRows[rid] = { entry, ctx };
+    const mv = _tvAdminOv().moves;
+    const movedFlag = [entry.ch].concat(entry.alts || []).some(v => v._mvNat && mv[v._mvNat + '|' + key]);
     const variantsBtn = totalVariants > 1
         ? `<button onclick="event.stopPropagation();_tvAdminToggleVariants('${uid}')" title="Zobrazit a spravovat kvalitní varianty" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:0.72rem;white-space:nowrap;flex-shrink:0;">🔀 ${totalVariants}×</button>`
         : '';
-    const catControls = catId !== null ? `
-        <select onchange="_tvAdminChangeCategory('${_esc(key)}', this.value)" style="background:var(--bg-elevated);border:1px solid var(--border);color:#ccc;font-size:0.72rem;border-radius:6px;padding:3px 4px;max-width:90px;flex-shrink:0;">${TV_GROUPS.filter(g => g.id !== 'all').map(g => `<option value="${g.id}" ${catId === g.id ? 'selected' : ''}>${tvGroupDisplayLabel(g)}</option>`).join('')}</select>
-        <button onclick="_tvAdminMoveOrder('${_esc(key)}', '${catId}', -1)" title="Posunout nahoru" style="background:none;border:1px solid var(--border);color:#ccc;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:0.8rem;flex-shrink:0;">↑</button>
-        <button onclick="_tvAdminMoveOrder('${_esc(key)}', '${catId}', 1)" title="Posunout dolů" style="background:none;border:1px solid var(--border);color:#ccc;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:0.8rem;flex-shrink:0;">↓</button>` : '';
+    const moveBtn = `<button onclick="_tvAdminOpenMove('${rid}')" title="Přesunout do jiné kategorie / do jiných Kanálů" style="background:none;border:1px solid ${movedFlag ? '#e6b800' : 'var(--border)'};color:${movedFlag ? '#e6b800' : '#ccc'};padding:3px 8px;border-radius:6px;cursor:pointer;font-size:0.72rem;white-space:nowrap;flex-shrink:0;">↪️ Přesunout</button>`;
+    const orderControls = ctx ? `
+        <button onclick="_tvAdminMoveOrder('${_esc(key)}', '${_tvAdminTok(ctx)}', -1)" title="Posunout nahoru" style="background:none;border:1px solid var(--border);color:#ccc;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:0.8rem;flex-shrink:0;">↑</button>
+        <button onclick="_tvAdminMoveOrder('${_esc(key)}', '${_tvAdminTok(ctx)}', 1)" title="Posunout dolů" style="background:none;border:1px solid var(--border);color:#ccc;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:0.8rem;flex-shrink:0;">↓</button>` : '';
     return `<div style="border-bottom:1px solid var(--border);${enabled ? '' : 'opacity:0.45;'}">
     <div style="padding:8px 10px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             ${logo}
             <div style="flex:1;min-width:0;">
                 <input type="text" value="${_esc(name)}" onclick="event.stopPropagation()" onchange="_tvAdminRenameChannel('${_esc(key)}', this.value)" title="Přepsat zobrazovaný název kanálu" style="width:100%;background:none;border:none;color:#eee;font-size:0.85rem;padding:2px 4px;border-radius:4px;box-sizing:border-box;" onfocus="this.style.background='var(--bg-elevated)'" onblur="this.style.background='none'">
-                ${(brokenFlag || sourceLabel) ? `<div style="font-size:0.68rem;color:var(--text-muted);display:flex;gap:6px;flex-wrap:wrap;padding:0 4px;">${brokenFlag ? '<span style="color:#ff6b6b;">🚫 nefunkční</span>' : ''}${sourceLabel ? `<span>${_esc(sourceLabel)}</span>` : ''}</div>` : ''}
+                ${(brokenFlag || sourceLabel || movedFlag) ? `<div style="font-size:0.68rem;color:var(--text-muted);display:flex;gap:6px;flex-wrap:wrap;padding:0 4px;">${brokenFlag ? '<span style="color:#ff6b6b;">🚫 nefunkční</span>' : ''}${movedFlag ? '<span style="color:#e6b800;">↪ přesunuto</span>' : ''}${sourceLabel ? `<span>${_esc(sourceLabel)}</span>` : ''}</div>` : ''}
             </div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;overflow-x:auto;padding-bottom:2px;">
             ${variantsBtn}
-            ${catControls}
+            ${moveBtn}
+            ${orderControls}
             <button onclick="_tvAdminToggleBroken('${_esc(key)}', '${_esc(entry.ch._origName || entry.ch.name)}')" title="${brokenFlag ? 'Obnovit (funguje zase)' : 'Označit jako nefunkční'}" style="background:none;border:1px solid ${brokenFlag ? '#ff6b6b' : 'var(--border)'};color:${brokenFlag ? '#ff6b6b' : '#ccc'};width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">${brokenFlag ? '↺' : '🚫'}</button>
             <button onclick="openInVlcUrl('${_esc(entry.ch.url).replace(/'/g, "\\'")}')" title="Spustit / otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">▶️</button>
             <div onclick="_tvAdminToggleEnabled('${_esc(key)}')" style="width:38px;height:22px;border-radius:11px;background:${enabled ? '#1db954' : '#444'};position:relative;cursor:pointer;flex-shrink:0;transition:background 0.15s;">
@@ -18983,59 +19183,194 @@ function _tvAdminChannelRowHtml(entry, catId, brokenFlag, sourceLabel) {
     </div>`;
 }
 
+// Lišta výběru: které Kanály právě upravuju.
+function _tvAdminRenderSourceBar() {
+    const bar = document.getElementById('tvAdminSourceBar');
+    if (!bar) return;
+    const st = window._tvAdminState;
+    bar.innerHTML = _TV_ADMIN_SOURCES.map(s => {
+        const on = st.source === s.id && !st.search;
+        return `<button onclick="_tvAdminSelectSource('${s.id}')" style="flex-shrink:0;padding:6px 13px;border-radius:16px;border:1px solid ${on ? '#5dade2' : 'var(--border)'};background:${on ? 'rgba(93,173,226,0.18)' : 'transparent'};color:${on ? '#5dade2' : '#ccc'};font-size:0.82rem;font-weight:${on ? '700' : '500'};cursor:pointer;white-space:nowrap;">📺 ${s.label}</button>`;
+    }).join('');
+}
+function _tvAdminSelectSource(id) {
+    const st = window._tvAdminState;
+    st.source = id;
+    st.expandedCat = null;
+    st.search = '';
+    const inp = document.getElementById('tvAdminSearchInput');
+    if (inp) inp.value = '';
+    _renderTvChannelAdminModal();
+    const b = document.getElementById('tvChannelAdminBody');
+    if (b) b.scrollTop = 0;
+}
+window._tvAdminSelectSource = _tvAdminSelectSource;
+
+function _tvAdminShowMore(tok) {
+    const k = _tvAdminUntok(tok);
+    const st = window._tvAdminState;
+    st.limits[k] = (st.limits[k] || 120) + 120;
+    _renderTvChannelAdminModal();
+}
+window._tvAdminShowMore = _tvAdminShowMore;
+
 function _renderTvChannelAdminModal() {
     const body = document.getElementById('tvChannelAdminBody');
     if (!body) return;
+    window._tvAdminRows = {};
+    _tvAdminRenderSourceBar();
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
-    const search = window._tvAdminState.search;
+    const st = window._tvAdminState;
+    const search = st.search;
 
     if (search) {
         // Hledá napříč VŠEMI zdroji (Kanály, Kanály 2 – všechny země, Kanály
-        // 3–6), aby šel najít a spravovat (přejmenovat/vypnout) kanál i mimo
-        // hlavní playlist. "Podle žánru" je jen jiné zobrazení TĚCHTO stejných
-        // kanálů, takže se do něj úpravy promítnou automaticky.
+        // 3–6), aby šel najít a spravovat (přejmenovat/vypnout/přesunout)
+        // kanál i mimo aktuálně vybraný zdroj.
+        try { _tvMvEnsureAll(); tvApplyMoves(); _tvMvTagAll(); } catch (e) {}
         const bySource = _tvAdminAllSourceChannels().filter(x => x.ch.name.toLowerCase().includes(search) && (adultAllowed || !isAdultChannel(x.ch)));
         if (!bySource.length) { body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);">Žádné kanály neodpovídají hledání (ve všech zdrojích).</div>'; return; }
         const sourceByUrl = new Map(bySource.map(x => [x.ch.url, x.source]));
         const grouped = tvGroupChannels(tvSortChannels(bySource.map(x => x.ch)), { includeDisabled: true, includeDisabledUrls: true });
         const all = [...grouped.shown, ...grouped.broken, ...grouped.noLogo];
         const brokenKeys = new Set(grouped.broken.map(e => e._brokenKey));
-        body.innerHTML = `<div style="padding:8px 0;">` + all.map(entry => {
+        const CAP = 300;
+        body.innerHTML = `<div style="padding:8px 0;">` + all.slice(0, CAP).map(entry => {
             // Když se pod jedním klíčem sešlo víc zdrojů (stejný kanál v Kanály i Kanály 3 např.), ukaž je všechny.
             const srcs = Array.from(new Set([entry.ch].concat(entry.alts || []).map(c => sourceByUrl.get(c.url)).filter(Boolean)));
             return _tvAdminChannelRowHtml(entry, null, brokenKeys.has(entry._brokenKey), srcs.join(' · '));
-        }).join('') + `</div>`;
+        }).join('') + (all.length > CAP ? `<div style="padding:14px;text-align:center;font-size:0.78rem;color:var(--text-muted);">Zobrazeno prvních ${CAP} z ${all.length} — zpřesni hledání.</div>` : '') + `</div>`;
         return;
     }
 
-    const expandedCat = window._tvAdminState.expandedCat;
+    const srcId = st.source;
+    try { _tvMvEnsureSource(srcId); tvApplyMoves(); _tvMvTagAll(); } catch (e) {}
     const catDisabledMap = _tvAdminOv().categoryDisabled;
-    const catsHtml = TV_GROUPS.filter(g => g.id !== 'all').map(g => {
-        const matched = tvState.channels.filter(ch => g.match(ch) && (adultAllowed || !isAdultChannel(ch)));
-        const isOpen = expandedCat === g.id;
-        const catOff = !!catDisabledMap[g.id];
+    const cats = _tvAdminSourceCats(srcId, true).filter(c => c.alwaysShow || c.count > 0);
+    if (!cats.length) { body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);">V tomto zdroji nejsou žádné kanály.</div>'; return; }
+    body.innerHTML = cats.map(c => {
+        const openKey = srcId + '::' + c.listId + '|' + c.cat;
+        const isOpen = st.expandedCat === openKey;
+        const catOff = c.isMain && !!catDisabledMap[c.gid];
         let inner = '';
         if (isOpen) {
-            const grouped = tvGroupChannels(tvSortChannels(matched), { includeDisabled: true, includeDisabledUrls: true });
-            const brokenKeys = new Set(grouped.broken.map(e => e._brokenKey));
-            const all = [...grouped.shown, ...grouped.broken, ...grouped.noLogo];
-            inner = `<div>${all.length ? all.map(entry => _tvAdminChannelRowHtml(entry, g.id, brokenKeys.has(entry._brokenKey))).join('') : '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.82rem;">Žádné kanály v této kategorii.</div>'}</div>`;
+            const ce = _tvAdminCatEntries(c);
+            const limit = st.limits[openKey] || 120;
+            const part = ce.all.slice(0, limit);
+            inner = `<div>${part.length ? part.map(entry => _tvAdminChannelRowHtml(entry, openKey, ce.brokenKeys.has(entry._brokenKey))).join('') : '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.82rem;">Žádné kanály v této kategorii.</div>'}${ce.all.length > limit ? `<div style="padding:10px;text-align:center;"><button onclick="_tvAdminShowMore('${_tvAdminTok(openKey)}')" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;">➕ Zobrazit dalších ${Math.min(120, ce.all.length - limit)} (zbývá ${ce.all.length - limit})</button></div>` : ''}</div>`;
         }
-        return `<div style="border-bottom:1px solid var(--border);${catOff ? 'opacity:0.5;' : ''}">
-            <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;" onclick="_tvAdminExpandCategory('${g.id}')">
-                <span style="font-size:0.72rem;color:var(--text-muted);transition:transform 0.15s;display:inline-block;transform:rotate(${isOpen ? '90deg' : '0deg'});">▸</span>
-                <input type="text" value="${_esc(tvGroupDisplayLabel(g))}" onclick="event.stopPropagation()" onchange="_tvAdminRenameCategory('${g.id}', this.value)" style="flex:1;background:none;border:none;color:#eee;font-weight:700;font-size:0.92rem;padding:2px 4px;border-radius:4px;" onfocus="this.style.background='var(--bg-elevated)'" onblur="this.style.background='none'">
-                <span style="font-size:0.78rem;color:var(--text-muted);">${matched.length}</span>
-                <span title="${catOff ? 'Kategorie je vypnutá — nezobrazí se v živé TV' : 'Vypnout celou kategorii'}" onclick="event.stopPropagation();_tvAdminToggleCategoryDisabled('${g.id}')" style="width:34px;height:20px;border-radius:10px;background:${catOff ? '#444' : '#1db954'};position:relative;cursor:pointer;flex-shrink:0;">
+        const headLabel = c.isMain
+            ? `<input type="text" value="${_esc(c.label)}" onclick="event.stopPropagation()" onchange="_tvAdminRenameCategory('${c.gid}', this.value)" style="flex:1;min-width:0;background:none;border:none;color:#eee;font-weight:700;font-size:0.92rem;padding:2px 4px;border-radius:4px;" onfocus="this.style.background='var(--bg-elevated)'" onblur="this.style.background='none'">`
+            : `<span style="flex:1;min-width:0;color:#eee;font-weight:700;font-size:0.92rem;padding:2px 4px;">${_esc(c.label)}</span>`;
+        const catToggle = c.isMain
+            ? `<span title="${catOff ? 'Kategorie je vypnutá — nezobrazí se v živé TV' : 'Vypnout celou kategorii'}" onclick="event.stopPropagation();_tvAdminToggleCategoryDisabled('${c.gid}')" style="width:34px;height:20px;border-radius:10px;background:${catOff ? '#444' : '#1db954'};position:relative;cursor:pointer;flex-shrink:0;">
                     <span style="width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${catOff ? '2px' : '16px'};transition:left .15s;display:block;"></span>
-                </span>
+                </span>` : '';
+        return `<div style="border-bottom:1px solid var(--border);${catOff ? 'opacity:0.5;' : ''}">
+            <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;" onclick="_tvAdminExpandCategory('${_tvAdminTok(openKey)}')">
+                <span style="font-size:0.72rem;color:var(--text-muted);transition:transform 0.15s;display:inline-block;transform:rotate(${isOpen ? '90deg' : '0deg'});">▸</span>
+                ${headLabel}
+                <span style="font-size:0.78rem;color:var(--text-muted);">${c.count}</span>
+                ${catToggle}
             </div>
             ${inner}
         </div>`;
     }).join('');
-    body.innerHTML = catsHtml;
 }
 window._renderTvChannelAdminModal = _renderTvChannelAdminModal;
+
+// ── Přesun kanálu (bottom sheet: zdroj + kategorie) ─────────────────────
+function _tvAdminOpenMove(rid) {
+    const row = window._tvAdminRows[rid];
+    if (!row) return;
+    const st = window._tvAdminState;
+    st.move = { rid };
+    const entry = row.entry;
+    let curSrc = st.source, curVal = null;
+    if (row.ctx) {
+        const i = row.ctx.indexOf('::');
+        curSrc = row.ctx.slice(0, i);
+        curVal = row.ctx.slice(i + 2);
+    } else {
+        const cont = _tvMvContainers().find(c => c.id === entry.ch._mvNat);
+        if (cont) curSrc = cont.src;
+    }
+    document.getElementById('tvAdminMoveTitle').textContent = 'Přesunout: ' + tvDisplayName(entry.ch.name);
+    document.getElementById('tvAdminMoveSrc').innerHTML = _TV_ADMIN_SOURCES.map(s => `<option value="${s.id}"${s.id === curSrc ? ' selected' : ''}>📺 ${s.label}</option>`).join('');
+    _tvAdminFillMoveCats(curSrc, curVal);
+    const key = entry._brokenKey, mv = _tvAdminOv().moves;
+    const hasMove = [entry.ch].concat(entry.alts || []).some(v => v._mvNat && mv[v._mvNat + '|' + key]);
+    document.getElementById('tvAdminMoveReset').style.display = hasMove ? '' : 'none';
+    document.getElementById('tvAdminMoveSheet').style.display = 'flex';
+}
+window._tvAdminOpenMove = _tvAdminOpenMove;
+
+function _tvAdminFillMoveCats(src, selVal) {
+    try { _tvMvEnsureSource(src); tvApplyMoves(); _tvMvTagAll(); } catch (e) {}
+    const cats = _tvAdminSourceCats(src, false);
+    const sel = document.getElementById('tvAdminMoveCat');
+    sel.style.borderColor = '';
+    const hasSel = selVal && cats.some(c => (c.listId + '|' + c.cat) === selVal);
+    let html = hasSel ? '' : '<option value="">— vyber cíl —</option>';
+    html += cats.map(c => { const v = c.listId + '|' + c.cat; return `<option value="${_esc(v)}"${(hasSel && v === selVal) ? ' selected' : ''}>${_esc(c.label)}</option>`; }).join('');
+    sel.innerHTML = html;
+    const lbl = document.getElementById('tvAdminMoveCatLabel');
+    if (lbl) lbl.textContent = src === 'k2' ? 'Seznam (země)' : 'Kategorie';
+}
+function _tvAdminMoveSrcChanged() {
+    _tvAdminFillMoveCats(document.getElementById('tvAdminMoveSrc').value, null);
+}
+window._tvAdminMoveSrcChanged = _tvAdminMoveSrcChanged;
+
+function _tvAdminCloseMove() {
+    const sh = document.getElementById('tvAdminMoveSheet');
+    if (sh) sh.style.display = 'none';
+    if (window._tvAdminState) window._tvAdminState.move = null;
+}
+window._tvAdminCloseMove = _tvAdminCloseMove;
+
+function _tvAdminAfterMoveChange() {
+    tvAdminSaveOverrides();
+    tvApplyMoves();
+    tvRerenderAllChannelLists();
+    if (typeof renderTvGroups === 'function' && document.getElementById('tvGroupTabs')) renderTvGroups();
+    _renderTvChannelAdminModal();
+}
+
+function _tvAdminDoMove() {
+    const st = window._tvAdminState;
+    if (!st.move) return;
+    const row = window._tvAdminRows[st.move.rid];
+    if (!row) { _tvAdminCloseMove(); return; }
+    const sel = document.getElementById('tvAdminMoveCat');
+    const val = sel.value;
+    if (!val) { sel.style.borderColor = '#ff6b6b'; return; }
+    const i = val.indexOf('|');
+    const tl = val.slice(0, i), tc = val.slice(i + 1);
+    const entry = row.entry, key = entry._brokenKey, ov = _tvAdminOv();
+    const nats = new Set([entry.ch].concat(entry.alts || []).map(v => v._mvNat).filter(Boolean));
+    nats.forEach(nat => {
+        const mk = nat + '|' + key;
+        if (nat === 'main' && tl === 'main') { delete ov.moves[mk]; ov.categoryOverride[key] = tc; }   // změna kategorie uvnitř Kanály (původní mechanismus)
+        else if (nat === tl && !tc) { delete ov.moves[mk]; }                                            // zpět do vlastního seznamu
+        else { ov.moves[mk] = tl + '|' + tc; }
+    });
+    _tvAdminCloseMove();
+    _tvAdminAfterMoveChange();
+}
+window._tvAdminDoMove = _tvAdminDoMove;
+
+function _tvAdminResetMove() {
+    const st = window._tvAdminState;
+    if (!st.move) return;
+    const row = window._tvAdminRows[st.move.rid];
+    if (!row) { _tvAdminCloseMove(); return; }
+    const entry = row.entry, key = entry._brokenKey, ov = _tvAdminOv();
+    [entry.ch].concat(entry.alts || []).forEach(v => { if (v._mvNat) delete ov.moves[v._mvNat + '|' + key]; });
+    _tvAdminCloseMove();
+    _tvAdminAfterMoveChange();
+}
+window._tvAdminResetMove = _tvAdminResetMove;
 
 // Vypne/zapne celou kategorii (TV_GROUPS) — vypnutá kategorie zmizí ze
 // selektoru v živé TV (renderTvGroups), dokud ji admin zase nezapne.
@@ -19048,8 +19383,9 @@ function _tvAdminToggleCategoryDisabled(catId) {
 }
 window._tvAdminToggleCategoryDisabled = _tvAdminToggleCategoryDisabled;
 
-function _tvAdminExpandCategory(catId) {
-    window._tvAdminState.expandedCat = window._tvAdminState.expandedCat === catId ? null : catId;
+function _tvAdminExpandCategory(tok) {
+    const v = _tvAdminUntok(tok);
+    window._tvAdminState.expandedCat = window._tvAdminState.expandedCat === v ? null : v;
     _renderTvChannelAdminModal();
 }
 window._tvAdminExpandCategory = _tvAdminExpandCategory;
@@ -19099,13 +19435,10 @@ window._tvAdminRenameCategory = _tvAdminRenameCategory;
 // Posun nahoru/dolů — přiřadí kanálu váhu mezi jeho dva sousedy v AKTUÁLNĚ
 // zobrazeném pořadí dané kategorie (klasický trik s "plovoucí" váhou mezi
 // sousedy, funguje bez nutnosti přečíslovávat celý seznam).
-function _tvAdminMoveOrder(key, catId, dir) {
-    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
-    const g = TV_GROUPS.find(x => x.id === catId);
-    if (!g) return;
-    const matched = tvState.channels.filter(ch => g.match(ch) && (adultAllowed || !isAdultChannel(ch)));
-    const grouped = tvGroupChannels(tvSortChannels(matched), { includeDisabled: true, includeDisabledUrls: true });
-    const all = [...grouped.shown, ...grouped.broken, ...grouped.noLogo];
+function _tvAdminMoveOrder(key, ctxTok, dir) {
+    const cat = _tvAdminFindCat(_tvAdminUntok(ctxTok));
+    if (!cat) return;
+    const all = _tvAdminCatEntries(cat).all;
     const i = all.findIndex(e => e._brokenKey === key);
     if (i === -1) return;
     const j = i + dir;
@@ -19113,9 +19446,8 @@ function _tvAdminMoveOrder(key, catId, dir) {
     // Prohoď sousedy přímo v poli...
     [all[i], all[j]] = [all[j], all[i]];
     // ...a VŠEM položkám v tomhle seznamu přepočítej váhu jako jejich nový
-    // index (0,1,2,...). Díky tomu se váhy nikdy nekumulují do velkých čísel
-    // z předchozích přesunů — každé kliknutí na ↑/↓ tak vždy posune položku
-    // o přesně JEDNU pozici, ať se předtím přesouvalo cokoliv jiného.
+    // index (0,1,2,...) — každé kliknutí na ↑/↓ posune položku o přesně JEDNU
+    // pozici, váhy se nikdy nekumulují.
     const ov = _tvAdminOv();
     const orderMap = ov.order;
     all.forEach((entry, idx) => { orderMap[entry._brokenKey] = idx; });
@@ -32735,13 +33067,15 @@ https://streams2.sofast.tv/vglive-sk-461164/index.m3u8` },
 let altState = window.altState = { activeCode: null, channels: [], filtered: [], filterText: '', currentChannel: null, parsedCache: {} };
 
 function renderAltPlaylistTabs() {
+    try { tvApplyMoves(); } catch (e) {}
     tvDdCloseAll();
     const tabs = document.getElementById('tvAltPlaylistTabs');
     if(!tabs) return;
     const opts = Object.keys(ALT_PLAYLISTS).filter(code => code !== 'alt2').map(code => {
         const pl = ALT_PLAYLISTS[code];
         if(pl._count === undefined) pl._count = (pl.m3u.match(/#EXTINF/g) || []).length;
-        return { value: code, label: `${pl.label} (${pl._count})` };
+        const _liveCnt = (altState.parsedCache[code] && altState.parsedCache[code]._mvNative) ? altState.parsedCache[code].length : pl._count;
+        return { value: code, label: `${pl.label} (${_liveCnt})` };
     });
     tabs.innerHTML = tvDdBuildHtml('tvAltPlaylistDD', 'selectAltPlaylist', opts, altState.activeCode);
 }
@@ -32830,6 +33164,7 @@ function playAltChannelDirect(encoded) {
 window.playAltChannelDirect = playAltChannelDirect;
 
 function renderAltChannelList() {
+    try { tvApplyMoves(); } catch (e) {}
     if(altState.filterText && altState._searchResults) { renderAltChannelListSearch(); return; }
     const listEl = document.getElementById('tvAltChannelList');
     if(!listEl) return;
@@ -33054,6 +33389,7 @@ const ALT2_GROUP_LABELS = {
 };
 
 function alt2GroupKey(ch) {
+    if (ch && ch._catOv) return ch._catOv;
     const g = (ch.group || '').split('|')[0].trim().toUpperCase();
     return ALT2_GROUP_LABELS[g] ? g : 'OTHER';
 }
@@ -33067,6 +33403,7 @@ function loadAlt2Channels() {
 }
 
 function renderAlt2GroupTabs() {
+    try { tvApplyMoves(); } catch (e) {}
     tvDdCloseAll();
     const tabs = document.getElementById('tvAlt2GroupTabs');
     if(!tabs) return;
@@ -33095,6 +33432,7 @@ function filterAlt2Channels(text) {
 window.filterAlt2Channels = filterAlt2Channels;
 
 function renderAlt2ChannelList() {
+    try { tvApplyMoves(); } catch (e) {}
     const listEl = document.getElementById('tvAlt2List');
     if(!listEl) return;
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
@@ -33148,6 +33486,7 @@ const ALT3_GROUP_LABELS = {
 };
 
 function alt3GroupKey(ch) {
+    if (ch && ch._catOv) return ch._catOv;
     const g = (ch.group || '').trim();
     return ALT3_GROUP_LABELS[g] ? g : 'OTHER';
 }
@@ -33161,6 +33500,7 @@ function loadAlt3Channels() {
 }
 
 function renderAlt3GroupTabs() {
+    try { tvApplyMoves(); } catch (e) {}
     tvDdCloseAll();
     const tabs = document.getElementById('tvAlt3GroupTabs');
     if(!tabs) return;
@@ -33189,6 +33529,7 @@ function filterAlt3Channels(text) {
 window.filterAlt3Channels = filterAlt3Channels;
 
 function renderAlt3ChannelList() {
+    try { tvApplyMoves(); } catch (e) {}
     const listEl = document.getElementById('tvAlt3List');
     if(!listEl) return;
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
@@ -33240,6 +33581,7 @@ const ALT4_GROUP_RULES = [
     [/home tv|jc1 tv|^jtv$|mňau tv|plzen\.tv|^polar(\s*2)?$|tv brno 1|^utv$|^vctv$|elektrika/i, 'REGIONAL'],
 ];
 function alt4GroupKey(ch) {
+    if (ch && ch._catOv) return ch._catOv;
     const name = ch.name || '';
     for (const rule of ALT4_GROUP_RULES) { if (rule[0].test(name)) return rule[1]; }
     return 'OTHER';
@@ -33254,6 +33596,7 @@ function loadAlt4Channels() {
 }
 
 function renderAlt4GroupTabs() {
+    try { tvApplyMoves(); } catch (e) {}
     tvDdCloseAll();
     const tabs = document.getElementById('tvAlt4GroupTabs');
     if(!tabs) return;
@@ -33282,6 +33625,7 @@ function filterAlt4Channels(text) {
 window.filterAlt4Channels = filterAlt4Channels;
 
 function renderAlt4ChannelList() {
+    try { tvApplyMoves(); } catch (e) {}
     const listEl = document.getElementById('tvAlt4List');
     if(!listEl) return;
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
@@ -33321,6 +33665,7 @@ const ALT5_GROUP_LABELS = {
     Series: '📼 Seriály', Lifestyle: '🌿 Lifestyle', Undefined: '📋 Ostatní'
 };
 function alt5GroupKey(ch) {
+    if (ch && ch._catOv) return ch._catOv;
     const raw = (ch.group || '').split(';')[0].trim();
     return raw || 'OTHER';
 }
@@ -33338,6 +33683,7 @@ function loadAlt5Channels() {
 }
 
 function renderAlt5GroupTabs() {
+    try { tvApplyMoves(); } catch (e) {}
     tvDdCloseAll();
     const tabs = document.getElementById('tvAlt5GroupTabs');
     if(!tabs) return;
@@ -33366,6 +33712,7 @@ function filterAlt5Channels(text) {
 window.filterAlt5Channels = filterAlt5Channels;
 
 function renderAlt5ChannelList() {
+    try { tvApplyMoves(); } catch (e) {}
     const listEl = document.getElementById('tvAlt5List');
     if(!listEl) return;
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
@@ -33592,6 +33939,7 @@ function applyTvChromeState(collapsed) {
 }
 
 function renderTvGroups() {
+    try { tvApplyMoves(); } catch (e) {}
     tvDdCloseAll();
     const tabs = document.getElementById('tvGroupTabs');
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
@@ -33636,6 +33984,7 @@ function isAdultChannel(ch) {
 }
 
 function renderTvChannelList() {
+    try { tvApplyMoves(); } catch (e) {}
     const listEl = document.getElementById('tvChannelList');
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
     const searchText = (tvState._searchText || '').toLowerCase().trim();
@@ -37871,6 +38220,7 @@ const rtdb = getDatabase(fbApp);
     if (!o.customName) o.customName = {};
     if (!o.disabledUrls) o.disabledUrls = {};
     if (!o.categoryDisabled) o.categoryDisabled = {};
+    if (!o.moves) o.moves = {};
     window._tvAdminOverrides = o;
     try { window._store && window._store.setItem('sinator_tv_admin_overrides', JSON.stringify(o)); } catch(e) {}
     if (typeof window.tvRerenderAllChannelLists === 'function') window.tvRerenderAllChannelLists();
