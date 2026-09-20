@@ -17430,6 +17430,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 <div class="tv-dd-opt" data-value="alt3">📺 Kanály 4</div>
                 <div class="tv-dd-opt" data-value="alt4">📺 Kanály 5</div>
                 <div class="tv-dd-opt" data-value="alt5">📺 Kanály 6</div>
+                <div class="tv-dd-opt" id="tvTabMgrOpt" data-value="mgr" style="display:none;">⚙️ Správa kanálů</div>
                 <div class="tv-dd-opt" data-value="genres">🗂️ Podle žánru</div>
             </div>
         </div>
@@ -17540,6 +17541,20 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
     <!-- Podle žánru: sjednocený "vycuc" ze VŠECH zdrojů (Kanály 1–6 a jakékoliv
          další, které přibydou v ALT_PLAYLISTS), roztříděný do žánrových skupin. -->
+    <!-- Správa kanálů: všechny kanály ze všech zdrojů pod sebou + zap/vyp (jen Admin level 2) -->
+    <div id="tvMgrWrap" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
+        <div class="tv-chrome-item" style="flex-shrink:0;padding:8px 12px;border-bottom:1px solid var(--border);">
+            <input type="text" id="tvMgrSearchInput" oninput="_tvMgrOnSearch(this.value)" placeholder="🔍 Hledat kanál ve všech zdrojích…" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.8rem;box-sizing:border-box;">
+            <div id="tvMgrFilterBar" style="display:flex;gap:6px;margin-top:8px;"></div>
+            <div style="display:flex;gap:6px;margin-top:8px;">
+                <button onclick="_tvMgrBulk(true)" style="flex:1;background:none;border:1px solid #1db954;color:#1db954;padding:7px 6px;border-radius:8px;cursor:pointer;font-size:0.75rem;">✅ Zapnout zobrazené</button>
+                <button onclick="_tvMgrBulk(false)" style="flex:1;background:none;border:1px solid #ff6b6b;color:#ff6b6b;padding:7px 6px;border-radius:8px;cursor:pointer;font-size:0.75rem;">⛔ Vypnout zobrazené</button>
+            </div>
+            <div id="tvMgrInfo" style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;"></div>
+        </div>
+        <div id="tvMgrBody" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0;"></div>
+    </div>
+
     <div id="tvGenresWrap" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
         <div class="tv-chrome-row">
             <div class="tv-group-tabs tv-chrome-item" id="tvGenresGroupTabs"></div>
@@ -19284,6 +19299,12 @@ function _tvAdminShowMore(tok) {
 window._tvAdminShowMore = _tvAdminShowMore;
 
 function _renderTvChannelAdminModal() {
+    // Záložka „Správa kanálů" používá stejné řádky/handlery — po každé změně ji přerenderuj.
+    if (window._tvMgr && window._tvMgr.active) {
+        try { _tvMgrRender(); } catch (e) { console.warn(e); }
+        const _m = document.getElementById('tvChannelAdminModal');
+        if (!_m || _m.style.display !== 'flex') return;   // admin modal není otevřený
+    }
     const body = document.getElementById('tvChannelAdminBody');
     if (!body) return;
     window._tvAdminRows = {};
@@ -19367,6 +19388,8 @@ function _tvAdminOpenMove(rid) {
         const cont = _tvMvContainers().find(c => c.id === entry.ch._mvNat);
         if (cont) curSrc = cont.src;
     }
+    const _sh = document.getElementById('tvAdminMoveSheet');
+    if (_sh && _sh.parentNode !== document.body) { document.body.appendChild(_sh); _sh.style.zIndex = '2000000'; }   // aby šel použít i mimo admin modal
     document.getElementById('tvAdminMoveTitle').textContent = 'Přesunout: ' + tvDisplayName(entry.ch.name);
     document.getElementById('tvAdminMoveSrc').innerHTML = _TV_ADMIN_SOURCES.map(s => `<option value="${s.id}"${s.id === curSrc ? ' selected' : ''}>📺 ${s.label}</option>`).join('');
     _tvAdminFillMoveCats(curSrc, curVal);
@@ -19443,6 +19466,83 @@ function _tvAdminResetMove() {
     _tvAdminAfterMoveChange();
 }
 window._tvAdminResetMove = _tvAdminResetMove;
+
+// ══ ZÁLOŽKA „SPRÁVA KANÁLŮ" (za Kanály 6) ═══════════════════════════════════
+// Všechny kanály ze všech zdrojů pod sebou (abecedně, sloučené podle názvu),
+// u každého zap/vyp zobrazení kanálu jako celku + celá správa (přejmenování,
+// přesun, zdroje/varianty, nefunkční, test).
+window._tvMgr = { search: '', filter: 'all', limit: 150, active: false };
+function _tvMgrIsAdmin() { return typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2(); }
+function _tvMgrUpdateOptVisibility() {
+    const o = document.getElementById('tvTabMgrOpt');
+    if (o) o.style.display = _tvMgrIsAdmin() ? '' : 'none';
+}
+function _tvMgrOpen() {
+    const body = document.getElementById('tvMgrBody');
+    if (body) body.innerHTML = '<div class="loading" style="padding:30px;"><div class="spinner"></div>Načítám všechny kanály…</div>';
+    setTimeout(() => { try { _tvMgrRender(); } catch (e) { console.warn(e); } }, 30);
+}
+function _tvMgrOnSearch(v) {
+    window._tvMgr.search = (v || '').trim().toLowerCase();
+    window._tvMgr.limit = 150;
+    _tvMgrRender();
+}
+function _tvMgrSetFilter(f) {
+    window._tvMgr.filter = f;
+    window._tvMgr.limit = 150;
+    _tvMgrRender();
+}
+function _tvMgrMore() { window._tvMgr.limit += 150; _tvMgrRender(); }
+function _tvMgrEntries() {
+    const st = window._tvMgr;
+    try { _tvMvEnsureAll(); tvApplyMoves(); _tvMvTagAll(); } catch (e) {}
+    const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
+    const src = _tvAdminAllSourceChannels().filter(x => (adultAllowed || !isAdultChannel(x.ch)) && (!st.search || x.ch.name.toLowerCase().includes(st.search)));
+    const sourceByUrl = new Map(src.map(x => [x.ch.url, x.source]));
+    const grouped = tvGroupChannels(tvSortChannels(src.map(x => x.ch)), { includeDisabled: true, includeDisabledUrls: true });
+    const brokenKeys = new Set(grouped.broken.map(e => e._brokenKey));
+    let all = [...grouped.shown, ...grouped.broken, ...grouped.noLogo];
+    all.sort((a, b) => tvDisplayName(a.ch.name).localeCompare(tvDisplayName(b.ch.name), 'cs'));
+    const total = all.length, offCount = all.filter(e => e._disabled).length;
+    if (st.filter === 'on') all = all.filter(e => !e._disabled);
+    else if (st.filter === 'off') all = all.filter(e => e._disabled);
+    return { all, sourceByUrl, brokenKeys, total, offCount };
+}
+function _tvMgrRender() {
+    const wrap = document.getElementById('tvMgrWrap'), body = document.getElementById('tvMgrBody');
+    const tvM = document.getElementById('tvModal');
+    if (!wrap || !body || wrap.style.display !== 'flex' || (tvM && !tvM.classList.contains('open'))) return;
+    const st = window._tvMgr;
+    window._tvAdminRows = {};
+    const r = _tvMgrEntries();
+    window._tvMgrLast = r.all;
+    const fb = document.getElementById('tvMgrFilterBar');
+    if (fb) fb.innerHTML = [['all', 'Vše'], ['on', 'Zapnuté'], ['off', 'Vypnuté']].map(([id, lb]) => {
+        const on = st.filter === id;
+        return `<button onclick="_tvMgrSetFilter('${id}')" style="padding:5px 13px;border-radius:16px;border:1px solid ${on ? '#5dade2' : 'var(--border)'};background:${on ? 'rgba(93,173,226,0.18)' : 'transparent'};color:${on ? '#5dade2' : '#ccc'};font-size:0.78rem;font-weight:${on ? '700' : '500'};cursor:pointer;">${lb}</button>`;
+    }).join('');
+    const info = document.getElementById('tvMgrInfo');
+    if (info) info.textContent = `${r.total} kanálů · zapnuto ${r.total - r.offCount} · vypnuto ${r.offCount} · zobrazeno ${r.all.length}`;
+    if (!r.all.length) { body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);">Žádné kanály.</div>'; return; }
+    const part = r.all.slice(0, st.limit);
+    body.innerHTML = part.map(entry => {
+        const srcs = Array.from(new Set([entry.ch].concat(entry.alts || []).map(c => r.sourceByUrl.get(c.url)).filter(Boolean)));
+        return _tvAdminChannelRowHtml(entry, null, r.brokenKeys.has(entry._brokenKey), srcs.join(' · '));
+    }).join('') + (r.all.length > st.limit ? `<div style="padding:12px;text-align:center;"><button onclick="_tvMgrMore()" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.8rem;">➕ Zobrazit dalších (zbývá ${r.all.length - st.limit})</button></div>` : '');
+}
+function _tvMgrBulk(on) {
+    const list = window._tvMgrLast || [];
+    if (!list.length) return;
+    if (!confirm((on ? 'Zapnout ' : 'Vypnout ') + list.length + ' zobrazených kanálů?')) return;
+    const ov = _tvAdminOv();
+    list.forEach(e => { if (on) delete ov.disabled[e._brokenKey]; else ov.disabled[e._brokenKey] = true; });
+    tvAdminSaveOverrides();
+    tvRerenderAllChannelLists();
+    if (typeof renderTvGroups === 'function' && document.getElementById('tvGroupTabs')) renderTvGroups();
+    _tvMgrRender();
+}
+Object.assign(window, { _tvMgrOnSearch, _tvMgrSetFilter, _tvMgrMore, _tvMgrBulk, _tvMgrOpen, _tvMgrRender, _tvMgrUpdateOptVisibility });
+
 
 // Vypne/zapne celou kategorii (TV_GROUPS) — vypnutá kategorie zmizí ze
 // selektoru v živé TV (renderTvGroups), dokud ji admin zase nezapne.
@@ -33295,6 +33395,7 @@ function playAltChannel(idx) {
 function tvDdToggle(id) {
     const wrap = document.getElementById(id);
     if(!wrap) return;
+    if (id === 'tvTabDD') { try { _tvMgrUpdateOptVisibility(); } catch (e) {} }
     const willOpen = !wrap.classList.contains('open');
     tvDdCloseAll();
     if(willOpen) {
@@ -33393,6 +33494,8 @@ document.addEventListener('touchmove', function(e) {
 window.addEventListener('resize', function() { tvDdCloseAll(); });
 
 function switchTvTab(tab) {
+    try { _tvMgrUpdateOptVisibility(); } catch (e) {}
+    if (tab === 'mgr' && !_tvMgrIsAdmin()) tab = 'channels';
     // Při přepnutí na jakoukoliv nabídku (i opětovném kliknutí na stejnou) vždy vymaž vyhledávací pole
     ['tvChannelSearchInput','tvAltSearchInput','tvAlt2SearchInput','tvAlt3SearchInput','tvAlt4SearchInput','tvAlt5SearchInput','tvGenresSearchInput'].forEach(id => {
         const el = document.getElementById(id);
@@ -33412,7 +33515,9 @@ function switchTvTab(tab) {
     const isAlt4 = tab === 'alt4';
     const isAlt5 = tab === 'alt5';
     const isGenres = tab === 'genres';
-    const isAnyAlt = isEpg || isAlt || isAlt2 || isAlt3 || isAlt4 || isAlt5 || isGenres;
+    const isMgr = tab === 'mgr';
+    if (window._tvMgr) window._tvMgr.active = isMgr;
+    const isAnyAlt = isEpg || isAlt || isAlt2 || isAlt3 || isAlt4 || isAlt5 || isGenres || isMgr;
     document.getElementById('tvSearchWrap').style.display = isAnyAlt ? 'none' : '';
     document.getElementById('tvChannelListWrap').style.display = isAnyAlt ? 'none' : '';
     document.getElementById('tvEpgWrap').style.display = isEpg ? 'flex' : 'none';
@@ -33422,10 +33527,12 @@ function switchTvTab(tab) {
     document.getElementById('tvAlt4Wrap').style.display = isAlt4 ? 'flex' : 'none';
     document.getElementById('tvAlt5Wrap').style.display = isAlt5 ? 'flex' : 'none';
     document.getElementById('tvGenresWrap').style.display = isGenres ? 'flex' : 'none';
+    const _mgrWrap = document.getElementById('tvMgrWrap');
+    if (_mgrWrap) _mgrWrap.style.display = isMgr ? 'flex' : 'none';
     document.getElementById('tvGroupTabs').style.display = isAnyAlt ? 'none' : '';
     const tvGroupTabsRow = document.getElementById('tvGroupTabsRow');
     if(tvGroupTabsRow) tvGroupTabsRow.style.display = isAnyAlt ? 'none' : '';
-    document.getElementById('tvVlcInfo').style.display = isEpg ? 'none' : '';
+    document.getElementById('tvVlcInfo').style.display = (isEpg || isMgr) ? 'none' : '';
     const btnCh = document.getElementById('tvTabChannels');
     const btnEpg = document.getElementById('tvTabEpg');
     const btnAlt = document.getElementById('tvTabAlt');
@@ -33470,6 +33577,9 @@ function switchTvTab(tab) {
     }
     if(isGenres) {
         loadGenresChannels();
+    }
+    if(isMgr) {
+        _tvMgrOpen();
     }
 }
 
