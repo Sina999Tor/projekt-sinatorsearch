@@ -18867,7 +18867,8 @@ const _TV_ADMIN_SOURCES = [
     { id: 'alt2', label: 'Kanály 3' },
     { id: 'alt3', label: 'Kanály 4' },
     { id: 'alt4', label: 'Kanály 5' },
-    { id: 'alt5', label: 'Kanály 6' }
+    { id: 'alt5', label: 'Kanály 6' },
+    { id: 'all',  label: 'Všechny kanály', icon: '⚙️' }   // plochý seznam všech kanálů + zap/vyp
 ];
 window._TV_ADMIN_SOURCES = _TV_ADMIN_SOURCES;
 
@@ -19271,17 +19272,19 @@ function _tvAdminRenderSourceBar() {
     if (!bar) return;
     const st = window._tvAdminState;
     bar.innerHTML = _TV_ADMIN_SOURCES.map(s => {
-        const on = st.source === s.id && !st.search;
-        return `<button onclick="_tvAdminSelectSource('${s.id}')" style="flex-shrink:0;padding:6px 13px;border-radius:16px;border:1px solid ${on ? '#5dade2' : 'var(--border)'};background:${on ? 'rgba(93,173,226,0.18)' : 'transparent'};color:${on ? '#5dade2' : '#ccc'};font-size:0.82rem;font-weight:${on ? '700' : '500'};cursor:pointer;white-space:nowrap;">📺 ${s.label}</button>`;
+        const on = st.source === s.id && (s.id === 'all' || !st.search);
+        return `<button onclick="_tvAdminSelectSource('${s.id}')" style="flex-shrink:0;padding:6px 13px;border-radius:16px;border:1px solid ${on ? '#5dade2' : 'var(--border)'};background:${on ? 'rgba(93,173,226,0.18)' : 'transparent'};color:${on ? '#5dade2' : '#ccc'};font-size:0.82rem;font-weight:${on ? '700' : '500'};cursor:pointer;white-space:nowrap;">${s.icon || '📺'} ${s.label}</button>`;
     }).join('');
 }
 function _tvAdminSelectSource(id) {
     const st = window._tvAdminState;
     st.source = id;
     st.expandedCat = null;
-    st.search = '';
-    const inp = document.getElementById('tvAdminSearchInput');
-    if (inp) inp.value = '';
+    if (id !== 'all') {
+        st.search = '';
+        const inp = document.getElementById('tvAdminSearchInput');
+        if (inp) inp.value = '';
+    }
     _renderTvChannelAdminModal();
     const b = document.getElementById('tvChannelAdminBody');
     if (b) b.scrollTop = 0;
@@ -19310,6 +19313,19 @@ function _renderTvChannelAdminModal() {
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
     const st = window._tvAdminState;
     const search = st.search;
+
+    if (st.source === 'all') {   // ⚙️ Všechny kanály: plochý abecední seznam + zap/vyp celého kanálu
+        const r = _tvMgrEntries(search);
+        window._tvMgrLast = r.all;
+        const mg = window._tvMgr;
+        body.innerHTML = _tvMgrHeaderHtml(r) + (r.all.length
+            ? r.all.slice(0, mg.limit).map(entry => {
+                const srcs = Array.from(new Set([entry.ch].concat(entry.alts || []).map(c => r.sourceByUrl.get(c.url)).filter(Boolean)));
+                return _tvAdminChannelRowHtml(entry, null, r.brokenKeys.has(entry._brokenKey), srcs.join(' · '));
+            }).join('') + (r.all.length > mg.limit ? `<div style="padding:12px;text-align:center;"><button onclick="_tvMgrMore()" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.8rem;">➕ Zobrazit dalších (zbývá ${r.all.length - mg.limit})</button></div>` : '')
+            : '<div style="padding:24px;text-align:center;color:var(--text-muted);">Žádné kanály.</div>');
+        return;
+    }
 
     if (search) {
         // Hledá napříč VŠEMI zdroji (Kanály, Kanály 2 – všechny země, Kanály
@@ -19389,7 +19405,8 @@ function _tvAdminOpenMove(rid) {
     const _sh = document.getElementById('tvAdminMoveSheet');
     if (_sh && _sh.parentNode !== document.body) { document.body.appendChild(_sh); _sh.style.zIndex = '2000000'; }   // aby šel použít i mimo admin modal
     document.getElementById('tvAdminMoveTitle').textContent = 'Přesunout: ' + tvDisplayName(entry.ch.name);
-    document.getElementById('tvAdminMoveSrc').innerHTML = _TV_ADMIN_SOURCES.map(s => `<option value="${s.id}"${s.id === curSrc ? ' selected' : ''}>📺 ${s.label}</option>`).join('');
+    if (curSrc === 'all') curSrc = 'main';
+    document.getElementById('tvAdminMoveSrc').innerHTML = _TV_ADMIN_SOURCES.filter(s => s.id !== 'all').map(s => `<option value="${s.id}"${s.id === curSrc ? ' selected' : ''}>📺 ${s.label}</option>`).join('');
     _tvAdminFillMoveCats(curSrc, curVal);
     const key = entry._brokenKey, mv = _tvAdminOv().moves;
     const hasMove = [entry.ch].concat(entry.alts || []).some(v => v._mvNat && mv[v._mvNat + '|' + key]);
@@ -19488,14 +19505,16 @@ function _tvMgrOnSearch(v) {
 function _tvMgrSetFilter(f) {
     window._tvMgr.filter = f;
     window._tvMgr.limit = 150;
+    _renderTvChannelAdminModal();
     _tvMgrRender();
 }
-function _tvMgrMore() { window._tvMgr.limit += 150; _tvMgrRender(); }
-function _tvMgrEntries() {
+function _tvMgrMore() { window._tvMgr.limit += 150; _renderTvChannelAdminModal(); _tvMgrRender(); }
+function _tvMgrEntries(searchOverride) {
     const st = window._tvMgr;
+    const q = (searchOverride !== undefined) ? (searchOverride || '') : st.search;
     try { _tvMvEnsureAll(); tvApplyMoves(); _tvMvTagAll(); } catch (e) {}
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
-    const src = _tvAdminAllSourceChannels().filter(x => (adultAllowed || !isAdultChannel(x.ch)) && (!st.search || x.ch.name.toLowerCase().includes(st.search)));
+    const src = _tvAdminAllSourceChannels().filter(x => (adultAllowed || !isAdultChannel(x.ch)) && (!q || x.ch.name.toLowerCase().includes(q)));
     const sourceByUrl = new Map(src.map(x => [x.ch.url, x.source]));
     const grouped = tvGroupChannels(tvSortChannels(src.map(x => x.ch)), { includeDisabled: true, includeDisabledUrls: true });
     const brokenKeys = new Set(grouped.broken.map(e => e._brokenKey));
@@ -19505,6 +19524,22 @@ function _tvMgrEntries() {
     if (st.filter === 'on') all = all.filter(e => !e._disabled);
     else if (st.filter === 'off') all = all.filter(e => e._disabled);
     return { all, sourceByUrl, brokenKeys, total, offCount };
+}
+// Hlavička seznamu (filtr Vše/Zapnuté/Vypnuté, hromadné zap/vyp, počty) — pro modal.
+function _tvMgrHeaderHtml(r) {
+    const st = window._tvMgr;
+    const chips = [['all', 'Vše'], ['on', 'Zapnuté'], ['off', 'Vypnuté']].map(([id, lb]) => {
+        const on = st.filter === id;
+        return `<button onclick="_tvMgrSetFilter('${id}')" style="padding:5px 13px;border-radius:16px;border:1px solid ${on ? '#5dade2' : 'var(--border)'};background:${on ? 'rgba(93,173,226,0.18)' : 'transparent'};color:${on ? '#5dade2' : '#ccc'};font-size:0.78rem;font-weight:${on ? '700' : '500'};cursor:pointer;">${lb}</button>`;
+    }).join('');
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;gap:6px;">${chips}</div>
+        <div style="display:flex;gap:6px;margin-top:8px;">
+            <button onclick="_tvMgrBulk(true)" style="flex:1;background:none;border:1px solid #1db954;color:#1db954;padding:7px 6px;border-radius:8px;cursor:pointer;font-size:0.75rem;">✅ Zapnout zobrazené</button>
+            <button onclick="_tvMgrBulk(false)" style="flex:1;background:none;border:1px solid #ff6b6b;color:#ff6b6b;padding:7px 6px;border-radius:8px;cursor:pointer;font-size:0.75rem;">⛔ Vypnout zobrazené</button>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">${r.total} kanálů · zapnuto ${r.total - r.offCount} · vypnuto ${r.offCount} · zobrazeno ${r.all.length}</div>
+    </div>`;
 }
 function _tvMgrRender() {
     const wrap = document.getElementById('tvMgrWrap'), body = document.getElementById('tvMgrBody');
@@ -19537,6 +19572,7 @@ function _tvMgrBulk(on) {
     tvAdminSaveOverrides();
     tvRerenderAllChannelLists();
     if (typeof renderTvGroups === 'function' && document.getElementById('tvGroupTabs')) renderTvGroups();
+    _renderTvChannelAdminModal();
     _tvMgrRender();
 }
 Object.assign(window, { _tvMgrOnSearch, _tvMgrSetFilter, _tvMgrMore, _tvMgrBulk, _tvMgrOpen, _tvMgrRender, _tvMgrUpdateOptVisibility });
