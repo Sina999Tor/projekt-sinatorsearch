@@ -707,161 +707,159 @@
     </div>
 </div>
 
-<!-- 🌐 Filmové weby modal -->
-<div class="websites-modal-overlay" id="websitesModal" onclick="if(event.target===this)closeWebsitesModal()">
-    <div class="websites-modal">
-        <div class="websites-modal-header">
-            <button onclick="closeWebsitesModal();openZabavaModal()" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;flex-shrink:0;margin-right:10px;">← Zpět</button>
-            <h2 style="flex:1;">Filmové magazíny a stránky o filmech</h2>
-            <button class="close-websites" onclick="closeWebsitesModal()" title="Zavřít">✕</button>
+<!-- 🌐 Filmové weby modal (stejný vzhled jako Přehledy a statistiky / Externí aplikace) -->
+<div class="websites-modal-overlay" id="websitesModal" onclick="if(event.target===this)closeWebsitesModal()" style="padding:0;align-items:stretch;justify-content:stretch;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);">
+    <div style="width:100%;height:100%;max-width:none;max-height:none;margin:0;display:flex;flex-direction:column;overflow:hidden;background:transparent;border:none;border-radius:0;box-shadow:none;">
+        <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);box-sizing:border-box;">
+            <button onclick="closeWebsitesModal();openZabavaModal()" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">← Zpět</button>
+            <h3 style="flex:1;font-family:'Playfair Display',serif;font-size:1.05rem;color:#fff;margin:0;">🌐 Filmové magazíny a stránky o filmech</h3>
+            <button onclick="closeWebsitesModal()" title="Zavřít" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;flex-shrink:0;">✕</button>
         </div>
-        <div class="websites-modal-body">
-            <div class="websites-grid">
-                <button class="website-btn" onclick="window.open('https://filmtoro.cz/', '_blank')">
-                    <span class="icon">🎬</span>
-                    <span class="name">filmtoro</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.nafilmu.cz', '_blank')">
-                    <span class="icon">🎥</span>
-                    <span class="name">Nafilmu</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.edna.cz', '_blank')">
-                    <span class="icon">📺</span>
-                    <span class="name">Edna</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.themoviedb.org', '_blank')">
-                    <span class="icon">🎬</span>
-                    <span class="name">TMDB</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.imdb.com', '_blank')">
-                    <span class="icon">⭐</span>
-                    <span class="name">IMDb</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.kinobox.cz', '_blank')">
-                    <span class="icon">🎫</span>
-                    <span class="name">Kinobox</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://trakt.tv', '_blank')">
-                    <span class="icon">📋</span>
-                    <span class="name">Trakt</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.fdb.cz', '_blank')">
-                    <span class="icon">🎞️</span>
-                    <span class="name">FDB</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.kviff.tv', '_blank')">
-                    <span class="icon">🎪</span>
-                    <span class="name">Kviff.tv</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://prima.iprima.cz', '_blank')">
-                    <span class="icon">📺</span>
-                    <span class="name">PrimaPlus</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.ivysilani.cz', '_blank')">
-                    <span class="icon">📡</span>
-                    <span class="name">iVysílání</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.totalfilm.cz', '_blank')">
-                    <span class="icon">🎬</span>
-                    <span class="name">TotalFilm</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.stream.cz', '_blank')">
-                    <span class="icon">🎥</span>
-                    <span class="name">Stream.cz</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.filmozrouti.cz', '_blank')">
-                    <span class="icon">🍿</span>
-                    <span class="name">Filmozrouti</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.filmtube.cz', '_blank')">
-                    <span class="icon">🎞️</span>
-                    <span class="name">FilmTube.cz</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://dokufilmy.cz/', '_blank')">
-                    <span class="icon">🎥</span>
-                    <span class="name">Dokufilmy</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://hellspio.vercel.app/cs', '_blank')">
-                    <span class="icon">👹</span>
-                    <span class="name">Hellspio</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://tv.nova.cz/', '_blank')">
-                    <span class="icon">📺</span>
-                    <span class="name">TV Nova</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.moviezone.cz/', '_blank')">
-                    <span class="icon">🎬</span>
-                    <span class="name">MovieZone</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.cinepur.cz/', '_blank')">
-                    <span class="icon">🎞️</span>
-                    <span class="name">Cinepur</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.kinotip2.cz/', '_blank')">
-                    <span class="icon">💡</span>
-                    <span class="name">KinoTip2</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://magazin.filmana.cz/blog.php', '_blank')">
-                    <span class="icon">📰</span>
-                    <span class="name">Filmana</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://nerdfix.cz/magazin/novinky', '_blank')">
-                    <span class="icon">🤓</span>
-                    <span class="name">Nerdfix</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://avmania.zive.cz/', '_blank')">
-                    <span class="icon">🔊</span>
-                    <span class="name">AVMania</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.filmavideo.cz/', '_blank')">
-                    <span class="icon">🎥</span>
-                    <span class="name">FilmaVideo</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://kinohled.cz/praha', '_blank')">
-                    <span class="icon">🎟️</span>
-                    <span class="name">Kinohled</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://dupe.cz/', '_blank')">
-                    <span class="icon">🐲</span>
-                    <span class="name">Dupe.cz</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://kulturnimapa.cz/filmy/premiery/', '_blank')">
-                    <span class="icon">🗺️</span>
-                    <span class="name">KulturníMapa</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.film-arena.cz/', '_blank')">
-                    <span class="icon">🏟️</span>
-                    <span class="name">Film Arena</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.csfd.cz', '_blank')">
-                    <span class="icon">🎬</span>
-                    <span class="name">ČSFD</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.docu.sk/', '_blank')">
-                    <span class="icon">🎥</span>
-                    <span class="name">Docu.sk</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://streamimdb.ru/year/2026', '_blank')">
-                    <span class="icon">🎞️</span>
-                    <span class="name">StreamIMDb 2026</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://mrkni.tv', '_blank')">
-                    <span class="icon">👁️</span>
-                    <span class="name">Mrkni.tv</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://www.thetvdb.com', '_blank')" style="border-color:rgba(0,163,255,0.4);">
-                    <span class="icon">📺</span>
-                    <span class="name">TheTVDB.com</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://mdblist.com', '_blank')" style="border-color:rgba(255,152,0,0.4);">
-                    <span class="icon">📋</span>
-                    <span class="name">MDBList</span>
-                </button>
-                <button class="website-btn" onclick="window.open('https://histra.net', '_blank')">
-                    <span class="icon">🎦</span>
-                    <span class="name">Histra.net</span>
-                </button>
-            </div>
+        <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
+        <button onclick="window.open('https://filmtoro.cz/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎬</span>
+            <div><div style="font-weight:700;color:#00b4d8;">filmtoro</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">filmtoro.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.nafilmu.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎥</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Nafilmu</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">nafilmu.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.edna.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📺</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Edna</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">edna.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.themoviedb.org', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎬</span>
+            <div><div style="font-weight:700;color:#00b4d8;">TMDB</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">themoviedb.org</div></div>
+        </button>
+        <button onclick="window.open('https://www.imdb.com', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">⭐</span>
+            <div><div style="font-weight:700;color:#00b4d8;">IMDb</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">imdb.com</div></div>
+        </button>
+        <button onclick="window.open('https://www.kinobox.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎫</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Kinobox</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">kinobox.cz</div></div>
+        </button>
+        <button onclick="window.open('https://trakt.tv', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📋</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Trakt</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">trakt.tv</div></div>
+        </button>
+        <button onclick="window.open('https://www.fdb.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎞️</span>
+            <div><div style="font-weight:700;color:#00b4d8;">FDB</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">fdb.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.kviff.tv', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎪</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Kviff.tv</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">kviff.tv</div></div>
+        </button>
+        <button onclick="window.open('https://prima.iprima.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📺</span>
+            <div><div style="font-weight:700;color:#00b4d8;">PrimaPlus</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">prima.iprima.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.ivysilani.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📡</span>
+            <div><div style="font-weight:700;color:#00b4d8;">iVysílání</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">ivysilani.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.totalfilm.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎬</span>
+            <div><div style="font-weight:700;color:#00b4d8;">TotalFilm</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">totalfilm.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.stream.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎥</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Stream.cz</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">stream.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.filmozrouti.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🍿</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Filmozrouti</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">filmozrouti.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.filmtube.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎞️</span>
+            <div><div style="font-weight:700;color:#00b4d8;">FilmTube.cz</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">filmtube.cz</div></div>
+        </button>
+        <button onclick="window.open('https://dokufilmy.cz/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎥</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Dokufilmy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">dokufilmy.cz</div></div>
+        </button>
+        <button onclick="window.open('https://hellspio.vercel.app/cs', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">👹</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Hellspio</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">hellspio.vercel.app</div></div>
+        </button>
+        <button onclick="window.open('https://tv.nova.cz/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📺</span>
+            <div><div style="font-weight:700;color:#00b4d8;">TV Nova</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">tv.nova.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.moviezone.cz/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎬</span>
+            <div><div style="font-weight:700;color:#00b4d8;">MovieZone</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">moviezone.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.cinepur.cz/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎞️</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Cinepur</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">cinepur.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.kinotip2.cz/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">💡</span>
+            <div><div style="font-weight:700;color:#00b4d8;">KinoTip2</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">kinotip2.cz</div></div>
+        </button>
+        <button onclick="window.open('https://magazin.filmana.cz/blog.php', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📰</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Filmana</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">magazin.filmana.cz</div></div>
+        </button>
+        <button onclick="window.open('https://nerdfix.cz/magazin/novinky', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🤓</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Nerdfix</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">nerdfix.cz</div></div>
+        </button>
+        <button onclick="window.open('https://avmania.zive.cz/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🔊</span>
+            <div><div style="font-weight:700;color:#00b4d8;">AVMania</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">avmania.zive.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.filmavideo.cz/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎥</span>
+            <div><div style="font-weight:700;color:#00b4d8;">FilmaVideo</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">filmavideo.cz</div></div>
+        </button>
+        <button onclick="window.open('https://kinohled.cz/praha', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎟️</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Kinohled</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">kinohled.cz</div></div>
+        </button>
+        <button onclick="window.open('https://dupe.cz/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🐲</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Dupe.cz</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">dupe.cz</div></div>
+        </button>
+        <button onclick="window.open('https://kulturnimapa.cz/filmy/premiery/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🗺️</span>
+            <div><div style="font-weight:700;color:#00b4d8;">KulturníMapa</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">kulturnimapa.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.film-arena.cz/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🏟️</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Film Arena</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">film-arena.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.csfd.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎬</span>
+            <div><div style="font-weight:700;color:#00b4d8;">ČSFD</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">csfd.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.docu.sk/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎥</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Docu.sk</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">docu.sk</div></div>
+        </button>
+        <button onclick="window.open('https://streamimdb.ru/year/2026', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎞️</span>
+            <div><div style="font-weight:700;color:#00b4d8;">StreamIMDb 2026</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">streamimdb.ru</div></div>
+        </button>
+        <button onclick="window.open('https://mrkni.tv', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">👁️</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Mrkni.tv</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">mrkni.tv</div></div>
+        </button>
+        <button onclick="window.open('https://www.thetvdb.com', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📺</span>
+            <div><div style="font-weight:700;color:#00b4d8;">TheTVDB.com</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">thetvdb.com</div></div>
+        </button>
+        <button onclick="window.open('https://mdblist.com', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📋</span>
+            <div><div style="font-weight:700;color:#00b4d8;">MDBList</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">mdblist.com</div></div>
+        </button>
+        <button onclick="window.open('https://histra.net', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎦</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Histra.net</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">histra.net</div></div>
+        </button>
         </div>
     </div>
 </div>
