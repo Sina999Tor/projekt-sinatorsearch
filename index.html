@@ -38291,8 +38291,20 @@ const rtdb = getDatabase(fbApp);
 (function initSharedTvAdminOverrides() {
   const tvAdminRef = ref(rtdb, 'presence/_tv_admin');
 
+  // Firebase klíče nesmí obsahovat . / # $ [ ] — URL streamu (disabledUrls) je
+  // obsahuje, takže by set() HODIL výjimku a přepínač by se nikdy nepřekreslil.
+  // Proto se klíče URL kódují (a při čtení zase dekódují).
+  const _encUrlKey = u => encodeURIComponent(u).replace(/\./g, '%2E');
+  const _decUrlKey = k => { try { return decodeURIComponent(k); } catch (e) { return k; } };
   window._fbSetTvAdminOverrides = function(overrides) {
-    set(tvAdminRef, overrides || {}).catch(() => {});
+    try {
+      const o = Object.assign({}, overrides || {});
+      const du = {};
+      Object.keys(o.disabledUrls || {}).forEach(u => { du[_encUrlKey(u)] = true; });
+      o.disabledUrls = du;
+      const r = set(tvAdminRef, o);
+      if (r && r.catch) r.catch(() => {});
+    } catch (e) { console.warn('tv admin overrides sync failed', e); }
   };
 
   onValue(tvAdminRef, (snap) => {
@@ -38303,6 +38315,7 @@ const rtdb = getDatabase(fbApp);
     if (!o.categoryLabels) o.categoryLabels = {};
     if (!o.customName) o.customName = {};
     if (!o.disabledUrls) o.disabledUrls = {};
+    else { const du = {}; Object.keys(o.disabledUrls).forEach(k => { du[_decUrlKey(k)] = true; }); o.disabledUrls = du; }
     if (!o.categoryDisabled) o.categoryDisabled = {};
     if (!o.moves) o.moves = {};
     window._tvAdminOverrides = o;
