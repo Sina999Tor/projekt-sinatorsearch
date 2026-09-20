@@ -18980,27 +18980,74 @@ function _esc(s) { return (s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;
 // Panel s jednotlivými kvalitními variantami kanálu (primární + alts) —
 // každá s vlastním přepínačem (disabledUrls, klíčováno podle URL), takže
 // jde nechat zapnutou jen jednu konkrétní kvalitu a ostatní vypnout.
-function _tvAdminVariantsHtml(entry) {
+function _tvAdminSrcLabel(v) {
+    const nat = v._mvNat;
+    if (!nat) return '';
+    if (nat === 'main') return 'Kanály';
+    if (nat === 'alt2') return 'Kanály 3';
+    if (nat === 'alt3') return 'Kanály 4';
+    if (nat === 'alt4') return 'Kanály 5';
+    if (nat === 'alt5') return 'Kanály 6';
+    const pl = (typeof ALT_PLAYLISTS !== 'undefined') && ALT_PLAYLISTS[nat];
+    return 'Kanály 2' + (pl && pl.label ? ' · ' + pl.label : '');
+}
+function _tvAdminVariantsHtml(entry, rid) {
     const disabledUrls = _tvAdminOv().disabledUrls;
     const all = [entry.ch].concat(entry.alts || []);
-    return all.map(v => {
+    const anyOff = all.some(v => disabledUrls[v.url]);
+    const rows = all.map((v, idx) => {
         const vOff = !!disabledUrls[v.url];
         const safeUrl = _esc(v.url).replace(/'/g, "\\'");
-        const safeName = _esc(v.name || '').replace(/'/g, "\\'");
+        const src = _tvAdminSrcLabel(v);
         return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;">
-            <div style="flex:1;min-width:0;font-size:0.76rem;color:${vOff ? '#888' : '#ccc'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${_esc(v.url)}">${_esc(v.name || v.url)}</div>
+            <div style="flex:1;min-width:0;" title="${_esc(v.url)}">
+                <div style="font-size:0.76rem;color:${vOff ? '#888' : '#ccc'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(v.name || v.url)}</div>
+                ${src ? `<div style="font-size:0.66rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📺 ${_esc(src)}</div>` : ''}
+            </div>
+            <button onclick="event.stopPropagation();_tvAdminOnlyVariant('${rid}', ${idx})" title="Nechat zapnutý jen tento zdroj, ostatní vypnout" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:0 7px;height:24px;border-radius:6px;cursor:pointer;font-size:0.68rem;flex-shrink:0;white-space:nowrap;">jen tento</button>
             <button onclick="event.stopPropagation();openInVlcUrl('${safeUrl}')" title="Otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;width:26px;height:24px;border-radius:6px;cursor:pointer;font-size:0.78rem;flex-shrink:0;">▶️</button>
             <div onclick="event.stopPropagation();_tvAdminToggleUrlEnabled('${safeUrl}')" style="width:34px;height:20px;border-radius:10px;background:${vOff ? '#444' : '#1db954'};position:relative;cursor:pointer;flex-shrink:0;">
                 <div style="width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${vOff ? '2px' : '16px'};transition:left .15s;"></div>
             </div>
         </div>`;
     }).join('');
+    const allOn = anyOff ? `<div style="padding:4px 0 0;"><button onclick="event.stopPropagation();_tvAdminAllVariantsOn('${rid}')" style="background:none;border:none;color:#5dade2;font-size:0.72rem;cursor:pointer;padding:2px 0;">↺ zapnout všechny zdroje</button></div>` : '';
+    return rows + allOn;
 }
 
-function _tvAdminToggleVariants(uid) {
+// Nechá zapnutý jen jednu variantu/zdroj (ostatní URL vypne).
+function _tvAdminOnlyVariant(rid, idx) {
+    const row = window._tvAdminRows[rid];
+    if (!row) return;
+    const all = [row.entry.ch].concat(row.entry.alts || []);
+    const ov = _tvAdminOv();
+    all.forEach((v, i) => { if (i === idx) delete ov.disabledUrls[v.url]; else ov.disabledUrls[v.url] = true; });
+    if (ov.disabled) delete ov.disabled[row.entry._brokenKey];   // kanál samotný musí zůstat zapnutý
+    _tvAdminAfterVariantChange();
+}
+window._tvAdminOnlyVariant = _tvAdminOnlyVariant;
+function _tvAdminAllVariantsOn(rid) {
+    const row = window._tvAdminRows[rid];
+    if (!row) return;
+    const ov = _tvAdminOv();
+    [row.entry.ch].concat(row.entry.alts || []).forEach(v => { delete ov.disabledUrls[v.url]; });
+    _tvAdminAfterVariantChange();
+}
+window._tvAdminAllVariantsOn = _tvAdminAllVariantsOn;
+function _tvAdminAfterVariantChange() {
+    tvAdminSaveOverrides();
+    tvRerenderAllChannelLists();
+    _renderTvChannelAdminModal();
+}
+
+function _tvAdminToggleVariants(uid, key) {
     const el = document.getElementById(uid);
     if (!el) return;
-    el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+    const open = (el.style.display === 'none' || !el.style.display);
+    el.style.display = open ? 'block' : 'none';
+    const st = window._tvAdminState;
+    if (!st.openVar) st.openVar = {};
+    if (key) { if (open) st.openVar[key] = true; else delete st.openVar[key]; }
 }
 window._tvAdminToggleVariants = _tvAdminToggleVariants;
 
@@ -19161,7 +19208,7 @@ function _tvAdminChannelRowHtml(entry, ctx, brokenFlag, sourceLabel) {
     const mv = _tvAdminOv().moves;
     const movedFlag = [entry.ch].concat(entry.alts || []).some(v => v._mvNat && mv[v._mvNat + '|' + key]);
     const variantsBtn = totalVariants > 1
-        ? `<button onclick="event.stopPropagation();_tvAdminToggleVariants('${uid}')" title="Zobrazit a spravovat kvalitní varianty" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:0.72rem;white-space:nowrap;flex-shrink:0;">🔀 ${totalVariants}×</button>`
+        ? `<button onclick="event.stopPropagation();_tvAdminToggleVariants('${uid}', '${_esc(key)}')" title="Zobrazit a spravovat kvalitní varianty" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:0.72rem;white-space:nowrap;flex-shrink:0;">🔀 ${totalVariants}×</button>`
         : '';
     const moveBtn = `<button onclick="_tvAdminOpenMove('${rid}')" title="Přesunout do jiné kategorie / do jiných Kanálů" style="background:none;border:1px solid ${movedFlag ? '#e6b800' : 'var(--border)'};color:${movedFlag ? '#e6b800' : '#ccc'};padding:3px 8px;border-radius:6px;cursor:pointer;font-size:0.72rem;white-space:nowrap;flex-shrink:0;">↪️ Přesunout</button>`;
     const orderControls = ctx ? `
@@ -19187,7 +19234,7 @@ function _tvAdminChannelRowHtml(entry, ctx, brokenFlag, sourceLabel) {
             </div>
         </div>
     </div>
-    ${totalVariants > 1 ? `<div id="${uid}" style="display:none;padding:2px 10px 10px 46px;background:rgba(0,0,0,0.2);">${_tvAdminVariantsHtml(entry)}</div>` : ''}
+    ${totalVariants > 1 ? `<div id="${uid}" style="display:${(window._tvAdminState.openVar && window._tvAdminState.openVar[key]) ? 'block' : 'none'};padding:2px 10px 10px 46px;background:rgba(0,0,0,0.2);">${_tvAdminVariantsHtml(entry, rid)}</div>` : ''}
     </div>`;
 }
 
