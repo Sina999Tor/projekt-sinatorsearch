@@ -18957,25 +18957,26 @@ function _tvAdminChannelRowHtml(entry, catId, brokenFlag, sourceLabel) {
         ? `<button onclick="event.stopPropagation();_tvAdminToggleVariants('${uid}')" title="Zobrazit a spravovat kvalitní varianty" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:0.72rem;white-space:nowrap;flex-shrink:0;">🔀 ${totalVariants}×</button>`
         : '';
     const catControls = catId !== null ? `
-        <select onchange="_tvAdminChangeCategory('${_esc(key)}', this.value)" style="background:var(--bg-elevated);border:1px solid var(--border);color:#ccc;font-size:0.72rem;border-radius:6px;padding:3px 4px;max-width:90px;">${TV_GROUPS.filter(g => g.id !== 'all').map(g => `<option value="${g.id}" ${catId === g.id ? 'selected' : ''}>${tvGroupDisplayLabel(g)}</option>`).join('')}</select>
-        <button onclick="_tvAdminMoveOrder('${_esc(key)}', '${catId}', -1)" title="Posunout nahoru" style="background:none;border:1px solid var(--border);color:#ccc;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:0.8rem;">↑</button>
-        <button onclick="_tvAdminMoveOrder('${_esc(key)}', '${catId}', 1)" title="Posunout dolů" style="background:none;border:1px solid var(--border);color:#ccc;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:0.8rem;">↓</button>` : '';
+        <select onchange="_tvAdminChangeCategory('${_esc(key)}', this.value)" style="background:var(--bg-elevated);border:1px solid var(--border);color:#ccc;font-size:0.72rem;border-radius:6px;padding:3px 4px;max-width:90px;flex-shrink:0;">${TV_GROUPS.filter(g => g.id !== 'all').map(g => `<option value="${g.id}" ${catId === g.id ? 'selected' : ''}>${tvGroupDisplayLabel(g)}</option>`).join('')}</select>
+        <button onclick="_tvAdminMoveOrder('${_esc(key)}', '${catId}', -1)" title="Posunout nahoru" style="background:none;border:1px solid var(--border);color:#ccc;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:0.8rem;flex-shrink:0;">↑</button>
+        <button onclick="_tvAdminMoveOrder('${_esc(key)}', '${catId}', 1)" title="Posunout dolů" style="background:none;border:1px solid var(--border);color:#ccc;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:0.8rem;flex-shrink:0;">↓</button>` : '';
     return `<div style="border-bottom:1px solid var(--border);${enabled ? '' : 'opacity:0.45;'}">
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;flex-wrap:wrap;">
-        ${logo}
-        <div style="flex:1;min-width:110px;">
-            <input type="text" value="${_esc(name)}" onclick="event.stopPropagation()" onchange="_tvAdminRenameChannel('${_esc(key)}', this.value)" title="Přepsat zobrazovaný název kanálu" style="width:100%;background:none;border:none;color:#eee;font-size:0.85rem;padding:2px 4px;border-radius:4px;box-sizing:border-box;" onfocus="this.style.background='var(--bg-elevated)'" onblur="this.style.background='none'">
-            <div style="font-size:0.68rem;color:var(--text-muted);display:flex;gap:6px;flex-wrap:wrap;">
-                ${brokenFlag ? '<span style="color:#ff6b6b;">🚫 nefunkční</span>' : ''}
-                ${sourceLabel ? `<span>${_esc(sourceLabel)}</span>` : ''}
+    <div style="padding:8px 10px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            ${logo}
+            <div style="flex:1;min-width:0;">
+                <input type="text" value="${_esc(name)}" onclick="event.stopPropagation()" onchange="_tvAdminRenameChannel('${_esc(key)}', this.value)" title="Přepsat zobrazovaný název kanálu" style="width:100%;background:none;border:none;color:#eee;font-size:0.85rem;padding:2px 4px;border-radius:4px;box-sizing:border-box;" onfocus="this.style.background='var(--bg-elevated)'" onblur="this.style.background='none'">
+                ${(brokenFlag || sourceLabel) ? `<div style="font-size:0.68rem;color:var(--text-muted);display:flex;gap:6px;flex-wrap:wrap;padding:0 4px;">${brokenFlag ? '<span style="color:#ff6b6b;">🚫 nefunkční</span>' : ''}${sourceLabel ? `<span>${_esc(sourceLabel)}</span>` : ''}</div>` : ''}
             </div>
         </div>
-        ${variantsBtn}
-        ${catControls}
-        <button onclick="_tvAdminToggleBroken('${_esc(key)}', '${_esc(entry.ch._origName || entry.ch.name)}')" title="${brokenFlag ? 'Obnovit (funguje zase)' : 'Označit jako nefunkční'}" style="background:none;border:1px solid ${brokenFlag ? '#ff6b6b' : 'var(--border)'};color:${brokenFlag ? '#ff6b6b' : '#ccc'};width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">${brokenFlag ? '↺' : '🚫'}</button>
-        <button onclick="openInVlcUrl('${_esc(entry.ch.url).replace(/'/g, "\\'")}')" title="Spustit / otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">▶️</button>
-        <div onclick="_tvAdminToggleEnabled('${_esc(key)}')" style="width:38px;height:22px;border-radius:11px;background:${enabled ? '#1db954' : '#444'};position:relative;cursor:pointer;flex-shrink:0;transition:background 0.15s;">
-            <div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${enabled ? '18px' : '2px'};transition:left 0.15s;"></div>
+        <div style="display:flex;align-items:center;gap:6px;overflow-x:auto;padding-bottom:2px;">
+            ${variantsBtn}
+            ${catControls}
+            <button onclick="_tvAdminToggleBroken('${_esc(key)}', '${_esc(entry.ch._origName || entry.ch.name)}')" title="${brokenFlag ? 'Obnovit (funguje zase)' : 'Označit jako nefunkční'}" style="background:none;border:1px solid ${brokenFlag ? '#ff6b6b' : 'var(--border)'};color:${brokenFlag ? '#ff6b6b' : '#ccc'};width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">${brokenFlag ? '↺' : '🚫'}</button>
+            <button onclick="openInVlcUrl('${_esc(entry.ch.url).replace(/'/g, "\\'")}')" title="Spustit / otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">▶️</button>
+            <div onclick="_tvAdminToggleEnabled('${_esc(key)}')" style="width:38px;height:22px;border-radius:11px;background:${enabled ? '#1db954' : '#444'};position:relative;cursor:pointer;flex-shrink:0;transition:background 0.15s;">
+                <div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${enabled ? '18px' : '2px'};transition:left 0.15s;"></div>
+            </div>
         </div>
     </div>
     ${totalVariants > 1 ? `<div id="${uid}" style="display:none;padding:2px 10px 10px 46px;background:rgba(0,0,0,0.2);">${_tvAdminVariantsHtml(entry)}</div>` : ''}
@@ -19109,20 +19110,15 @@ function _tvAdminMoveOrder(key, catId, dir) {
     if (i === -1) return;
     const j = i + dir;
     if (j < 0 || j >= all.length) return;
+    // Prohoď sousedy přímo v poli...
+    [all[i], all[j]] = [all[j], all[i]];
+    // ...a VŠEM položkám v tomhle seznamu přepočítej váhu jako jejich nový
+    // index (0,1,2,...). Díky tomu se váhy nikdy nekumulují do velkých čísel
+    // z předchozích přesunů — každé kliknutí na ↑/↓ tak vždy posune položku
+    // o přesně JEDNU pozici, ať se předtím přesouvalo cokoliv jiného.
     const ov = _tvAdminOv();
     const orderMap = ov.order;
-    const wA = orderMap[all[i]._brokenKey] || 0;
-    const wB = orderMap[all[j]._brokenKey] || 0;
-    // Prohodit váhy sousedů — nejjednodušší způsob, jak spolehlivě prohodit
-    // pořadí dvou sousedících položek bez zásahu do zbytku seznamu.
-    orderMap[all[i]._brokenKey] = wB;
-    orderMap[all[j]._brokenKey] = wA;
-    // Pokud měly stejnou (typicky nulovou) váhu, prohození nic nezmění —
-    // dorovnat explicitním posunem o 1, ať se opravdu prohodí.
-    if (wA === wB) {
-        orderMap[all[i]._brokenKey] = wA + dir;
-        orderMap[all[j]._brokenKey] = wB - dir;
-    }
+    all.forEach((entry, idx) => { orderMap[entry._brokenKey] = idx; });
     tvAdminSaveOverrides();
     tvRerenderAllChannelLists();
     _renderTvChannelAdminModal();
