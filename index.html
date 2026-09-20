@@ -18691,7 +18691,8 @@ function tvGroupChannels(list, opts) {
         // Jednotlivě vypnutá kvalitní varianta (konkrétní URL) — admin panel
         // volá s includeDisabledUrls:true, aby všechny varianty pořád viděl
         // a mohl je zpátky zapnout.
-        if (disabledUrlsMap[ch.url] && !opts.includeDisabledUrls) return;
+        // (Vypnuté URL už se nezahazují — zůstanou v seznamu variant jako
+        // "vypnuté" alternativy; hlavní dlaždice ale vždy pustí zapnutý zdroj.)
         const key = tvChannelKey(ch);
         // Vypnuté kanály (Admin level 2, "Správa IPTV kanálů") se pro běžné
         // seznamy skryjí úplně — na rozdíl od "nefunkčních", ty se jen
@@ -18706,7 +18707,9 @@ function tvGroupChannels(list, opts) {
     const broken = [];
     order.forEach(key => {
         const arr = groups.get(key);
-        if (!arr.length) return; // všechny varianty vyfiltrované/jednotlivě vypnuté
+        if (!arr.length) return;
+        // Žádný zapnutý zdroj → kanál se v běžných seznamech neukazuje vůbec.
+        if (!opts.includeDisabledUrls && !arr.some(c => !disabledUrlsMap[c.url])) return;
         const withLogo = arr.filter(c => c.logo);
         let entry;
         if (withLogo.length) {
@@ -18714,6 +18717,16 @@ function tvGroupChannels(list, opts) {
             entry = { ch: primary, alts: arr.filter(c => c !== primary), _brokenKey: key, _disabled: !!disabledMap[key] };
         } else {
             entry = { ch: arr[0], alts: arr.slice(1), _brokenKey: key, _disabled: !!disabledMap[key] };
+        }
+        // Hlavní dlaždice = vždy ZAPNUTÝ (funkční) zdroj; logo zůstane z varianty,
+        // která ho má, i když je ta vypnutá. Všechny ostatní zdroje (i vypnuté)
+        // jsou dál vidět v seznamu alternativ ▾.
+        if (!opts.includeDisabledUrls && disabledUrlsMap[entry.ch.url]) {
+            const logoFrom = entry.ch;
+            const en = arr.filter(c => !disabledUrlsMap[c.url])
+                .sort((a, b) => tvDisplayName(a.name).length - tvDisplayName(b.name).length)[0];
+            if (!en.logo && logoFrom.logo) en.logo = logoFrom.logo;
+            entry = { ch: en, alts: arr.filter(c => c !== en), _brokenKey: key, _disabled: !!disabledMap[key] };
         }
         if (brokenMap[key] && !opts.includeDisabled) {
             broken.push(entry);
@@ -18762,7 +18775,8 @@ function tvTileHtml(entry, onclickForChannel, isActive) {
         : '';
     const altPanel = alts.length
         ? '<div class="tv-ch-alts" id="' + uid + '" style="display:none;">' + alts.map(a => {
-            return '<div class="tv-ch-alt-item" onclick="event.stopPropagation();' + onclickForChannel(a) + '">' + tvDisplayName(a.name) + (a.logo ? '' : ' <span style="opacity:.55;">(bez loga)</span>') + '</div>';
+            const _off = !!_tvAdminOv().disabledUrls[a.url];
+            return '<div class="tv-ch-alt-item"' + (_off ? ' style="opacity:.5;"' : '') + ' onclick="event.stopPropagation();' + onclickForChannel(a) + '">' + tvDisplayName(a.name) + (a.logo ? '' : ' <span style="opacity:.55;">(bez loga)</span>') + (_off ? ' <span style="opacity:.8;">(vypnuto)</span>' : '') + '</div>';
         }).join('') + '</div>'
         : '';
     const brokenBtn = tvBrokenMarkButtonHtml(entry);
