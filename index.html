@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-21T21:21:00Z -->
+<!-- BUILD: 2026-09-21T21:43:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -19700,7 +19700,41 @@ function _tvMgrIsAdmin() { return typeof window._isAdminLevel2 === 'function' &&
 function _tvMgrUpdateOptVisibility() {
     const o = document.getElementById('tvTabMgrOpt');
     if (o) o.style.display = _tvMgrIsAdmin() ? '' : 'none';
+    try { _tvUpdateTabOptVisibility(); } catch (e) { console.warn('tab visibility', e); }
 }
+
+// Nabídka Kanály / Kanály 2–6 / vlastní playlisty: seznam, ve kterém jsou VYPNUTÉ všechny kanály
+// (Správa IPTV kanálů), se v rozbalovací nabídce vůbec nezobrazí. Právě otevřená záložka zůstane
+// vždy vidět (aby nezmizela pod prsty); v admin panelu se vypnuté seznamy dál spravují.
+function _tvUpdateTabOptVisibility() {
+    const menu = document.querySelector('.tv-dd-menu[data-owner="tvTabDD"]');
+    if (!menu) return;
+    _tvMvEnsureAll();
+    tvApplyMoves();
+    const conts = _tvMvContainers();
+    const ov = _tvAdminOv();
+    const sig = JSON.stringify(ov.disabled) + '|' + JSON.stringify(ov.disabledUrls) + '|'
+        + conts.map(c => { let a = null; try { a = c.arr(); } catch (e) {} return c.id + ':' + (a ? a.length : 0); }).join(',');
+    if (window._tvTabCountsSig !== sig) {
+        const counts = {};
+        conts.forEach(c => {
+            let a = null; try { a = c.arr(); } catch (e) {}
+            let n = 0;
+            if (a && a.length) { const g = tvGroupChannels(a); n = g.shown.length + g.noLogo.length + g.broken.length; }
+            const key = c.src === 'k2' ? 'alt' : (c.id === 'main' ? 'channels' : c.id);
+            counts[key] = (counts[key] || 0) + n;
+        });
+        window._tvTabCounts = counts;
+        window._tvTabCountsSig = sig;
+    }
+    const counts = window._tvTabCounts || {};
+    menu.querySelectorAll('.tv-dd-opt').forEach(o => {
+        const v = o.getAttribute('data-value');
+        if (!Object.prototype.hasOwnProperty.call(counts, v)) return;
+        o.style.display = (counts[v] === 0 && !o.classList.contains('active')) ? 'none' : '';
+    });
+}
+window._tvUpdateTabOptVisibility = _tvUpdateTabOptVisibility;
 function _tvMgrOpen() {
     const body = document.getElementById('tvMgrBody');
     if (body) body.innerHTML = '<div class="loading" style="padding:30px;"><div class="spinner"></div>Načítám všechny kanály…</div>';
