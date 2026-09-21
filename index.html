@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-21T19:08:00Z -->
+<!-- BUILD: 2026-09-21T19:46:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -17758,6 +17758,8 @@ function _tvAdminOv() {
     if (!o.moves) o.moves = {};
     // Sdílené kanály přidané z vlastních playlistů (Kanály 7+): {hash: {n,u,l,g,i,t,s}}
     if (!o.injected) o.injected = {};
+    // Ručně umístěné kanály BEZ loga: {klíč:true} — zobrazí se v hlavní mřížce na svém místě (ne v „Další TV")
+    if (!o.pinned) o.pinned = {};
     return o;
 }
 function tvAdminSaveOverrides() {
@@ -18825,6 +18827,7 @@ function tvGroupChannels(list, opts) {
     const disabledMap = _tvAdminOv().disabled;
     const disabledUrlsMap = _tvAdminOv().disabledUrls;
     const orderMap = _tvAdminOv().order;
+    const pinnedMap = _tvAdminOv().pinned || {};
     const groups = new Map();
     const order = [];
     (list || []).forEach(ch => {
@@ -18890,7 +18893,12 @@ function tvGroupChannels(list, opts) {
             shown.push(entry);
         } else if (hasLogoNow) {
             shown.push(entry);
+        } else if (pinnedMap[key]) {
+            // Ručně umístěný kanál bez loga → zůstane v hlavní mřížce na zvolené pozici
+            entry._pinnedNoLogo = true;
+            shown.push(entry);
         } else {
+            entry._inNoLogo = true;
             noLogo.push(entry);
         }
     });
@@ -18940,8 +18948,25 @@ function tvTileHtml(entry, onclickForChannel, isActive) {
         }).join('') + '</div>'
         : '';
     const brokenBtn = tvBrokenMarkButtonHtml(entry);
-    return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + ' has-logo" onclick="' + onclickForChannel(ch) + '" title="' + safeTitle + '">'
-        + '<img class="tv-ch-logo" src="' + String(entry._logo || ch.logo).replace(/"/g, '%22') + '" loading="lazy" decoding="async" data-chname="' + safeTitle + '" data-chkey="' + String(entry._key || '').replace(/"/g, '') + '" onerror="tvLogoFallback(this)">'
+    // Ručně umístěný kanál bez loga (Správa IPTV kanálů → pozice): zůstane v hlavní mřížce
+    // jako prázdný čtvereček s názvem, stejně jako v „Další TV" — jinak by nešel přesunout.
+    let logoHtml;
+    if (entry._pinnedNoLogo) {
+        let src = entry._logo || '';
+        let gh = false;
+        if (!src && entry._tryGh) {
+            const c = tvGithubLogoCandidates(ch.name);
+            if (c.length) { src = c[0]; gh = true; }
+        }
+        logoHtml = '<div class="tv-ch-logo-empty">' + (src
+            ? '<img src="' + String(src).replace(/"/g, '%22') + '" loading="lazy" decoding="async"' + (gh ? ' data-gh="1"' : '')
+                + ' data-chname="' + safeTitle + '" data-chkey="' + String(entry._key || '').replace(/"/g, '') + '" onload="tvLogoOk(this)" onerror="tvNoLogoImgFallback(this)">'
+            : '') + '</div>';
+    } else {
+        logoHtml = '<img class="tv-ch-logo" src="' + String(entry._logo || ch.logo).replace(/"/g, '%22') + '" loading="lazy" decoding="async" data-chname="' + safeTitle + '" data-chkey="' + String(entry._key || '').replace(/"/g, '') + '" onerror="tvLogoFallback(this)">';
+    }
+    return '<div class="tv-ch-item ' + (isActive ? 'active' : '') + (entry._pinnedNoLogo ? ' tv-nl-tile' : ' has-logo') + '" onclick="' + onclickForChannel(ch) + '" title="' + safeTitle + '">'
+        + logoHtml
         + altBtn
         + brokenBtn
         + '<div class="tv-ch-name">' + shortName + '</div>'
@@ -19898,11 +19923,31 @@ function _tvAdminMoveOrder(key, ctxTok, dir) {
     const ov = _tvAdminOv();
     const orderMap = ov.order;
     all.forEach((entry, idx) => { orderMap[entry._brokenKey] = idx; });
+    _tvAdminApplyPins(all);
     tvAdminSaveOverrides();
     tvRerenderAllChannelLists();
     _renderTvChannelAdminModal();
 }
 window._tvAdminMoveOrder = _tvAdminMoveOrder;
+
+
+// Kanály BEZ loga (nebo s nenačteným logem) veřejně patří do sbalené sekce „➕ Další TV",
+// kterou řadí abeceda — jejich ruční pořadí se tam nikdy neprojevilo, takže „nešly přesunout".
+// Proto: každý kanál bez loga, který po přeřazení stojí PŘED nějakým kanálem s logem,
+// se označí jako „pinned" (ov.pinned) a zobrazí se v hlavní mřížce na svém místě.
+// Kanály bez loga na konci seznamu zůstávají v „Další TV".
+function _tvAdminApplyPins(all) {
+    const ov = _tvAdminOv();
+    if (!ov.pinned) ov.pinned = {};
+    const isNl = e => !!(e._inNoLogo || e._pinnedNoLogo);
+    let lastMain = -1;
+    all.forEach((e, i) => { if (!isNl(e)) lastMain = i; });
+    all.forEach((e, i) => {
+        if (!isNl(e)) return;
+        if (i < lastMain) ov.pinned[e._brokenKey] = true; else delete ov.pinned[e._brokenKey];
+    });
+}
+window._tvAdminApplyPins = _tvAdminApplyPins;
 
 // ── Výběr pozice kanálu v kategorii ────────────────────────────────────────
 // Každý řádek má vedle přepínače číslo své pozice (1., 2., …). Klepnutím se
@@ -19952,6 +19997,7 @@ function _tvAdminDoPos(which) {
     all.splice(pos - 1, 0, item);
     const orderMap = _tvAdminOv().order;
     all.forEach((entry, idx) => { orderMap[entry._brokenKey] = idx; });
+    _tvAdminApplyPins(all);
     tvAdminSaveOverrides();
     tvRerenderAllChannelLists();
     _renderTvChannelAdminModal();
@@ -39326,6 +39372,7 @@ const rtdb = getDatabase(fbApp);
     if (!o.categoryDisabled) o.categoryDisabled = {};
     if (!o.moves) o.moves = {};
     if (!o.injected) o.injected = {};
+    if (!o.pinned) o.pinned = {};
     window._tvAdminOverrides = o;
     try { window._store && window._store.setItem('sinator_tv_admin_overrides', JSON.stringify(o)); } catch(e) {}
     if (typeof window.tvRerenderAllChannelLists === 'function') window.tvRerenderAllChannelLists();
