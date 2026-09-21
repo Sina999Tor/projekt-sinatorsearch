@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-21T20:41:00Z -->
+<!-- BUILD: 2026-09-21T21:21:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -18981,7 +18981,7 @@ window.tvTileHtml = tvTileHtml;
 // Tlačítko "➕ Další TV" (stanice bez platného loga) + skrytý panel s nimi
 // jako MŘÍŽKA dlaždic (stejná jako hlavní), seřazená podle abecedy. Když stanice
 // logo nemá nebo se nenačetlo, zobrazí se prázdný čtvereček.
-function tvNoLogoTileHtml(name, onclickStr, key, logoUrl, tryGh) {
+function tvNoLogoTileHtml(name, onclickStr, key, logoUrl, tryGh, brokenBtnHtml) {
     const label = tvDisplayName(name);
     const safeName = (name || '').replace(/"/g, '&quot;');
     const sk = tvSortKey(name);
@@ -18998,6 +18998,7 @@ function tvNoLogoTileHtml(name, onclickStr, key, logoUrl, tryGh) {
         : '';
     return '<div class="tv-ch-item tv-nl-tile" data-sk="' + sk + '" onclick="' + onclickStr + '" title="' + safeName + '">'
         + '<div class="tv-ch-logo-empty">' + img + '</div>'
+        + (brokenBtnHtml || '')   // 🚫 označení nefunkčního streamu (Admin level 2) — stejně jako u dlaždic s logem
         + '<div class="tv-ch-name">' + label + '</div></div>';
 }
 window.tvNoLogoTileHtml = tvNoLogoTileHtml;
@@ -19010,7 +19011,7 @@ function tvNoLogoSectionHtml(noLogo, onclickForChannel, panelId) {
         return tvDisplayName(a.ch.name).localeCompare(tvDisplayName(b.ch.name), 'cs', { sensitivity: 'base', numeric: true });
     });
     const items = sorted.map(entry =>
-        tvNoLogoTileHtml(entry.ch.name, onclickForChannel(entry.ch), entry._key || tvChannelKey(entry.ch), entry._logo, entry._tryGh)
+        tvNoLogoTileHtml(entry.ch.name, onclickForChannel(entry.ch), entry._key || tvChannelKey(entry.ch), entry._logo, entry._tryGh, tvBrokenMarkButtonHtml(entry))
     ).join('');
     return '<button class="tv-more-btn" onclick="tvToggleAlts(\'' + panelId + '\')">➕ Další TV (' + noLogo.length + ')</button>'
         + '<div class="tv-nl-grid" id="' + panelId + '" style="display:none;">' + items + '</div>';
@@ -20189,7 +20190,8 @@ function tvDemoteTileToNoLogo(img, name) {
     const listEl = tile.parentElement;
     const onclickAttr = (tile.getAttribute('onclick') || '').replace(/"/g, '&quot;');
     const key = img.dataset ? img.dataset.chkey : '';
-    const itemHtml = tvNoLogoTileHtml(name, onclickAttr, key, '', false);   // prázdný čtvereček
+    const _bb = tile.querySelector('.tv-broken-btn');   // zachovat tlačítko 🚫 i po přesunu do „Další TV"
+    const itemHtml = tvNoLogoTileHtml(name, onclickAttr, key, '', false, _bb ? _bb.outerHTML : '');   // prázdný čtvereček
     tile.remove();
     if (!listEl) return;
     const panel = listEl.querySelector('.tv-nl-grid');
