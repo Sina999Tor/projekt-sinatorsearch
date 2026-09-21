@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-20T20:16:00Z -->
+<!-- BUILD: 2026-09-21T19:08:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -1540,6 +1540,24 @@
                 <button onclick="_tvAdminDoMove()" style="flex:2;background:#5dade2;border:none;color:#000;font-weight:700;padding:10px;border-radius:10px;cursor:pointer;font-size:0.9rem;">↪️ Přesunout</button>
             </div>
             <button id="tvAdminMoveReset" onclick="_tvAdminResetMove()" style="display:none;width:100%;margin-top:8px;background:none;border:1px solid #e6b800;color:#e6b800;padding:8px;border-radius:10px;cursor:pointer;font-size:0.82rem;">↩ Vrátit na původní místo</button>
+        </div>
+    </div>
+</div>
+
+<!-- 🔢 Výběr pozice kanálu v kategorii (Správa IPTV kanálů) -->
+<div id="tvAdminPosSheet" style="display:none;position:fixed;inset:0;z-index:2000000;background:rgba(0,0,0,0.65);align-items:flex-end;justify-content:center;" onclick="if(event.target===this)_tvAdminClosePos()">
+    <div style="width:100%;max-width:520px;background:var(--bg-card);border:1px solid var(--border);border-bottom:none;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;">
+        <div id="tvAdminPosTitle" style="font-weight:700;font-size:0.95rem;color:#eee;margin-bottom:4px;word-break:break-word;"></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:12px;line-height:1.4;">Kanál se vloží přesně na vybranou pozici, ostatní se posunou.</div>
+        <label style="display:block;font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;">Nová pozice</label>
+        <select id="tvAdminPosSel" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;font-size:0.9rem;margin-bottom:10px;box-sizing:border-box;"></select>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <button onclick="_tvAdminDoPos('first')" style="flex:1;background:none;border:1px solid #5dade2;color:#5dade2;padding:9px;border-radius:10px;cursor:pointer;font-size:0.85rem;">⏫ Na začátek</button>
+            <button onclick="_tvAdminDoPos('last')" style="flex:1;background:none;border:1px solid #5dade2;color:#5dade2;padding:9px;border-radius:10px;cursor:pointer;font-size:0.85rem;">⏬ Na konec</button>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button onclick="_tvAdminClosePos()" style="flex:1;background:none;border:1px solid var(--border);color:#ccc;padding:10px;border-radius:10px;cursor:pointer;font-size:0.9rem;">Zrušit</button>
+            <button onclick="_tvAdminDoPos()" style="flex:2;background:#5dade2;border:none;color:#000;font-weight:700;padding:10px;border-radius:10px;cursor:pointer;font-size:0.9rem;">🔢 Přesunout na pozici</button>
         </div>
     </div>
 </div>
@@ -19382,8 +19400,10 @@ function _tvAdminCatEntries(cat) {
 // Jeden řádek kanálu — přepínač zapnuto/vypnuto, 🚫 nefunkční, ▶️ test,
 // ↑/↓ pořadí v rámci kategorie, ↪️ přesun do jiné kategorie / jiných Kanálů.
 // ctx === null → řádek z cross-source hledání (bez pořadí, ukazuje zdroj).
-function _tvAdminChannelRowHtml(entry, ctx, brokenFlag, sourceLabel) {
+function _tvAdminChannelRowHtml(entry, ctx, brokenFlag, sourceLabel, pos, total) {
     const key = entry._brokenKey;
+    // Pozice v kategorii (jen v řádcích s pořadím) — klepnutí otevře výběr pozice.
+    const posBtn = (ctx && pos) ? `<button onclick="_tvAdminOpenPos('${_esc(key)}', '${_tvAdminTok(ctx)}')" title="Vybrat pozici v kategorii (${pos} z ${total})" style="background:none;border:1px solid #5dade2;color:#5dade2;min-width:38px;height:26px;padding:0 7px;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:700;flex-shrink:0;white-space:nowrap;">${pos}.</button>` : '';
     const enabled = !entry._disabled;
     const name = tvDisplayName(entry.ch.name);
     const logo = entry.ch.logo ? `<img src="${entry.ch.logo}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;background:#111;flex-shrink:0;" onerror="this.style.display='none'">` : `<div style="width:28px;height:28px;flex-shrink:0;"></div>`;
@@ -19415,6 +19435,7 @@ function _tvAdminChannelRowHtml(entry, ctx, brokenFlag, sourceLabel) {
             ${orderControls}
             <button onclick="_tvAdminToggleBroken('${_esc(key)}', '${_esc(entry.ch._origName || entry.ch.name)}')" title="${brokenFlag ? 'Obnovit (funguje zase)' : 'Označit jako nefunkční'}" style="background:none;border:1px solid ${brokenFlag ? '#ff6b6b' : 'var(--border)'};color:${brokenFlag ? '#ff6b6b' : '#ccc'};width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">${brokenFlag ? '↺' : '🚫'}</button>
             <button onclick="openInVlcUrl('${_esc(entry.ch.url).replace(/'/g, "\\'")}')" title="Spustit / otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">▶️</button>
+            ${posBtn}
             <div onclick="_tvAdminToggleEnabled('${_esc(key)}')" style="width:38px;height:22px;border-radius:11px;background:${enabled ? '#1db954' : '#444'};position:relative;cursor:pointer;flex-shrink:0;transition:background 0.15s;">
                 <div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${enabled ? '18px' : '2px'};transition:left 0.15s;"></div>
             </div>
@@ -19513,7 +19534,7 @@ function _renderTvChannelAdminModal() {
             const ce = _tvAdminCatEntries(c);
             const limit = st.limits[openKey] || 120;
             const part = ce.all.slice(0, limit);
-            inner = `<div>${part.length ? part.map(entry => _tvAdminChannelRowHtml(entry, openKey, ce.brokenKeys.has(entry._brokenKey))).join('') : '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.82rem;">Žádné kanály v této kategorii.</div>'}${ce.all.length > limit ? `<div style="padding:10px;text-align:center;"><button onclick="_tvAdminShowMore('${_tvAdminTok(openKey)}')" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;">➕ Zobrazit dalších ${Math.min(120, ce.all.length - limit)} (zbývá ${ce.all.length - limit})</button></div>` : ''}</div>`;
+            inner = `<div>${part.length ? part.map((entry, ix) => _tvAdminChannelRowHtml(entry, openKey, ce.brokenKeys.has(entry._brokenKey), undefined, ix + 1, ce.all.length)).join('') : '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.82rem;">Žádné kanály v této kategorii.</div>'}${ce.all.length > limit ? `<div style="padding:10px;text-align:center;"><button onclick="_tvAdminShowMore('${_tvAdminTok(openKey)}')" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;">➕ Zobrazit dalších ${Math.min(120, ce.all.length - limit)} (zbývá ${ce.all.length - limit})</button></div>` : ''}</div>`;
         }
         const headLabel = c.isMain
             ? `<input type="text" value="${_esc(c.label)}" onclick="event.stopPropagation()" onchange="_tvAdminRenameCategory('${c.gid}', this.value)" style="flex:1;min-width:0;background:none;border:none;color:#eee;font-weight:700;font-size:0.92rem;padding:2px 4px;border-radius:4px;" onfocus="this.style.background='var(--bg-elevated)'" onblur="this.style.background='none'">`
@@ -19882,6 +19903,61 @@ function _tvAdminMoveOrder(key, ctxTok, dir) {
     _renderTvChannelAdminModal();
 }
 window._tvAdminMoveOrder = _tvAdminMoveOrder;
+
+// ── Výběr pozice kanálu v kategorii ────────────────────────────────────────
+// Každý řádek má vedle přepínače číslo své pozice (1., 2., …). Klepnutím se
+// otevře výběr pozice: kanál se vloží přesně na zvolené místo a ostatní se
+// posunou (přesun nahoru → ostatní o 1 níž; přesun dolů → ostatní o 1 výš).
+// Ukládá se stejnými váhami (ov.order) jako tlačítka ↑/↓, takže je pořadí
+// sdílené se všemi uživateli.
+function _tvAdminOpenPos(key, ctxTok) {
+    const cat = _tvAdminFindCat(_tvAdminUntok(ctxTok));
+    if (!cat) return;
+    const all = _tvAdminCatEntries(cat).all;
+    const i = all.findIndex(e => e._brokenKey === key);
+    if (i === -1) return;
+    window._tvAdminState.pos = { key, ctxTok };
+    const _sh = document.getElementById('tvAdminPosSheet');
+    if (!_sh) return;
+    if (_sh.parentNode !== document.body) document.body.appendChild(_sh);
+    document.getElementById('tvAdminPosTitle').textContent = tvDisplayName(all[i].ch.name) + ' — teď na pozici ' + (i + 1) + ' z ' + all.length;
+    document.getElementById('tvAdminPosSel').innerHTML = all.map((e, ix) =>
+        `<option value="${ix + 1}"${ix === i ? ' selected' : ''}>${ix + 1}. ${_esc(tvDisplayName(e.ch.name))}${ix === i ? ' (teď)' : ''}</option>`).join('');
+    _sh.style.display = 'flex';
+}
+window._tvAdminOpenPos = _tvAdminOpenPos;
+
+function _tvAdminClosePos() {
+    const sh = document.getElementById('tvAdminPosSheet');
+    if (sh) sh.style.display = 'none';
+    if (window._tvAdminState) window._tvAdminState.pos = null;
+}
+window._tvAdminClosePos = _tvAdminClosePos;
+
+// which: 'first' | 'last' | undefined (= hodnota z výběru)
+function _tvAdminDoPos(which) {
+    const p = window._tvAdminState.pos;
+    if (!p) return;
+    const cat = _tvAdminFindCat(_tvAdminUntok(p.ctxTok));
+    if (!cat) { _tvAdminClosePos(); return; }
+    const all = _tvAdminCatEntries(cat).all;
+    const i = all.findIndex(e => e._brokenKey === p.key);
+    if (i === -1) { _tvAdminClosePos(); return; }
+    let pos = which === 'first' ? 1 : which === 'last' ? all.length : parseInt(document.getElementById('tvAdminPosSel').value, 10);
+    if (!(pos >= 1)) pos = i + 1;
+    pos = Math.min(pos, all.length);
+    _tvAdminClosePos();
+    if (pos - 1 === i) return;   // beze změny
+    const item = all.splice(i, 1)[0];
+    all.splice(pos - 1, 0, item);
+    const orderMap = _tvAdminOv().order;
+    all.forEach((entry, idx) => { orderMap[entry._brokenKey] = idx; });
+    tvAdminSaveOverrides();
+    tvRerenderAllChannelLists();
+    _renderTvChannelAdminModal();
+}
+window._tvAdminDoPos = _tvAdminDoPos;
+
 
 
 function tvSetViewMode(mode) {
