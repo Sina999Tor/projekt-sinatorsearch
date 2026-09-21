@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-21T20:06:00Z -->
+<!-- BUILD: 2026-09-21T20:41:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -19421,7 +19421,7 @@ function _tvAdminCatEntries(cat) {
     const adultAllowed = window._store.getItem('sinator_adult_content') === 'true';
     const matched = cat.channels().filter(ch => adultAllowed || !isAdultChannel(ch));
     const grouped = tvGroupChannels(tvSortChannels(matched), { includeDisabled: true, includeDisabledUrls: true });
-    return { all: [...grouped.shown, ...grouped.broken, ...grouped.noLogo], brokenKeys: new Set(grouped.broken.map(e => e._brokenKey)) };
+    return { all: [...grouped.shown, ...grouped.broken, ...grouped.noLogo], brokenKeys: _tvAdminBrokenKeySet([].concat(grouped.shown, grouped.broken, grouped.noLogo)) };
 }
 
 // Jeden řádek kanálu — přepínač zapnuto/vypnuto, 🚫 nefunkční, ▶️ test,
@@ -19453,7 +19453,7 @@ function _tvAdminChannelRowHtml(entry, ctx, brokenFlag, sourceLabel, pos, total)
             ${logo}
             <div style="flex:1;min-width:0;">
                 <input type="text" value="${_esc(name)}" onclick="event.stopPropagation()" onchange="_tvAdminRenameChannel('${_esc(key)}', this.value)" title="Přepsat zobrazovaný název kanálu" style="width:100%;background:none;border:none;color:#eee;font-size:0.85rem;padding:2px 4px;border-radius:4px;box-sizing:border-box;" onfocus="this.style.background='var(--bg-elevated)'" onblur="this.style.background='none'">
-                ${(brokenFlag || sourceLabel || movedFlag) ? `<div style="font-size:0.68rem;color:var(--text-muted);display:flex;gap:6px;flex-wrap:wrap;padding:0 4px;">${brokenFlag ? '<span style="color:#ff6b6b;">🚫 nefunkční</span>' : ''}${movedFlag ? '<span style="color:#e6b800;">↪ přesunuto</span>' : ''}${sourceLabel ? `<span>${_esc(sourceLabel)}</span>` : ''}</div>` : ''}
+                ${(brokenFlag || sourceLabel || movedFlag || entry._inNoLogo || entry._disabled) ? `<div style="font-size:0.68rem;color:var(--text-muted);display:flex;gap:6px;flex-wrap:wrap;padding:0 4px;">${entry._disabled ? '<span style="color:#ff9f43;">⛔ vypnuto — v mřížce se neukazuje</span>' : ''}${brokenFlag ? '<span style="color:#ff6b6b;">🚫 nefunkční — v mřížce jen dole v „Nefunkční“</span>' : ''}${(entry._inNoLogo && !brokenFlag && !entry._disabled) ? '<span style="color:#f0a030;">🖼 v mřížce jen v „➕ Další TV“ — logo chybí / nenačetlo se</span>' : ''}${movedFlag ? '<span style="color:#e6b800;">↪ přesunuto</span>' : ''}${sourceLabel ? `<span>${_esc(sourceLabel)}</span>` : ''}</div>` : ''}
             </div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;overflow-x:auto;padding-bottom:2px;">
@@ -19537,7 +19537,7 @@ function _renderTvChannelAdminModal() {
         const sourceByUrl = new Map(bySource.map(x => [x.ch.url, x.source]));
         const grouped = tvGroupChannels(tvSortChannels(bySource.map(x => x.ch)), { includeDisabled: true, includeDisabledUrls: true });
         const all = [...grouped.shown, ...grouped.broken, ...grouped.noLogo];
-        const brokenKeys = new Set(grouped.broken.map(e => e._brokenKey));
+        const brokenKeys = _tvAdminBrokenKeySet([].concat(grouped.shown, grouped.broken, grouped.noLogo));
         const CAP = 300;
         body.innerHTML = `<div style="padding:8px 0;">` + all.slice(0, CAP).map(entry => {
             // Když se pod jedním klíčem sešlo víc zdrojů (stejný kanál v Kanály i Kanály 3 např.), ukaž je všechny.
@@ -19731,7 +19731,7 @@ function _tvMgrEntries(searchOverride) {
         && (st.src === 'all' || contSrc[x.ch._mvNat] === st.src));
     const sourceByUrl = new Map(src.map(x => [x.ch.url, x.source]));
     const grouped = tvGroupChannels(tvSortChannels(src.map(x => x.ch)), { includeDisabled: true, includeDisabledUrls: true });
-    const brokenKeys = new Set(grouped.broken.map(e => e._brokenKey));
+    const brokenKeys = _tvAdminBrokenKeySet([].concat(grouped.shown, grouped.broken, grouped.noLogo));
     const du = _tvAdminOv().disabledUrls;
     let all = [...grouped.shown, ...grouped.broken, ...grouped.noLogo];
     all.forEach(e => { e._mgrOff = !!e._disabled || [e.ch].concat(e.alts || []).every(v => du[v.url]); });
@@ -19932,6 +19932,13 @@ function _tvAdminMoveOrder(key, ctxTok, dir) {
 }
 window._tvAdminMoveOrder = _tvAdminMoveOrder;
 
+
+// Které z daných záznamů jsou označené jako nefunkční (🚫). V admin režimu tvGroupChannels nefunkční
+// nevyděluje do samostatného pole, proto se čtou přímo ze sdílené mapy nefunkčních streamů.
+function _tvAdminBrokenKeySet(entries) {
+    const m = tvBrokenLoad();
+    return new Set((entries || []).filter(e => m[e._brokenKey]).map(e => e._brokenKey));
+}
 
 // Kanály BEZ loga (nebo s nenačteným logem) veřejně patří do sbalené sekce „➕ Další TV",
 // kterou řadí abeceda — jejich ruční pořadí se tam nikdy neprojevilo, takže „nešly přesunout".
