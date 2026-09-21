@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-21T19:46:00Z -->
+<!-- BUILD: 2026-09-21T20:06:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -18952,7 +18952,9 @@ function tvTileHtml(entry, onclickForChannel, isActive) {
     // jako prázdný čtvereček s názvem, stejně jako v „Další TV" — jinak by nešel přesunout.
     let logoHtml;
     if (entry._pinnedNoLogo) {
-        let src = entry._logo || '';
+        // Cache může mít logo zapsané jako „nenačetlo se" (24 h se pak nezkouší), i když kanál vlastní
+        // funkční logo má (v admin panelu se ukazuje) → u ručně umístěných kanálů zkusíme znovu zdrojové logo.
+        let src = entry._logo || ch.logo || '';
         let gh = false;
         if (!src && entry._tryGh) {
             const c = tvGithubLogoCandidates(ch.name);
@@ -19431,7 +19433,7 @@ function _tvAdminChannelRowHtml(entry, ctx, brokenFlag, sourceLabel, pos, total)
     const posBtn = (ctx && pos) ? `<button onclick="_tvAdminOpenPos('${_esc(key)}', '${_tvAdminTok(ctx)}')" title="Vybrat pozici v kategorii (${pos} z ${total})" style="background:none;border:1px solid #5dade2;color:#5dade2;min-width:38px;height:26px;padding:0 7px;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:700;flex-shrink:0;white-space:nowrap;">${pos}.</button>` : '';
     const enabled = !entry._disabled;
     const name = tvDisplayName(entry.ch.name);
-    const logo = entry.ch.logo ? `<img src="${entry.ch.logo}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;background:#111;flex-shrink:0;" onerror="this.style.display='none'">` : `<div style="width:28px;height:28px;flex-shrink:0;"></div>`;
+    const logo = entry.ch.logo ? `<img src="${entry.ch.logo}" data-chkey="${_esc(key)}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;background:#111;flex-shrink:0;" onload="tvLogoOk(this)" onerror="this.style.display='none'">` : `<div style="width:28px;height:28px;flex-shrink:0;"></div>`;
     const totalVariants = 1 + ((entry.alts && entry.alts.length) || 0);
     const uid = 'tvAdminVariants_' + (++_tvAdminRowUidSeq);
     const rid = 'r' + _tvAdminRowUidSeq;
@@ -19764,7 +19766,7 @@ function _tvMgrRowsHtml(r) {
             return `<div style="background:rgba(93,173,226,0.05);">${_tvAdminChannelRowHtml(entry, null, r.brokenKeys.has(key), srcs)}<div style="padding:0 12px 8px;text-align:right;"><button onclick="_tvMgrExpand('${_esc(key)}')" style="background:none;border:none;color:#5dade2;font-size:0.75rem;cursor:pointer;">▲ sbalit</button></div></div>`;
         }
         const off = entry._mgrOff;
-        const logo = entry.ch.logo ? `<img src="${entry.ch.logo}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;background:#111;flex-shrink:0;" onerror="this.style.display='none'">` : `<div style="width:28px;height:28px;flex-shrink:0;"></div>`;
+        const logo = entry.ch.logo ? `<img src="${entry.ch.logo}" data-chkey="${_esc(key)}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;background:#111;flex-shrink:0;" onload="tvLogoOk(this)" onerror="this.style.display='none'">` : `<div style="width:28px;height:28px;flex-shrink:0;"></div>`;
         return `<div onclick="_tvMgrExpand('${_esc(key)}')" style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;${off ? 'opacity:0.5;' : ''}">
             ${logo}
             <div style="flex:1;min-width:0;">
