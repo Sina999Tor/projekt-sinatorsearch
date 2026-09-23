@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-21T21:43:00Z -->
+<!-- BUILD: 2026-09-23T03:36:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -853,6 +853,10 @@
         <button onclick="window.open('https://www.docu.sk/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎥</span>
             <div><div style="font-weight:700;color:#00b4d8;">Docu.sk</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">docu.sk</div></div>
+        </button>
+        <button onclick="window.open('https://www.fandimefilmu.cz/', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎦</span>
+            <div><div style="font-weight:700;color:#00b4d8;">Fandíme filmu</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">fandimefilmu.cz</div></div>
         </button>
         <button onclick="window.open('https://streamimdb.ru/year/2026', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎞️</span>
@@ -17760,6 +17764,8 @@ function _tvAdminOv() {
     if (!o.injected) o.injected = {};
     // Ručně umístěné kanály BEZ loga: {klíč:true} — zobrazí se v hlavní mřížce na svém místě (ne v „Další TV")
     if (!o.pinned) o.pinned = {};
+    // Vypnutí streamu JEN v konkrétním seznamu: {"<seznam>|<url>": true} (hromadné vypnutí zdroje v „Všechny kanály")
+    if (!o.disabledIn) o.disabledIn = {};
     return o;
 }
 function tvAdminSaveOverrides() {
@@ -18826,6 +18832,8 @@ function tvGroupChannels(list, opts) {
     const brokenMap = tvBrokenLoad();
     const disabledMap = _tvAdminOv().disabled;
     const disabledUrlsMap = _tvAdminOv().disabledUrls;
+    const disabledInMap = _tvAdminOv().disabledIn || {};
+    const urlOff = c => !!(disabledUrlsMap[c.url] || disabledInMap[_tvCurList(c) + '|' + c.url]);
     const orderMap = _tvAdminOv().order;
     const pinnedMap = _tvAdminOv().pinned || {};
     const groups = new Map();
@@ -18852,7 +18860,7 @@ function tvGroupChannels(list, opts) {
         const arr = groups.get(key);
         if (!arr.length) return;
         // Žádný zapnutý zdroj → kanál se v běžných seznamech neukazuje vůbec.
-        if (!opts.includeDisabledUrls && !arr.some(c => !disabledUrlsMap[c.url])) return;
+        if (!opts.includeDisabledUrls && !arr.some(c => !urlOff(c))) return;
         const withLogo = arr.filter(c => c.logo);
         let entry;
         if (withLogo.length) {
@@ -18864,9 +18872,9 @@ function tvGroupChannels(list, opts) {
         // Hlavní dlaždice = vždy ZAPNUTÝ (funkční) zdroj; logo zůstane z varianty,
         // která ho má, i když je ta vypnutá. Všechny ostatní zdroje (i vypnuté)
         // jsou dál vidět v seznamu alternativ ▾.
-        if (!opts.includeDisabledUrls && disabledUrlsMap[entry.ch.url]) {
+        if (!opts.includeDisabledUrls && urlOff(entry.ch)) {
             const logoFrom = entry.ch;
-            const en = arr.filter(c => !disabledUrlsMap[c.url])
+            const en = arr.filter(c => !urlOff(c))
                 .sort((a, b) => tvDisplayName(a.name).length - tvDisplayName(b.name).length)[0];
             if (!en.logo && logoFrom.logo) en.logo = logoFrom.logo;
             entry = { ch: en, alts: arr.filter(c => c !== en), _brokenKey: key, _disabled: !!disabledMap[key] };
@@ -18943,7 +18951,7 @@ function tvTileHtml(entry, onclickForChannel, isActive) {
         : '';
     const altPanel = alts.length
         ? '<div class="tv-ch-alts" id="' + uid + '" style="display:none;">' + alts.map(a => {
-            const _off = !!_tvAdminOv().disabledUrls[a.url];
+            const _off = !!tvUrlOff(a);
             return '<div class="tv-ch-alt-item"' + (_off ? ' style="opacity:.5;"' : '') + ' onclick="event.stopPropagation();' + onclickForChannel(a) + '">' + tvDisplayName(a.name) + (a.logo ? '' : ' <span style="opacity:.55;">(bez loga)</span>') + (_off ? ' <span style="opacity:.8;">(vypnuto)</span>' : '') + '</div>';
         }).join('') + '</div>'
         : '';
@@ -19108,6 +19116,9 @@ function _tvMvTagAll() {
 }
 let _tvMvSeq = 0, _tvMvLastSig = null;
 function tvApplyMoves() {
+    try { _tvApplyMovesCore(); } finally { try { _tvTagCurrent(); } catch (e) {} }
+}
+function _tvApplyMovesCore() {
     try {
         try { _tvInjSync(); } catch (e) { console.warn('inj sync', e); }
         const moves = _tvAdminOv().moves;
@@ -19222,11 +19233,10 @@ function _tvAdminSrcLabel(v) {
     return 'Kanály 2' + (pl && pl.label ? ' · ' + pl.label : '');
 }
 function _tvAdminVariantsHtml(entry, rid) {
-    const disabledUrls = _tvAdminOv().disabledUrls;
     const all = [entry.ch].concat(entry.alts || []);
-    const anyOff = all.some(v => disabledUrls[v.url]);
+    const anyOff = all.some(v => tvUrlOff(v));
     const rows = all.map((v, idx) => {
-        const vOff = !!disabledUrls[v.url];
+        const vOff = !!tvUrlOff(v);
         const safeUrl = _esc(v.url).replace(/'/g, "\\'");
         const src = _tvAdminSrcLabel(v);
         return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;">
@@ -19236,7 +19246,7 @@ function _tvAdminVariantsHtml(entry, rid) {
             </div>
             <button onclick="event.stopPropagation();_tvAdminOnlyVariant('${rid}', ${idx})" title="Nechat zapnutý jen tento zdroj, ostatní vypnout" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:0 7px;height:24px;border-radius:6px;cursor:pointer;font-size:0.68rem;flex-shrink:0;white-space:nowrap;">jen tento</button>
             <button onclick="event.stopPropagation();openInVlcUrl('${safeUrl}')" title="Otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;width:26px;height:24px;border-radius:6px;cursor:pointer;font-size:0.78rem;flex-shrink:0;">▶️</button>
-            <div onclick="event.stopPropagation();_tvAdminToggleUrlEnabled('${safeUrl}')" style="width:34px;height:20px;border-radius:10px;background:${vOff ? '#444' : '#1db954'};position:relative;cursor:pointer;flex-shrink:0;">
+            <div onclick="event.stopPropagation();_tvAdminToggleUrlEnabled('${safeUrl}', '${_esc(_tvCurList(v))}')" style="width:34px;height:20px;border-radius:10px;background:${vOff ? '#444' : '#1db954'};position:relative;cursor:pointer;flex-shrink:0;">
                 <div style="width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${vOff ? '2px' : '16px'};transition:left .15s;"></div>
             </div>
         </div>`;
@@ -19251,7 +19261,7 @@ function _tvAdminOnlyVariant(rid, idx) {
     if (!row) return;
     const all = [row.entry.ch].concat(row.entry.alts || []);
     const ov = _tvAdminOv();
-    all.forEach((v, i) => { if (i === idx) delete ov.disabledUrls[v.url]; else ov.disabledUrls[v.url] = true; });
+    all.forEach((v, i) => { if (i === idx) _tvUrlEnable(v); else ov.disabledUrls[v.url] = true; });
     if (ov.disabled) delete ov.disabled[row.entry._brokenKey];   // kanál samotný musí zůstat zapnutý
     _tvAdminAfterVariantChange();
 }
@@ -19260,7 +19270,7 @@ function _tvAdminAllVariantsOn(rid) {
     const row = window._tvAdminRows[rid];
     if (!row) return;
     const ov = _tvAdminOv();
-    [row.entry.ch].concat(row.entry.alts || []).forEach(v => { delete ov.disabledUrls[v.url]; });
+    [row.entry.ch].concat(row.entry.alts || []).forEach(v => { _tvUrlEnable(v); });
     _tvAdminAfterVariantChange();
 }
 window._tvAdminAllVariantsOn = _tvAdminAllVariantsOn;
@@ -19284,9 +19294,12 @@ window._tvAdminToggleVariants = _tvAdminToggleVariants;
 // Jednotlivě zapne/vypne KONKRÉTNÍ kvalitní variantu (podle URL) — na rozdíl
 // od _tvAdminToggleEnabled (celý kanál/klíč) tohle nechá zbytek variant
 // nedotčený, takže jde nechat funkční jen jednu.
-function _tvAdminToggleUrlEnabled(url) {
+function _tvAdminToggleUrlEnabled(url, listId) {
     const ov = _tvAdminOv();
-    if (ov.disabledUrls[url]) delete ov.disabledUrls[url]; else ov.disabledUrls[url] = true;
+    const sk = (listId || '') + '|' + url;
+    if (ov.disabledIn && ov.disabledIn[sk]) delete ov.disabledIn[sk];          // vypnuto jen v tomto seznamu → zapnout
+    else if (ov.disabledUrls[url]) delete ov.disabledUrls[url];
+    else ov.disabledUrls[url] = true;
     tvAdminSaveOverrides();
     tvRerenderAllChannelLists();
     _renderTvChannelAdminModal();
@@ -19340,7 +19353,7 @@ window.tvApplyCustomNameToLoadedChannels = tvApplyCustomNameToLoadedChannels;
 function _tvAdminAllSourceChannels() {
     try { _tvMvEnsureAll(); tvApplyMoves(); _tvMvTagAll(); } catch (e) {}
     const all = [];
-    tvState.channels.forEach(ch => all.push({ ch, source: '📺 Kanály' }));
+    tvState.channels.forEach(ch => all.push({ ch, source: '📺 Kanály', src: 'main' }));
     if (typeof ALT_PLAYLISTS !== 'undefined') {
         Object.keys(ALT_PLAYLISTS).forEach(code => {
             if (code === 'alt2' || code === 'alt3' || code === 'alt4' || code === 'alt5') return;
@@ -19349,14 +19362,14 @@ function _tvAdminAllSourceChannels() {
                 try { altState.parsedCache[code] = parseM3U(ALT_PLAYLISTS[code].m3u); } catch (e) { altState.parsedCache[code] = []; }
             }
             const label = '📺 Kanály 2 (' + (ALT_PLAYLISTS[code].label || code) + ')';
-            (altState.parsedCache[code] || []).forEach(ch => all.push({ ch, source: label }));
+            (altState.parsedCache[code] || []).forEach(ch => all.push({ ch, source: label, src: 'k2' }));
         });
     }
-    if (typeof alt2State !== 'undefined') { if (!alt2State.channels.length && typeof loadAlt2Channels === 'function') loadAlt2Channels(); alt2State.channels.forEach(ch => all.push({ ch, source: '📺 Kanály 3' })); }
-    if (typeof alt3State !== 'undefined') { if (!alt3State.channels.length && typeof loadAlt3Channels === 'function') loadAlt3Channels(); alt3State.channels.forEach(ch => all.push({ ch, source: '📺 Kanály 4' })); }
-    if (typeof alt4State !== 'undefined') { if (!alt4State.channels.length && typeof loadAlt4Channels === 'function') loadAlt4Channels(); alt4State.channels.forEach(ch => all.push({ ch, source: '📺 Kanály 5' })); }
-    if (typeof alt5State !== 'undefined') { if (!alt5State.channels.length && typeof loadAlt5Channels === 'function') loadAlt5Channels(); alt5State.channels.forEach(ch => all.push({ ch, source: '📺 Kanály 6' })); }
-    try { _tvUpState().lists.forEach(l => { _tvUpEnsure(l); l.channels.forEach(ch => all.push({ ch, source: '📺 ' + _tvUpLabel(l) })); }); } catch (e) {}
+    if (typeof alt2State !== 'undefined') { if (!alt2State.channels.length && typeof loadAlt2Channels === 'function') loadAlt2Channels(); alt2State.channels.forEach(ch => all.push({ ch, source: '📺 Kanály 3', src: 'alt2' })); }
+    if (typeof alt3State !== 'undefined') { if (!alt3State.channels.length && typeof loadAlt3Channels === 'function') loadAlt3Channels(); alt3State.channels.forEach(ch => all.push({ ch, source: '📺 Kanály 4', src: 'alt3' })); }
+    if (typeof alt4State !== 'undefined') { if (!alt4State.channels.length && typeof loadAlt4Channels === 'function') loadAlt4Channels(); alt4State.channels.forEach(ch => all.push({ ch, source: '📺 Kanály 5', src: 'alt4' })); }
+    if (typeof alt5State !== 'undefined') { if (!alt5State.channels.length && typeof loadAlt5Channels === 'function') loadAlt5Channels(); alt5State.channels.forEach(ch => all.push({ ch, source: '📺 Kanály 6', src: 'alt5' })); }
+    try { _tvUpState().lists.forEach(l => { _tvUpEnsure(l); l.channels.forEach(ch => all.push({ ch, source: '📺 ' + _tvUpLabel(l), src: l.id })); }); } catch (e) {}
     return all;
 }
 window._tvAdminAllSourceChannels = _tvAdminAllSourceChannels;
@@ -19713,7 +19726,7 @@ function _tvUpdateTabOptVisibility() {
     tvApplyMoves();
     const conts = _tvMvContainers();
     const ov = _tvAdminOv();
-    const sig = JSON.stringify(ov.disabled) + '|' + JSON.stringify(ov.disabledUrls) + '|'
+    const sig = JSON.stringify(ov.disabled) + '|' + JSON.stringify(ov.disabledUrls) + '|' + JSON.stringify(ov.disabledIn) + '|'
         + conts.map(c => { let a = null; try { a = c.arr(); } catch (e) {} return c.id + ':' + (a ? a.length : 0); }).join(',');
     if (window._tvTabCountsSig !== sig) {
         const counts = {};
@@ -19763,13 +19776,12 @@ function _tvMgrEntries(searchOverride) {
     _tvMvContainers().forEach(c => { contSrc[c.id] = c.src; });
     const src = _tvAdminAllSourceChannels().filter(x => (adultAllowed || !isAdultChannel(x.ch))
         && (!q || x.ch.name.toLowerCase().includes(q))
-        && (st.src === 'all' || contSrc[x.ch._mvNat] === st.src));
+        && (st.src === 'all' || x.src === st.src));   // podle seznamu, kde kanál AKTUÁLNĚ je (ne podle původního)
     const sourceByUrl = new Map(src.map(x => [x.ch.url, x.source]));
     const grouped = tvGroupChannels(tvSortChannels(src.map(x => x.ch)), { includeDisabled: true, includeDisabledUrls: true });
     const brokenKeys = _tvAdminBrokenKeySet([].concat(grouped.shown, grouped.broken, grouped.noLogo));
-    const du = _tvAdminOv().disabledUrls;
     let all = [...grouped.shown, ...grouped.broken, ...grouped.noLogo];
-    all.forEach(e => { e._mgrOff = !!e._disabled || [e.ch].concat(e.alts || []).every(v => du[v.url]); });
+    all.forEach(e => { e._mgrOff = !!e._disabled || [e.ch].concat(e.alts || []).every(v => tvUrlOff(v)); });
     all.sort((a, b) => tvDisplayName(a.ch.name).localeCompare(tvDisplayName(b.ch.name), 'cs'));
     const total = all.length, offCount = all.filter(e => e._mgrOff).length;
     if (st.filter === 'on') all = all.filter(e => !e._mgrOff);
@@ -19819,13 +19831,17 @@ function _tvMgrRowsHtml(r) {
 function _tvMgrApply(entry, on) {
     const ov = _tvAdminOv();
     const key = entry._brokenKey;
-    const urls = [entry.ch].concat(entry.alts || []).map(v => v.url);
+    const vars = [entry.ch].concat(entry.alts || []);
     if (window._tvMgr.src === 'all') {
-        if (on) { delete ov.disabled[key]; urls.forEach(u => { delete ov.disabledUrls[u]; }); }
+        if (on) { delete ov.disabled[key]; vars.forEach(v => _tvUrlEnable(v)); }
         else ov.disabled[key] = true;
     } else {
-        if (on) { delete ov.disabled[key]; urls.forEach(u => { delete ov.disabledUrls[u]; }); }
-        else urls.forEach(u => { ov.disabledUrls[u] = true; });
+        if (on) { delete ov.disabled[key]; vars.forEach(v => _tvUrlEnable(v)); }
+        else {
+            // vypnout streamy JEN v seznamu, ve kterém jsou (ne globálně podle URL)
+            if (!ov.disabledIn) ov.disabledIn = {};
+            vars.forEach(v => { ov.disabledIn[_tvCurList(v) + '|' + v.url] = true; });
+        }
     }
 }
 function _tvMgrAfterChange() {
@@ -19967,6 +19983,31 @@ function _tvAdminMoveOrder(key, ctxTok, dir) {
 }
 window._tvAdminMoveOrder = _tvAdminMoveOrder;
 
+
+// ── Vypnutí streamu podle SEZNAMU, ve kterém kanál právě je ─────────────────────────────────
+// Dřív hromadné vypnutí zdroje (např. celé „Kanály 2") vypínalo streamy podle URL globálně, takže
+// zmizely i kanály, které jsi z Kanály 2 přesunul jinam (mají stejné URL), a stejně tak kanály
+// s totožnou URL v jiném seznamu. Teď se vypíná jen v seznamu (ov.disabledIn), kde kanál aktuálně je.
+// Každý kanál si nese _curList = id seznamu, ve kterém se zrovna zobrazuje (po přesunech).
+function _tvCurList(c) { return (c && (c._curList || c._mvNat || c._src)) || ''; }
+function tvUrlOff(c) {
+    const ov = _tvAdminOv();
+    if (ov.disabledUrls[c.url]) return true;
+    return !!(ov.disabledIn && ov.disabledIn[_tvCurList(c) + '|' + c.url]);
+}
+window.tvUrlOff = tvUrlOff;
+function _tvUrlEnable(c) {
+    const ov = _tvAdminOv();
+    delete ov.disabledUrls[c.url];
+    if (ov.disabledIn) delete ov.disabledIn[_tvCurList(c) + '|' + c.url];
+}
+function _tvTagCurrent() {
+    _tvMvContainers().forEach(c => {
+        let a = null; try { a = c.arr(); } catch (e) {}
+        if (!a) return;
+        for (let i = 0; i < a.length; i++) a[i]._curList = c.id;
+    });
+}
 
 // Které z daných záznamů jsou označené jako nefunkční (🚫). V admin režimu tvGroupChannels nefunkční
 // nevyděluje do samostatného pole, proto se čtou přímo ze sdílené mapy nefunkčních streamů.
@@ -39400,6 +39441,9 @@ const rtdb = getDatabase(fbApp);
       const du = {};
       Object.keys(o.disabledUrls || {}).forEach(u => { du[_encUrlKey(u)] = true; });
       o.disabledUrls = du;
+      const di = {};
+      Object.keys(o.disabledIn || {}).forEach(k => { di[_encUrlKey(k)] = true; });
+      o.disabledIn = di;
       const r = set(tvAdminRef, o);
       if (r && r.catch) r.catch(() => {});
     } catch (e) { console.warn('tv admin overrides sync failed', e); }
@@ -39414,6 +39458,8 @@ const rtdb = getDatabase(fbApp);
     if (!o.customName) o.customName = {};
     if (!o.disabledUrls) o.disabledUrls = {};
     else { const du = {}; Object.keys(o.disabledUrls).forEach(k => { du[_decUrlKey(k)] = true; }); o.disabledUrls = du; }
+    if (!o.disabledIn) o.disabledIn = {};
+    else { const di = {}; Object.keys(o.disabledIn).forEach(k => { di[_decUrlKey(k)] = true; }); o.disabledIn = di; }
     if (!o.categoryDisabled) o.categoryDisabled = {};
     if (!o.moves) o.moves = {};
     if (!o.injected) o.injected = {};
