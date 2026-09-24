@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-24T03:00:00Z -->
+<!-- BUILD: 2026-09-24T18:12:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -11732,8 +11732,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 switchTvTab('epg');
                 if (window._epgPendingReturn) { openEpgDetail(window._epgPendingReturn); window._epgPendingReturn = null; }
             }
-            else if (['zebricky','upcoming','porovnani','mood','tentoden','koukats','nahodnytip','uzbylo'].includes(backTo)) {
-                const modalIds = { zebricky:'zebrickyModal', upcoming:'upcomingModal', porovnani:'porovnaniModal', mood:'moodModal', tentoden:'tentodenModal', koukats:'koukatSModal', nahodnytip:'nahodnyTipModal', uzbylo:'uzByloVKineModal' };
+            else if (['zebricky','upcoming','porovnani','mood','tentoden','koukats','nahodnytip','uzbylo','asksinator'].includes(backTo)) {
+                const modalIds = { zebricky:'zebrickyModal', upcoming:'upcomingModal', porovnani:'porovnaniModal', mood:'moodModal', tentoden:'tentodenModal', koukats:'koukatSModal', nahodnytip:'nahodnyTipModal', uzbylo:'uzByloVKineModal', asksinator:'askSinatorModal' };
                 if (window._reopenZabavaSub) window._reopenZabavaSub(modalIds[backTo]);
             }
         }
@@ -17320,6 +17320,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             <span style="font-size:1.6rem;">👥</span>
             <div><div style="font-weight:700;color:#facc15;">Koukat s...</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">AI tipy podle toho, s kým díváš</div></div>
         </button>
+        <button onclick="closeZabavaAiModal();openAskSinatorModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">💬</span>
+            <div><div style="font-weight:700;color:#38bdf8;">Zeptej se Sinatora</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Popiš vlastními slovy, co chceš sledovat — AI vybere top 10</div></div>
+        </button>
     </div>
 </div>
 
@@ -17447,6 +17451,23 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             </button>
         </div>
         <div id="koukatSResult" style="display:none;"></div>
+    </div>
+</div>
+
+
+<!-- 💬 ZEPTEJ SE SINATORA — volný popis, AI vybere top 10 -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" id="askSinatorModal" onclick="if(event.target===this)closeAskSinatorModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">💬 Zeptej se Sinatora</h3>
+        <button onclick="closeAskSinatorModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;">
+        <div id="askSinatorPicker">
+            <p style="color:#888;font-size:0.85rem;margin-bottom:12px;text-align:center;">Popiš vlastními slovy, co chceš sledovat — téma, žánr, děj, náladu, film nebo seriál. AI ti podle toho vybere top 10 nejlépe sedících titulů.</p>
+            <textarea id="askSinatorInput" rows="4" maxlength="500" placeholder="Např. chci temný sci-fi seriál s dobrým dějem, podobný Black Mirror, ne moc dlouhý…" style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.92rem;font-family:inherit;resize:vertical;margin-bottom:12px;"></textarea>
+            <button onclick="loadAskSinatorResults()" style="width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,#38bdf8,#818cf8);border:none;color:#0b1220;font-weight:700;font-size:0.94rem;cursor:pointer;">🔍 Najít top 10 tipů</button>
+        </div>
+        <div id="askSinatorResult" style="display:none;"></div>
     </div>
 </div>
 
@@ -40499,7 +40520,8 @@ window._restoreLastZabavaList = function() {
             zebrickyModal: 'openZebricky', upcomingModal: 'openUpcomingModal',
             porovnaniModal: 'openPorovnaniModal', moodModal: 'openMoodModal',
             tentodenModal: 'openTentodenModal', koukatSModal: 'openKoukatSModal',
-            nahodnyTipModal: 'openNahodnyTipModal', uzByloVKineModal: 'openUzByloVKineModal'
+            nahodnyTipModal: 'openNahodnyTipModal', uzByloVKineModal: 'openUzByloVKineModal',
+            askSinatorModal: 'openAskSinatorModal'
         };
         const fnName = data && openers[data.modalId];
         if (fnName && typeof window[fnName] === 'function') window[fnName]();
@@ -42073,6 +42095,101 @@ async function _zabavaAiCall(prompt) {
   throw new Error('Žádný AI klíč nebo selhání.');
 }
 
+// =====================================================
+// 💬 ZEPTEJ SE SINATORA — volný popis (téma/žánr/děj/nálada), AI vybere top 10
+// =====================================================
+function openAskSinatorModal() {
+    const m = document.getElementById('askSinatorModal');
+    if (m) { m.style.display = 'flex'; resetAskSinator(); }
+    if (window._saveLastZabavaList) window._saveLastZabavaList('asksinator', 'askSinatorModal');
+    if (window.updatePwaBtn) updatePwaBtn();
+}
+window.openAskSinatorModal = openAskSinatorModal;
+function closeAskSinatorModal() {
+    const m = document.getElementById('askSinatorModal');
+    if (m) m.style.display = 'none';
+    if (window._clearLastZabavaList) window._clearLastZabavaList();
+    if (window._returnToZabava) _returnToZabava();
+}
+window.closeAskSinatorModal = closeAskSinatorModal;
+function resetAskSinator() {
+    const pick = document.getElementById('askSinatorPicker');
+    const res = document.getElementById('askSinatorResult');
+    if (pick) pick.style.display = 'block';
+    if (res) { res.style.display = 'none'; res.innerHTML = ''; }
+}
+window.resetAskSinator = resetAskSinator;
+async function loadAskSinatorResults() {
+    const input = document.getElementById('askSinatorInput');
+    const query = (input?.value || '').trim();
+    if (!query) { input?.focus(); return; }
+    const pick = document.getElementById('askSinatorPicker');
+    const res = document.getElementById('askSinatorResult');
+    if (pick) pick.style.display = 'none';
+    if (res) { res.style.display = 'block'; res.innerHTML = '<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI hledá nejlepší shody…<br><br>⏳</div>'; }
+    const prompt = `Uživatel popsal vlastními slovy, co chce sledovat (může jít o téma, žánr, děj, náladu, konkrétní film/seriál jako inspiraci, cokoliv): "${query}"
+
+Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON (žádný markdown, žádný text okolo):
+{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — 1-2 věty."}]}`;
+    try {
+        const raw = await _zabavaAiCall(prompt);
+        const clean = raw.replace(/```json|```/g, '').trim();
+        const d = JSON.parse(clean);
+        const tips = (d.tips || []).slice(0, 10);
+        if (!tips.length) throw new Error('AI nevrátila žádné tipy.');
+        const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+        const enriched = await Promise.all(tips.map(async t => {
+            if (!tmdbKey) return { ...t, tmdbId: null, poster: null };
+            try {
+                const mediaType = (t.media_type === 'tv') ? 'tv' : 'movie';
+                const q = encodeURIComponent(t.title || t.title_cs || '');
+                const url = `https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${q}&language=cs-CZ&page=1`;
+                const data = await fetch(url).then(r => r.json());
+                const hit = (data.results || []).find(r => (r.media_type === 'movie' || r.media_type === 'tv') && r.poster_path)
+                    || (data.results || []).find(r => r.media_type === 'movie' || r.media_type === 'tv');
+                if (hit) return { ...t, tmdbId: hit.id, tmdbType: hit.media_type, poster: hit.poster_path, rating: hit.vote_average };
+            } catch (e) {}
+            return { ...t, tmdbId: null, poster: null };
+        }));
+        const cards = enriched.map((t, i) => {
+            const displayTitle = t.title_cs || t.title || '?';
+            const mediaLabel = (t.tmdbType || t.media_type) === 'tv' ? 'seriál' : 'film';
+            const posterHtml = t.poster
+                ? `<img src="https://image.tmdb.org/t/p/w92${t.poster}" style="width:52px;height:76px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">`
+                : `<div style="width:52px;height:76px;border-radius:8px;background:#2a2a2a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">${(t.tmdbType || t.media_type) === 'tv' ? '📺' : '🎬'}</div>`;
+            const ratingHtml = t.rating > 0 ? `<span style="color:#fbbf24;font-size:0.72rem;margin-left:6px;">★ ${t.rating.toFixed(1)}</span>` : '';
+            const clickable = t.tmdbId && typeof openDetailFromZabavaList === 'function';
+            const clickStyle = clickable ? 'cursor:pointer;' : '';
+            const clickAttr = clickable ? `onclick="openDetailFromZabavaList('asksinator','askSinatorModal',${t.tmdbId},'${t.tmdbType || 'movie'}')"` : '';
+            return `<div ${clickAttr} style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;${clickStyle}transition:background 0.15s,border-color 0.15s;" onmouseover="this.style.background='#222';this.style.borderColor='#38bdf8'" onmouseout="this.style.background='#1a1a1a';this.style.borderColor='#2a2a2a'">
+                <div style="flex-shrink:0;width:22px;text-align:center;color:#38bdf8;font-weight:700;font-size:0.85rem;padding-top:2px;">${i + 1}.</div>
+                ${posterHtml}
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;color:#fff;font-size:0.92rem;margin-bottom:2px;">${displayTitle} ${t.year ? `<span style="color:#888;font-size:0.78rem;">(${t.year})</span>` : ''}</div>
+                    <div style="display:flex;align-items:center;margin-bottom:6px;">
+                        <span style="color:#38bdf8;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${mediaLabel}</span>${ratingHtml}
+                    </div>
+                    <div style="color:#aaa;font-size:0.8rem;line-height:1.5;">${t.reason || ''}</div>
+                    ${clickable ? `<div style="color:#38bdf8;font-size:0.75rem;margin-top:6px;font-weight:600;">Otevřít detail →</div>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+        const html = `<div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+                <span style="font-size:1.4rem;">💬</span>
+                <span style="color:#38bdf8;font-weight:700;font-size:0.95rem;">Top ${enriched.length} tipů pro tvůj popis:</span>
+            </div>
+            ${cards}
+            <button onclick="resetAskSinator()" style="width:100%;margin-top:6px;padding:12px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#fff;font-size:0.88rem;cursor:pointer;">← Zkusit jiný popis</button>
+        </div>`;
+        if (res) res.innerHTML = html;
+    } catch (e) {
+        if (res) res.innerHTML = '<div style="padding:20px;text-align:center;"><p style="color:#e50914;margin-bottom:12px;">❌ Chyba AI. Zkontroluj, že máš v Nastavení zadaný AI klíč (Gemini / Groq / OpenRouter).</p><button onclick="resetAskSinator()" style="padding:10px 20px;border-radius:10px;background:#333;border:none;color:#fff;cursor:pointer;">← Zpět</button></div>';
+    }
+}
+window.loadAskSinatorResults = loadAskSinatorResults;
+
+
 // ===== JIŽ BYLO V KINĚ =====
 (function() {
   let _page = 1;
@@ -42238,6 +42355,7 @@ async function _zabavaAiCall(prompt) {
   orig['calendarModal'] = function() { if(typeof closeCalendarModal==='function') closeCalendarModal(); };
   orig['tentodenModal'] = function() { if(typeof closeTentodenModal==='function') closeTentodenModal(); };
   orig['uzByloVKineModal'] = function() { if(typeof closeUzByloVKineModal==='function') closeUzByloVKineModal(); };
+  orig['askSinatorModal'] = function() { if(typeof closeAskSinatorModal==='function') closeAskSinatorModal(); };
   window._modalCloseMap = orig;
 })();
 
