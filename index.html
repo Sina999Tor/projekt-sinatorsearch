@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-24T02:44:00Z -->
+<!-- BUILD: 2026-09-24T02:50:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -11762,12 +11762,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         state._fromFavs = false;
         state._fromTrakt = false;
         state._fromSimkl = false;
-        // ✕ z detailu filmu otevřeného z „Tematických seznamů“ zavře jen detail,
-        // ne celé tematické seznamy — na rozdíl od ostatních vstupů (Oblíbené,
-        // Shlédnuté…), kde ✕ zavírá vše a jen šipka „← Zpět“ vrací zpátky.
-        const _wasThematic = state._backTo === 'thematic';
         state._backTo = null;
-        if (_wasThematic) { openThematicListsModal(); return; }
     }
 
     // Helper: generates sticky modal nav bar HTML
