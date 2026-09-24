@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-24T02:50:00Z -->
+<!-- BUILD: 2026-09-24T03:00:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -11709,6 +11709,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             else if (prev.type === 'episode') _openEpisodeDetailNoStack(prev.tvId, prev.seasonNumber, prev.epNumber, prev.title);
             else if (prev.type === 'collection') _showCollectionNoStack(prev.id, prev.title);
             else if (prev.type === 'gallery') showMediaGallery(prev.mediaId, prev.mediaType, prev.title);
+            else if (prev.type === 'similar') _showSimilarNoStack(prev.simId, prev.simMediaType);
             else _openDetailNoStack(prev.id, prev.type);
         } else {
             const backTo = state._backTo;
@@ -12471,7 +12472,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 }
             }
 
-            const collectionBtn = d.belongs_to_collection ? `<button class="action-btn-modal collection" onclick="showCollectionOverlay(${d.belongs_to_collection.id}, '${jsq(d.belongs_to_collection.name)}')">📦 Kolekce</button>` : '';
+            const collectionBtn = d.belongs_to_collection ? `<button class="action-btn-modal collection" onclick="showCollection(${d.belongs_to_collection.id}, '${jsq(d.belongs_to_collection.name)}')">📦 Kolekce</button>` : '';
             
             const posterPath = d.poster_path || '';
             const playBtn = `<button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;font-size:1.5em;font-weight:700;padding:18px;width:100%;margin:14px 0;display:block;" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeTitle}'))">▶️ Přehrát</button>`;
@@ -16348,24 +16349,33 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     // Window aliasy pro inline onclick v dynamicky generovaném HTML
     const _loadTraktLists = loadTraktLists;
     const _loadSimklLists = loadSimklLists;
+    // "Podobné tituly" — dřív samostatné okno nezávislé na detailu filmu (proklikem na
+    // titul a zpět se appka vracela úplně na začátek). Teď se vykresluje do stejného
+    // #modal jako detail a ukládá do navigationStack, takže "← Zpět" z otevřeného titulu
+    // vrátí zase na "Podobné tituly" (viz navigateBack() → prev.type === 'similar').
     async function showSimilarInModal(id, type, btn) {
         if (btn) { btn.textContent = '⏳ Načítám...'; btn.disabled = true; }
+        navigationStack.push({ type: 'similar', simId: id, simMediaType: type });
+        await _showSimilarNoStack(id, type);
+        if (btn) { btn.textContent = '🎯 Podobné tituly'; btn.disabled = false; }
+    }
+    window.showSimilarInModal = showSimilarInModal;
+
+    async function _showSimilarNoStack(id, type) {
+        const hasBack = navigationStack.length > 1;
+        $('modalNavBar').style.display = 'none';
+        $('modalScrollBody').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
         try {
             const [simRes, recRes] = await Promise.all([
                 fetch(`${BASE}/${type}/${id}/similar?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`).then(r=>r.json()).catch(()=>({results:[]})),
                 fetch(`${BASE}/${type}/${id}/recommendations?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`).then(r=>r.json()).catch(()=>({results:[]}))
             ]);
-            if (btn) { btn.textContent = '🎯 Podobné tituly'; btn.disabled = false; }
 
             const seen = new Set();
             const items = [...(recRes.results||[]), ...(simRes.results||[])].filter(it => {
                 if (!it.id || seen.has(it.id)) return false;
                 seen.add(it.id); return true;
             }).map(it => ({...it, media_type: type}));
-
-            const overlay = document.createElement('div');
-            overlay.id = 'similarOverlay';
-            overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-card);z-index:10600;display:flex;flex-direction:column;overflow:hidden;';
 
             const cardsHtml = items.length ? items.map(it => {
                 const t = (it.title||it.name||'?').replace(/'/g,"&#39;");
@@ -16375,28 +16385,20 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 const img = it.poster_path ? `<img class="card-image" src="${IMG}w342${it.poster_path}" loading="lazy">` : `<div class="card-placeholder">${type==='tv'?'📺':'🎬'}</div>`;
                 const liked = state.favs.some(f=>Number(f.id)===Number(it.id));
                 const watched = isWatched(it.id, type);
-                return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('similarOverlay')?.remove();document.body.style.overflow='';openDetail(${it.id},'${type}')">${img}<div class="card-badge">${type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${tJs}','${y}',${it.vote_average||0},'${type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating">★ ${r}</span></div></div></div>`;
+                return `<div class="card${watched?' is-watched':''}" onclick="openDetail(${it.id},'${type}')">${img}<div class="card-badge">${type==='tv'?'📺':''}</div><button class="card-fav ${liked?'liked':''}" onclick="toggleFav(${it.id},'${tJs}','${y}',${it.vote_average||0},'${type}','${it.poster_path||''}',event)">${liked?'❤️':'🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y||'—'}</span><span class="card-rating">★ ${r}</span></div></div></div>`;
             }).join('') : '<div style="padding:24px;text-align:center;color:var(--text-muted);">😕 Žádné podobné tituly nenalezeny.</div>';
 
-            overlay.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
-                    <span style="font-weight:700;font-size:1.1rem;">🎯 Podobné tituly</span>
-                    <button onclick="document.getElementById('similarOverlay')?.remove();document.body.style.overflow=''" style="width:36px;height:36px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);color:#fff;cursor:pointer;font-size:1.1rem;">✕</button>
-                </div>
-                <div style="flex:1;overflow-y:auto;padding:16px;">
+            $('modalScrollBody').innerHTML = `${modalNav('🎯 Podobné tituly', hasBack, '')}<div class="modal-body">
                 <div id="similarGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;">${cardsHtml}</div>
                 ${items.length ? `<div style="margin-top:14px;">
                     <button id="btnLoadMoreSimilar" onclick="loadMoreSimilar(${id},'${type}',2,this)" style="padding:11px 22px;background:rgba(100,160,255,0.13);border:1px solid rgba(100,160,255,0.35);border-radius:10px;color:#7db8f7;font-size:0.88rem;font-weight:600;cursor:pointer;width:100%;">➕ Další podobné tituly</button>
                 </div>` : ''}
                 </div>`;
-            overlay.addEventListener('click', e => { if(e.target === overlay) { overlay.remove(); document.body.style.overflow=''; } });
-            document.body.appendChild(overlay);
-            document.body.style.overflow = 'hidden';
         } catch(e) {
             console.error(e);
-            if (btn) { btn.textContent = '🎯 Podobné tituly'; btn.disabled = false; }
+            $('modalScrollBody').innerHTML = `${modalNav('🎯 Podobné tituly', hasBack, '')}<div class="empty">⚠️ Chyba načtení podobných titulů</div>`;
         }
     }
-    window.showSimilarInModal = showSimilarInModal;
 
     async function loadMoreSimilar(id, type, page, btn) {
         if (btn) { btn.textContent = '⏳ Načítám...'; btn.disabled = true; }
