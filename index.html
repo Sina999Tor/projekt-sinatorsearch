@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-23T03:36:00Z -->
+<!-- BUILD: 2026-09-24T02:44:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -11723,6 +11723,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             else if (backTo === 'mdblist') openMdblistModal();
             else if (backTo === 'watching') openWatchingModal();
             else if (backTo === 'moviesprogress') openMoviesProgressModal();
+            else if (backTo === 'thematic') {
+                openThematicListsModal();
+            }
             else if (backTo === 'epg') {
                 openTvModal();
                 switchTvTab('epg');
@@ -11759,13 +11762,18 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         state._fromFavs = false;
         state._fromTrakt = false;
         state._fromSimkl = false;
+        // ✕ z detailu filmu otevřeného z „Tematických seznamů“ zavře jen detail,
+        // ne celé tematické seznamy — na rozdíl od ostatních vstupů (Oblíbené,
+        // Shlédnuté…), kde ✕ zavírá vše a jen šipka „← Zpět“ vrací zpátky.
+        const _wasThematic = state._backTo === 'thematic';
         state._backTo = null;
+        if (_wasThematic) { openThematicListsModal(); return; }
     }
 
     // Helper: generates sticky modal nav bar HTML
     function modalNav(title, hasBack, extraBtns = '') {
         const backTo = state._backTo;
-        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : '← Zpět';
+        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'thematic' ? '← Tematické seznamy' : '← Zpět';
         const back = hasBack ? `<button class="modal-back-btn" onclick="navigateBack()">${backLabel}</button>` : '';
         const nav = $('modalNavBar'); const left = $('modalNavLeft'); const right = $('modalNavRight');
         if(nav && left && right) {
@@ -15968,6 +15976,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     function openThematicListsModal() {
         const sbClear = $('modalScrollBody'); if(sbClear) sbClear.onscroll = null;
         state._thematicFull = null;
+        state._backTo = 'thematic';   // ✕ v detailu filmu otevřeného odsud se vrátí sem, ne úplně pryč
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if(nav && left && right) {
             left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;background:none;-webkit-text-fill-color:#fb923c;color:#fb923c;" title="Zpět nahoru">🧵 Tematické seznamy ↑</span>`;
@@ -16105,6 +16114,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     }
 
     async function openThematicListDetail(listId, name) {
+        state._backTo = 'thematic';
         const right = $('modalNavRight');
         if(right) right.innerHTML = `<button class="modal-close-btn" onclick="closeThematicListDetail()" title="Zpět na tematické seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Tematické seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
         const body = $('thematicListsBody');
@@ -16183,6 +16193,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     function openThematicThemeFull(idx) {
         const theme = CURATED_THEMATIC_THEMES[idx];
         if(!theme) return;
+        state._backTo = 'thematic';
         state._thematicFull = { theme, page: 0, totalPages: 1, loading: false, seenIds: new Set() };
         const right = $('modalNavRight');
         if(right) right.innerHTML = `<button class="modal-close-btn" onclick="closeThematicThemeFull()" title="Zpět na tematické seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Tematické seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
