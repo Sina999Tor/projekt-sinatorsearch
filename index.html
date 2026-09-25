@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-24T18:35:00Z -->
+<!-- BUILD: 2026-09-25T08:49:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -38990,7 +38990,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'porovnaniModal','moodModal','myStatsModal','tentodenModal','koukatSModal','uzByloVKineModal',
             'tvRadioModal','zabavaModal','listsModal','musicModal',
             'slozkyModal','slozkyPickerModal','doporucujiOverlay','addDoporuceniOverlay',
-            'settingsModal','externalInstallModal'
+            'settingsModal','externalInstallModal','askSinatorModal'
         ];
         var anyModalOpen = fullscreenModalIds.some(function(id) {
             var el = document.getElementById(id);
@@ -42109,7 +42109,12 @@ function closeAskSinatorModal() {
     const m = document.getElementById('askSinatorModal');
     if (m) m.style.display = 'none';
     if (window._clearLastZabavaList) window._clearLastZabavaList();
-    if (window._returnToZabava) _returnToZabava();
+    // Na rozdíl od ostatních nástrojů v "Zábava" (Nálada, Koukat s...), které se
+    // vrací na hlavní menu Zábava, se ✕ tady vrací rovnou do "AI nástroje" —
+    // odsud se sem přišlo, takže je to nejkratší cesta zpátky.
+    if (window.openZabavaAiModal) openZabavaAiModal();
+    else if (window._returnToZabava) _returnToZabava();
+    if (window.updatePwaBtn) updatePwaBtn();
 }
 window.closeAskSinatorModal = closeAskSinatorModal;
 function resetAskSinator() {
