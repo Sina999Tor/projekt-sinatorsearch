@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-24T18:12:00Z -->
+<!-- BUILD: 2026-09-24T18:35:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -42127,14 +42127,31 @@ async function loadAskSinatorResults() {
     const res = document.getElementById('askSinatorResult');
     if (pick) pick.style.display = 'none';
     if (res) { res.style.display = 'block'; res.innerHTML = '<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI hledá nejlepší shody…<br><br>⏳</div>'; }
+    // Krátké odůvodnění (max ~12 slov) drží odpověď pod limitem tokenů AI volání
+    // (společný pro všechny AI nástroje) — u 10 položek by delší věty snadno
+    // způsobily useknutí JSON uprostřed, což _repairJsonTips() níže navíc opraví.
     const prompt = `Uživatel popsal vlastními slovy, co chce sledovat (může jít o téma, žánr, děj, náladu, konkrétní film/seriál jako inspiraci, cokoliv): "${query}"
 
-Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON (žádný markdown, žádný text okolo):
-{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — 1-2 věty."}]}`;
+Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" max 12 slov:
+{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}`;
+    let aiCallFailed = false;
     try {
-        const raw = await _zabavaAiCall(prompt);
+        let raw;
+        try { raw = await _zabavaAiCall(prompt); }
+        catch (eCall) { aiCallFailed = true; throw eCall; }
         const clean = raw.replace(/```json|```/g, '').trim();
-        const d = JSON.parse(clean);
+        let d;
+        try {
+            d = JSON.parse(clean);
+        } catch (eParse) {
+            // AI odpověď mohla být uťatá (limit délky odpovědi) — zkus dokončit
+            // poslední nekompletní položku a doplnit chybějící uzavírací závorky,
+            // ať se nezahodí ani tipy, které už dorazily celé.
+            let repaired = clean.replace(/,?\s*\{[^{}]*$/, '').replace(/,\s*"[^"]*$/, '');
+            if ((repaired.match(/\[/g) || []).length > (repaired.match(/\]/g) || []).length) repaired += ']';
+            if ((repaired.match(/\{/g) || []).length > (repaired.match(/\}/g) || []).length) repaired += '}';
+            d = JSON.parse(repaired);
+        }
         const tips = (d.tips || []).slice(0, 10);
         if (!tips.length) throw new Error('AI nevrátila žádné tipy.');
         const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
@@ -42184,7 +42201,11 @@ Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídaj
         </div>`;
         if (res) res.innerHTML = html;
     } catch (e) {
-        if (res) res.innerHTML = '<div style="padding:20px;text-align:center;"><p style="color:#e50914;margin-bottom:12px;">❌ Chyba AI. Zkontroluj, že máš v Nastavení zadaný AI klíč (Gemini / Groq / OpenRouter).</p><button onclick="resetAskSinator()" style="padding:10px 20px;border-radius:10px;background:#333;border:none;color:#fff;cursor:pointer;">← Zpět</button></div>';
+        console.error('[Zeptej se Sinatora]', e);
+        const msg = aiCallFailed
+            ? '❌ AI se nepodařilo zavolat. Zkontroluj, že máš v Nastavení zadaný a platný AI klíč (Gemini / Groq / OpenRouter).'
+            : '❌ AI vrátila nepoužitelnou odpověď. Zkus popis zkrátit nebo to zkusit znovu.';
+        if (res) res.innerHTML = `<div style="padding:20px;text-align:center;"><p style="color:#e50914;margin-bottom:12px;">${msg}</p><button onclick="resetAskSinator()" style="padding:10px 20px;border-radius:10px;background:#333;border:none;color:#fff;cursor:pointer;">← Zpět</button></div>`;
     }
 }
 window.loadAskSinatorResults = loadAskSinatorResults;
