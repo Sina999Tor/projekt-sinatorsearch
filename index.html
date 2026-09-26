@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-26d', date: '26. 9. 2026', items: [
+            '„Zeptej se Sinatora" — přidáno tlačítko "Další tipy" (dalších 10 podle popisu) a listování zpět mezi už načtenými stránkami'
+        ] },
         { version: '2026-09-26c', date: '26. 9. 2026', items: [
             'Historie změn: aktualizace ve stejný den se teď sloučí pod jedno datum místo duplicitních řádků'
         ] },
@@ -42290,13 +42293,21 @@ function closeAskSinatorModal() {
     if (window.updatePwaBtn) updatePwaBtn();
 }
 window.closeAskSinatorModal = closeAskSinatorModal;
+// Stav stránkování "Zeptej se Sinatora" — každá stránka je pole 10 obohacených
+// tipů z jednoho AI volání; už zobrazené tituly se posílají AI jako vyloučené,
+// ať se v dalších stránkách neopakují. Stránky se cachují, takže listování
+// zpět (◀ Předchozí) nevolá AI znovu.
+let _askSinator = { query: '', forceType: null, typeInstruction: '', pages: [], pageIdx: -1 };
+
 function resetAskSinator() {
     const pick = document.getElementById('askSinatorPicker');
     const res = document.getElementById('askSinatorResult');
     if (pick) pick.style.display = 'block';
     if (res) { res.style.display = 'none'; res.innerHTML = ''; }
+    _askSinator = { query: '', forceType: null, typeInstruction: '', pages: [], pageIdx: -1 };
 }
 window.resetAskSinator = resetAskSinator;
+
 async function loadAskSinatorResults() {
     const input = document.getElementById('askSinatorInput');
     const query = (input?.value || '').trim();
@@ -42304,7 +42315,7 @@ async function loadAskSinatorResults() {
     const pick = document.getElementById('askSinatorPicker');
     const res = document.getElementById('askSinatorResult');
     if (pick) pick.style.display = 'none';
-    if (res) { res.style.display = 'block'; res.innerHTML = '<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI hledá nejlepší shody…<br><br>⏳</div>'; }
+    if (res) { res.style.display = 'block'; }
     // Pozná, jestli uživatel výslovně chce jen "film" nebo jen "seriál" (bez diakritiky,
     // aby to sedělo i na "serial", "serialy" apod.) — pak se to vynutí v promptu i po
     // straně appky filtrem, aby se do filmového dotazu nepletl seriál a naopak.
@@ -42317,13 +42328,28 @@ async function loadAskSinatorResults() {
         : forceType === 'tv'
         ? '\n\nDŮLEŽITÉ: uživatel chce výhradně SERIÁLY — nabídni jen seriály (media_type "tv"), žádné filmy.'
         : '';
+    _askSinator = { query, forceType, typeInstruction, pages: [], pageIdx: -1 };
+    await _askSinatorLoadPage();
+}
+window.loadAskSinatorResults = loadAskSinatorResults;
+
+async function _askSinatorLoadPage() {
+    const res = document.getElementById('askSinatorResult');
+    const isFirstPage = _askSinator.pages.length === 0;
+    if (res) res.innerHTML = `<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI hledá ${isFirstPage ? 'nejlepší shody' : 'další tipy'}…<br><br>⏳</div>`;
+    const { query, forceType, typeInstruction } = _askSinator;
+    // Tituly ze všech dosud načtených stránek — AI je má vynechat, ať se tipy neopakují.
+    const alreadyShown = _askSinator.pages.flat().map(t => t.title_cs || t.title).filter(Boolean);
+    const excludeInstruction = alreadyShown.length
+        ? `\n\nToto už bylo navrženo, NEOPAKUJ to a vyber jiných 10 titulů: ${alreadyShown.join(', ')}.`
+        : '';
     // Krátké odůvodnění (max ~12 slov) drží odpověď pod limitem tokenů AI volání
     // (společný pro všechny AI nástroje) — u 10 položek by delší věty snadno
     // způsobily useknutí JSON uprostřed, což _repairJsonTips() níže navíc opraví.
     const prompt = `Uživatel popsal vlastními slovy, co chce sledovat (může jít o téma, žánr, děj, náladu, konkrétní film/seriál jako inspiraci, cokoliv): "${query}"
 
 Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" max 12 slov:
-{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}`;
+{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}`;
     let aiCallFailed = false;
     try {
         let raw;
@@ -42346,7 +42372,12 @@ Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídaj
         // Pojistka: i kdyby AI instrukci v promptu nedodržela, odfiltrujeme opačný typ
         // (film/seriál) po straně appky, aby se do "film se zombii" nepletl seriál.
         if (forceType) tips = tips.filter(t => (t.media_type === 'tv' ? 'tv' : 'movie') === forceType);
-        if (!tips.length) throw new Error('AI nevrátila žádné tipy.');
+        // Pojistka i pro duplicity, kdyby AI přesto vrátila titul z předchozí stránky.
+        if (alreadyShown.length) {
+            const shownNorm = new Set(alreadyShown.map(s => s.toLowerCase().trim()));
+            tips = tips.filter(t => !shownNorm.has((t.title_cs || t.title || '').toLowerCase().trim()));
+        }
+        if (!tips.length) throw new Error('AI nevrátila žádné (nové) tipy.');
         const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
         const enriched = await Promise.all(tips.map(async t => {
             if (!tmdbKey) return { ...t, tmdbId: null, poster: null };
@@ -42361,47 +42392,86 @@ Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídaj
             } catch (e) {}
             return { ...t, tmdbId: null, poster: null };
         }));
-        const cards = enriched.map((t, i) => {
-            const displayTitle = t.title_cs || t.title || '?';
-            const mediaLabel = (t.tmdbType || t.media_type) === 'tv' ? 'seriál' : 'film';
-            const posterHtml = t.poster
-                ? `<img src="https://image.tmdb.org/t/p/w92${t.poster}" style="width:52px;height:76px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">`
-                : `<div style="width:52px;height:76px;border-radius:8px;background:#2a2a2a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">${(t.tmdbType || t.media_type) === 'tv' ? '📺' : '🎬'}</div>`;
-            const ratingHtml = t.rating > 0 ? `<span style="color:#fbbf24;font-size:0.72rem;margin-left:6px;">★ ${t.rating.toFixed(1)}</span>` : '';
-            const clickable = t.tmdbId && typeof openDetailFromZabavaList === 'function';
-            const clickStyle = clickable ? 'cursor:pointer;' : '';
-            const clickAttr = clickable ? `onclick="openDetailFromZabavaList('asksinator','askSinatorModal',${t.tmdbId},'${t.tmdbType || 'movie'}')"` : '';
-            return `<div ${clickAttr} style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;${clickStyle}transition:background 0.15s,border-color 0.15s;" onmouseover="this.style.background='#222';this.style.borderColor='#38bdf8'" onmouseout="this.style.background='#1a1a1a';this.style.borderColor='#2a2a2a'">
-                <div style="flex-shrink:0;width:22px;text-align:center;color:#38bdf8;font-weight:700;font-size:0.85rem;padding-top:2px;">${i + 1}.</div>
-                ${posterHtml}
-                <div style="flex:1;min-width:0;">
-                    <div style="font-weight:700;color:#fff;font-size:0.92rem;margin-bottom:2px;">${displayTitle} ${t.year ? `<span style="color:#888;font-size:0.78rem;">(${t.year})</span>` : ''}</div>
-                    <div style="display:flex;align-items:center;margin-bottom:6px;">
-                        <span style="color:#38bdf8;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${mediaLabel}</span>${ratingHtml}
-                    </div>
-                    <div style="color:#aaa;font-size:0.8rem;line-height:1.5;">${t.reason || ''}</div>
-                    ${clickable ? `<div style="color:#38bdf8;font-size:0.75rem;margin-top:6px;font-weight:600;">Otevřít detail →</div>` : ''}
-                </div>
-            </div>`;
-        }).join('');
-        const html = `<div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-                <span style="font-size:1.4rem;">💬</span>
-                <span style="color:#38bdf8;font-weight:700;font-size:0.95rem;">Top ${enriched.length} tipů pro tvůj popis:</span>
-            </div>
-            ${cards}
-            <button onclick="resetAskSinator()" style="width:100%;margin-top:6px;padding:12px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#fff;font-size:0.88rem;cursor:pointer;">← Zkusit jiný popis</button>
-        </div>`;
-        if (res) res.innerHTML = html;
+        _askSinator.pages.push(enriched);
+        _askSinator.pageIdx = _askSinator.pages.length - 1;
+        _askSinatorRenderPage();
     } catch (e) {
         console.error('[Zeptej se Sinatora]', e);
         const msg = aiCallFailed
             ? '❌ AI se nepodařilo zavolat. Zkontroluj, že máš v Nastavení zadaný a platný AI klíč (Gemini / Groq / OpenRouter).'
-            : '❌ AI vrátila nepoužitelnou odpověď. Zkus popis zkrátit nebo to zkusit znovu.';
+            : isFirstPage
+            ? '❌ AI vrátila nepoužitelnou odpověď. Zkus popis zkrátit nebo to zkusit znovu.'
+            : '❌ Nepodařilo se načíst další tipy. Zkus to prosím znovu.';
+        // Na chybě u dalších stránek (ne první) necháme aktuální stránku zobrazenou
+        // a jen ukážeme chybu pod tlačítky, ať uživatel nepřijde o už načtené tipy.
+        if (!isFirstPage) { _askSinatorRenderPage(msg); return; }
         if (res) res.innerHTML = `<div style="padding:20px;text-align:center;"><p style="color:#e50914;margin-bottom:12px;">${msg}</p><button onclick="resetAskSinator()" style="padding:10px 20px;border-radius:10px;background:#333;border:none;color:#fff;cursor:pointer;">← Zpět</button></div>`;
     }
 }
-window.loadAskSinatorResults = loadAskSinatorResults;
+
+function _askSinatorRenderPage(errorMsg) {
+    const res = document.getElementById('askSinatorResult');
+    if (!res) return;
+    const idx = _askSinator.pageIdx;
+    const page = _askSinator.pages[idx] || [];
+    const baseNum = idx * 10;
+    const cards = page.map((t, i) => {
+        const displayTitle = t.title_cs || t.title || '?';
+        const mediaLabel = (t.tmdbType || t.media_type) === 'tv' ? 'seriál' : 'film';
+        const posterHtml = t.poster
+            ? `<img src="https://image.tmdb.org/t/p/w92${t.poster}" style="width:52px;height:76px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">`
+            : `<div style="width:52px;height:76px;border-radius:8px;background:#2a2a2a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">${(t.tmdbType || t.media_type) === 'tv' ? '📺' : '🎬'}</div>`;
+        const ratingHtml = t.rating > 0 ? `<span style="color:#fbbf24;font-size:0.72rem;margin-left:6px;">★ ${t.rating.toFixed(1)}</span>` : '';
+        const clickable = t.tmdbId && typeof openDetailFromZabavaList === 'function';
+        const clickStyle = clickable ? 'cursor:pointer;' : '';
+        const clickAttr = clickable ? `onclick="openDetailFromZabavaList('asksinator','askSinatorModal',${t.tmdbId},'${t.tmdbType || 'movie'}')"` : '';
+        return `<div ${clickAttr} style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;${clickStyle}transition:background 0.15s,border-color 0.15s;" onmouseover="this.style.background='#222';this.style.borderColor='#38bdf8'" onmouseout="this.style.background='#1a1a1a';this.style.borderColor='#2a2a2a'">
+            <div style="flex-shrink:0;width:26px;text-align:center;color:#38bdf8;font-weight:700;font-size:0.85rem;padding-top:2px;">${baseNum + i + 1}.</div>
+            ${posterHtml}
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;color:#fff;font-size:0.92rem;margin-bottom:2px;">${displayTitle} ${t.year ? `<span style="color:#888;font-size:0.78rem;">(${t.year})</span>` : ''}</div>
+                <div style="display:flex;align-items:center;margin-bottom:6px;">
+                    <span style="color:#38bdf8;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${mediaLabel}</span>${ratingHtml}
+                </div>
+                <div style="color:#aaa;font-size:0.8rem;line-height:1.5;">${t.reason || ''}</div>
+                ${clickable ? `<div style="color:#38bdf8;font-size:0.75rem;margin-top:6px;font-weight:600;">Otevřít detail →</div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+    const hasPrev = idx > 0;
+    const totalPages = _askSinator.pages.length;
+    const errorHtml = errorMsg ? `<div style="color:#e50914;font-size:0.82rem;text-align:center;margin-bottom:10px;">${errorMsg}</div>` : '';
+    const html = `<div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <span style="font-size:1.4rem;">💬</span>
+            <span style="color:#38bdf8;font-weight:700;font-size:0.95rem;">Top tipů pro tvůj popis${totalPages > 1 ? ` — strana ${idx + 1}/${totalPages}` : ''}:</span>
+        </div>
+        ${cards}
+        ${errorHtml}
+        <div style="display:flex;gap:8px;margin-top:6px;">
+            ${hasPrev ? `<button onclick="_askSinatorGoPrev()" style="flex:1;padding:12px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#fff;font-size:0.85rem;cursor:pointer;">◀ Předchozí</button>` : ''}
+            <button onclick="_askSinatorGoNext()" style="flex:1;padding:12px;border-radius:10px;background:#38bdf8;border:none;color:#0a0a0a;font-weight:700;font-size:0.85rem;cursor:pointer;">Další tipy →</button>
+        </div>
+        <button onclick="resetAskSinator()" style="width:100%;margin-top:8px;padding:12px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#fff;font-size:0.88rem;cursor:pointer;">← Zkusit jiný popis</button>
+    </div>`;
+    res.innerHTML = html;
+}
+
+window._askSinatorGoNext = async function() {
+    if (_askSinator.pageIdx < _askSinator.pages.length - 1) {
+        // Stránka už je v cache (uživatel se předtím vrátil tlačítkem Předchozí).
+        _askSinator.pageIdx++;
+        _askSinatorRenderPage();
+    } else {
+        await _askSinatorLoadPage();
+    }
+};
+window._askSinatorGoPrev = function() {
+    if (_askSinator.pageIdx > 0) {
+        _askSinator.pageIdx--;
+        _askSinatorRenderPage();
+    }
+};
 
 
 // ===== JIŽ BYLO V KINĚ =====
