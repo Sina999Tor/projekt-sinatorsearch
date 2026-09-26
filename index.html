@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-26j', date: '26. 9. 2026', items: [
+            'Smart seznamy: odznak 🧠 se teď zobrazuje u úplně každého tipu (i 1×), ne jen od 2× — jde kliknout na zdroj kdekoliv'
+        ] },
         { version: '2026-09-26i', date: '26. 9. 2026', items: [
             'Smart seznamy: klik na odznak 🧠 Nx u tipu teď ukáže, ze kterých konkrétních shlédnutých titulů byl odvozen'
         ] },
@@ -16044,7 +16047,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             const img = it.poster_path ? `<img class="card-image" src="${IMG}w342${it.poster_path}" loading="lazy">` : `<div class="card-placeholder">${mediaType === 'tv' ? '📺' : '🎬'}</div>`;
             const liked = state.favs.some(f => Number(f.id) === Number(it.id) && (f.type || 'movie') === mediaType);
             const watched = isWatched(it.id, mediaType);
-            const matchBadge = score > 1 ? `<span class="card-rating" style="color:#a78bfa;cursor:pointer;text-decoration:underline dotted;" onclick="event.stopPropagation();_smartListShowSources(${it.id})">🧠 ${score}×</span>` : '';
+            const matchBadge = `<span class="card-rating" style="color:#a78bfa;cursor:pointer;text-decoration:underline dotted;" onclick="event.stopPropagation();_smartListShowSources(${it.id})">🧠 ${score}×</span>`;
             return `<div class="card${watched ? ' is-watched' : ''}" onclick="openDetailFromSmartList(${it.id},'${mediaType}')">${img}<button class="card-fav ${liked ? 'liked' : ''}" onclick="event.stopPropagation();toggleFav(${it.id},'${tJs}','${y}',${it.vote_average || 0},'${mediaType}','${it.poster_path || ''}',event)">${liked ? '❤️' : '🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y || '—'}</span><span class="card-rating">★ ${r}</span>${matchBadge}</div></div></div>`;
         }).join('');
         const hasPrev = ctx.page > 0;
