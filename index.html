@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-26k', date: '26. 9. 2026', items: [
+            'Smart seznamy: v okně "Proč tenhle tip?" jde teď na zdrojový titul kliknout a otevřít jeho detail'
+        ] },
         { version: '2026-09-26j', date: '26. 9. 2026', items: [
             'Smart seznamy: odznak 🧠 se teď zobrazuje u úplně každého tipu (i 1×), ne jen od 2× — jde kliknout na zdroj kdekoliv'
         ] },
@@ -16085,7 +16088,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         overlay.id = 'smartSourcesOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
         const title = (entry.item.title || entry.item.name || '?').replace(/</g, '&lt;');
-        const itemsHtml = uniqueSources.map(s => `<li style="margin-bottom:6px;">${(s.title || '?').replace(/</g, '&lt;')}</li>`).join('') || '<li>—</li>';
+        const mediaType = ctx.mediaType;
+        const itemsHtml = uniqueSources.map(s => `<li onclick="document.getElementById('smartSourcesOverlay')?.remove();openDetailFromSmartList(${s.id},'${mediaType}')" style="margin-bottom:8px;color:#38bdf8;cursor:pointer;text-decoration:underline;">${(s.title || '?').replace(/</g, '&lt;')} →</li>`).join('') || '<li>—</li>';
         overlay.innerHTML = `
             <div style="background:#161616;border:1px solid #2a2a2a;border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);max-height:70vh;overflow-y:auto;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
