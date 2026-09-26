@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-26T07:30:00Z -->
+<!-- BUILD: 2026-09-26T08:24:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -42132,13 +42132,25 @@ async function loadAskSinatorResults() {
     const res = document.getElementById('askSinatorResult');
     if (pick) pick.style.display = 'none';
     if (res) { res.style.display = 'block'; res.innerHTML = '<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI hledá nejlepší shody…<br><br>⏳</div>'; }
+    // Pozná, jestli uživatel výslovně chce jen "film" nebo jen "seriál" (bez diakritiky,
+    // aby to sedělo i na "serial", "serialy" apod.) — pak se to vynutí v promptu i po
+    // straně appky filtrem, aby se do filmového dotazu nepletl seriál a naopak.
+    const qNorm = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const wantsFilm = /\bfilm/.test(qNorm) && !/serial/.test(qNorm);
+    const wantsSerial = /serial/.test(qNorm) && !/\bfilm/.test(qNorm);
+    const forceType = wantsFilm ? 'movie' : wantsSerial ? 'tv' : null;
+    const typeInstruction = forceType === 'movie'
+        ? '\n\nDŮLEŽITÉ: uživatel chce výhradně FILMY — nabídni jen filmy (media_type "movie"), žádné seriály.'
+        : forceType === 'tv'
+        ? '\n\nDŮLEŽITÉ: uživatel chce výhradně SERIÁLY — nabídni jen seriály (media_type "tv"), žádné filmy.'
+        : '';
     // Krátké odůvodnění (max ~12 slov) drží odpověď pod limitem tokenů AI volání
     // (společný pro všechny AI nástroje) — u 10 položek by delší věty snadno
     // způsobily useknutí JSON uprostřed, což _repairJsonTips() níže navíc opraví.
     const prompt = `Uživatel popsal vlastními slovy, co chce sledovat (může jít o téma, žánr, děj, náladu, konkrétní film/seriál jako inspiraci, cokoliv): "${query}"
 
 Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" max 12 slov:
-{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}`;
+{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}`;
     let aiCallFailed = false;
     try {
         let raw;
@@ -42157,7 +42169,10 @@ Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídaj
             if ((repaired.match(/\{/g) || []).length > (repaired.match(/\}/g) || []).length) repaired += '}';
             d = JSON.parse(repaired);
         }
-        const tips = (d.tips || []).slice(0, 10);
+        let tips = (d.tips || []).slice(0, 10);
+        // Pojistka: i kdyby AI instrukci v promptu nedodržela, odfiltrujeme opačný typ
+        // (film/seriál) po straně appky, aby se do "film se zombii" nepletl seriál.
+        if (forceType) tips = tips.filter(t => (t.media_type === 'tv' ? 'tv' : 'movie') === forceType);
         if (!tips.length) throw new Error('AI nevrátila žádné tipy.');
         const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
         const enriched = await Promise.all(tips.map(async t => {
