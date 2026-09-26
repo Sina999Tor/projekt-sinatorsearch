@@ -1435,6 +1435,14 @@
             </div>
             <div class="settings-divider"></div>
             <div class="settings-section">
+                <span class="settings-label">🕘 Historie změn</span>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">
+                    Přehled toho, co bylo v jednotlivých aktualizacích přidáno nebo upraveno, i s datem.
+                </div>
+                <div id="changelogHistoryList" style="display:flex;flex-direction:column;gap:12px;max-height:280px;overflow-y:auto;padding-right:4px;"></div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section">
                 <span class="settings-label">Záloha dat</span>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Kompletní záloha úplně všeho v appce — oblíbené, shlédnuté, všechny API klíče, Trakt/Simkl/Sinator backend přihlášení, IPTV údaje, vzhled i všechna ostatní nastavení.</div>
                 <div class="settings-actions">
@@ -3814,48 +3822,74 @@
     const MUSIC_HEADERS = { 'User-Agent': 'SinatorSearch/1.0 (https://sinator.app)' };
 
     // ============================================================
-    // 🆕 CO JE NOVÉHO — okno s novinkami po aktualizaci
-    // Při každé nové aktualizaci aplikace:
-    //   1) Zvyš WHATS_NEW_VERSION (např. na dnešní datum "2026-09-27")
-    //   2) Přepiš WHATS_NEW_ITEMS stručnými body, co bylo přidáno/upraveno
-    // Uživateli se okno zobrazí jen jednou pro danou verzi — po zavření
-    // (✕ nebo "Rozumím") se už znovu nezobrazí, dokud verze zase nevzroste.
+    // 🆕 CO JE NOVÉHO + 🕘 HISTORIE ZMĚN
+    // Při každé nové aktualizaci aplikace přidej NOVOU položku úplně
+    // NAHORU pole CHANGELOG_HISTORY (nejnovější je vždy první):
+    //   { version: '2026-09-27', date: '27. 9. 2026', items: ['...', '...'] }
+    // - "version" musí být unikátní řetězec (stačí datum) — podle něj appka
+    //   pozná, že jde o novou verzi, a znovu ukáže okno "Co je nového".
+    // - "date" je jen hezky čitelné datum pro zobrazení v historii.
+    // - Nic jiného mazat/měnit netřeba, staré položky zůstávají v poli
+    //   a tvoří historii zobrazenou v Nastavení → Ostatní → Historie změn.
+    // Uživateli se okno "Co je nového" zobrazí jen jednou pro nejnovější
+    // verzi — po zavření (✕ nebo "Rozumím") se už znovu nezobrazí, dokud
+    // nepřibude další položka nahoru.
     // ============================================================
-    const WHATS_NEW_VERSION = '2026-09-26';
-    const WHATS_NEW_ITEMS = [
-        'Přidáno okno „Co je nového" po aktualizaci aplikace'
+    const CHANGELOG_HISTORY = [
+        { version: '2026-09-26', date: '26. 9. 2026', items: [
+            'Přidáno okno „Co je nového" po aktualizaci aplikace',
+            'Přidána historie změn (changelog) v Nastavení → Ostatní'
+        ] }
     ];
 
     function showWhatsNewIfNeeded() {
+        const latest = CHANGELOG_HISTORY[0];
+        if (!latest || !latest.items || !latest.items.length) return;
         try {
-            if (localStorage.getItem('sinator_whatsnew_seen') === WHATS_NEW_VERSION) return;
+            if (localStorage.getItem('sinator_whatsnew_seen') === latest.version) return;
         } catch(e) {}
-        if (!WHATS_NEW_ITEMS.length) return;
         if (document.getElementById('whatsNewOverlay')) return;
         const overlay = document.createElement('div');
         overlay.id = 'whatsNewOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
-        const itemsHtml = WHATS_NEW_ITEMS.map(t => `<li style="margin-bottom:6px;">${t}</li>`).join('');
+        const itemsHtml = latest.items.map(t => `<li style="margin-bottom:6px;">${t}</li>`).join('');
         overlay.innerHTML = `
             <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);max-height:80vh;overflow-y:auto;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
                     <span style="font-weight:700;font-size:1.05rem;color:var(--gold);">✨ Co je nového</span>
                     <button onclick="closeWhatsNewOverlay()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;line-height:1;">✕</button>
                 </div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:10px;">${latest.date || ''}</div>
                 <ul style="color:var(--text);font-size:0.88rem;line-height:1.5;margin:0 0 16px;padding-left:20px;">${itemsHtml}</ul>
                 <button onclick="closeWhatsNewOverlay()" style="width:100%;padding:11px;border-radius:10px;border:none;background:var(--gold);color:#1a1a1a;font-weight:700;cursor:pointer;">Rozumím</button>
             </div>`;
         document.body.appendChild(overlay);
     }
     window.closeWhatsNewOverlay = function() {
-        try { localStorage.setItem('sinator_whatsnew_seen', WHATS_NEW_VERSION); } catch(e) {}
+        const latest = CHANGELOG_HISTORY[0];
+        try { if (latest) localStorage.setItem('sinator_whatsnew_seen', latest.version); } catch(e) {}
         const el = document.getElementById('whatsNewOverlay');
         if (el) el.remove();
     };
 
+    function renderChangelogHistory() {
+        const box = document.getElementById('changelogHistoryList');
+        if (!box) return;
+        if (!CHANGELOG_HISTORY.length) { box.innerHTML = '<div style="font-size:0.8rem;color:var(--text-muted);">Zatím žádná historie.</div>'; return; }
+        box.innerHTML = CHANGELOG_HISTORY.map(entry => {
+            const items = (entry.items || []).map(t => `<li style="margin-bottom:4px;">${t}</li>`).join('');
+            return `<div style="border-left:2px solid var(--gold,#ffd700);padding-left:10px;">
+                <div style="font-size:0.78rem;font-weight:700;color:var(--gold,#ffd700);margin-bottom:4px;">${entry.date || entry.version || ''}</div>
+                <ul style="margin:0;padding-left:18px;font-size:0.82rem;color:var(--text);line-height:1.5;">${items}</ul>
+            </div>`;
+        }).join('');
+    }
+    window.renderChangelogHistory = renderChangelogHistory;
+
     document.addEventListener('DOMContentLoaded', async () => {
         setupPWA();
         setTimeout(showWhatsNewIfNeeded, 600);
+        renderChangelogHistory();
         
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
