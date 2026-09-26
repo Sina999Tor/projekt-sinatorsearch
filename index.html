@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-26c', date: '26. 9. 2026', items: [
+            'Historie změn: aktualizace ve stejný den se teď sloučí pod jedno datum místo duplicitních řádků'
+        ] },
         { version: '2026-09-26b', date: '26. 9. 2026', items: [
             'Historie změn je teď samostatné okno — kliknutím na datum se rozbalí detail úprav',
             'Okno "Co je nového" po aktualizaci je teď stručné (datum a čas) s odkazem na plnou historii změn'
@@ -3843,6 +3846,36 @@
         { version: '2026-09-26', date: '26. 9. 2026', items: [
             'Přidáno okno „Co je nového" po aktualizaci aplikace',
             'Přidána historie změn (changelog) v Nastavení → Ostatní'
+        ] },
+        // Starší úpravy zpětně doplněné z historie vývoje — bez přesných
+        // dat jednotlivých změn (ta appka dřív nezaznamenávala), pořadí je
+        // jen orientační od novějšího k staršímu.
+        { version: 'legacy', date: 'Starší aktualizace', items: [
+            'Nová Správa IPTV kanálů, Kanály 2–6, přesun kanálů mezi skupinami',
+            'iVysílání ČT integrace žánrových dlaždic',
+            'Zábava: náhodný výběr, návrhy podle nálady, hádací hry, žebříčky',
+            'Minisérie tab, Directors tab s kurátorovanými CZ/SK režiséry, anime tab s CJK překladem názvů',
+            'Infinite scroll (IntersectionObserver) ve výsledcích',
+            'AI vyhledávání sjednoceno do jednoho smart_movie_search nástroje s referenceTitles pro dotazy "podobné X" (Gemini → Groq → OpenRouter fallback)',
+            'Trakt Device Code OAuth a Simkl OAuth PIN přihlášení',
+            'TMDB keyword-ID theme presety (bez AI)',
+            'Filtr země původu (CZ/SK vs. ostatní)',
+            'OMDb API integrace vedle TMDB s přepínačem',
+            'Alternativa 2/3 tab s ~1930 kanály podle zemí',
+            'api/check-source.js pro obcházení CORS při kontrole dostupnosti zdrojů',
+            'Přechod z Netlify na Vercel',
+            'GitHub Actions workflow pro EPG XML do samostatné větve epg-data',
+            'Unifikovaná IPTV - živě modal, EPG tab s daty z epg.m3u8.cz přes CORS proxy',
+            'Firebase Firestore „Doporučuji" — anonymní přezdívky, SHA-256 admin hash, filtrování podle tagů',
+            '„Koukat s..." funkce s deduplikací historie a CZ fallbacky titulů',
+            'Modernizace UI: sjednocený 3D styl tlačítek, fullscreen bottom-sheet overlaye, tmavá paleta akčních tlačítek, kompletní záloha/obnova',
+            'Oprava race conditions (stale fetch guard, debounce dvojkliku)',
+            'Výkon: paralelní dávkové načítání historie, 10s cache, limit souběžných TMDB dotazů',
+            '"Hist. seriály" tab agregující sledování podle seriálu',
+            'Trakt/Simkl sjednocený modal s přepínačem tabů, sjednocený Rozkoukané modal',
+            'Přehled karet: jednosloupcové neořezané postery, sjednocená ❤️/👁/🧩 tlačítka, zelený odznak shlédnuto',
+            'Histra sync: deduplikace podle tmdb+timestamp, automatická synchronizace na startu, správné watched_at časy',
+            'Settings → Klíče: výběr služby s panely, možnost smazat data na backendu'
         ] }
     ];
 
@@ -3897,12 +3930,29 @@
 
     // 🕘 Historie změn — vlastní okno se seznamem datumů (nejnovější nahoře),
     // kliknutím na datum se rozbalí detail úprav pro danou aktualizaci.
+    // Sloučí po sobě jdoucí položky se stejným datem do jedné skupiny —
+    // víc aktualizací ve stejný den se v historii zobrazí pod jedním datem.
+    function _buildChangelogGroups() {
+        const groups = [];
+        for (const entry of CHANGELOG_HISTORY) {
+            const key = entry.date || entry.version || '';
+            const last = groups[groups.length - 1];
+            if (last && last.date === key) {
+                last.items = last.items.concat(entry.items || []);
+            } else {
+                groups.push({ date: key, items: (entry.items || []).slice() });
+            }
+        }
+        return groups;
+    }
+
     window.openChangelogModal = function() {
         if (document.getElementById('changelogModalOverlay')) return;
         const overlay = document.createElement('div');
         overlay.id = 'changelogModalOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
-        const entriesHtml = CHANGELOG_HISTORY.length ? CHANGELOG_HISTORY.map((entry, idx) => {
+        const groups = _buildChangelogGroups();
+        const entriesHtml = groups.length ? groups.map((entry, idx) => {
             const itemsHtml = (entry.items || []).map(t => `<li style="margin-bottom:4px;">${t}</li>`).join('');
             return `<div style="border-bottom:1px solid var(--border);">
                 <div onclick="toggleChangelogEntry(${idx})" style="display:flex;align-items:center;justify-content:space-between;padding:12px 2px;cursor:pointer;">
