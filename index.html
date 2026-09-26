@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-26g', date: '26. 9. 2026', items: [
+            'Smart seznamy: "← Zpět" z detailu titulu teď vede zase zpátky do Smart seznamu (dřív skončilo mimo)'
+        ] },
         { version: '2026-09-26f', date: '26. 9. 2026', items: [
             'Nové „Smart seznamy" v menu Seznamy — tipy na filmy/seriály sestavené podle tvé shlédnuté historie (TMDB similar/recommendations)'
         ] },
@@ -11915,6 +11918,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             else if (backTo === 'thematic') {
                 openThematicListsModal();
             }
+            else if (backTo === 'smartlist') {
+                if (window._reopenSmartList) window._reopenSmartList();
+            }
             else if (backTo === 'epg') {
                 openTvModal();
                 switchTvTab('epg');
@@ -11957,7 +11963,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     // Helper: generates sticky modal nav bar HTML
     function modalNav(title, hasBack, extraBtns = '') {
         const backTo = state._backTo;
-        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'thematic' ? '← Tematické seznamy' : '← Zpět';
+        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'thematic' ? '← Tematické seznamy' : backTo === 'smartlist' ? '← Smart seznamy' : '← Zpět';
         const back = hasBack ? `<button class="modal-back-btn" onclick="navigateBack()">${backLabel}</button>` : '';
         const nav = $('modalNavBar'); const left = $('modalNavLeft'); const right = $('modalNavRight');
         if(nav && left && right) {
@@ -15936,6 +15942,12 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const seeds = watchedOfType.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)).slice(0, 12);
         const scoreMap = new Map(); // tmdbId -> { item, score, voteSum, voteCount }
         const gen = (window._smartListGen = (window._smartListGen || 0) + 1);
+        // Zapamatuje si poslední vygenerovaný seznam (podle reference se mění spolu s
+        // dalšími iteracemi níž) — díky tomu tlačítko "← Zpět" z detailu titulu vrátí
+        // rovnou sem, bez opětovného volání TMDB (viz openDetailFromSmartList / _reopenSmartList).
+        window._smartListLastMediaType = mediaType;
+        window._smartListLastScoreMap = scoreMap;
+        window._smartListLastSeedCount = seeds.length;
 
         const batchSize = 4;
         for (let i = 0; i < seeds.length; i += batchSize) {
@@ -15991,11 +16003,44 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             const liked = state.favs.some(f => Number(f.id) === Number(it.id) && (f.type || 'movie') === mediaType);
             const watched = isWatched(it.id, mediaType);
             const matchBadge = score > 1 ? `<span class="card-rating" style="color:#a78bfa;">🧠 ${score}×</span>` : '';
-            return `<div class="card${watched ? ' is-watched' : ''}" onclick="closeModal();openDetail(${it.id},'${mediaType}')">${img}<button class="card-fav ${liked ? 'liked' : ''}" onclick="event.stopPropagation();toggleFav(${it.id},'${tJs}','${y}',${it.vote_average || 0},'${mediaType}','${it.poster_path || ''}',event)">${liked ? '❤️' : '🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y || '—'}</span><span class="card-rating">★ ${r}</span>${matchBadge}</div></div></div>`;
+            return `<div class="card${watched ? ' is-watched' : ''}" onclick="openDetailFromSmartList(${it.id},'${mediaType}')">${img}<button class="card-fav ${liked ? 'liked' : ''}" onclick="event.stopPropagation();toggleFav(${it.id},'${tJs}','${y}',${it.vote_average || 0},'${mediaType}','${it.poster_path || ''}',event)">${liked ? '❤️' : '🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y || '—'}</span><span class="card-rating">★ ${r}</span>${matchBadge}</div></div></div>`;
         }).join('');
         body.innerHTML = headerNote + `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;padding:12px 0 16px;">${cardsHtml}</div>`;
     }
     window.renderSmartListGrid = renderSmartListGrid;
+
+    // Otevře detail titulu ze Smart seznamu tak, aby "← Zpět" v detailu vedlo
+    // zase zpátky do Smart seznamu (stejný vzor jako openDetailFromWatched) —
+    // místo obecného openDetail(), který by po zavření modalu skončil úplně mimo.
+    function openDetailFromSmartList(id, type) {
+        if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
+        state._backTo = 'smartlist';
+        navigationStack.length = 0;
+        navigationStack.push({ type, id });
+        _openDetailNoStack(id, type);
+    }
+    window.openDetailFromSmartList = openDetailFromSmartList;
+
+    // Znovu vykreslí naposledy zobrazený Smart seznam z mezipaměti (bez nového
+    // volání TMDB) — používá ho navigateBack() pro backTo === 'smartlist'.
+    function _reopenSmartList() {
+        const mediaType = window._smartListLastMediaType;
+        if (!mediaType) { openSmartListsMenu(); return; }
+        const label = mediaType === 'tv' ? 'Seriály' : 'Filmy';
+        const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
+        if (nav && left && right) {
+            left.innerHTML = `<span class="modal-nav-title" style="background:none;-webkit-text-fill-color:#a78bfa;color:#a78bfa;">🧠 Smart tipy — ${label}</span>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openSmartListsMenu();" title="Zpět" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Smart seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            nav.style.display = 'flex';
+        }
+        $('modal')?.classList.add('open');
+        if (window._smartListLastScoreMap) {
+            renderSmartListGrid(window._smartListLastScoreMap, mediaType, window._smartListLastSeedCount || 0, false);
+        } else {
+            loadSmartList(mediaType);
+        }
+    }
+    window._reopenSmartList = _reopenSmartList;
 
     function openWatchedModal() {
         const items = Object.values(state.watched).sort((a,b) => b.addedAt - a.addedAt);
