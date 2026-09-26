@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-26h', date: '26. 9. 2026', items: [
+            'Smart seznamy: přidáno stránkování (◀ Předchozí / Další →) u filmů i seriálů — po 20 tipech na stránku, s možností natáhnout ještě další dávku tipů'
+        ] },
         { version: '2026-09-26g', date: '26. 9. 2026', items: [
             'Smart seznamy: "← Zpět" z detailu titulu teď vede zase zpátky do Smart seznamu (dřív skončilo mimo)'
         ] },
@@ -15913,22 +15916,27 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     }
     window.openSmartListsMenu = openSmartListsMenu;
 
-    async function loadSmartList(mediaType) {
-        if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
-        const isTv = mediaType === 'tv';
-        const label = isTv ? 'Seriály' : 'Filmy';
+    function _smartListRenderNavBar(label) {
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if (nav && left && right) {
             left.innerHTML = `<span class="modal-nav-title" style="background:none;-webkit-text-fill-color:#a78bfa;color:#a78bfa;">🧠 Smart tipy — ${label}</span>`;
             right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openSmartListsMenu();" title="Zpět" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Smart seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
             nav.style.display = 'flex';
         }
+    }
+
+    async function loadSmartList(mediaType) {
+        if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
+        const isTv = mediaType === 'tv';
+        const label = isTv ? 'Seriály' : 'Filmy';
+        _smartListRenderNavBar(label);
         $('modal')?.classList.add('open');
         $('modalScrollBody').innerHTML = `<div class="loading"><div class="spinner"></div>Hledám tipy podle tvé historie…</div>`;
 
         const watchedAll = Object.values(state.watched || {});
         const watchedOfType = watchedAll.filter(w => w.type === mediaType && w.id);
         if (!watchedOfType.length) {
+            window._smartList = null;
             $('modalScrollBody').innerHTML = `<div class="empty" style="padding:30px;text-align:center;">Zatím nemáš shlédnuté žádné ${isTv ? 'seriály' : 'filmy'} — Smart seznam se generuje z historie „✅ Shlédnuto".</div>`;
             return;
         }
@@ -15940,15 +15948,33 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         // Nejnovější shlédnuté tituly jsou nejsilnější signál aktuální chuti — použije
         // se max 12 "semínek" (víc by jen násobilo počet TMDB dotazů bez lepšího výsledku).
         const seeds = watchedOfType.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)).slice(0, 12);
-        const scoreMap = new Map(); // tmdbId -> { item, score, voteSum, voteCount }
         const gen = (window._smartListGen = (window._smartListGen || 0) + 1);
-        // Zapamatuje si poslední vygenerovaný seznam (podle reference se mění spolu s
-        // dalšími iteracemi níž) — díky tomu tlačítko "← Zpět" z detailu titulu vrátí
-        // rovnou sem, bez opětovného volání TMDB (viz openDetailFromSmartList / _reopenSmartList).
-        window._smartListLastMediaType = mediaType;
-        window._smartListLastScoreMap = scoreMap;
-        window._smartListLastSeedCount = seeds.length;
+        // Sdílený stav (mezipaměť) pro tuhle generaci Smart seznamu — díky němu
+        // funguje jak stránkování (page), tak "← Zpět" z detailu titulu
+        // (viz openDetailFromSmartList / _reopenSmartList) bez opětovného
+        // volání TMDB, a "Načíst další tipy" ví, na jaké TMDB stránce skončilo.
+        window._smartList = {
+            mediaType, seeds, excludeIds,
+            scoreMap: new Map(), // tmdbId -> { item, score, voteSum, voteCount }
+            seedCount: seeds.length,
+            tmdbPage: 0,   // poslední natažená TMDB stránka similar/recommendations (za všechna semínka)
+            page: 0,       // aktuálně zobrazovaná stránka výsledků (0-based, po pageSize položkách)
+            pageSize: 20,
+            gen
+        };
 
+        await _smartListFetchTmdbPage(1, gen);
+        if (window._smartListGen === gen) { window._smartList.page = 0; renderSmartListGrid(false); }
+    }
+    window.loadSmartList = loadSmartList;
+
+    // Natáhne danou TMDB stránku similar+recommendations pro všechna semínka a přičte
+    // nové kandidáty do scoreMap (po dávkách, s průběžným vykreslením) — používá jak
+    // první načtení (tmdbPage=1), tak "Načíst další tipy" (další TMDB stránka).
+    async function _smartListFetchTmdbPage(tmdbPage, gen) {
+        const ctx = window._smartList;
+        if (!ctx || window._smartListGen !== gen) return;
+        const { mediaType, seeds, excludeIds, scoreMap } = ctx;
         const batchSize = 4;
         for (let i = 0; i < seeds.length; i += batchSize) {
             if (window._smartListGen !== gen) return;
@@ -15956,8 +15982,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             await Promise.all(batch.map(async seed => {
                 try {
                     const [simRes, recRes] = await Promise.all([
-                        fetch(`${BASE}/${mediaType}/${seed.id}/similar?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`).then(r => r.json()).catch(() => ({ results: [] })),
-                        fetch(`${BASE}/${mediaType}/${seed.id}/recommendations?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`).then(r => r.json()).catch(() => ({ results: [] }))
+                        fetch(`${BASE}/${mediaType}/${seed.id}/similar?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${tmdbPage}`).then(r => r.json()).catch(() => ({ results: [] })),
+                        fetch(`${BASE}/${mediaType}/${seed.id}/recommendations?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${tmdbPage}`).then(r => r.json()).catch(() => ({ results: [] }))
                     ]);
                     [...(recRes.results || []), ...(simRes.results || [])].forEach(it => {
                         if (!it.id || excludeIds.has(Number(it.id))) return;
@@ -15974,27 +16000,33 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             }));
             // Průběžné vykreslení, ať uživatel něco vidí, i než doběhnou všechna "semínka".
             if (window._smartListGen !== gen) return;
-            renderSmartListGrid(scoreMap, mediaType, seeds.length, (i + batch.length) < seeds.length);
+            renderSmartListGrid(true);
         }
-        if (window._smartListGen === gen) renderSmartListGrid(scoreMap, mediaType, seeds.length, false);
+        if (window._smartListGen === gen) ctx.tmdbPage = tmdbPage;
     }
-    window.loadSmartList = loadSmartList;
 
-    function renderSmartListGrid(scoreMap, mediaType, seedCount, stillLoading) {
+    function renderSmartListGrid(stillLoading) {
+        const ctx = window._smartList;
         const body = $('modalScrollBody');
-        if (!body) return;
+        if (!body || !ctx) return;
+        const { mediaType, seedCount, scoreMap, pageSize } = ctx;
         const ranked = Array.from(scoreMap.values()).sort((a, b) => {
             if (b.score !== a.score) return b.score - a.score;
             const av = a.voteCount ? a.voteSum / a.voteCount : 0;
             const bv = b.voteCount ? b.voteSum / b.voteCount : 0;
             return bv - av;
-        }).slice(0, 30);
-        const headerNote = `<p style="color:var(--text-muted);font-size:0.8rem;padding:12px 16px 0;margin:0;">Sestaveno z ${seedCount} tvých shlédnutých ${mediaType === 'tv' ? 'seriálů' : 'filmů'}.${stillLoading ? ' Načítám další…' : ''}</p>`;
-        if (!ranked.length) {
+        });
+        const totalPages = Math.max(1, Math.ceil(ranked.length / pageSize));
+        if (ctx.page >= totalPages) ctx.page = totalPages - 1;
+        if (ctx.page < 0) ctx.page = 0;
+        const pageItems = ranked.slice(ctx.page * pageSize, ctx.page * pageSize + pageSize);
+        const pageInfo = ranked.length ? ` — strana ${ctx.page + 1}/${totalPages}` : '';
+        const headerNote = `<p style="color:var(--text-muted);font-size:0.8rem;padding:12px 16px 0;margin:0;">Sestaveno z ${seedCount} tvých shlédnutých ${mediaType === 'tv' ? 'seriálů' : 'filmů'}${pageInfo}.${stillLoading ? ' Načítám další…' : ''}</p>`;
+        if (!pageItems.length) {
             body.innerHTML = headerNote + `<div class="empty" style="padding:30px;text-align:center;">${stillLoading ? '⏳ Hledám tipy…' : '😕 Nepodařilo se najít žádné nové tipy — možná už máš shlédnuté skoro všechno podobné 🙂'}</div>`;
             return;
         }
-        const cardsHtml = ranked.map(({ item: it, score }) => {
+        const cardsHtml = pageItems.map(({ item: it, score }) => {
             const t = (it.title || it.name || '?').replace(/'/g, "&#39;");
             const tJs = jsq(it.title || it.name || '?');
             const y = (it.release_date || it.first_air_date || '').slice(0, 4);
@@ -16005,9 +16037,49 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             const matchBadge = score > 1 ? `<span class="card-rating" style="color:#a78bfa;">🧠 ${score}×</span>` : '';
             return `<div class="card${watched ? ' is-watched' : ''}" onclick="openDetailFromSmartList(${it.id},'${mediaType}')">${img}<button class="card-fav ${liked ? 'liked' : ''}" onclick="event.stopPropagation();toggleFav(${it.id},'${tJs}','${y}',${it.vote_average || 0},'${mediaType}','${it.poster_path || ''}',event)">${liked ? '❤️' : '🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y || '—'}</span><span class="card-rating">★ ${r}</span>${matchBadge}</div></div></div>`;
         }).join('');
-        body.innerHTML = headerNote + `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;padding:12px 0 16px;">${cardsHtml}</div>`;
+        const hasPrev = ctx.page > 0;
+        const hasMoreCached = (ctx.page + 1) < totalPages;
+        const reachedTmdbLimit = (ctx.tmdbPage || 1) >= 5; // similar/recommendations dál už zpravidla přestává být relevantní
+        const pagerHtml = !stillLoading ? `<div style="display:flex;gap:8px;padding:6px 0 16px;">
+            ${hasPrev ? `<button onclick="_smartListGoPage(${ctx.page - 1})" style="flex:1;padding:12px;border-radius:10px;background:#1a1a1a;border:1px solid #333;color:#fff;font-size:0.85rem;cursor:pointer;">◀ Předchozí</button>` : ''}
+            ${(!hasMoreCached && reachedTmdbLimit) ? '' : `<button id="smartListNextBtn" onclick="_smartListNext()" style="flex:1;padding:12px;border-radius:10px;background:linear-gradient(135deg,#a78bfa,#818cf8);border:none;color:#0b1220;font-weight:700;font-size:0.85rem;cursor:pointer;">${hasMoreCached ? 'Další →' : '➕ Načíst další tipy'}</button>`}
+        </div>` : '';
+        body.innerHTML = headerNote + `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;padding:12px 0 0;">${cardsHtml}</div>${pagerHtml}`;
     }
     window.renderSmartListGrid = renderSmartListGrid;
+
+    window._smartListGoPage = function(page) {
+        if (!window._smartList) return;
+        window._smartList.page = page;
+        renderSmartListGrid(false);
+        $('modalScrollBody')?.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // "Další →" — pokud je další stránka výsledků už v mezipaměti (z dřívějšího
+    // "Načíst další tipy"), jen se přepne na ni. Jinak natáhne další TMDB stránku
+    // similar/recommendations za všechna semínka a pak na nově vzniklou stránku přejde.
+    window._smartListNext = async function() {
+        const ctx = window._smartList;
+        if (!ctx) return;
+        const totalPages = Math.max(1, Math.ceil(ctx.scoreMap.size / ctx.pageSize));
+        if (ctx.page + 1 < totalPages) {
+            ctx.page += 1;
+            renderSmartListGrid(false);
+            $('modalScrollBody')?.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+        const btn = document.getElementById('smartListNextBtn');
+        if (btn) { btn.textContent = '⏳ Načítám další tipy…'; btn.disabled = true; }
+        const gen = window._smartListGen;
+        const nextTmdbPage = (ctx.tmdbPage || 1) + 1;
+        const sizeBefore = ctx.scoreMap.size;
+        await _smartListFetchTmdbPage(nextTmdbPage, gen);
+        if (window._smartListGen !== gen) return;
+        const totalPagesNow = Math.max(1, Math.ceil(ctx.scoreMap.size / ctx.pageSize));
+        if (ctx.scoreMap.size > sizeBefore && ctx.page + 1 < totalPagesNow) ctx.page += 1;
+        renderSmartListGrid(false);
+        $('modalScrollBody')?.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
     // Otevře detail titulu ze Smart seznamu tak, aby "← Zpět" v detailu vedlo
     // zase zpátky do Smart seznamu (stejný vzor jako openDetailFromWatched) —
@@ -16021,24 +16093,15 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     }
     window.openDetailFromSmartList = openDetailFromSmartList;
 
-    // Znovu vykreslí naposledy zobrazený Smart seznam z mezipaměti (bez nového
-    // volání TMDB) — používá ho navigateBack() pro backTo === 'smartlist'.
+    // Znovu vykreslí naposledy zobrazenou stránku Smart seznamu z mezipaměti
+    // (bez nového volání TMDB) — používá ho navigateBack() pro backTo === 'smartlist'.
     function _reopenSmartList() {
-        const mediaType = window._smartListLastMediaType;
-        if (!mediaType) { openSmartListsMenu(); return; }
-        const label = mediaType === 'tv' ? 'Seriály' : 'Filmy';
-        const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
-        if (nav && left && right) {
-            left.innerHTML = `<span class="modal-nav-title" style="background:none;-webkit-text-fill-color:#a78bfa;color:#a78bfa;">🧠 Smart tipy — ${label}</span>`;
-            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openSmartListsMenu();" title="Zpět" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Smart seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
-            nav.style.display = 'flex';
-        }
+        const ctx = window._smartList;
+        if (!ctx) { openSmartListsMenu(); return; }
+        const label = ctx.mediaType === 'tv' ? 'Seriály' : 'Filmy';
+        _smartListRenderNavBar(label);
         $('modal')?.classList.add('open');
-        if (window._smartListLastScoreMap) {
-            renderSmartListGrid(window._smartListLastScoreMap, mediaType, window._smartListLastSeedCount || 0, false);
-        } else {
-            loadSmartList(mediaType);
-        }
+        renderSmartListGrid(false);
     }
     window._reopenSmartList = _reopenSmartList;
 
