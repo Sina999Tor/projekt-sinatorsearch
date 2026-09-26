@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-26e', date: '26. 9. 2026', items: [
+            '„Zeptej se Sinatora" — přidáno tlačítko 🎤 pro hlasové nadiktování popisu'
+        ] },
         { version: '2026-09-26d', date: '26. 9. 2026', items: [
             '„Zeptej se Sinatora" — přidáno tlačítko "Další tipy" (dalších 10 podle popisu) a listování zpět mezi už načtenými stránkami'
         ] },
@@ -9669,9 +9672,10 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         }
     }
 
-    function startVoiceSearch(inputId, btnId) {
+    function startVoiceSearch(inputId, btnId, mode) {
         inputId = inputId || 'searchInput';
         btnId = btnId || 'voiceSearchBtn';
+        mode = mode || 'replace'; // 'append' — přidá nadiktovaný text k tomu, co už v poli je (víceřádkové popisy)
         const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
         const btn = $(btnId);
         if(!SpeechRecognitionCtor) {
@@ -9693,7 +9697,12 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const transcript = e.results?.[0]?.[0]?.transcript || '';
             const input = $(inputId);
             if(input && transcript) {
-                input.value = transcript;
+                if(mode === 'append') {
+                    const existing = (input.value || '').trim();
+                    input.value = existing ? (existing + ' ' + transcript) : transcript;
+                } else {
+                    input.value = transcript;
+                }
                 input.dispatchEvent(new Event('input', { bubbles: true }));
             }
         };
@@ -17640,7 +17649,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     <div style="flex:1;overflow-y:auto;padding:16px;">
         <div id="askSinatorPicker">
             <p style="color:#888;font-size:0.85rem;margin-bottom:12px;text-align:center;">Popiš vlastními slovy, co chceš sledovat — téma, žánr, děj, náladu, film nebo seriál. AI ti podle toho vybere top 10 nejlépe sedících titulů.</p>
-            <textarea id="askSinatorInput" rows="4" maxlength="500" placeholder="Např. chci temný sci-fi seriál s dobrým dějem, podobný Black Mirror, ne moc dlouhý…" style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.92rem;font-family:inherit;resize:vertical;margin-bottom:12px;"></textarea>
+            <div style="position:relative;margin-bottom:12px;">
+                <textarea id="askSinatorInput" rows="4" maxlength="500" placeholder="Např. chci temný sci-fi seriál s dobrým dějem, podobný Black Mirror, ne moc dlouhý…" style="width:100%;box-sizing:border-box;padding:12px;padding-right:52px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.92rem;font-family:inherit;resize:vertical;"></textarea>
+                <button id="askSinatorVoiceBtn" onclick="startVoiceSearch('askSinatorInput','askSinatorVoiceBtn','append')" title="Nadiktovat" style="position:absolute;right:10px;bottom:10px;width:34px;height:34px;border-radius:50%;background:rgba(56,189,248,0.18);border:1px solid rgba(56,189,248,0.4);color:#38bdf8;font-size:1.05rem;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span>🎤</span></button>
+            </div>
             <button onclick="loadAskSinatorResults()" style="width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,#38bdf8,#818cf8);border:none;color:#0b1220;font-weight:700;font-size:0.94rem;cursor:pointer;">🔍 Najít top 10 tipů</button>
         </div>
         <div id="askSinatorResult" style="display:none;"></div>
