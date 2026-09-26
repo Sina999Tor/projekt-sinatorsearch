@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-26i', date: '26. 9. 2026', items: [
+            'Smart seznamy: klik na odznak 🧠 Nx u tipu teď ukáže, ze kterých konkrétních shlédnutých titulů byl odvozen'
+        ] },
         { version: '2026-09-26h', date: '26. 9. 2026', items: [
             'Smart seznamy: přidáno stránkování (◀ Předchozí / Další →) u filmů i seriálů — po 20 tipech na stránku, s možností natáhnout ještě další dávku tipů'
         ] },
@@ -15985,15 +15988,22 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                         fetch(`${BASE}/${mediaType}/${seed.id}/similar?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${tmdbPage}`).then(r => r.json()).catch(() => ({ results: [] })),
                         fetch(`${BASE}/${mediaType}/${seed.id}/recommendations?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${tmdbPage}`).then(r => r.json()).catch(() => ({ results: [] }))
                     ]);
+                    // Sjednotí similar+recommendations pro TOTO semínko a odstraní duplicity,
+                    // ať jeden titul, který se objeví v obou seznamech, nezvýší skóre 2×
+                    // za stejné semínko — skóre má odpovídat počtu různých semínek.
+                    const seenForThisSeed = new Set();
                     [...(recRes.results || []), ...(simRes.results || [])].forEach(it => {
                         if (!it.id || excludeIds.has(Number(it.id))) return;
                         const key = Number(it.id);
+                        if (seenForThisSeed.has(key)) return;
+                        seenForThisSeed.add(key);
                         const existing = scoreMap.get(key);
                         if (existing) {
                             existing.score += 1;
+                            existing.sources.push({ id: seed.id, title: seed.title || '?' });
                             if (it.vote_average) { existing.voteSum += it.vote_average; existing.voteCount += 1; }
                         } else {
-                            scoreMap.set(key, { item: it, score: 1, voteSum: it.vote_average || 0, voteCount: it.vote_average ? 1 : 0 });
+                            scoreMap.set(key, { item: it, score: 1, voteSum: it.vote_average || 0, voteCount: it.vote_average ? 1 : 0, sources: [{ id: seed.id, title: seed.title || '?' }] });
                         }
                     });
                 } catch (e) {}
@@ -16034,7 +16044,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             const img = it.poster_path ? `<img class="card-image" src="${IMG}w342${it.poster_path}" loading="lazy">` : `<div class="card-placeholder">${mediaType === 'tv' ? '📺' : '🎬'}</div>`;
             const liked = state.favs.some(f => Number(f.id) === Number(it.id) && (f.type || 'movie') === mediaType);
             const watched = isWatched(it.id, mediaType);
-            const matchBadge = score > 1 ? `<span class="card-rating" style="color:#a78bfa;">🧠 ${score}×</span>` : '';
+            const matchBadge = score > 1 ? `<span class="card-rating" style="color:#a78bfa;cursor:pointer;text-decoration:underline dotted;" onclick="event.stopPropagation();_smartListShowSources(${it.id})">🧠 ${score}×</span>` : '';
             return `<div class="card${watched ? ' is-watched' : ''}" onclick="openDetailFromSmartList(${it.id},'${mediaType}')">${img}<button class="card-fav ${liked ? 'liked' : ''}" onclick="event.stopPropagation();toggleFav(${it.id},'${tJs}','${y}',${it.vote_average || 0},'${mediaType}','${it.poster_path || ''}',event)">${liked ? '❤️' : '🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y || '—'}</span><span class="card-rating">★ ${r}</span>${matchBadge}</div></div></div>`;
         }).join('');
         const hasPrev = ctx.page > 0;
@@ -16053,6 +16063,36 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         window._smartList.page = page;
         renderSmartListGrid(false);
         $('modalScrollBody')?.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // Ukáže, ze kterých konkrétních shlédnutých titulů byl daný tip odvozen
+    // (klik na odznak 🧠 Nx u karty) — bez dalšího volání TMDB, jen z mezipaměti.
+    window._smartListShowSources = function(candidateId) {
+        const ctx = window._smartList;
+        const entry = ctx?.scoreMap?.get(Number(candidateId));
+        if (!entry) return;
+        const seen = new Set();
+        const uniqueSources = (entry.sources || []).filter(s => {
+            if (seen.has(s.id)) return false;
+            seen.add(s.id);
+            return true;
+        });
+        if (document.getElementById('smartSourcesOverlay')) return;
+        const overlay = document.createElement('div');
+        overlay.id = 'smartSourcesOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
+        const title = (entry.item.title || entry.item.name || '?').replace(/</g, '&lt;');
+        const itemsHtml = uniqueSources.map(s => `<li style="margin-bottom:6px;">${(s.title || '?').replace(/</g, '&lt;')}</li>`).join('') || '<li>—</li>';
+        overlay.innerHTML = `
+            <div style="background:#161616;border:1px solid #2a2a2a;border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);max-height:70vh;overflow-y:auto;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <span style="font-weight:700;font-size:1rem;color:#a78bfa;">🧠 Proč „${title}"?</span>
+                    <button onclick="document.getElementById('smartSourcesOverlay')?.remove()" style="background:none;border:none;color:#888;font-size:1.3rem;cursor:pointer;line-height:1;">✕</button>
+                </div>
+                <p style="color:#aaa;font-size:0.82rem;margin:0 0 10px;">Doporučeno na základě těchto tvých shlédnutých titulů:</p>
+                <ul style="color:#fff;font-size:0.88rem;line-height:1.6;margin:0;padding-left:20px;">${itemsHtml}</ul>
+            </div>`;
+        document.body.appendChild(overlay);
     };
 
     // "Další →" — pokud je další stránka výsledků už v mezipaměti (z dřívějšího
