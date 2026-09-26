@@ -1439,7 +1439,7 @@
                 <div style="font-size:0.72rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">
                     Přehled toho, co bylo v jednotlivých aktualizacích přidáno nebo upraveno, i s datem.
                 </div>
-                <div id="changelogHistoryList" style="display:flex;flex-direction:column;gap:12px;max-height:280px;overflow-y:auto;padding-right:4px;"></div>
+                <button class="settings-btn-small" onclick="openChangelogModal()" style="width:100%;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.35);color:var(--gold,#ffd700);font-weight:600;padding:10px;">🕘 Zobrazit historii změn</button>
             </div>
             <div class="settings-divider"></div>
             <div class="settings-section">
@@ -3836,31 +3836,54 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-26b', date: '26. 9. 2026', items: [
+            'Historie změn je teď samostatné okno — kliknutím na datum se rozbalí detail úprav',
+            'Okno "Co je nového" po aktualizaci je teď stručné (datum a čas) s odkazem na plnou historii změn'
+        ] },
         { version: '2026-09-26', date: '26. 9. 2026', items: [
             'Přidáno okno „Co je nového" po aktualizaci aplikace',
             'Přidána historie změn (changelog) v Nastavení → Ostatní'
         ] }
     ];
 
-    function showWhatsNewIfNeeded() {
+    // Zjistí přesné datum a čas nahrání aktuální verze (stejný zdroj jako
+    // "Nahráno:" v sekci Aktualizace aplikace) — s fallbackem na ručně
+    // vyplněné "date" u nejnovější položky, kdyby se síťový dotaz nestihl.
+    async function _getDeployedDateTimeText(fallback) {
+        try {
+            await Promise.race([window._bootHashPromise, new Promise(r => setTimeout(r, 1500))]);
+            if (window._bootLastModified) {
+                const d = new Date(window._bootLastModified);
+                if (!isNaN(d.getTime())) {
+                    return d.toLocaleString('cs-CZ', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+                }
+            }
+        } catch(e) {}
+        return fallback || '';
+    }
+
+    async function showWhatsNewIfNeeded() {
         const latest = CHANGELOG_HISTORY[0];
-        if (!latest || !latest.items || !latest.items.length) return;
+        if (!latest) return;
         try {
             if (localStorage.getItem('sinator_whatsnew_seen') === latest.version) return;
         } catch(e) {}
         if (document.getElementById('whatsNewOverlay')) return;
+        const deployedText = await _getDeployedDateTimeText(latest.date);
+        if (document.getElementById('whatsNewOverlay')) return; // mezitím už otevřeno jinak
         const overlay = document.createElement('div');
         overlay.id = 'whatsNewOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
-        const itemsHtml = latest.items.map(t => `<li style="margin-bottom:6px;">${t}</li>`).join('');
         overlay.innerHTML = `
-            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);max-height:80vh;overflow-y:auto;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-                    <span style="font-weight:700;font-size:1.05rem;color:var(--gold);">✨ Co je nového</span>
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <span style="font-weight:700;font-size:1.05rem;color:var(--gold);">✨ Aplikace byla aktualizována</span>
                     <button onclick="closeWhatsNewOverlay()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;line-height:1;">✕</button>
                 </div>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:10px;">${latest.date || ''}</div>
-                <ul style="color:var(--text);font-size:0.88rem;line-height:1.5;margin:0 0 16px;padding-left:20px;">${itemsHtml}</ul>
+                <div style="font-size:0.85rem;color:var(--text);margin-bottom:14px;">🕘 ${deployedText}</div>
+                <div style="font-size:0.85rem;color:var(--text-muted);line-height:1.5;margin-bottom:18px;">
+                    Podrobnosti najdeš v <a href="#" onclick="event.preventDefault();closeWhatsNewOverlay();openChangelogModal();" style="color:var(--gold);font-weight:600;text-decoration:underline;">historii změn</a>.
+                </div>
                 <button onclick="closeWhatsNewOverlay()" style="width:100%;padding:11px;border-radius:10px;border:none;background:var(--gold);color:#1a1a1a;font-weight:700;cursor:pointer;">Rozumím</button>
             </div>`;
         document.body.appendChild(overlay);
@@ -3872,24 +3895,49 @@
         if (el) el.remove();
     };
 
-    function renderChangelogHistory() {
-        const box = document.getElementById('changelogHistoryList');
-        if (!box) return;
-        if (!CHANGELOG_HISTORY.length) { box.innerHTML = '<div style="font-size:0.8rem;color:var(--text-muted);">Zatím žádná historie.</div>'; return; }
-        box.innerHTML = CHANGELOG_HISTORY.map(entry => {
-            const items = (entry.items || []).map(t => `<li style="margin-bottom:4px;">${t}</li>`).join('');
-            return `<div style="border-left:2px solid var(--gold,#ffd700);padding-left:10px;">
-                <div style="font-size:0.78rem;font-weight:700;color:var(--gold,#ffd700);margin-bottom:4px;">${entry.date || entry.version || ''}</div>
-                <ul style="margin:0;padding-left:18px;font-size:0.82rem;color:var(--text);line-height:1.5;">${items}</ul>
+    // 🕘 Historie změn — vlastní okno se seznamem datumů (nejnovější nahoře),
+    // kliknutím na datum se rozbalí detail úprav pro danou aktualizaci.
+    window.openChangelogModal = function() {
+        if (document.getElementById('changelogModalOverlay')) return;
+        const overlay = document.createElement('div');
+        overlay.id = 'changelogModalOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
+        const entriesHtml = CHANGELOG_HISTORY.length ? CHANGELOG_HISTORY.map((entry, idx) => {
+            const itemsHtml = (entry.items || []).map(t => `<li style="margin-bottom:4px;">${t}</li>`).join('');
+            return `<div style="border-bottom:1px solid var(--border);">
+                <div onclick="toggleChangelogEntry(${idx})" style="display:flex;align-items:center;justify-content:space-between;padding:12px 2px;cursor:pointer;">
+                    <span style="font-weight:700;color:var(--gold,#ffd700);font-size:0.92rem;">${entry.date || entry.version || ''}</span>
+                    <span id="changelogChevron${idx}" style="color:var(--text-muted);font-size:0.8rem;transition:transform 0.2s;display:inline-block;">▼</span>
+                </div>
+                <ul id="changelogItems${idx}" style="display:none;margin:0 0 12px;padding-left:20px;font-size:0.85rem;color:var(--text);line-height:1.5;">${itemsHtml}</ul>
             </div>`;
-        }).join('');
-    }
-    window.renderChangelogHistory = renderChangelogHistory;
+        }).join('') : '<div style="font-size:0.85rem;color:var(--text-muted);padding:10px 0;">Zatím žádná historie.</div>';
+        overlay.innerHTML = `
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);max-height:80vh;display:flex;flex-direction:column;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-shrink:0;">
+                    <span style="font-weight:700;font-size:1.05rem;color:var(--gold);">🕘 Historie změn</span>
+                    <button onclick="closeChangelogModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;line-height:1;">✕</button>
+                </div>
+                <div style="overflow-y:auto;flex:1;">${entriesHtml}</div>
+            </div>`;
+        document.body.appendChild(overlay);
+    };
+    window.closeChangelogModal = function() {
+        const el = document.getElementById('changelogModalOverlay');
+        if (el) el.remove();
+    };
+    window.toggleChangelogEntry = function(idx) {
+        const ul = document.getElementById('changelogItems' + idx);
+        const chev = document.getElementById('changelogChevron' + idx);
+        if (!ul) return;
+        const isOpen = ul.style.display !== 'none';
+        ul.style.display = isOpen ? 'none' : 'block';
+        if (chev) chev.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    };
 
     document.addEventListener('DOMContentLoaded', async () => {
         setupPWA();
         setTimeout(showWhatsNewIfNeeded, 600);
-        renderChangelogHistory();
         
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
