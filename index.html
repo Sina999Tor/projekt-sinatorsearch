@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-26l', date: '26. 9. 2026', items: [
+            'Smart seznamy: "← Zpět" z detailu zdrojového titulu (otevřeného z okna "Proč tenhle tip?") teď vede zase do toho samého otevřeného okna, ne jen do seznamu'
+        ] },
         { version: '2026-09-26k', date: '26. 9. 2026', items: [
             'Smart seznamy: v okně "Proč tenhle tip?" jde teď na zdrojový titul kliknout a otevřít jeho detail'
         ] },
@@ -11933,6 +11936,12 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             else if (backTo === 'smartlist') {
                 if (window._reopenSmartList) window._reopenSmartList();
             }
+            else if (backTo === 'smartlist-sources') {
+                if (window._reopenSmartList) window._reopenSmartList();
+                if (window._smartListShowSources && window._smartListReturnCandidateId != null) {
+                    window._smartListShowSources(window._smartListReturnCandidateId);
+                }
+            }
             else if (backTo === 'epg') {
                 openTvModal();
                 switchTvTab('epg');
@@ -11975,7 +11984,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     // Helper: generates sticky modal nav bar HTML
     function modalNav(title, hasBack, extraBtns = '') {
         const backTo = state._backTo;
-        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'thematic' ? '← Tematické seznamy' : backTo === 'smartlist' ? '← Smart seznamy' : '← Zpět';
+        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'thematic' ? '← Tematické seznamy' : backTo === 'smartlist' ? '← Smart seznamy' : backTo === 'smartlist-sources' ? '← Smart seznamy' : '← Zpět';
         const back = hasBack ? `<button class="modal-back-btn" onclick="navigateBack()">${backLabel}</button>` : '';
         const nav = $('modalNavBar'); const left = $('modalNavLeft'); const right = $('modalNavRight');
         if(nav && left && right) {
@@ -16089,7 +16098,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
         const title = (entry.item.title || entry.item.name || '?').replace(/</g, '&lt;');
         const mediaType = ctx.mediaType;
-        const itemsHtml = uniqueSources.map(s => `<li onclick="document.getElementById('smartSourcesOverlay')?.remove();openDetailFromSmartList(${s.id},'${mediaType}')" style="margin-bottom:8px;color:#38bdf8;cursor:pointer;text-decoration:underline;">${(s.title || '?').replace(/</g, '&lt;')} →</li>`).join('') || '<li>—</li>';
+        const itemsHtml = uniqueSources.map(s => `<li onclick="document.getElementById('smartSourcesOverlay')?.remove();openSourceDetailFromSmartList(${s.id},'${mediaType}',${Number(candidateId)})" style="margin-bottom:8px;color:#38bdf8;cursor:pointer;text-decoration:underline;">${(s.title || '?').replace(/</g, '&lt;')} →</li>`).join('') || '<li>—</li>';
         overlay.innerHTML = `
             <div style="background:#161616;border:1px solid #2a2a2a;border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);max-height:70vh;overflow-y:auto;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -16139,6 +16148,19 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         _openDetailNoStack(id, type);
     }
     window.openDetailFromSmartList = openDetailFromSmartList;
+
+    // Otevře detail zdrojového titulu z okna "🧠 Proč tenhle tip?" tak, aby
+    // "← Zpět" vedlo zase zpátky do stejného otevřeného okna se zdroji
+    // (ne jen do holého Smart seznamu) — viz backTo === 'smartlist-sources'.
+    function openSourceDetailFromSmartList(id, type, candidateId) {
+        if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
+        state._backTo = 'smartlist-sources';
+        window._smartListReturnCandidateId = candidateId;
+        navigationStack.length = 0;
+        navigationStack.push({ type, id });
+        _openDetailNoStack(id, type);
+    }
+    window.openSourceDetailFromSmartList = openSourceDetailFromSmartList;
 
     // Znovu vykreslí naposledy zobrazenou stránku Smart seznamu z mezipaměti
     // (bez nového volání TMDB) — používá ho navigateBack() pro backTo === 'smartlist'.
