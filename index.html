@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-26f', date: '26. 9. 2026', items: [
+            'Nové „Smart seznamy" v menu Seznamy — tipy na filmy/seriály sestavené podle tvé shlédnuté historie (TMDB similar/recommendations)'
+        ] },
         { version: '2026-09-26e', date: '26. 9. 2026', items: [
             '„Zeptej se Sinatora" — přidáno tlačítko 🎤 pro hlasové nadiktování popisu'
         ] },
@@ -15880,6 +15883,120 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         c.innerHTML = count + grid;
     }
 
+    // ══ SMART SEZNAMY — tipy podle shlédnuté historie (TMDB similar/recommendations
+    // pro každý shlédnutý titul, agregováno a seřazeno podle počtu shod) ═══════
+    function openSmartListsMenu() {
+        const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
+        if (nav && left && right) {
+            left.innerHTML = `<span class="modal-nav-title" style="background:none;-webkit-text-fill-color:#a78bfa;color:#a78bfa;">🧠 Smart seznamy</span>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openListsModal();" title="Zpět na Seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            nav.style.display = 'flex';
+        }
+        $('modal')?.classList.add('open');
+        $('modalScrollBody').innerHTML = `<div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+            <p style="color:var(--text-muted);font-size:0.85rem;margin:0 0 4px;">Tipy sestavené podle tvé shlédnuté historie — tituly podobné tomu, co už jsi viděl/a.</p>
+            <button onclick="loadSmartList('movie')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+                <span style="font-size:1.6rem;">🎬</span>
+                <div><div style="color:#a78bfa;font-weight:700;">Filmy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Podle tvé shlédnuté historie filmů</div></div>
+            </button>
+            <button onclick="loadSmartList('tv')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+                <span style="font-size:1.6rem;">📺</span>
+                <div><div style="color:#a78bfa;font-weight:700;">Seriály</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Podle tvé shlédnuté historie seriálů</div></div>
+            </button>
+        </div>`;
+    }
+    window.openSmartListsMenu = openSmartListsMenu;
+
+    async function loadSmartList(mediaType) {
+        if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
+        const isTv = mediaType === 'tv';
+        const label = isTv ? 'Seriály' : 'Filmy';
+        const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
+        if (nav && left && right) {
+            left.innerHTML = `<span class="modal-nav-title" style="background:none;-webkit-text-fill-color:#a78bfa;color:#a78bfa;">🧠 Smart tipy — ${label}</span>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openSmartListsMenu();" title="Zpět" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Smart seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            nav.style.display = 'flex';
+        }
+        $('modal')?.classList.add('open');
+        $('modalScrollBody').innerHTML = `<div class="loading"><div class="spinner"></div>Hledám tipy podle tvé historie…</div>`;
+
+        const watchedAll = Object.values(state.watched || {});
+        const watchedOfType = watchedAll.filter(w => w.type === mediaType && w.id);
+        if (!watchedOfType.length) {
+            $('modalScrollBody').innerHTML = `<div class="empty" style="padding:30px;text-align:center;">Zatím nemáš shlédnuté žádné ${isTv ? 'seriály' : 'filmy'} — Smart seznam se generuje z historie „✅ Shlédnuto".</div>`;
+            return;
+        }
+        // Vyloučit z návrhů to, co už bylo shlédnuto nebo je v oblíbených — nemá smysl
+        // doporučovat něco, co uživatel už viděl nebo má v seznamu.
+        const excludeIds = new Set(watchedOfType.map(w => Number(w.id)));
+        (state.favs || []).forEach(f => { if ((f.type || 'movie') === mediaType) excludeIds.add(Number(f.id)); });
+
+        // Nejnovější shlédnuté tituly jsou nejsilnější signál aktuální chuti — použije
+        // se max 12 "semínek" (víc by jen násobilo počet TMDB dotazů bez lepšího výsledku).
+        const seeds = watchedOfType.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)).slice(0, 12);
+        const scoreMap = new Map(); // tmdbId -> { item, score, voteSum, voteCount }
+        const gen = (window._smartListGen = (window._smartListGen || 0) + 1);
+
+        const batchSize = 4;
+        for (let i = 0; i < seeds.length; i += batchSize) {
+            if (window._smartListGen !== gen) return;
+            const batch = seeds.slice(i, i + batchSize);
+            await Promise.all(batch.map(async seed => {
+                try {
+                    const [simRes, recRes] = await Promise.all([
+                        fetch(`${BASE}/${mediaType}/${seed.id}/similar?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`).then(r => r.json()).catch(() => ({ results: [] })),
+                        fetch(`${BASE}/${mediaType}/${seed.id}/recommendations?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=1`).then(r => r.json()).catch(() => ({ results: [] }))
+                    ]);
+                    [...(recRes.results || []), ...(simRes.results || [])].forEach(it => {
+                        if (!it.id || excludeIds.has(Number(it.id))) return;
+                        const key = Number(it.id);
+                        const existing = scoreMap.get(key);
+                        if (existing) {
+                            existing.score += 1;
+                            if (it.vote_average) { existing.voteSum += it.vote_average; existing.voteCount += 1; }
+                        } else {
+                            scoreMap.set(key, { item: it, score: 1, voteSum: it.vote_average || 0, voteCount: it.vote_average ? 1 : 0 });
+                        }
+                    });
+                } catch (e) {}
+            }));
+            // Průběžné vykreslení, ať uživatel něco vidí, i než doběhnou všechna "semínka".
+            if (window._smartListGen !== gen) return;
+            renderSmartListGrid(scoreMap, mediaType, seeds.length, (i + batch.length) < seeds.length);
+        }
+        if (window._smartListGen === gen) renderSmartListGrid(scoreMap, mediaType, seeds.length, false);
+    }
+    window.loadSmartList = loadSmartList;
+
+    function renderSmartListGrid(scoreMap, mediaType, seedCount, stillLoading) {
+        const body = $('modalScrollBody');
+        if (!body) return;
+        const ranked = Array.from(scoreMap.values()).sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            const av = a.voteCount ? a.voteSum / a.voteCount : 0;
+            const bv = b.voteCount ? b.voteSum / b.voteCount : 0;
+            return bv - av;
+        }).slice(0, 30);
+        const headerNote = `<p style="color:var(--text-muted);font-size:0.8rem;padding:12px 16px 0;margin:0;">Sestaveno z ${seedCount} tvých shlédnutých ${mediaType === 'tv' ? 'seriálů' : 'filmů'}.${stillLoading ? ' Načítám další…' : ''}</p>`;
+        if (!ranked.length) {
+            body.innerHTML = headerNote + `<div class="empty" style="padding:30px;text-align:center;">${stillLoading ? '⏳ Hledám tipy…' : '😕 Nepodařilo se najít žádné nové tipy — možná už máš shlédnuté skoro všechno podobné 🙂'}</div>`;
+            return;
+        }
+        const cardsHtml = ranked.map(({ item: it, score }) => {
+            const t = (it.title || it.name || '?').replace(/'/g, "&#39;");
+            const tJs = jsq(it.title || it.name || '?');
+            const y = (it.release_date || it.first_air_date || '').slice(0, 4);
+            const r = it.vote_average ? it.vote_average.toFixed(1) : '—';
+            const img = it.poster_path ? `<img class="card-image" src="${IMG}w342${it.poster_path}" loading="lazy">` : `<div class="card-placeholder">${mediaType === 'tv' ? '📺' : '🎬'}</div>`;
+            const liked = state.favs.some(f => Number(f.id) === Number(it.id) && (f.type || 'movie') === mediaType);
+            const watched = isWatched(it.id, mediaType);
+            const matchBadge = score > 1 ? `<span class="card-rating" style="color:#a78bfa;">🧠 ${score}×</span>` : '';
+            return `<div class="card${watched ? ' is-watched' : ''}" onclick="closeModal();openDetail(${it.id},'${mediaType}')">${img}<button class="card-fav ${liked ? 'liked' : ''}" onclick="event.stopPropagation();toggleFav(${it.id},'${tJs}','${y}',${it.vote_average || 0},'${mediaType}','${it.poster_path || ''}',event)">${liked ? '❤️' : '🤍'}</button><div class="card-info"><div class="card-title">${t}</div><div class="card-meta"><span>${y || '—'}</span><span class="card-rating">★ ${r}</span>${matchBadge}</div></div></div>`;
+        }).join('');
+        body.innerHTML = headerNote + `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;padding:12px 0 16px;">${cardsHtml}</div>`;
+    }
+    window.renderSmartListGrid = renderSmartListGrid;
+
     function openWatchedModal() {
         const items = Object.values(state.watched).sort((a,b) => b.addedAt - a.addedAt);
         const movies = items.filter(i => i.type === 'movie');
@@ -17195,6 +17312,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <button onclick="closeListsModal();openThematicListsModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🧵</span>
             <div><div style="color:#fb923c;font-weight:700;">Tematické seznamy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Komunitní seznamy z TMDB podle témat</div></div>
+        </button>
+        <button onclick="closeListsModal();openSmartListsMenu()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🧠</span>
+            <div><div style="color:#a78bfa;font-weight:700;">Smart seznamy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Tipy podle tvé shlédnuté historie</div></div>
         </button>
         <button onclick="closeListsModal();openRozkoukaneModal()" class="menu-row-btn" id="listsMenuRozkoukaneBtn" style="display:none;" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎭</span>
