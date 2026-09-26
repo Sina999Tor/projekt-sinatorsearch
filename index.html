@@ -3813,8 +3813,49 @@
     const paginationContainer = $('paginationContainer');
     const MUSIC_HEADERS = { 'User-Agent': 'SinatorSearch/1.0 (https://sinator.app)' };
 
+    // ============================================================
+    // 🆕 CO JE NOVÉHO — okno s novinkami po aktualizaci
+    // Při každé nové aktualizaci aplikace:
+    //   1) Zvyš WHATS_NEW_VERSION (např. na dnešní datum "2026-09-27")
+    //   2) Přepiš WHATS_NEW_ITEMS stručnými body, co bylo přidáno/upraveno
+    // Uživateli se okno zobrazí jen jednou pro danou verzi — po zavření
+    // (✕ nebo "Rozumím") se už znovu nezobrazí, dokud verze zase nevzroste.
+    // ============================================================
+    const WHATS_NEW_VERSION = '2026-09-26';
+    const WHATS_NEW_ITEMS = [
+        'Přidáno okno „Co je nového" po aktualizaci aplikace'
+    ];
+
+    function showWhatsNewIfNeeded() {
+        try {
+            if (localStorage.getItem('sinator_whatsnew_seen') === WHATS_NEW_VERSION) return;
+        } catch(e) {}
+        if (!WHATS_NEW_ITEMS.length) return;
+        if (document.getElementById('whatsNewOverlay')) return;
+        const overlay = document.createElement('div');
+        overlay.id = 'whatsNewOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
+        const itemsHtml = WHATS_NEW_ITEMS.map(t => `<li style="margin-bottom:6px;">${t}</li>`).join('');
+        overlay.innerHTML = `
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);max-height:80vh;overflow-y:auto;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                    <span style="font-weight:700;font-size:1.05rem;color:var(--gold);">✨ Co je nového</span>
+                    <button onclick="closeWhatsNewOverlay()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;line-height:1;">✕</button>
+                </div>
+                <ul style="color:var(--text);font-size:0.88rem;line-height:1.5;margin:0 0 16px;padding-left:20px;">${itemsHtml}</ul>
+                <button onclick="closeWhatsNewOverlay()" style="width:100%;padding:11px;border-radius:10px;border:none;background:var(--gold);color:#1a1a1a;font-weight:700;cursor:pointer;">Rozumím</button>
+            </div>`;
+        document.body.appendChild(overlay);
+    }
+    window.closeWhatsNewOverlay = function() {
+        try { localStorage.setItem('sinator_whatsnew_seen', WHATS_NEW_VERSION); } catch(e) {}
+        const el = document.getElementById('whatsNewOverlay');
+        if (el) el.remove();
+    };
+
     document.addEventListener('DOMContentLoaded', async () => {
         setupPWA();
+        setTimeout(showWhatsNewIfNeeded, 600);
         
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
