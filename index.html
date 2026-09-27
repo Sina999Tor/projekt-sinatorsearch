@@ -3836,6 +3836,12 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-27e', date: '27. 9. 2026', items: [
+            '„Zeptej se Sinatora" — oprava předchozí verze: appka mylně po jednom neúspěšném pokusu tvrdila, že jsou tipy pro daný popis vyčerpané, a schovávala tlačítko "Další tipy" — i u širokých žánrů (např. "zombie filmy"), kde to zdaleka není pravda. Teď to appka netvrdí, tlačítko zůstává a "Další tipy" zkusí až 3× s čím dál důraznější instrukcí pro AI, ať sáhne i po méně známých/zahraničních titulech',
+        ] },
+        { version: '2026-09-27d', date: '27. 9. 2026', items: [
+            '„Zeptej se Sinatora" — u úzkého zadání (např. "korejské zombie filmy"), kde AI po pár stránkách reálně dojdou shody, appka to teď pozná a místo opakované chyby ukáže info hlášku a schová tlačítko "Další tipy" (druhý pokus navíc AI vybízí sáhnout i po méně známých/starších titulech)'
+        ] },
         { version: '2026-09-27c', date: '27. 9. 2026', items: [
             '„Zeptej se Sinatora" — tlačítko "Další tipy" už tolik nechybuje: AI volání má teď timeout (dřív žádný nemělo, takže při pomalé odpovědi appka jen tiše visela) a při shodě se stejnými tituly appka sama zkusí jeden další pokus s delším timeoutem, než ukáže chybu',
             '„Zeptej se Sinatora" — spolehlivější odhalení duplicit mezi stránkami (ignoruje diakritiku, velikost písmen a členy "the/a/an"), takže se stejný titul v seznamu už neobjeví dvakrát'
@@ -42745,21 +42751,22 @@ async function _askSinatorLoadPage() {
 
     // Slabší (často free) AI klíče instrukci "neopakuj" ne vždy dodrží a vrátí
     // stejnou desítku znovu. Než kvůli tomu appka rovnou ukáže chybu, zkusí to
-    // (jen když už nějaké tituly vylučujeme, tj. na "Další tipy") ještě jednou
-    // s delším timeoutem a jiným náhodným seedem, ať má AI víc času i důvod
-    // vybrat jinak. Ne příliš dlouhé — 2 pokusy, 15s a 22s.
-    const maxAttempts = alreadyShown.length ? 2 : 1;
+    // (jen když už nějaké tituly vylučujeme, tj. na "Další tipy") ještě 2×
+    // s delším timeoutem, jiným náhodným seedem a čím dál důraznější instrukcí
+    // k rozmanitosti, ať to i u slabšího/zaseknutého AI klíče má šanci uspět.
+    // Ne příliš dlouhé — max 3 pokusy, 15s / 20s / 25s.
+    const maxAttempts = alreadyShown.length ? 3 : 1;
     let tips = [];
     let lastErr = null;
     let aiCallFailed = false;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         if (res) {
-            const loadingLabel = isFirstPage ? 'nejlepší shody' : (attempt > 1 ? 'jiné tipy (zkouším to ještě jednou)' : 'další tipy');
+            const loadingLabel = isFirstPage ? 'nejlepší shody' : (attempt > 1 ? `jiné tipy (zkouším to ${attempt}. ${attempt === 2 ? 'ze 3' : ''})` : 'další tipy');
             res.innerHTML = `<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI hledá ${loadingLabel}…<br><br>⏳</div>`;
         }
         const seedInstruction = attempt > 1
-            ? `\n\nNáhodné číslo pro rozmanitost výběru: ${Math.floor(Math.random() * 100000)}. Zvol tentokrát jiných 10 titulů než v předchozí odpovědi.`
+            ? `\n\nNáhodné číslo pro rozmanitost výběru: ${Math.floor(Math.random() * 100000)}. Zvol tentokrát jiných 10 titulů než v předchozí odpovědi — sáhni i po méně známých, starších nebo zahraničních titulech (klidně z jiných zemí/dekád), pokud pořád odpovídají zadání. Žánr má obvykle desítky až stovky titulů, takže po 10-20 navržených rozhodně nejsou vyčerpané všechny možnosti.`
             : '';
         // Krátké odůvodnění (max ~12 slov) drží odpověď pod limitem tokenů AI volání
         // (společný pro všechny AI nástroje) — u 10 položek by delší věty snadno
@@ -42768,7 +42775,7 @@ async function _askSinatorLoadPage() {
 
 Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" max 12 slov:
 {"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}${seedInstruction}`;
-        const timeoutMs = attempt === 1 ? 15000 : 22000;
+        const timeoutMs = attempt === 1 ? 15000 : attempt === 2 ? 20000 : 25000;
         try {
             let raw;
             try { raw = await _askSinatorWithTimeout(_zabavaAiCall(prompt), timeoutMs); aiCallFailed = false; }
@@ -42810,13 +42817,17 @@ Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídaj
 
     if (!tips.length) {
         console.error('[Zeptej se Sinatora]', lastErr);
+        // I po 3 pokusech se nemusí nutně jednat o vyčerpaný žánr (u "zombie filmy"
+        // apod. je titulů spousta) — může to být jen slabší/zaseknutý AI klíč v tuhle
+        // chvíli. Appka proto nic netvrdí o vyčerpání a tlačítko "Další tipy" nechá
+        // být — uživatel může kdykoliv zkusit znovu, další klik pošle nový náhodný seed.
         const msg = aiCallFailed
             ? '❌ AI se nepodařilo zavolat. Zkontroluj, že máš v Nastavení zadaný a platný AI klíč (Gemini / Groq / OpenRouter).'
             : isFirstPage
             ? '❌ AI vrátila nepoužitelnou odpověď. Zkus popis zkrátit nebo to zkusit znovu.'
-            : '❌ AI opakovaně vrátila jen už zobrazené tituly. Zkus to prosím znovu.';
+            : '❌ AI teď nenašla žádné nové tipy. Zkus to prosím znovu.';
         // Na chybě u dalších stránek (ne první) necháme aktuální stránku zobrazenou
-        // a jen ukážeme chybu pod tlačítky, ať uživatel nepřijde o už načtené tipy.
+        // a jen ukážeme zprávu pod tlačítky, ať uživatel nepřijde o už načtené tipy.
         if (!isFirstPage) { _askSinatorRenderPage(msg); return; }
         if (res) res.innerHTML = `<div style="padding:20px;text-align:center;"><p style="color:#e50914;margin-bottom:12px;">${msg}</p><button onclick="resetAskSinator()" style="padding:10px 20px;border-radius:10px;background:#333;border:none;color:#fff;cursor:pointer;">← Zpět</button></div>`;
         return;
