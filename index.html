@@ -3836,6 +3836,10 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-27c', date: '27. 9. 2026', items: [
+            '„Zeptej se Sinatora" — tlačítko "Další tipy" už tolik nechybuje: AI volání má teď timeout (dřív žádný nemělo, takže při pomalé odpovědi appka jen tiše visela) a při shodě se stejnými tituly appka sama zkusí jeden další pokus s delším timeoutem, než ukáže chybu',
+            '„Zeptej se Sinatora" — spolehlivější odhalení duplicit mezi stránkami (ignoruje diakritiku, velikost písmen a členy "the/a/an"), takže se stejný titul v seznamu už neobjeví dvakrát'
+        ] },
         { version: '2026-09-27b', date: '27. 9. 2026', items: [
             'Smart seznamy: analýza teď bere posledních 50 shlédnutých titulů (dřív 12), pokaždé počítáno úplně od nuly (žádné trvalé cachování)',
             'Smart seznamy: tituly starší roku 1980 se nenabízí vůbec, tituly z let 1980-1999 jsou odsunuté až na poslední stránky — přednost mají tituly od roku 2000, v rámci toho vždy vyhrává shoda',
@@ -42708,51 +42712,117 @@ async function loadAskSinatorResults() {
 }
 window.loadAskSinatorResults = loadAskSinatorResults;
 
+// Zabalí AI volání timeoutem — bez tohohle appka při pomalé/zaseklé odpovědi
+// (přetížený free klíč apod.) jen tiše visela na spinneru bez jakékoli reakce.
+function _askSinatorWithTimeout(promise, ms) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`timeout ${ms}ms bez odpovědi`)), ms))
+    ]);
+}
+// Normalizace názvu pro porovnání duplicit — ignoruje diakritiku, velikost
+// písmen, interpunkci a úvodní člen "the/a/an", ať se titul lišící se jen
+// v zápisu (např. s/bez diakritiky) nepovažuje za nový.
+function _normSinatorTitle(s) {
+    return (s || '')
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/^(the|a|an)\s+/, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
 async function _askSinatorLoadPage() {
     const res = document.getElementById('askSinatorResult');
     const isFirstPage = _askSinator.pages.length === 0;
-    if (res) res.innerHTML = `<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI hledá ${isFirstPage ? 'nejlepší shody' : 'další tipy'}…<br><br>⏳</div>`;
     const { query, forceType, typeInstruction } = _askSinator;
     // Tituly ze všech dosud načtených stránek — AI je má vynechat, ať se tipy neopakují.
     const alreadyShown = _askSinator.pages.flat().map(t => t.title_cs || t.title).filter(Boolean);
+    const alreadyShownNorm = new Set(alreadyShown.map(_normSinatorTitle));
     const excludeInstruction = alreadyShown.length
         ? `\n\nToto už bylo navrženo, NEOPAKUJ to a vyber jiných 10 titulů: ${alreadyShown.join(', ')}.`
         : '';
-    // Krátké odůvodnění (max ~12 slov) drží odpověď pod limitem tokenů AI volání
-    // (společný pro všechny AI nástroje) — u 10 položek by delší věty snadno
-    // způsobily useknutí JSON uprostřed, což _repairJsonTips() níže navíc opraví.
-    const prompt = `Uživatel popsal vlastními slovy, co chce sledovat (může jít o téma, žánr, děj, náladu, konkrétní film/seriál jako inspiraci, cokoliv): "${query}"
+
+    // Slabší (často free) AI klíče instrukci "neopakuj" ne vždy dodrží a vrátí
+    // stejnou desítku znovu. Než kvůli tomu appka rovnou ukáže chybu, zkusí to
+    // (jen když už nějaké tituly vylučujeme, tj. na "Další tipy") ještě jednou
+    // s delším timeoutem a jiným náhodným seedem, ať má AI víc času i důvod
+    // vybrat jinak. Ne příliš dlouhé — 2 pokusy, 15s a 22s.
+    const maxAttempts = alreadyShown.length ? 2 : 1;
+    let tips = [];
+    let lastErr = null;
+    let aiCallFailed = false;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        if (res) {
+            const loadingLabel = isFirstPage ? 'nejlepší shody' : (attempt > 1 ? 'jiné tipy (zkouším to ještě jednou)' : 'další tipy');
+            res.innerHTML = `<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI hledá ${loadingLabel}…<br><br>⏳</div>`;
+        }
+        const seedInstruction = attempt > 1
+            ? `\n\nNáhodné číslo pro rozmanitost výběru: ${Math.floor(Math.random() * 100000)}. Zvol tentokrát jiných 10 titulů než v předchozí odpovědi.`
+            : '';
+        // Krátké odůvodnění (max ~12 slov) drží odpověď pod limitem tokenů AI volání
+        // (společný pro všechny AI nástroje) — u 10 položek by delší věty snadno
+        // způsobily useknutí JSON uprostřed, což _repairJsonTips() níže navíc opraví.
+        const prompt = `Uživatel popsal vlastními slovy, co chce sledovat (může jít o téma, žánr, děj, náladu, konkrétní film/seriál jako inspiraci, cokoliv): "${query}"
 
 Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" max 12 slov:
-{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}`;
-    let aiCallFailed = false;
-    try {
-        let raw;
-        try { raw = await _zabavaAiCall(prompt); }
-        catch (eCall) { aiCallFailed = true; throw eCall; }
-        const clean = raw.replace(/```json|```/g, '').trim();
-        let d;
+{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}${seedInstruction}`;
+        const timeoutMs = attempt === 1 ? 15000 : 22000;
         try {
-            d = JSON.parse(clean);
-        } catch (eParse) {
-            // AI odpověď mohla být uťatá (limit délky odpovědi) — zkus dokončit
-            // poslední nekompletní položku a doplnit chybějící uzavírací závorky,
-            // ať se nezahodí ani tipy, které už dorazily celé.
-            let repaired = clean.replace(/,?\s*\{[^{}]*$/, '').replace(/,\s*"[^"]*$/, '');
-            if ((repaired.match(/\[/g) || []).length > (repaired.match(/\]/g) || []).length) repaired += ']';
-            if ((repaired.match(/\{/g) || []).length > (repaired.match(/\}/g) || []).length) repaired += '}';
-            d = JSON.parse(repaired);
+            let raw;
+            try { raw = await _askSinatorWithTimeout(_zabavaAiCall(prompt), timeoutMs); aiCallFailed = false; }
+            catch (eCall) { aiCallFailed = true; throw eCall; }
+            const clean = raw.replace(/```json|```/g, '').trim();
+            let d;
+            try {
+                d = JSON.parse(clean);
+            } catch (eParse) {
+                // AI odpověď mohla být uťatá (limit délky odpovědi) — zkus dokončit
+                // poslední nekompletní položku a doplnit chybějící uzavírací závorky,
+                // ať se nezahodí ani tipy, které už dorazily celé.
+                let repaired = clean.replace(/,?\s*\{[^{}]*$/, '').replace(/,\s*"[^"]*$/, '');
+                if ((repaired.match(/\[/g) || []).length > (repaired.match(/\]/g) || []).length) repaired += ']';
+                if ((repaired.match(/\{/g) || []).length > (repaired.match(/\}/g) || []).length) repaired += '}';
+                d = JSON.parse(repaired);
+            }
+            let candidateTips = (d.tips || []).slice(0, 10);
+            // Pojistka: i kdyby AI instrukci v promptu nedodržela, odfiltrujeme opačný typ
+            // (film/seriál) po straně appky, aby se do "film se zombii" nepletl seriál.
+            if (forceType) candidateTips = candidateTips.filter(t => (t.media_type === 'tv' ? 'tv' : 'movie') === forceType);
+            // Pojistka i pro duplicity, kdyby AI přesto vrátila titul z předchozí stránky
+            // (nebo dvakrát v rámci jedné odpovědi) — normalizované porovnání odchytí
+            // i shody lišící se jen diakritikou/velikostí písmen.
+            const seenNorm = new Set(alreadyShownNorm);
+            candidateTips = candidateTips.filter(t => {
+                const norm = _normSinatorTitle(t.title_cs || t.title || '');
+                if (!norm || seenNorm.has(norm)) return false;
+                seenNorm.add(norm);
+                return true;
+            });
+            tips = candidateTips;
+            if (tips.length) { lastErr = null; break; }
+            lastErr = new Error('AI nevrátila žádné (nové) tipy.');
+        } catch (e) {
+            lastErr = e;
         }
-        let tips = (d.tips || []).slice(0, 10);
-        // Pojistka: i kdyby AI instrukci v promptu nedodržela, odfiltrujeme opačný typ
-        // (film/seriál) po straně appky, aby se do "film se zombii" nepletl seriál.
-        if (forceType) tips = tips.filter(t => (t.media_type === 'tv' ? 'tv' : 'movie') === forceType);
-        // Pojistka i pro duplicity, kdyby AI přesto vrátila titul z předchozí stránky.
-        if (alreadyShown.length) {
-            const shownNorm = new Set(alreadyShown.map(s => s.toLowerCase().trim()));
-            tips = tips.filter(t => !shownNorm.has((t.title_cs || t.title || '').toLowerCase().trim()));
-        }
-        if (!tips.length) throw new Error('AI nevrátila žádné (nové) tipy.');
+    }
+
+    if (!tips.length) {
+        console.error('[Zeptej se Sinatora]', lastErr);
+        const msg = aiCallFailed
+            ? '❌ AI se nepodařilo zavolat. Zkontroluj, že máš v Nastavení zadaný a platný AI klíč (Gemini / Groq / OpenRouter).'
+            : isFirstPage
+            ? '❌ AI vrátila nepoužitelnou odpověď. Zkus popis zkrátit nebo to zkusit znovu.'
+            : '❌ AI opakovaně vrátila jen už zobrazené tituly. Zkus to prosím znovu.';
+        // Na chybě u dalších stránek (ne první) necháme aktuální stránku zobrazenou
+        // a jen ukážeme chybu pod tlačítky, ať uživatel nepřijde o už načtené tipy.
+        if (!isFirstPage) { _askSinatorRenderPage(msg); return; }
+        if (res) res.innerHTML = `<div style="padding:20px;text-align:center;"><p style="color:#e50914;margin-bottom:12px;">${msg}</p><button onclick="resetAskSinator()" style="padding:10px 20px;border-radius:10px;background:#333;border:none;color:#fff;cursor:pointer;">← Zpět</button></div>`;
+        return;
+    }
+
+    try {
         const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
         const enriched = await Promise.all(tips.map(async t => {
             if (!tmdbKey) return { ...t, tmdbId: null, poster: null };
@@ -42772,13 +42842,7 @@ Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídaj
         _askSinatorRenderPage();
     } catch (e) {
         console.error('[Zeptej se Sinatora]', e);
-        const msg = aiCallFailed
-            ? '❌ AI se nepodařilo zavolat. Zkontroluj, že máš v Nastavení zadaný a platný AI klíč (Gemini / Groq / OpenRouter).'
-            : isFirstPage
-            ? '❌ AI vrátila nepoužitelnou odpověď. Zkus popis zkrátit nebo to zkusit znovu.'
-            : '❌ Nepodařilo se načíst další tipy. Zkus to prosím znovu.';
-        // Na chybě u dalších stránek (ne první) necháme aktuální stránku zobrazenou
-        // a jen ukážeme chybu pod tlačítky, ať uživatel nepřijde o už načtené tipy.
+        const msg = '❌ Nepodařilo se dokončit načtení tipů. Zkus to prosím znovu.';
         if (!isFirstPage) { _askSinatorRenderPage(msg); return; }
         if (res) res.innerHTML = `<div style="padding:20px;text-align:center;"><p style="color:#e50914;margin-bottom:12px;">${msg}</p><button onclick="resetAskSinator()" style="padding:10px 20px;border-radius:10px;background:#333;border:none;color:#fff;cursor:pointer;">← Zpět</button></div>`;
     }
