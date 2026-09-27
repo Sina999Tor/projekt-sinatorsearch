@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-27a', date: '27. 9. 2026', items: [
+            'Smart seznamy: tipy jsou teď tematičtější — appka analyzuje motivy/žánry (klíčová slova) tvých shlédnutých titulů, takže třeba u zombie seriálu doporučí i další zombie tituly, ne jen obecně "podobné"'
+        ] },
         { version: '2026-09-26l', date: '26. 9. 2026', items: [
             'Smart seznamy: "← Zpět" z detailu zdrojového titulu (otevřeného z okna "Proč tenhle tip?") teď vede zase do toho samého otevřeného okna, ne jen do seznamu'
         ] },
@@ -15981,14 +15984,39 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             gen
         };
 
+        await _smartListPrepareKeywords(mediaType, seeds, gen);
+        if (window._smartListGen !== gen) return;
+        $('modalScrollBody').innerHTML = `<div class="loading"><div class="spinner"></div>Hledám tipy podle tvé historie…</div>`;
+
         await _smartListFetchTmdbPage(1, gen);
         if (window._smartListGen === gen) { window._smartList.page = 0; renderSmartListGrid(false); }
     }
     window.loadSmartList = loadSmartList;
 
-    // Natáhne danou TMDB stránku similar+recommendations pro všechna semínka a přičte
-    // nové kandidáty do scoreMap (po dávkách, s průběžným vykreslením) — používá jak
-    // první načtení (tmdbPage=1), tak "Načíst další tipy" (další TMDB stránka).
+    // Pro každé semínko natáhne jeho TMDB "klíčová slova" (motivy jako "zombie",
+    // "post-apocalyptic", "space opera"…) a uloží prvních pár na semínko samotné.
+    // Díky tomu se níž (_smartListFetchTmdbPage) kromě similar/recommendations
+    // dotahují i tituly se STEJNÝM motivem přes /discover — takže třeba jediný
+    // shlédnutý zombie seriál přitáhne další zombie tituly, ne jen obecně "podobné".
+    async function _smartListPrepareKeywords(mediaType, seeds, gen) {
+        $('modalScrollBody').innerHTML = `<div class="loading"><div class="spinner"></div>Analyzuji motivy a žánry z tvé historie…</div>`;
+        const batchSize = 4;
+        for (let i = 0; i < seeds.length; i += batchSize) {
+            if (window._smartListGen !== gen) return;
+            const batch = seeds.slice(i, i + batchSize);
+            await Promise.all(batch.map(async seed => {
+                try {
+                    const data = await fetch(`${BASE}/${mediaType}/${seed.id}/keywords?api_key=${tmdbApiKey}`).then(r => r.json());
+                    const list = mediaType === 'tv' ? (data.results || []) : (data.keywords || []);
+                    seed._kwIds = list.slice(0, 3).map(k => k.id);
+                } catch (e) { seed._kwIds = []; }
+            }));
+        }
+    }
+
+    // Natáhne danou TMDB stránku similar+recommendations+discover-podle-motivu pro
+    // všechna semínka a přičte nové kandidáty do scoreMap (po dávkách, s průběžným
+    // vykreslením) — používá jak první načtení (tmdbPage=1), tak "Načíst další tipy".
     async function _smartListFetchTmdbPage(tmdbPage, gen) {
         const ctx = window._smartList;
         if (!ctx || window._smartListGen !== gen) return;
@@ -15999,16 +16027,22 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             const batch = seeds.slice(i, i + batchSize);
             await Promise.all(batch.map(async seed => {
                 try {
-                    const [simRes, recRes] = await Promise.all([
+                    // Kromě similar+recommendations se dotáhne i "discover" podle 1-2
+                    // nejvýraznějších motivů (klíčových slov) tohoto semínka — to je to,
+                    // co zajistí konkrétnější shody typu "zombie seriál → další zombie".
+                    const kwIds = (seed._kwIds || []).slice(0, 2);
+                    const fetches = [
                         fetch(`${BASE}/${mediaType}/${seed.id}/similar?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${tmdbPage}`).then(r => r.json()).catch(() => ({ results: [] })),
-                        fetch(`${BASE}/${mediaType}/${seed.id}/recommendations?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${tmdbPage}`).then(r => r.json()).catch(() => ({ results: [] }))
-                    ]);
-                    // Sjednotí similar+recommendations pro TOTO semínko a odstraní duplicity,
-                    // ať jeden titul, který se objeví v obou seznamech, nezvýší skóre 2×
+                        fetch(`${BASE}/${mediaType}/${seed.id}/recommendations?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${tmdbPage}`).then(r => r.json()).catch(() => ({ results: [] })),
+                        ...kwIds.map(kwId => fetch(`${BASE}/discover/${mediaType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_keywords=${kwId}&sort_by=vote_average.desc&vote_count.gte=30&page=${tmdbPage}`).then(r => r.json()).catch(() => ({ results: [] })))
+                    ];
+                    const resultsArr = await Promise.all(fetches);
+                    // Sjednotí similar+recommendations+discover pro TOTO semínko a odstraní
+                    // duplicity, ať jeden titul nalezený víc cestami nezvýší skóre víckrát
                     // za stejné semínko — skóre má odpovídat počtu různých semínek.
                     const seenForThisSeed = new Set();
-                    [...(recRes.results || []), ...(simRes.results || [])].forEach(it => {
-                        if (!it.id || excludeIds.has(Number(it.id))) return;
+                    resultsArr.flatMap(r => r.results || []).forEach(it => {
+                        if (!it.id || excludeIds.has(Number(it.id)) || Number(it.id) === Number(seed.id)) return;
                         const key = Number(it.id);
                         if (seenForThisSeed.has(key)) return;
                         seenForThisSeed.add(key);
