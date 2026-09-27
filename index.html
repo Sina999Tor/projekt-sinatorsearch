@@ -3836,6 +3836,11 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-27b', date: '27. 9. 2026', items: [
+            'Smart seznamy: analýza teď bere posledních 50 shlédnutých titulů (dřív 12), pokaždé počítáno úplně od nuly (žádné trvalé cachování)',
+            'Smart seznamy: tituly starší roku 1980 se nenabízí vůbec, tituly z let 1980-1999 jsou odsunuté až na poslední stránky — přednost mají tituly od roku 2000, v rámci toho vždy vyhrává shoda',
+            'Okno "Proč tenhle tip?" má teď pevnou hlavičku a scrolovatelný seznam zdrojů'
+        ] },
         { version: '2026-09-27a', date: '27. 9. 2026', items: [
             'Smart seznamy: tipy jsou teď tematičtější — appka analyzuje motivy/žánry (klíčová slova) tvých shlédnutých titulů, takže třeba u zombie seriálu doporučí i další zombie tituly, ne jen obecně "podobné"'
         ] },
@@ -15948,6 +15953,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
     async function loadSmartList(mediaType) {
         if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
+        // Žádné dlouhodobé cachování výsledků — každé otevření "Filmy"/"Seriály" ze
+        // Smart seznamů zahodí předchozí generaci a počítá tipy úplně od nuly z
+        // aktuální shlédnuté historie. (Stránkování/cache uvnitř JEDNÉ otevřené
+        // generace zůstává kvůli plynulému "← Zpět" z detailu — viz _reopenSmartList.)
+        window._smartList = null;
         const isTv = mediaType === 'tv';
         const label = isTv ? 'Seriály' : 'Filmy';
         _smartListRenderNavBar(label);
@@ -15966,9 +15976,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const excludeIds = new Set(watchedOfType.map(w => Number(w.id)));
         (state.favs || []).forEach(f => { if ((f.type || 'movie') === mediaType) excludeIds.add(Number(f.id)); });
 
-        // Nejnovější shlédnuté tituly jsou nejsilnější signál aktuální chuti — použije
-        // se max 12 "semínek" (víc by jen násobilo počet TMDB dotazů bez lepšího výsledku).
-        const seeds = watchedOfType.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)).slice(0, 12);
+        // Bere posledních 50 shlédnutých titulů daného typu jako "semínka" — víc než
+        // dřívějších 12, ať se v tipech reálně odráží celá nedávná sledovaná historie,
+        // ne jen hrstka posledních filmů/seriálů.
+        const seeds = watchedOfType.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)).slice(0, 50);
         const gen = (window._smartListGen = (window._smartListGen || 0) + 1);
         // Sdílený stav (mezipaměť) pro tuhle generaci Smart seznamu — díky němu
         // funguje jak stránkování (page), tak "← Zpět" z detailu titulu
@@ -16027,10 +16038,12 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             const batch = seeds.slice(i, i + batchSize);
             await Promise.all(batch.map(async seed => {
                 try {
-                    // Kromě similar+recommendations se dotáhne i "discover" podle 1-2
-                    // nejvýraznějších motivů (klíčových slov) tohoto semínka — to je to,
+                    // Kromě similar+recommendations se dotáhne i "discover" podle
+                    // nejvýraznějšího motivu (klíčového slova) tohoto semínka — to je to,
                     // co zajistí konkrétnější shody typu "zombie seriál → další zombie".
-                    const kwIds = (seed._kwIds || []).slice(0, 2);
+                    // Jen 1 klíčové slovo na semínko (místo víc), protože semínek je teď
+                    // 50 — víc by znamenalo stovky souběžných TMDB dotazů.
+                    const kwIds = (seed._kwIds || []).slice(0, 1);
                     const fetches = [
                         fetch(`${BASE}/${mediaType}/${seed.id}/similar?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${tmdbPage}`).then(r => r.json()).catch(() => ({ results: [] })),
                         fetch(`${BASE}/${mediaType}/${seed.id}/recommendations?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&page=${tmdbPage}`).then(r => r.json()).catch(() => ({ results: [] })),
@@ -16043,6 +16056,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                     const seenForThisSeed = new Set();
                     resultsArr.flatMap(r => r.results || []).forEach(it => {
                         if (!it.id || excludeIds.has(Number(it.id)) || Number(it.id) === Number(seed.id)) return;
+                        // Tvrdý spodní limit — starší tituly než rok 1980 appka vůbec
+                        // nenabízí (viz i řazení níž v renderSmartListGrid, kde tituly
+                        // 1980–1999 jdou až na konec, přednost mají ty od roku 2000).
+                        const itYear = parseInt((it.release_date || it.first_air_date || '').slice(0, 4), 10);
+                        if (itYear && itYear < 1980) return;
                         const key = Number(it.id);
                         if (seenForThisSeed.has(key)) return;
                         seenForThisSeed.add(key);
@@ -16069,8 +16087,19 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const body = $('modalScrollBody');
         if (!body || !ctx) return;
         const { mediaType, seedCount, scoreMap, pageSize } = ctx;
+        // Řazení: shoda (score) má vždy přednost, ale tituly z let 1980–1999 jsou
+        // odsunuté do druhé "vrstvy" na konec seznamu (takže vyjdou až na posledních
+        // stránkách) — tituly od roku 2000 (nebo bez známého roku) tvoří hlavní,
+        // přednostní vrstvu. V rámci vrstvy se řadí podle shody, pak sestupně podle
+        // roku, a nakonec podle hodnocení.
+        const _smartYear = it => parseInt((it.release_date || it.first_air_date || '').slice(0, 4), 10) || null;
         const ranked = Array.from(scoreMap.values()).sort((a, b) => {
+            const ya = _smartYear(a.item), yb = _smartYear(b.item);
+            const tierA = (ya && ya < 2000) ? 1 : 0;
+            const tierB = (yb && yb < 2000) ? 1 : 0;
+            if (tierA !== tierB) return tierA - tierB;
             if (b.score !== a.score) return b.score - a.score;
+            if ((ya || 0) !== (yb || 0)) return (yb || 0) - (ya || 0);
             const av = a.voteCount ? a.voteSum / a.voteCount : 0;
             const bv = b.voteCount ? b.voteSum / b.voteCount : 0;
             return bv - av;
@@ -16134,13 +16163,15 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const mediaType = ctx.mediaType;
         const itemsHtml = uniqueSources.map(s => `<li onclick="document.getElementById('smartSourcesOverlay')?.remove();openSourceDetailFromSmartList(${s.id},'${mediaType}',${Number(candidateId)})" style="margin-bottom:8px;color:#38bdf8;cursor:pointer;text-decoration:underline;">${(s.title || '?').replace(/</g, '&lt;')} →</li>`).join('') || '<li>—</li>';
         overlay.innerHTML = `
-            <div style="background:#161616;border:1px solid #2a2a2a;border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);max-height:70vh;overflow-y:auto;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="background:#161616;border:1px solid #2a2a2a;border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);max-height:70vh;display:flex;flex-direction:column;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0;">
                     <span style="font-weight:700;font-size:1rem;color:#a78bfa;">🧠 Proč „${title}"?</span>
                     <button onclick="document.getElementById('smartSourcesOverlay')?.remove()" style="background:none;border:none;color:#888;font-size:1.3rem;cursor:pointer;line-height:1;">✕</button>
                 </div>
-                <p style="color:#aaa;font-size:0.82rem;margin:0 0 10px;">Doporučeno na základě těchto tvých shlédnutých titulů:</p>
-                <ul style="color:#fff;font-size:0.88rem;line-height:1.6;margin:0;padding-left:20px;">${itemsHtml}</ul>
+                <p style="color:#aaa;font-size:0.82rem;margin:0 0 10px;flex-shrink:0;">Doporučeno na základě těchto tvých shlédnutých titulů (${uniqueSources.length}):</p>
+                <div style="overflow-y:auto;flex:1;">
+                    <ul style="color:#fff;font-size:0.88rem;line-height:1.6;margin:0;padding-left:20px;">${itemsHtml}</ul>
+                </div>
             </div>`;
         document.body.appendChild(overlay);
     };
