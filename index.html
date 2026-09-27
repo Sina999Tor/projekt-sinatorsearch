@@ -3836,6 +3836,10 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-27f', date: '27. 9. 2026', items: [
+            '„Zeptej se Sinatora" — oprava číslování: když stránka po odfiltrování duplicit/špatného typu (film vs. seriál) neměla přesně 10 tipů, další stránka pak přeskočila čísla (např. 1-3 a rovnou 11-…) — teď číslování navazuje na skutečný počet',
+            '„Zeptej se Sinatora" — appka teď při nedostatku tipů (např. AI vrátí i pár seriálů do čistě filmového dotazu) sama dorovná na 10 dalším AI pokusem místo toho, aby ukázala neúplnou stránku'
+        ] },
         { version: '2026-09-27e', date: '27. 9. 2026', items: [
             '„Zeptej se Sinatora" — oprava předchozí verze: appka mylně po jednom neúspěšném pokusu tvrdila, že jsou tipy pro daný popis vyčerpané, a schovávala tlačítko "Další tipy" — i u širokých žánrů (např. "zombie filmy"), kde to zdaleka není pravda. Teď to appka netvrdí, tlačítko zůstává a "Další tipy" zkusí až 3× s čím dál důraznější instrukcí pro AI, ať sáhne i po méně známých/zahraničních titulech',
         ] },
@@ -42744,33 +42748,40 @@ async function _askSinatorLoadPage() {
     const { query, forceType, typeInstruction } = _askSinator;
     // Tituly ze všech dosud načtených stránek — AI je má vynechat, ať se tipy neopakují.
     const alreadyShown = _askSinator.pages.flat().map(t => t.title_cs || t.title).filter(Boolean);
-    const alreadyShownNorm = new Set(alreadyShown.map(_normSinatorTitle));
-    const excludeInstruction = alreadyShown.length
-        ? `\n\nToto už bylo navrženo, NEOPAKUJ to a vyber jiných 10 titulů: ${alreadyShown.join(', ')}.`
-        : '';
+    const seenNorm = new Set(alreadyShown.map(_normSinatorTitle));
 
-    // Slabší (často free) AI klíče instrukci "neopakuj" ne vždy dodrží a vrátí
-    // stejnou desítku znovu. Než kvůli tomu appka rovnou ukáže chybu, zkusí to
-    // (jen když už nějaké tituly vylučujeme, tj. na "Další tipy") ještě 2×
-    // s delším timeoutem, jiným náhodným seedem a čím dál důraznější instrukcí
-    // k rozmanitosti, ať to i u slabšího/zaseknutého AI klíče má šanci uspět.
-    // Ne příliš dlouhé — max 3 pokusy, 15s / 20s / 25s.
-    const maxAttempts = alreadyShown.length ? 3 : 1;
-    let tips = [];
+    // Jeden AI pokus nemusí vrátit celou použitelnou desítku najednou — buď se
+    // překryje s předchozí stránkou (na "Další tipy"), nebo AI i přes instrukci
+    // vrátí nějaké tituly opačného typu (film/seriál), co appka odfiltruje, a
+    // zbyde jich míň než 10. Proto appka sbírá unikátní tipy napříč až 3 pokusy,
+    // dokud jich nemá 10 (nebo dokud se pokusy nevyčerpají) — s delším timeoutem
+    // a čím dál důraznější instrukcí k rozmanitosti. Ne příliš dlouhé — max 3
+    // pokusy, 15s / 20s / 25s, a jakmile je tipů dost, další pokus se přeskočí.
+    const maxAttempts = 3;
+    let collected = [];
     let lastErr = null;
     let aiCallFailed = false;
+    let anyAttemptSucceeded = false;
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    for (let attempt = 1; attempt <= maxAttempts && collected.length < 10; attempt++) {
         if (res) {
-            const loadingLabel = isFirstPage ? 'nejlepší shody' : (attempt > 1 ? `jiné tipy (zkouším to ${attempt}. ${attempt === 2 ? 'ze 3' : ''})` : 'další tipy');
+            const loadingLabel = isFirstPage
+                ? (attempt > 1 ? `hledá další shody (${attempt}. pokus)` : 'nejlepší shody')
+                : (attempt > 1 ? `jiné tipy (${attempt}. pokus)` : 'další tipy');
             res.innerHTML = `<div style="text-align:center;padding:40px;font-size:2rem;color:#888;">🤖 AI hledá ${loadingLabel}…<br><br>⏳</div>`;
         }
+        // Vyloučit i to, co se posbíralo v předchozích pokusech tohoto samého
+        // volání — jinak by 2. pokus mohl znovu navrhnout totéž jako 1. pokus.
+        const excludeNow = alreadyShown.concat(collected.map(t => t.title_cs || t.title).filter(Boolean));
+        const excludeInstruction = excludeNow.length
+            ? `\n\nToto už bylo navrženo, NEOPAKUJ to a vyber jiných titulů: ${excludeNow.join(', ')}.`
+            : '';
         const seedInstruction = attempt > 1
-            ? `\n\nNáhodné číslo pro rozmanitost výběru: ${Math.floor(Math.random() * 100000)}. Zvol tentokrát jiných 10 titulů než v předchozí odpovědi — sáhni i po méně známých, starších nebo zahraničních titulech (klidně z jiných zemí/dekád), pokud pořád odpovídají zadání. Žánr má obvykle desítky až stovky titulů, takže po 10-20 navržených rozhodně nejsou vyčerpané všechny možnosti.`
+            ? `\n\nNáhodné číslo pro rozmanitost výběru: ${Math.floor(Math.random() * 100000)}. Zvol tentokrát jiné tituly než v předchozí odpovědi — sáhni i po méně známých, starších nebo zahraničních titulech (klidně z jiných zemí/dekád), pokud pořád odpovídají zadání. Žánr má obvykle desítky až stovky titulů, takže po 10-20 navržených rozhodně nejsou vyčerpané všechny možnosti.`
             : '';
         // Krátké odůvodnění (max ~12 slov) drží odpověď pod limitem tokenů AI volání
         // (společný pro všechny AI nástroje) — u 10 položek by delší věty snadno
-        // způsobily useknutí JSON uprostřed, což _repairJsonTips() níže navíc opraví.
+        // způsobily useknutí JSON uprostřed, což oprava JSON parsu níže navíc opraví.
         const prompt = `Uživatel popsal vlastními slovy, co chce sledovat (může jít o téma, žánr, děj, náladu, konkrétní film/seriál jako inspiraci, cokoliv): "${query}"
 
 Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" max 12 slov:
@@ -42778,8 +42789,10 @@ Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídaj
         const timeoutMs = attempt === 1 ? 15000 : attempt === 2 ? 20000 : 25000;
         try {
             let raw;
-            try { raw = await _askSinatorWithTimeout(_zabavaAiCall(prompt), timeoutMs); aiCallFailed = false; }
-            catch (eCall) { aiCallFailed = true; throw eCall; }
+            try { raw = await _askSinatorWithTimeout(_zabavaAiCall(prompt), timeoutMs); }
+            catch (eCall) { if (!anyAttemptSucceeded) aiCallFailed = true; throw eCall; }
+            anyAttemptSucceeded = true;
+            aiCallFailed = false;
             const clean = raw.replace(/```json|```/g, '').trim();
             let d;
             try {
@@ -42797,24 +42810,23 @@ Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídaj
             // Pojistka: i kdyby AI instrukci v promptu nedodržela, odfiltrujeme opačný typ
             // (film/seriál) po straně appky, aby se do "film se zombii" nepletl seriál.
             if (forceType) candidateTips = candidateTips.filter(t => (t.media_type === 'tv' ? 'tv' : 'movie') === forceType);
-            // Pojistka i pro duplicity, kdyby AI přesto vrátila titul z předchozí stránky
-            // (nebo dvakrát v rámci jedné odpovědi) — normalizované porovnání odchytí
-            // i shody lišící se jen diakritikou/velikostí písmen.
-            const seenNorm = new Set(alreadyShownNorm);
-            candidateTips = candidateTips.filter(t => {
+            // Pojistka i pro duplicity (vůči už zobrazeným i vůči tomu, co appka
+            // posbírala v předchozích pokusech tohoto volání) — normalizované
+            // porovnání odchytí i shody lišící se jen diakritikou/velikostí písmen.
+            for (const t of candidateTips) {
+                if (collected.length >= 10) break;
                 const norm = _normSinatorTitle(t.title_cs || t.title || '');
-                if (!norm || seenNorm.has(norm)) return false;
+                if (!norm || seenNorm.has(norm)) continue;
                 seenNorm.add(norm);
-                return true;
-            });
-            tips = candidateTips;
-            if (tips.length) { lastErr = null; break; }
-            lastErr = new Error('AI nevrátila žádné (nové) tipy.');
+                collected.push(t);
+            }
+            lastErr = null;
         } catch (e) {
             lastErr = e;
         }
     }
 
+    const tips = collected;
     if (!tips.length) {
         console.error('[Zeptej se Sinatora]', lastErr);
         // I po 3 pokusech se nemusí nutně jednat o vyčerpaný žánr (u "zombie filmy"
@@ -42864,7 +42876,10 @@ function _askSinatorRenderPage(errorMsg) {
     if (!res) return;
     const idx = _askSinator.pageIdx;
     const page = _askSinator.pages[idx] || [];
-    const baseNum = idx * 10;
+    // Součet délek všech předchozích stránek, NE idx*10 — stránka nemusí mít
+    // vždy přesně 10 položek (viz sběr napříč pokusy výše), takže pevný krok
+    // 10 by číslování rozjel (např. "1,2,3" a pak rovnou "11,12,…").
+    const baseNum = _askSinator.pages.slice(0, idx).reduce((sum, p) => sum + p.length, 0);
     const cards = page.map((t, i) => {
         const displayTitle = t.title_cs || t.title || '?';
         const mediaLabel = (t.tmdbType || t.media_type) === 'tv' ? 'seriál' : 'film';
