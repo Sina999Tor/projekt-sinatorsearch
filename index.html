@@ -3836,6 +3836,10 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-27g', date: '27. 9. 2026', items: [
+            '„Zeptej se Sinatora" — opakované pokusy o "Další tipy" teď žádají o výslovně rozmanitější výběr (jiné země, dekády i rozpočty, ne jen ty nejznámější velkofilmy) a mají vyšší AI "teplotu", ať model nesklouzne pořád ke stejné hrstce titulů',
+            '„Zeptej se Sinatora" — když appka nemá vlastní AI klíč, běží na omezeném bezplatném modelu, který u delších seznamů dřív dojde dechu — hláška o nenalezení dalších tipů na to teď upozorní a nabídne přidat vlastní klíč v Nastavení'
+        ] },
         { version: '2026-09-27f', date: '27. 9. 2026', items: [
             '„Zeptej se Sinatora" — oprava číslování: když stránka po odfiltrování duplicit/špatného typu (film vs. seriál) neměla přesně 10 tipů, další stránka pak přeskočila čísla (např. 1-3 a rovnou 11-…) — teď číslování navazuje na skutečný počet',
             '„Zeptej se Sinatora" — appka teď při nedostatku tipů (např. AI vrátí i pár seriálů do čistě filmového dotazu) sama dorovná na 10 dalším AI pokusem místo toho, aby ukázala neúplnou stránku'
@@ -42639,12 +42643,13 @@ Pro zajištění rozmanitosti použij toto náhodné seed číslo k výběru jin
   }
 }
 
-async function _zabavaAiCall(prompt) {
+async function _zabavaAiCall(prompt, temperature) {
   const geminiKey = window._store?.getItem('sinator_gemini_api_key') || '';
   const groqKey = window._store?.getItem('sinator_groq_api_key') || '';
   const orKey = window._store?.getItem('sinator_openrouter_key') || '';
+  const temp = typeof temperature === 'number' ? temperature : 0.7;
   async function _oai(url, key, model, hdrs) {
-    const res = await fetch(url, { method:'POST', headers:Object.assign({'Content-Type':'application/json','Authorization':'Bearer '+key},hdrs||{}), body:JSON.stringify({model,messages:[{role:'user',content:prompt}],max_tokens:1200,temperature:0.7}) });
+    const res = await fetch(url, { method:'POST', headers:Object.assign({'Content-Type':'application/json','Authorization':'Bearer '+key},hdrs||{}), body:JSON.stringify({model,messages:[{role:'user',content:prompt}],max_tokens:1200,temperature:temp}) });
     if (!res.ok) throw new Error('err');
     const j = await res.json();
     return j?.choices?.[0]?.message?.content || '';
@@ -42658,6 +42663,13 @@ async function _zabavaAiCall(prompt) {
   // Poslední záchranná varianta bez vlastního klíče
   try { return await _oai('https://openrouter.ai/api/v1/chat/completions','sk-or-free','meta-llama/llama-3.3-8b-instruct:free',{'HTTP-Referer':'https://si-search.netlify.app','X-Title':'Sinator'}); } catch(e) {}
   throw new Error('Žádný AI klíč nebo selhání.');
+}
+// Appka má vlastní AI klíč (Gemini/Groq/OpenRouter) v Nastavení, nebo bez něj
+// padá na omezený bezplatný model — ten u dlouhých seznamů (20+ tipů na stejné
+// téma) dřív dojde dechu než plnohodnotný klíč. Používá se pro hlášku při
+// vyčerpání tipů, ať uživatel ví, čím si může pomoct.
+function _zabavaHasOwnKey() {
+  return !!(window._store?.getItem('sinator_gemini_api_key') || window._store?.getItem('sinator_groq_api_key') || window._store?.getItem('sinator_openrouter_key'));
 }
 
 // =====================================================
@@ -42777,7 +42789,7 @@ async function _askSinatorLoadPage() {
             ? `\n\nToto už bylo navrženo, NEOPAKUJ to a vyber jiných titulů: ${excludeNow.join(', ')}.`
             : '';
         const seedInstruction = attempt > 1
-            ? `\n\nNáhodné číslo pro rozmanitost výběru: ${Math.floor(Math.random() * 100000)}. Zvol tentokrát jiné tituly než v předchozí odpovědi — sáhni i po méně známých, starších nebo zahraničních titulech (klidně z jiných zemí/dekád), pokud pořád odpovídají zadání. Žánr má obvykle desítky až stovky titulů, takže po 10-20 navržených rozhodně nejsou vyčerpané všechny možnosti.`
+            ? `\n\nNáhodné číslo pro rozmanitost výběru: ${Math.floor(Math.random() * 100000)}. Zvol tentokrát jiné tituly než v předchozí odpovědi. Nejde jen o hrstku nejznámějších velkofilmů — u tohoto tématu/žánru reálně existují desítky až stovky titulů napříč zeměmi (nejen USA/UK — i asijské, evropské, latinskoamerické), dekádami (klidně od 60. let po dnešek) a rozpočty (mainstreamové velkofilmy i nízkorozpočtové, kultovní, přímo na video, méně známé nebo béčkové). Sáhni klidně i po těch méně samozřejmých, pokud pořád odpovídají zadání.`
             : '';
         // Krátké odůvodnění (max ~12 slov) drží odpověď pod limitem tokenů AI volání
         // (společný pro všechny AI nástroje) — u 10 položek by delší věty snadno
@@ -42787,9 +42799,12 @@ async function _askSinatorLoadPage() {
 Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" max 12 slov:
 {"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}${seedInstruction}`;
         const timeoutMs = attempt === 1 ? 15000 : attempt === 2 ? 20000 : 25000;
+        // Vyšší teplota u opakovaných pokusů = víc náhody ve výběru, ať model
+        // nesklouzne zase ke stejné hrstce nejočividnějších titulů.
+        const temperature = attempt === 1 ? 0.7 : attempt === 2 ? 0.95 : 1.1;
         try {
             let raw;
-            try { raw = await _askSinatorWithTimeout(_zabavaAiCall(prompt), timeoutMs); }
+            try { raw = await _askSinatorWithTimeout(_zabavaAiCall(prompt, temperature), timeoutMs); }
             catch (eCall) { if (!anyAttemptSucceeded) aiCallFailed = true; throw eCall; }
             anyAttemptSucceeded = true;
             aiCallFailed = false;
@@ -42833,11 +42848,17 @@ Na základě toho vyber TOP 10 filmů nebo seriálů, které nejvíce odpovídaj
         // apod. je titulů spousta) — může to být jen slabší/zaseknutý AI klíč v tuhle
         // chvíli. Appka proto nic netvrdí o vyčerpání a tlačítko "Další tipy" nechá
         // být — uživatel může kdykoliv zkusit znovu, další klik pošle nový náhodný seed.
+        // Bez vlastního AI klíče appka padá na omezený bezplatný model, který u
+        // delších seznamů (20+ tipů na stejné téma) dřív dojde dechu — u toho
+        // přidáme hint, ať uživatel ví, čím si může pomoct.
+        const noOwnKeyHint = !_zabavaHasOwnKey()
+            ? ' Appka teď běží na omezeném bezplatném AI modelu — pro delší a rozmanitější seznamy zkus v Nastavení zadat vlastní AI klíč (stačí zdarma dostupný Gemini).'
+            : '';
         const msg = aiCallFailed
             ? '❌ AI se nepodařilo zavolat. Zkontroluj, že máš v Nastavení zadaný a platný AI klíč (Gemini / Groq / OpenRouter).'
             : isFirstPage
             ? '❌ AI vrátila nepoužitelnou odpověď. Zkus popis zkrátit nebo to zkusit znovu.'
-            : '❌ AI teď nenašla žádné nové tipy. Zkus to prosím znovu.';
+            : `❌ AI teď nenašla žádné nové tipy. Zkus to prosím znovu.${noOwnKeyHint}`;
         // Na chybě u dalších stránek (ne první) necháme aktuální stránku zobrazenou
         // a jen ukážeme zprávu pod tlačítky, ať uživatel nepřijde o už načtené tipy.
         if (!isFirstPage) { _askSinatorRenderPage(msg); return; }
