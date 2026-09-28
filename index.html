@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-28f', date: '28. 9. 2026', items: [
+            'Detail herce — u zemřelých se ukazuje datum úmrtí (🕯️) a věk se počítá k datu úmrtí, ne k dnešku (dřív např. u Paula Walkera stále „53 let")'
+        ] },
         { version: '2026-09-28e', date: '28. 9. 2026', items: [
             '„Zeptej se Sinatora" — oprava chyby „AI vrátila nepoužitelnou odpověď" u zadání s rokem (např. „film s Bradem Pittem 2026"): AI neví o nových filmech, takže appka rok ze zadání rozpozná a u zadání „osoba + rok" bere tituly rovnou z filmografie na TMDB (včetně novinek a chystaných filmů)',
             '„Zeptej se Sinatora" — rok/rozmezí let ze zadání se dodržuje i u ostatních dotazů (tituly mimo rok se vyřadí)'
@@ -13501,7 +13504,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     function openTraktSearch(t) { window.open(`https://trakt.tv/search?query=${encodeURIComponent(t)}`, '_blank'); }
     function openYouTube(q) { window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(q+' trailer')}`, '_blank'); }
 
-    function calculateAge(b) { if(!b) return ''; const bd = new Date(b), t = new Date(); let age = t.getFullYear() - bd.getFullYear(); const m = t.getMonth() - bd.getMonth(); if(m < 0 || (m === 0 && t.getDate() < bd.getDate())) age--; return age > 0 ? `(${age} let)` : ''; }
+    function calculateAge(b, end) { if(!b) return ''; const bd = new Date(b), t = end ? new Date(end) : new Date(); let age = t.getFullYear() - bd.getFullYear(); const m = t.getMonth() - bd.getMonth(); if(m < 0 || (m === 0 && t.getDate() < bd.getDate())) age--; return age > 0 ? `(${age} let)` : ''; }
     async function fetchBiography(id) { for(const lang of ['cs-CZ', 'sk-SK', 'en-US']) { try { const d = await (await _fetchWithTimeout(`${BASE}/person/${id}?api_key=${tmdbApiKey}&language=${lang}`)).json(); if(d.biography?.trim()) return { bio: d.biography, lang }; } catch {} } return { bio: null, lang: 'none' }; }
 
     async function openPersonDetail(id) {
@@ -13528,7 +13531,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             ]);
             const name = p.name; const isLiked = state.actorFavs.some(f => Number(f.id) === Number(id));
             const portraitUrl = p.profile_path ? `${IMG}w342${p.profile_path}` : null;
-            const age = p.birthday ? ` ${calculateAge(p.birthday)}` : '';
+            const age = p.birthday ? ` ${calculateAge(p.birthday, p.deathday)}` : '';
             const vk = ['hlas', 'dab', 'voice', 'vypravěč', 'narrator', 'zvuk', 'sound', 'dabing'];
             let acting = [], dubbing = [];
             (c.cast||[]).forEach(i => { const ch = (i.character||'').toLowerCase(); vk.some(k => ch.includes(k)) ? dubbing.push(i) : acting.push(i); });
@@ -13555,7 +13558,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                         ${portraitUrl ? `<img class="actor-portrait" src="${portraitUrl}" alt="${name}">` : `<div class="actor-portrait-placeholder">👤</div>`}
                         <div class="actor-header-info">
                             <h2 class="modal-title">${name}</h2>
-                            <div class="modal-chips">${p.birthday?`<div class="modal-chip"><b>📅</b> ${p.birthday}${age}</div>`:''}${p.place_of_birth?`<div class="modal-chip"><b>📍</b> ${p.place_of_birth}</div>`:''}${p.known_for_department?`<div class="modal-chip"><b>🎭</b> ${p.known_for_department}</div>`:''}</div>
+                            <div class="modal-chips">${p.birthday?`<div class="modal-chip"><b>📅</b> ${p.birthday}${age}</div>`:''}${p.deathday?`<div class="modal-chip"><b>🕯️</b> ${p.gender===1?'Zemřela':'Zemřel'}: ${p.deathday}</div>`:''}${p.place_of_birth?`<div class="modal-chip"><b>📍</b> ${p.place_of_birth}</div>`:''}${p.known_for_department?`<div class="modal-chip"><b>🎭</b> ${p.known_for_department}</div>`:''}</div>
                         </div>
                     </div>
                     <div class="person-bio" style="margin-top:16px">${bioText}</div>
