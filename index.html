@@ -3836,6 +3836,10 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-28c', date: '28. 9. 2026', items: [
+            '„Zeptej se Sinatora" — u zadání s osobou (např. „filmy s Johnnym Deppem") se u herců počítá jen skutečné hraní (dřív prošly i filmy, kde byl jen producent, např. Hugo), u režisérů/autorů příslušná práce',
+            '„Zeptej se Sinatora" — když AI nedodá dost titulů a zadání je jen osoba, appka doplní skutečnou filmografii přímo z TMDB (nejznámější napřed); u ověřených titulů se místo AI textu ukazuje skutečná role'
+        ] },
         { version: '2026-09-28b', date: '28. 9. 2026', items: [
             '„Zeptej se Sinatora" — zadání s konkrétní osobou (např. „filmy s Johnnym Deppem") se teď ověřuje proti skutečné filmografii z TMDB: tituly, kde dotyčný nehrál (AI je občas vymyslí, aby vycpala seznam), se zahodí. AI je navíc instruována dodržet všechny podmínky zadání a raději vrátit méně titulů než vymýšlet'
         ] },
@@ -42761,7 +42765,8 @@ function _normSinatorTitle(s) {
 
 // Ověření tipů proti skutečné filmografii osoby z TMDB (herec/režisér/tvůrce ze zadání).
 // AI totiž při zadání typu "filmy s Johnnym Deppem" ráda vycpe seznam tituly, kde
-// dotyčný vůbec nehrál. Vrací pole {norms:Set, year} nebo null (klíč chybí / osoba nenalezena).
+// dotyčný nehrál. U herců se počítá jen skutečné hraní (ne produkce), u režisérů/autorů
+// příslušná práce. Vrací pole záznamů z filmografie nebo null (klíč chybí / osoba nenalezena).
 async function _askSinatorPersonCredits(name) {
     if (_askSinator.personCredits !== undefined) return _askSinator.personCredits;
     _askSinator.personCredits = null;
@@ -42772,11 +42777,26 @@ async function _askSinatorPersonCredits(name) {
         const person = (sr.results || [])[0];
         if (!person) return null;
         const cr = await fetch(`https://api.themoviedb.org/3/person/${person.id}/combined_credits?api_key=${key}&language=cs-CZ`).then(r => r.json());
-        const all = [...(cr.cast || []), ...(cr.crew || [])];
-        const list = all.map(c => {
-            const norms = new Set([c.title, c.original_title, c.name, c.original_name].map(x => _normSinatorTitle(x || '')).filter(Boolean));
-            const y = parseInt(((c.release_date || c.first_air_date || '') + '').slice(0, 4)) || 0;
-            return { norms, year: y };
+        const dept = person.known_for_department || '';
+        let crew = [];
+        if (dept === 'Directing') crew = (cr.crew || []).filter(c => c.job === 'Director');
+        else if (dept === 'Writing') crew = (cr.crew || []).filter(c => ['Writer', 'Screenplay', 'Creator', 'Story', 'Novel'].includes(c.job));
+        else if (dept !== 'Acting') crew = (cr.crew || []).filter(c => ['Director', 'Creator'].includes(c.job));
+        const seen = new Set();
+        const list = [];
+        [...(cr.cast || []), ...crew].forEach(c => {
+            if (c.media_type !== 'movie' && c.media_type !== 'tv') return;
+            const k = c.media_type + ':' + c.id;
+            if (seen.has(k)) return;
+            seen.add(k);
+            list.push({
+                id: c.id, type: c.media_type,
+                title: c.title || c.name || '', origTitle: c.original_title || c.original_name || '',
+                norms: new Set([c.title, c.original_title, c.name, c.original_name].map(x => _normSinatorTitle(x || '')).filter(Boolean)),
+                year: parseInt(((c.release_date || c.first_air_date || '') + '').slice(0, 4)) || 0,
+                poster: c.poster_path || null, rating: c.vote_average || 0, votes: c.vote_count || 0,
+                genres: c.genre_ids || [], character: c.character || ''
+            });
         });
         if (list.length) _askSinator.personCredits = list;
     } catch (e) {}
@@ -42838,8 +42858,8 @@ async function _askSinatorLoadPage() {
         const prompt = `Uživatel popsal vlastními slovy, co chce sledovat (může jít o téma, žánr, děj, náladu, konkrétní film/seriál jako inspiraci, cokoliv): "${query}"
 
 Na základě toho vyber ${remaining} různých filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" česky, max 12 slov.
-DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (herec, režisér, tvůrce), dej do pole "person" její jméno a vrať JEN tituly, kde tato osoba SKUTEČNĚ hrála/tvořila — nikdy nevymýšlej shodu jen aby byl seznam plný, raději vrať méně titulů. Jinak "person": null. Striktně dodrž VŠECHNY podmínky ze zadání:
-{"person":null,"tips":[{"title":"PŘESNÝ původní/mezinárodní název přesně jak je na TMDB (nic nekombinuj ani nepřekládej)","title_cs":"Oficiální český název; pokud si nejsi jistý, dej stejný jako title","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}${seedInstruction}`;
+DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (herec, režisér, tvůrce), dej do pole "person" její jméno a vrať JEN tituly, kde tato osoba SKUTEČNĚ hrála/tvořila — nikdy nevymýšlej shodu jen aby byl seznam plný, raději vrať méně titulů. Jinak "person": null. Pole "person_only" nastav na true, pokud zadání obsahuje JEN tuto osobu bez dalších podmínek (žánr, rok, nálada, děj…), jinak false. Striktně dodrž VŠECHNY podmínky ze zadání:
+{"person":null,"person_only":false,"tips":[{"title":"PŘESNÝ původní/mezinárodní název přesně jak je na TMDB (nic nekombinuj ani nepřekládej)","title_cs":"Oficiální český název; pokud si nejsi jistý, dej stejný jako title","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}${seedInstruction}`;
         const timeoutMs = attempt === 1 ? 20000 : attempt === 2 ? 25000 : 28000;
         // Vyšší teplota u opakovaných pokusů = víc náhody ve výběru, ať model
         // nesklouzne zase ke stejné hrstce nejočividnějších titulů.
@@ -42868,15 +42888,23 @@ DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (here
             }
             let candidateTips = (d.tips || []).slice(0, remaining);
             // Zadání s konkrétní osobou: ověřit každý tip proti její filmografii na TMDB
-            if (d.person && !_askSinator.person) _askSinator.person = String(d.person).trim();
+            if (d.person && !_askSinator.person) {
+                _askSinator.person = String(d.person).trim();
+                _askSinator.personOnly = d.person_only === true;
+            }
             if (_askSinator.person) {
                 const credits = await _askSinatorPersonCredits(_askSinator.person);
                 if (credits) {
-                    candidateTips = candidateTips.filter(t => {
+                    const verified = [];
+                    for (const t of candidateTips) {
                         const ns = [t.title, t.title_cs].map(x => _normSinatorTitle(x || '')).filter(Boolean);
                         const ty = parseInt(t.year) || 0;
-                        return credits.some(c => ns.some(n => c.norms.has(n)) && (!ty || !c.year || Math.abs(c.year - ty) <= 1));
-                    });
+                        const c = credits.find(c => ns.some(n => c.norms.has(n)) && (!ty || !c.year || Math.abs(c.year - ty) <= 1));
+                        if (!c) continue;
+                        // Text od AI u ověřeného titulu občas vymýšlí role — je-li známa skutečná role, použij ji.
+                        verified.push(c.character ? { ...t, reason: 'Role: ' + c.character } : t);
+                    }
+                    candidateTips = verified;
                 }
             }
             // Pojistka: i kdyby AI instrukci v promptu nedodržela, odfiltrujeme opačný typ
@@ -42898,6 +42926,26 @@ DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (here
         }
     }
 
+    // Zadání je jen osoba (bez dalších podmínek) a AI nedodala dost: doplň skutečnou
+    // filmografii přímo z TMDB (nejhodnocenější/nejznámější napřed).
+    if (_askSinator.person && _askSinator.personOnly && collected.length < batchTarget && _askSinator.personCredits) {
+        const skipGenres = [10767, 10763, 10764, 10766]; // talk show, zprávy, reality, telenovela
+        const pool = _askSinator.personCredits
+            .filter(c => (!forceType || c.type === forceType)
+                && !seenTmdbIds.has(c.id)
+                && !collected.some(x => x.tmdbId === c.id)
+                && !seenNorm.has(_normSinatorTitle(c.title)) && !seenNorm.has(_normSinatorTitle(c.origTitle))
+                && !c.genres.some(g => skipGenres.includes(g))
+                && !/\b(self|himself|herself|sám|sama)\b/i.test(c.character)
+                && c.votes >= 30 && c.poster)
+            .sort((a, b) => b.votes - a.votes)
+            .slice(0, batchTarget - collected.length);
+        pool.forEach(c => collected.push({
+            title: c.origTitle || c.title, title_cs: c.title, year: c.year, media_type: c.type,
+            reason: c.character ? 'Role: ' + c.character : 'Z filmografie',
+            tmdbId: c.id, tmdbType: c.type, poster: c.poster, rating: c.rating, tmdbTitle: c.title
+        }));
+    }
     const tips = collected;
     if (!tips.length) {
         console.error('[Zeptej se Sinatora]', lastErr);
@@ -42920,6 +42968,7 @@ DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (here
     try {
         const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
         let enriched = await Promise.all(tips.map(async t => {
+            if (t.tmdbId) return t;
             if (!tmdbKey) return { ...t, tmdbId: null, poster: null };
             try {
                 const wantType = (t.media_type === 'tv') ? 'tv' : 'movie';
