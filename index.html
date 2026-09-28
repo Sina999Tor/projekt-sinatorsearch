@@ -3836,6 +3836,10 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-28a', date: '28. 9. 2026', items: [
+            '„Zeptej se Sinatora" — zkomolené názvy (např. „Pirates of the Caribbean: Na konci světa"): název a rok se teď berou z TMDB (správně česky), ne z AI; výběr shody navíc hlídá typ (film/seriál) a rok',
+            '„Zeptej se Sinatora" — odůvodnění tipů je česky; duplicity se hlídají i podle TMDB ID'
+        ] },
         { version: '2026-09-27h', date: '27. 9. 2026', items: [
             'Oprava předchozí hlášky: appka mylně navrhovala chybějící AI klíč, i když ho uživatel v Nastavení měl (u všech 3 poskytovatelů) — hláška o nenalezení dalších tipů to už netvrdí',
             '„Zeptej se Sinatora" — skutečná příčina častého vyčerpání kolem 20. tipu: appka si o tipy říkala po 10 s pořád delším seznamem vyloučených titulů v promptu, což modelu dělalo problém. Teď žádá rovnou o víc najednou (30 na úvod, pak po 20), takže "Další tipy" většinou jen listuje v už načtené dávce bez nového AI volání'
@@ -42757,8 +42761,11 @@ async function _askSinatorLoadPage() {
     const isFirstPage = _askSinator.pages.length === 0;
     const { query, forceType, typeInstruction } = _askSinator;
     // Tituly ze všech dosud načtených stránek — AI je má vynechat, ať se tipy neopakují.
-    const alreadyShown = _askSinator.pages.flat().map(t => t.title_cs || t.title).filter(Boolean);
-    const seenNorm = new Set(alreadyShown.map(_normSinatorTitle));
+    const shownFlat = _askSinator.pages.flat();
+    const alreadyShown = shownFlat.map(t => t.title || t.title_cs).filter(Boolean);
+    const seenNorm = new Set();
+    shownFlat.forEach(t => { [t.title, t.title_cs, t.tmdbTitle].forEach(x => { const n = _normSinatorTitle(x || ''); if (n) seenNorm.add(n); }); });
+    const seenTmdbIds = new Set(shownFlat.map(t => t.tmdbId).filter(Boolean));
 
     // Vyžádat si tipy po víc než 10 najednou: opakované volání se stejným
     // (rostoucím) seznamem vyloučených titulů dělalo modelu problém — po pár
@@ -42791,7 +42798,7 @@ async function _askSinatorLoadPage() {
         }
         // Vyloučit i to, co se posbíralo v předchozích pokusech tohoto samého
         // volání — jinak by 2. pokus mohl znovu navrhnout totéž jako 1. pokus.
-        const excludeNow = alreadyShown.concat(collected.map(t => t.title_cs || t.title).filter(Boolean));
+        const excludeNow = alreadyShown.concat(collected.map(t => t.title || t.title_cs).filter(Boolean));
         const excludeInstruction = excludeNow.length
             ? `\n\nToto už bylo navrženo, NEOPAKUJ to a vyber jiných titulů: ${excludeNow.join(', ')}.`
             : '';
@@ -42803,8 +42810,8 @@ async function _askSinatorLoadPage() {
         // useknutý JSON uprostřed navíc opraví oprava parsu níže.
         const prompt = `Uživatel popsal vlastními slovy, co chce sledovat (může jít o téma, žánr, děj, náladu, konkrétní film/seriál jako inspiraci, cokoliv): "${query}"
 
-Na základě toho vyber ${remaining} různých filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" max 12 slov:
-{"tips":[{"title":"Anglický název pro TMDB search","title_cs":"Český nebo originální název k zobrazení","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}${seedInstruction}`;
+Na základě toho vyber ${remaining} různých filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" česky, max 12 slov:
+{"tips":[{"title":"PŘESNÝ původní/mezinárodní název přesně jak je na TMDB (nic nekombinuj ani nepřekládej)","title_cs":"Oficiální český název; pokud si nejsi jistý, dej stejný jako title","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}${seedInstruction}`;
         const timeoutMs = attempt === 1 ? 20000 : attempt === 2 ? 25000 : 28000;
         // Vyšší teplota u opakovaných pokusů = víc náhody ve výběru, ať model
         // nesklouzne zase ke stejné hrstce nejočividnějších titulů.
@@ -42872,19 +42879,39 @@ Na základě toho vyber ${remaining} různých filmů nebo seriálů, které nej
 
     try {
         const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
-        const enriched = await Promise.all(tips.map(async t => {
+        let enriched = await Promise.all(tips.map(async t => {
             if (!tmdbKey) return { ...t, tmdbId: null, poster: null };
             try {
-                const mediaType = (t.media_type === 'tv') ? 'tv' : 'movie';
+                const wantType = (t.media_type === 'tv') ? 'tv' : 'movie';
                 const q = encodeURIComponent(t.title || t.title_cs || '');
                 const url = `https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${q}&language=cs-CZ&page=1`;
                 const data = await fetch(url).then(r => r.json());
-                const hit = (data.results || []).find(r => (r.media_type === 'movie' || r.media_type === 'tv') && r.poster_path)
-                    || (data.results || []).find(r => r.media_type === 'movie' || r.media_type === 'tv');
-                if (hit) return { ...t, tmdbId: hit.id, tmdbType: hit.media_type, poster: hit.poster_path, rating: hit.vote_average };
+                const cands = (data.results || []).filter(r => r.media_type === 'movie' || r.media_type === 'tv');
+                const yr = r => parseInt(((r.release_date || r.first_air_date || '') + '').slice(0, 4)) || 0;
+                const yearOk = r => !t.year || !yr(r) || Math.abs(yr(r) - t.year) <= 1;
+                // Nejlepší shoda: správný typ + sedící rok, pak správný typ, pak cokoliv
+                const hit = cands.find(r => r.media_type === wantType && yearOk(r) && r.poster_path)
+                    || cands.find(r => r.media_type === wantType && yearOk(r))
+                    || cands.find(r => r.media_type === wantType)
+                    || cands[0];
+                if (hit) {
+                    // Název i rok bereme z TMDB (česky), ne z AI — AI názvy často zkomolí/smíchá jazyky.
+                    const tmdbTitle = hit.title || hit.name || '';
+                    return { ...t, tmdbId: hit.id, tmdbType: hit.media_type, poster: hit.poster_path, rating: hit.vote_average,
+                        tmdbTitle, title_cs: tmdbTitle || t.title_cs, year: yr(hit) || t.year };
+                }
             } catch (e) {}
             return { ...t, tmdbId: null, poster: null };
         }));
+        // Duplicity podle TMDB ID (AI mohla stejný titul napsat jinak)
+        const batchIds = new Set();
+        enriched = enriched.filter(t => {
+            if (!t.tmdbId) return true;
+            if (seenTmdbIds.has(t.tmdbId) || batchIds.has(t.tmdbId)) return false;
+            batchIds.add(t.tmdbId);
+            return true;
+        });
+        if (!enriched.length) throw new Error('Všechny tipy byly duplicity.');
         // Dávka > 10 se rozseká na víc stránek po 10 najednou, takže "Další tipy"
         // pak jen listuje v cachi bez dalšího AI volání, dokud se nedojde na konec.
         const startPageIdx = _askSinator.pages.length;
