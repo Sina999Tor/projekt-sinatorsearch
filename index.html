@@ -3836,6 +3836,10 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-28e', date: '28. 9. 2026', items: [
+            '„Zeptej se Sinatora" — oprava chyby „AI vrátila nepoužitelnou odpověď" u zadání s rokem (např. „film s Bradem Pittem 2026"): AI neví o nových filmech, takže appka rok ze zadání rozpozná a u zadání „osoba + rok" bere tituly rovnou z filmografie na TMDB (včetně novinek a chystaných filmů)',
+            '„Zeptej se Sinatora" — rok/rozmezí let ze zadání se dodržuje i u ostatních dotazů (tituly mimo rok se vyřadí)'
+        ] },
         { version: '2026-09-28d', date: '28. 9. 2026', items: [
             '„Zeptej se Sinatora" — nad tlačítkem mikrofonu je nové tlačítko 🗑️ pro rychlé smazání napsaného textu'
         ] },
@@ -42798,7 +42802,7 @@ async function _askSinatorPersonCredits(name) {
                 title: c.title || c.name || '', origTitle: c.original_title || c.original_name || '',
                 norms: new Set([c.title, c.original_title, c.name, c.original_name].map(x => _normSinatorTitle(x || '')).filter(Boolean)),
                 year: parseInt(((c.release_date || c.first_air_date || '') + '').slice(0, 4)) || 0,
-                poster: c.poster_path || null, rating: c.vote_average || 0, votes: c.vote_count || 0,
+                poster: c.poster_path || null, rating: c.vote_average || 0, votes: c.vote_count || 0, pop: c.popularity || 0,
                 genres: c.genre_ids || [], character: c.character || ''
             });
         });
@@ -42862,8 +42866,8 @@ async function _askSinatorLoadPage() {
         const prompt = `Uživatel popsal vlastními slovy, co chce sledovat (může jít o téma, žánr, děj, náladu, konkrétní film/seriál jako inspiraci, cokoliv): "${query}"
 
 Na základě toho vyber ${remaining} různých filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" česky, max 12 slov.
-DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (herec, režisér, tvůrce), dej do pole "person" její jméno a vrať JEN tituly, kde tato osoba SKUTEČNĚ hrála/tvořila — nikdy nevymýšlej shodu jen aby byl seznam plný, raději vrať méně titulů. Jinak "person": null. Pole "person_only" nastav na true, pokud zadání obsahuje JEN tuto osobu bez dalších podmínek (žánr, rok, nálada, děj…), jinak false. Striktně dodrž VŠECHNY podmínky ze zadání:
-{"person":null,"person_only":false,"tips":[{"title":"PŘESNÝ původní/mezinárodní název přesně jak je na TMDB (nic nekombinuj ani nepřekládej)","title_cs":"Oficiální český název; pokud si nejsi jistý, dej stejný jako title","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}${seedInstruction}`;
+DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (herec, režisér, tvůrce), dej do pole "person" její jméno a vrať JEN tituly, kde tato osoba SKUTEČNĚ hrála/tvořila — nikdy nevymýšlej shodu jen aby byl seznam plný, raději vrať méně titulů. Jinak "person": null. Pole "person_only" nastav na true, pokud zadání obsahuje JEN tuto osobu (případně s rokem) bez dalších podmínek (žánr, nálada, děj…), jinak false. Pokud zadání obsahuje rok nebo rozmezí let (např. "2026", "z 90. let"), vyplň "year_from" a "year_to" (čísla), jinak null; tituly mimo toto rozmezí nevracej. Striktně dodrž VŠECHNY podmínky ze zadání:
+{"person":null,"person_only":false,"year_from":null,"year_to":null,"tips":[{"title":"PŘESNÝ původní/mezinárodní název přesně jak je na TMDB (nic nekombinuj ani nepřekládej)","title_cs":"Oficiální český název; pokud si nejsi jistý, dej stejný jako title","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}${seedInstruction}`;
         const timeoutMs = attempt === 1 ? 20000 : attempt === 2 ? 25000 : 28000;
         // Vyšší teplota u opakovaných pokusů = víc náhody ve výběru, ať model
         // nesklouzne zase ke stejné hrstce nejočividnějších titulů.
@@ -42896,9 +42900,17 @@ DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (here
                 _askSinator.person = String(d.person).trim();
                 _askSinator.personOnly = d.person_only === true;
             }
+            if (!_askSinator.yearSet) {
+                _askSinator.yearSet = true;
+                const yf = parseInt(d.year_from) || 0, yt = parseInt(d.year_to) || 0;
+                if (yf > 1880 && yf < 2100) { _askSinator.yearFrom = yf; _askSinator.yearTo = (yt >= yf && yt < 2100) ? yt : yf; }
+            }
             if (_askSinator.person) {
                 const credits = await _askSinatorPersonCredits(_askSinator.person);
                 if (credits) {
+                    // Osoba + rok a nic víc: AI neví o nových filmech (končí jí znalosti), TMDB ano —
+                    // tipy se doplní přímo z filmografie níže, další AI pokusy nemají smysl.
+                    if (_askSinator.personOnly && _askSinator.yearFrom) { lastErr = null; break; }
                     const verified = [];
                     for (const t of candidateTips) {
                         const ns = [t.title, t.title_cs].map(x => _normSinatorTitle(x || '')).filter(Boolean);
@@ -42910,6 +42922,10 @@ DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (here
                     }
                     candidateTips = verified;
                 }
+            }
+            // Rok/rozmezí ze zadání: vyřadit tituly mimo něj
+            if (_askSinator.yearFrom) {
+                candidateTips = candidateTips.filter(t => { const y = parseInt(t.year) || 0; return !y || (y >= _askSinator.yearFrom && y <= _askSinator.yearTo); });
             }
             // Pojistka: i kdyby AI instrukci v promptu nedodržela, odfiltrujeme opačný typ
             // (film/seriál) po straně appky, aby se do "film se zombii" nepletl seriál.
@@ -42930,9 +42946,10 @@ DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (here
         }
     }
 
-    // Zadání je jen osoba (bez dalších podmínek) a AI nedodala dost: doplň skutečnou
-    // filmografii přímo z TMDB (nejhodnocenější/nejznámější napřed).
+    // Zadání je jen osoba (případně s rokem) a AI nedodala dost: doplň skutečnou
+    // filmografii přímo z TMDB (u zadaného roku nejpopulárnější, jinak nejhodnocenější napřed).
     if (_askSinator.person && _askSinator.personOnly && collected.length < batchTarget && _askSinator.personCredits) {
+        const yf = _askSinator.yearFrom, yt = _askSinator.yearTo;
         const skipGenres = [10767, 10763, 10764, 10766]; // talk show, zprávy, reality, telenovela
         const pool = _askSinator.personCredits
             .filter(c => (!forceType || c.type === forceType)
@@ -42941,8 +42958,8 @@ DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (here
                 && !seenNorm.has(_normSinatorTitle(c.title)) && !seenNorm.has(_normSinatorTitle(c.origTitle))
                 && !c.genres.some(g => skipGenres.includes(g))
                 && !/\b(self|himself|herself|sám|sama)\b/i.test(c.character)
-                && c.votes >= 30 && c.poster)
-            .sort((a, b) => b.votes - a.votes)
+                && (yf ? (c.year >= yf && c.year <= yt) : (c.votes >= 30 && c.poster)))
+            .sort((a, b) => yf ? (b.pop - a.pop) : (b.votes - a.votes))
             .slice(0, batchTarget - collected.length);
         pool.forEach(c => collected.push({
             title: c.origTitle || c.title, title_cs: c.title, year: c.year, media_type: c.type,
@@ -42960,7 +42977,7 @@ DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (here
         const msg = aiCallFailed
             ? '❌ AI se nepodařilo zavolat. Zkontroluj, že máš v Nastavení zadaný a platný AI klíč (Gemini / Groq / OpenRouter).'
             : isFirstPage
-            ? '❌ AI vrátila nepoužitelnou odpověď. Zkus popis zkrátit nebo to zkusit znovu.'
+            ? (_askSinator.yearFrom ? '❌ Pro zadaný rok se nenašly žádné odpovídající tituly (u nových filmů je TMDB často ještě neeviduje). Zkus jiný rok nebo popis.' : '❌ AI vrátila nepoužitelnou odpověď. Zkus popis zkrátit nebo to zkusit znovu.')
             : '❌ AI teď nenašla žádné nové tipy. Zkus to prosím znovu.';
         // Na chybě u dalších stránek (ne první) necháme aktuální stránku zobrazenou
         // a jen ukážeme zprávu pod tlačítky, ať uživatel nepřijde o už načtené tipy.
