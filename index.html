@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-28d', date: '28. 9. 2026', items: [
+            '„Zeptej se Sinatora" — nad tlačítkem mikrofonu je nové tlačítko 🗑️ pro rychlé smazání napsaného textu'
+        ] },
         { version: '2026-09-28c', date: '28. 9. 2026', items: [
             '„Zeptej se Sinatora" — u zadání s osobou (např. „filmy s Johnnym Deppem") se u herců počítá jen skutečné hraní (dřív prošly i filmy, kde byl jen producent, např. Hugo), u režisérů/autorů příslušná práce',
             '„Zeptej se Sinatora" — když AI nedodá dost titulů a zadání je jen osoba, appka doplní skutečnou filmografii přímo z TMDB (nejznámější napřed); u ověřených titulů se místo AI textu ukazuje skutečná role'
@@ -18047,6 +18050,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             <p style="color:#888;font-size:0.85rem;margin-bottom:12px;text-align:center;">Popiš vlastními slovy, co chceš sledovat — téma, žánr, děj, náladu, film nebo seriál. AI ti podle toho vybere top 10 nejlépe sedících titulů.</p>
             <div style="position:relative;margin-bottom:12px;">
                 <textarea id="askSinatorInput" rows="4" maxlength="500" placeholder="Např. chci temný sci-fi seriál s dobrým dějem, podobný Black Mirror, ne moc dlouhý…" style="width:100%;box-sizing:border-box;padding:12px;padding-right:52px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:0.92rem;font-family:inherit;resize:vertical;"></textarea>
+                <button id="askSinatorClearBtn" onclick="var i=document.getElementById('askSinatorInput');i.value='';i.focus();" title="Smazat text" style="position:absolute;right:10px;bottom:52px;width:34px;height:34px;border-radius:50%;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);color:#f87171;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span>🗑️</span></button>
                 <button id="askSinatorVoiceBtn" onclick="startVoiceSearch('askSinatorInput','askSinatorVoiceBtn','append')" title="Nadiktovat" style="position:absolute;right:10px;bottom:10px;width:34px;height:34px;border-radius:50%;background:rgba(56,189,248,0.18);border:1px solid rgba(56,189,248,0.4);color:#38bdf8;font-size:1.05rem;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span>🎤</span></button>
             </div>
             <button onclick="loadAskSinatorResults()" style="width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,#38bdf8,#818cf8);border:none;color:#0b1220;font-weight:700;font-size:0.94rem;cursor:pointer;">🔍 Najít top 10 tipů</button>
