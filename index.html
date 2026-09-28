@@ -3836,6 +3836,9 @@
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-28b', date: '28. 9. 2026', items: [
+            '„Zeptej se Sinatora" — zadání s konkrétní osobou (např. „filmy s Johnnym Deppem") se teď ověřuje proti skutečné filmografii z TMDB: tituly, kde dotyčný nehrál (AI je občas vymyslí, aby vycpala seznam), se zahodí. AI je navíc instruována dodržet všechny podmínky zadání a raději vrátit méně titulů než vymýšlet'
+        ] },
         { version: '2026-09-28a', date: '28. 9. 2026', items: [
             '„Zeptej se Sinatora" — zkomolené názvy (např. „Pirates of the Caribbean: Na konci světa"): název a rok se teď berou z TMDB (správně česky), ne z AI; výběr shody navíc hlídá typ (film/seriál) a rok',
             '„Zeptej se Sinatora" — odůvodnění tipů je česky; duplicity se hlídají i podle TMDB ID'
@@ -42756,6 +42759,30 @@ function _normSinatorTitle(s) {
         .trim();
 }
 
+// Ověření tipů proti skutečné filmografii osoby z TMDB (herec/režisér/tvůrce ze zadání).
+// AI totiž při zadání typu "filmy s Johnnym Deppem" ráda vycpe seznam tituly, kde
+// dotyčný vůbec nehrál. Vrací pole {norms:Set, year} nebo null (klíč chybí / osoba nenalezena).
+async function _askSinatorPersonCredits(name) {
+    if (_askSinator.personCredits !== undefined) return _askSinator.personCredits;
+    _askSinator.personCredits = null;
+    try {
+        const key = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+        if (!key || !name) return null;
+        const sr = await fetch(`https://api.themoviedb.org/3/search/person?api_key=${key}&query=${encodeURIComponent(name)}&language=cs-CZ&page=1`).then(r => r.json());
+        const person = (sr.results || [])[0];
+        if (!person) return null;
+        const cr = await fetch(`https://api.themoviedb.org/3/person/${person.id}/combined_credits?api_key=${key}&language=cs-CZ`).then(r => r.json());
+        const all = [...(cr.cast || []), ...(cr.crew || [])];
+        const list = all.map(c => {
+            const norms = new Set([c.title, c.original_title, c.name, c.original_name].map(x => _normSinatorTitle(x || '')).filter(Boolean));
+            const y = parseInt(((c.release_date || c.first_air_date || '') + '').slice(0, 4)) || 0;
+            return { norms, year: y };
+        });
+        if (list.length) _askSinator.personCredits = list;
+    } catch (e) {}
+    return _askSinator.personCredits;
+}
+
 async function _askSinatorLoadPage() {
     const res = document.getElementById('askSinatorResult');
     const isFirstPage = _askSinator.pages.length === 0;
@@ -42810,8 +42837,9 @@ async function _askSinatorLoadPage() {
         // useknutý JSON uprostřed navíc opraví oprava parsu níže.
         const prompt = `Uživatel popsal vlastními slovy, co chce sledovat (může jít o téma, žánr, děj, náladu, konkrétní film/seriál jako inspiraci, cokoliv): "${query}"
 
-Na základě toho vyber ${remaining} různých filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" česky, max 12 slov:
-{"tips":[{"title":"PŘESNÝ původní/mezinárodní název přesně jak je na TMDB (nic nekombinuj ani nepřekládej)","title_cs":"Oficiální český název; pokud si nejsi jistý, dej stejný jako title","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}${seedInstruction}`;
+Na základě toho vyber ${remaining} různých filmů nebo seriálů, které nejvíce odpovídají zadání (téma, žánr i děj musí co nejvíce sedět). Řaď od nejlépe sedícího. Vrať POUZE validní JSON, žádný markdown, žádný text okolo, "reason" česky, max 12 slov.
+DŮLEŽITÉ: pokud zadání výslovně žádá tituly s konkrétní osobou (herec, režisér, tvůrce), dej do pole "person" její jméno a vrať JEN tituly, kde tato osoba SKUTEČNĚ hrála/tvořila — nikdy nevymýšlej shodu jen aby byl seznam plný, raději vrať méně titulů. Jinak "person": null. Striktně dodrž VŠECHNY podmínky ze zadání:
+{"person":null,"tips":[{"title":"PŘESNÝ původní/mezinárodní název přesně jak je na TMDB (nic nekombinuj ani nepřekládej)","title_cs":"Oficiální český název; pokud si nejsi jistý, dej stejný jako title","year":2020,"media_type":"movie nebo tv","reason":"Proč přesně sedí zadání — krátce."}]}${typeInstruction}${excludeInstruction}${seedInstruction}`;
         const timeoutMs = attempt === 1 ? 20000 : attempt === 2 ? 25000 : 28000;
         // Vyšší teplota u opakovaných pokusů = víc náhody ve výběru, ať model
         // nesklouzne zase ke stejné hrstce nejočividnějších titulů.
@@ -42839,6 +42867,18 @@ Na základě toho vyber ${remaining} různých filmů nebo seriálů, které nej
                 d = JSON.parse(repaired);
             }
             let candidateTips = (d.tips || []).slice(0, remaining);
+            // Zadání s konkrétní osobou: ověřit každý tip proti její filmografii na TMDB
+            if (d.person && !_askSinator.person) _askSinator.person = String(d.person).trim();
+            if (_askSinator.person) {
+                const credits = await _askSinatorPersonCredits(_askSinator.person);
+                if (credits) {
+                    candidateTips = candidateTips.filter(t => {
+                        const ns = [t.title, t.title_cs].map(x => _normSinatorTitle(x || '')).filter(Boolean);
+                        const ty = parseInt(t.year) || 0;
+                        return credits.some(c => ns.some(n => c.norms.has(n)) && (!ty || !c.year || Math.abs(c.year - ty) <= 1));
+                    });
+                }
+            }
             // Pojistka: i kdyby AI instrukci v promptu nedodržela, odfiltrujeme opačný typ
             // (film/seriál) po straně appky, aby se do "film se zombii" nepletl seriál.
             if (forceType) candidateTips = candidateTips.filter(t => (t.media_type === 'tv' ? 'tv' : 'movie') === forceType);
