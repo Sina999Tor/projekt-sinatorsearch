@@ -3879,6 +3879,10 @@ header .logo-container.logo-mini ~ .header-actions{
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-30a', date: '30. 9. 2026', items: [
+            'Oblíbené — návrat z detailu titulu/herce teď vrátí na místo, kde jsi scrolloval, ne úplně nahoru na začátek seznamu',
+            'Nové logo v hlavičce — širší banner \'Sinator_Search\' přes celou šířku obrazovky místo původní malé ikony'
+        ] },
         { version: '2026-09-28f', date: '28. 9. 2026', items: [
             'Detail herce — u zemřelých se ukazuje datum úmrtí (🕯️) a věk se počítá k datu úmrtí, ne k dnešku (dřív např. u Paula Walkera stále „53 let")'
         ] },
@@ -4806,6 +4810,14 @@ header .logo-container.logo-mini ~ .header-actions{
         $('modal')?.classList.add('open');
         $('modal').style.zIndex = '9999';
         $('modalContent')?.classList.add('watched-full');
+        // Obnovit scroll pozici po návratu z detailu
+        if (state._favsScrollTop) {
+            requestAnimationFrame(() => {
+                const sb = $('modalScrollBody');
+                if (sb) sb.scrollTop = state._favsScrollTop;
+                state._favsScrollTop = 0;
+            });
+        }
     }
     
     function closeFavsModal() { 
@@ -17336,6 +17348,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     window.openDetail = (id, type) => _openDetail(id, type);
     window.openDetailFromFavs = (id, type) => {
         if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
+        state._favsScrollTop = $('modalScrollBody')?.scrollTop || 0;
         closeFavsModal();
         state._backTo = 'favs';
         navigationStack.length = 0;
@@ -17344,6 +17357,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     };
     window.openPersonDetailFromFavs = (id) => {
         if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
+        state._favsScrollTop = $('modalScrollBody')?.scrollTop || 0;
         closeFavsModal();
         state._backTo = 'favs';
         navigationStack.length = 0;
