@@ -3882,6 +3882,9 @@ header .logo-container.logo-mini ~ .header-actions{
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-30d', date: '30. 9. 2026', items: [
+            'Seznamy — nová položka 📡 Populární streamy: Netflix, Disney+, HBO Max/Max, Prime Video, Apple TV+, Voyo, SkyShowtime a další (podle toho, co je reálně dostupné v ČR), s oficiálními logy z TMDB. Klik na službu → Filmy/Seriály → nekonečný scroll toho, co tam teď mají v nabídce'
+        ] },
         { version: '2026-09-30c', date: '30. 9. 2026', items: [
             'Oblíbené — herci se teď dělí i na Herci / Režiséři (nový tab vedle Herců); rozřazení doběhne na pozadí i pro už dřív přidané oblíbené osoby'
         ] },
@@ -12149,6 +12152,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             else if (backTo === 'thematic') {
                 openThematicListsModal();
             }
+            else if (backTo === 'streaming') {
+                openStreamingModal();
+            }
             else if (backTo === 'smartlist') {
                 if (window._reopenSmartList) window._reopenSmartList();
             }
@@ -12200,7 +12206,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     // Helper: generates sticky modal nav bar HTML
     function modalNav(title, hasBack, extraBtns = '') {
         const backTo = state._backTo;
-        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'thematic' ? '← Tematické seznamy' : backTo === 'smartlist' ? '← Smart seznamy' : backTo === 'smartlist-sources' ? '← Smart seznamy' : '← Zpět';
+        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'thematic' ? '← Tematické seznamy' : backTo === 'streaming' ? '← Streamy' : backTo === 'smartlist' ? '← Smart seznamy' : backTo === 'smartlist-sources' ? '← Smart seznamy' : '← Zpět';
         const back = hasBack ? `<button class="modal-back-btn" onclick="navigateBack()">${backLabel}</button>` : '';
         const nav = $('modalNavBar'); const left = $('modalNavLeft'); const right = $('modalNavRight');
         if(nav && left && right) {
@@ -16964,6 +16970,159 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         renderThematicListsSections(state._thematicListsCache || {});
     }
 
+    // ══ POPULÁRNÍ STREAMY — Netflix, Disney+, HBO Max a další ═════════════════
+    // Loga i seznam poskytovatelů se berou přímo z TMDB (/watch/providers),
+    // takže jsou vždy aktuální a licenčně v pořádku (stejný zdroj, ze kterého
+    // appka bere plakáty). Region CZ — přesně ty služby, co jde reálně
+    // "koukat s" v ČR/SK; služby dostupné jen jinde (např. Hulu v USA) se tu
+    // proto logicky nezobrazí, TMDB pro ně v CZ regionu žádného poskytovatele
+    // nehlásí a discover dotaz by stejně nic nevrátil.
+    const STREAM_PROVIDERS_PREFERRED = [
+        'Netflix', 'Max', 'HBO Max', 'Disney Plus', 'Amazon Prime Video', 'Apple TV Plus',
+        'Apple TV+', 'SkyShowtime', 'Voyo', 'Oneplay', 'Paramount Plus', 'Paramount+',
+        'Discovery Plus', 'Google Play Movies', 'YouTube', 'Hulu', 'Peacock', 'MUBI'
+    ];
+
+    async function loadStreamingProviders() {
+        if (state._streamProvidersCache) return state._streamProvidersCache;
+        try {
+            const [m, t] = await Promise.all([
+                fetch(`${BASE}/watch/providers/movie?api_key=${tmdbApiKey}&language=cs-CZ&watch_region=CZ`).then(r=>r.json()),
+                fetch(`${BASE}/watch/providers/tv?api_key=${tmdbApiKey}&language=cs-CZ&watch_region=CZ`).then(r=>r.json())
+            ]);
+            const byId = {};
+            [...(m.results||[]), ...(t.results||[])].forEach(p => { if (!byId[p.provider_id]) byId[p.provider_id] = p; });
+            let list = Object.values(byId);
+            // Nejznámější služby napřed (podle STREAM_PROVIDERS_PREFERRED), zbytek za nimi podle popularity CZ
+            const prefIdx = name => { const i = STREAM_PROVIDERS_PREFERRED.findIndex(p => name.toLowerCase().includes(p.toLowerCase())); return i === -1 ? 999 : i; };
+            list.sort((a, b) => {
+                const pa = prefIdx(a.provider_name), pb = prefIdx(b.provider_name);
+                if (pa !== pb) return pa - pb;
+                const prA = (a.display_priorities && a.display_priorities.CZ) ?? 999;
+                const prB = (b.display_priorities && b.display_priorities.CZ) ?? 999;
+                return prA - prB;
+            });
+            state._streamProvidersCache = list;
+            return list;
+        } catch(e) { return []; }
+    }
+
+    function openStreamingModal() {
+        state._backTo = 'streaming';
+        const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
+        if (nav && left && right) {
+            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;background:none;-webkit-text-fill-color:#22d3ee;color:#22d3ee;" title="Zpět nahoru">📡 Populární streamy ↑</span>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openListsModal();" title="Zpět na Seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            nav.style.display = 'flex';
+        }
+        $('modal')?.classList.add('open');
+        $('modalContent')?.classList.add('watched-full');
+        const sb = $('modalScrollBody');
+        if (sb) sb.onscroll = null;
+        $('modalScrollBody').innerHTML = `<div id="streamProvidersBody" style="padding:16px;">
+            <div style="text-align:center;padding:40px 0;color:var(--text-muted);">⏳ Načítám seznam streamovacích služeb…</div>
+        </div>`;
+        if (state._streamProvidersCache) renderStreamingProviders(state._streamProvidersCache);
+        else loadStreamingProviders().then(renderStreamingProviders);
+    }
+    window.openStreamingModal = openStreamingModal;
+
+    function renderStreamingProviders(list) {
+        const body = $('streamProvidersBody');
+        if (!body) return;
+        if (!list.length) { body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);">❌ Nepodařilo se načíst streamovací služby.</div>`; return; }
+        body.innerHTML = `
+            <p style="color:var(--text-muted);font-size:0.85rem;margin:0 0 14px;">Vyber službu a pak jestli tě zajímají filmy nebo seriály — uvidíš, co v ní teď reálně je (ČR).</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;">
+                ${list.map(p => `
+                <button onclick="openStreamingProviderPicker(${p.provider_id},'${jsq(p.provider_name)}','${p.logo_path||''}')" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:14px;padding:14px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;">
+                    ${p.logo_path
+                        ? `<img src="${IMG}w185${p.logo_path}" alt="${p.provider_name.replace(/'/g,'&#39;')}" style="width:56px;height:56px;border-radius:12px;object-fit:cover;">`
+                        : `<div style="width:56px;height:56px;border-radius:12px;background:#222;display:grid;place-items:center;font-size:1.6rem;">📡</div>`}
+                    <div style="font-size:0.78rem;text-align:center;color:var(--text);font-weight:600;">${p.provider_name}</div>
+                </button>`).join('')}
+            </div>`;
+    }
+
+    function openStreamingProviderPicker(id, name, logoPath) {
+        state._backTo = 'streaming';
+        const right = $('modalNavRight');
+        if (right) right.innerHTML = `<button class="modal-close-btn" onclick="openStreamingModal()" title="Zpět na Populární streamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Streamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+        const logo = logoPath ? `<img src="${IMG}w185${logoPath}" style="width:40px;height:40px;border-radius:9px;object-fit:cover;vertical-align:middle;margin-right:10px;">` : '';
+        $('modalScrollBody').innerHTML = `<div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:700;color:#fff;margin-bottom:4px;">${logo}${name}</div>
+            <button onclick="openStreamingResults('movie',${id},'${jsq(name)}','${logoPath||''}')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+                <span style="font-size:1.6rem;">🎬</span>
+                <div><div style="color:#1db954;font-weight:700;">Filmy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co teď nabízí ${name}</div></div>
+            </button>
+            <button onclick="openStreamingResults('tv',${id},'${jsq(name)}','${logoPath||''}')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+                <span style="font-size:1.6rem;">📺</span>
+                <div><div style="color:#1db954;font-weight:700;">Seriály</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co teď nabízí ${name}</div></div>
+            </button>
+        </div>`;
+    }
+    window.openStreamingProviderPicker = openStreamingProviderPicker;
+
+    // ── Výsledky pro konkrétní službu — nekonečný scroll (stejný princip
+    // jako u tematických seznamů výše, jen dotaz jde přes with_watch_providers).
+    function _streamFullScrollHandler() {
+        const st = state._streamFull;
+        const sb = $('modalScrollBody');
+        if (!st || !sb || st.loading) return;
+        if (st.page > 0 && st.page >= st.totalPages) return;
+        if (sb.scrollTop + sb.clientHeight >= sb.scrollHeight - 500) {
+            _streamFullLoadMore();
+        }
+    }
+
+    async function _streamFullLoadMore() {
+        const st = state._streamFull;
+        if (!st || st.loading) return;
+        if (st.page > 0 && st.page >= st.totalPages) return;
+        st.loading = true;
+        const statusEl = $('streamFullStatus');
+        if (statusEl) statusEl.textContent = '⏳ Načítám další…';
+        const nextPage = st.page + 1;
+        try {
+            const url = `${BASE}/discover/${st.type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&watch_region=CZ&with_watch_providers=${st.providerId}&with_watch_monetization_types=flatrate&sort_by=popularity.desc&page=${nextPage}`;
+            const data = await fetch(url).then(r=>r.json());
+            st.page = data.page || nextPage;
+            st.totalPages = data.total_pages || nextPage;
+            const items = (data.results||[]).filter(it => !st.seenIds.has(it.id)).map(it => { st.seenIds.add(it.id); return { ...it, media_type: st.type }; });
+            const grid = $('streamFullGrid');
+            if (grid) grid.insertAdjacentHTML('beforeend', items.map(it => cardHtml(it)).join(''));
+            if (statusEl) statusEl.textContent = (st.page >= st.totalPages)
+                ? (st.seenIds.size ? `✅ Načteno vše (${st.seenIds.size})` : '')
+                : '';
+            if (!st.seenIds.size && st.page >= st.totalPages) {
+                const grid2 = $('streamFullGrid');
+                if (grid2) grid2.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted);">Momentálně se nepodařilo najít žádné tituly s předplatným u téhle služby.</div>`;
+            }
+        } catch(e) {
+            if (statusEl) statusEl.textContent = '❌ Chyba načítání, zkus posunout znovu.';
+        } finally {
+            st.loading = false;
+        }
+    }
+
+    function openStreamingResults(type, providerId, name, logoPath) {
+        state._backTo = 'streaming';
+        state._streamFull = { type, providerId, name, page: 0, totalPages: 1, loading: false, seenIds: new Set() };
+        const right = $('modalNavRight');
+        const logo = logoPath ? `<img src="${IMG}w185${logoPath}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:8px;">` : '';
+        if (right) right.innerHTML = `<button class="modal-close-btn" onclick="openStreamingProviderPicker(${providerId},'${jsq(name)}','${logoPath||''}')" title="Zpět" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← ${name}</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+        $('modalScrollBody').innerHTML = `
+            <div style="padding:16px;">
+                <div style="display:flex;align-items:center;font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:14px;">${logo}${name} · ${type === 'movie' ? 'Filmy' : 'Seriály'}</div>
+                <div id="streamFullGrid" class="results" style="grid-template-columns:repeat(2,1fr);gap:4px;padding:0;width:100%;"></div>
+                <div id="streamFullStatus" style="text-align:center;padding:16px;color:var(--text-muted);font-size:0.85rem;"></div>
+            </div>`;
+        const sb = $('modalScrollBody');
+        if (sb) sb.onscroll = _streamFullScrollHandler;
+        _streamFullLoadMore();
+    }
+    window.openStreamingResults = openStreamingResults;
+
     // ══ TRAKT WATCHLIST + LIST PICKER ════════════════════════════════════════
 
     async function toggleTraktWatchlist(tmdbId, type, btn) {
@@ -17764,6 +17923,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <button onclick="closeListsModal();openThematicListsModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🧵</span>
             <div><div style="color:#fb923c;font-weight:700;">Tematické seznamy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Komunitní seznamy z TMDB podle témat</div></div>
+        </button>
+        <button onclick="closeListsModal();openStreamingModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📡</span>
+            <div><div style="color:#22d3ee;font-weight:700;">Populární streamy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Netflix, Disney+, HBO Max a další — co teď mají v nabídce</div></div>
         </button>
         <button onclick="closeListsModal();openSmartListsMenu()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🧠</span>
