@@ -3539,6 +3539,9 @@ header .logo-container.logo-mini ~ .header-actions{
         omdbSource: false,
         favs: (()=>{ try { return JSON.parse(_store.getItem('sinator_favs')||'[]'); } catch(e) { return []; } })(),
         actorFavs: (()=>{ try { return JSON.parse(_store.getItem('sinator_actor_favs')||'[]'); } catch(e) { return []; } })(),
+        // Klasifikace oblíbených seriálů na Seriály/Minisérie/Anime (viz classifyFavsTv) —
+        // { [tvId]: 'tv' | 'miniseries' | 'anime' }, doplňuje se na pozadí přes TMDB detail.
+        favsTvClass: (()=>{ try { return JSON.parse(_store.getItem('sinator_favs_tv_class')||'{}'); } catch(e) { return {}; } })(),
         trakt: (()=>{ try { return JSON.parse(_store.getItem('sinator_trakt') || _TRAKT_DATA_SAVED || '{}'); } catch(e) { try { return JSON.parse(_TRAKT_DATA_SAVED||'{}'); } catch(e2) { return {}; } } })(),
         simkl: (()=>{ try { return JSON.parse(_store.getItem('sinator_simkl')||'{}'); } catch(e) { return {}; } })(),
         myBackend: (()=>{ try { return JSON.parse(_store.getItem('sinator_mybackend')||'{}'); } catch(e) { return {}; } })(),
@@ -3879,6 +3882,9 @@ header .logo-container.logo-mini ~ .header-actions{
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-30b', date: '30. 9. 2026', items: [
+            'Oblíbené — seriály se teď dělí na Seriály / Minisérie / Anime (nové taby vedle Filmů), stejně jako v hlavních záložkách appky; rozřazení doběhne na pozadí i pro už dřív přidané oblíbené seriály'
+        ] },
         { version: '2026-09-30a', date: '30. 9. 2026', items: [
             'Oblíbené — návrat z detailu titulu/herce teď vrátí na místo, kde jsi scrolloval, ne úplně nahoru na začátek seznamu',
             'Nové logo v hlavičce — širší banner \'Sinator_Search\' přes celou šířku obrazovky místo původní malé ikony'
@@ -4810,6 +4816,7 @@ header .logo-container.logo-mini ~ .header-actions{
         $('modal')?.classList.add('open');
         $('modal').style.zIndex = '9999';
         $('modalContent')?.classList.add('watched-full');
+        classifyFavsTv();
         // Obnovit scroll pozici po návratu z detailu
         if (state._favsScrollTop) {
             requestAnimationFrame(() => {
@@ -7621,6 +7628,48 @@ header .logo-container.logo-mini ~ .header-actions{
         if (origins.length) return origins.some(c => ANIME_ORIGIN_COUNTRIES.includes(c));
         // Fallback, pokud TMDB nevrátí origin_country (stává se u některých discover odpovědí)
         return ANIME_ORIGIN_LANGS.includes(item.original_language || '');
+    }
+
+    // ── Klasifikace oblíbených seriálů: Seriály vs. Minisérie vs. Anime ──────
+    // Objekt oblíbeného seriálu ukládá jen {id,title,year,rating,type,poster} —
+    // bez žánrů/země původu potřebných k rozlišení. Doplní se proto na pozadí
+    // po jednom TMDB detailu na seriál (stejný postup jako fetchMissingPosters)
+    // a výsledek ('tv'|'miniseries'|'anime') se natrvalo uloží do
+    // state.favsTvClass, aby se stejný seriál nemusel klasifikovat znovu.
+    function _favTvClassOf(item) {
+        if (isAnimeItem(item)) return 'anime';
+        if (item.type === 'Miniseries') return 'miniseries';
+        if ((item.number_of_seasons || 0) <= 1 && (item.number_of_episodes || 0) > 0 && item.number_of_episodes <= 12) return 'miniseries';
+        return 'tv';
+    }
+    let _favsTvClassifying = false;
+    async function classifyFavsTv() {
+        if (_favsTvClassifying || !tmdbApiKey) return;
+        const todo = state.favs.filter(f => (f.type || 'movie') === 'tv' && !state.favsTvClass[f.id]);
+        if (!todo.length) return;
+        _favsTvClassifying = true;
+        try {
+            for (let i = 0; i < todo.length; i += 6) {
+                const batch = todo.slice(i, i + 6);
+                await Promise.all(batch.map(async f => {
+                    try {
+                        const r = await fetch(`${BASE}/tv/${f.id}?api_key=${tmdbApiKey}&language=cs-CZ`);
+                        const d = await r.json();
+                        if (d && d.id) state.favsTvClass[f.id] = _favTvClassOf(d);
+                    } catch(e) { /* zkusí se znovu při dalším otevření Oblíbených */ }
+                }));
+                _store.setItem('sinator_favs_tv_class', JSON.stringify(state.favsTvClass));
+                if ($('modal')?.classList.contains('open') && $('favsGrid')) {
+                    // Zachovat scroll pozici — klasifikace doběhne na pozadí,
+                    // uživatel může mezitím procházet seznam (viz oprava scrollu výše)
+                    const _sb = $('modalScrollBody');
+                    const _top = _sb ? _sb.scrollTop : 0;
+                    renderFavsModal();
+                    const _sb2 = $('modalScrollBody');
+                    if (_sb2) _sb2.scrollTop = _top;
+                }
+            }
+        } finally { _favsTvClassifying = false; }
     }
 
     // Detekce japonských/čínských znaků (kanji, hiragana, katakana) v názvu
@@ -10766,9 +10815,14 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
 
     function renderFavsModal() {
         const movies = state.favs.filter(f => (f.type || 'movie') === 'movie');
-        const tv = state.favs.filter(f => (f.type || 'movie') === 'tv');
+        const allTv = state.favs.filter(f => (f.type || 'movie') === 'tv');
+        // Rozdělení podle klasifikace na pozadí (viz classifyFavsTv); dokud
+        // není seriál klasifikovaný, počítá se prozatím mezi obyčejné Seriály.
+        const miniseries = allTv.filter(f => state.favsTvClass[f.id] === 'miniseries');
+        const anime = allTv.filter(f => state.favsTvClass[f.id] === 'anime');
+        const tv = allTv.filter(f => { const c = state.favsTvClass[f.id]; return c !== 'miniseries' && c !== 'anime'; });
         const actors = state.actorFavs;
-        const total = movies.length + tv.length + actors.length;
+        const total = movies.length + allTv.length + actors.length;
 
         const tab = state._favsTab || 'all';
         const sort = state._favsSort || 'default';
@@ -10781,6 +10835,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 <button onclick="setFavsTab('all')" id="fTab-all" style="padding:6px 14px;border-radius:20px;border:1px solid ${tab==='all'?'#1db954':'var(--border)'};background:${tab==='all'?'#1db954':'var(--bg-elevated)'};color:${tab==='all'?'#000':'var(--text)'};cursor:pointer;font-weight:${tab==='all'?'600':'normal'};font-size:0.8rem;">Vše (${total})</button>
                 <button onclick="setFavsTab('movie')" id="fTab-movie" style="padding:6px 14px;border-radius:20px;border:1px solid ${tab==='movie'?'#1db954':'var(--border)'};background:${tab==='movie'?'#1db954':'var(--bg-elevated)'};color:${tab==='movie'?'#000':'var(--text)'};cursor:pointer;font-weight:${tab==='movie'?'600':'normal'};font-size:0.8rem;">🎬 Filmy (${movies.length})</button>
                 <button onclick="setFavsTab('tv')" id="fTab-tv" style="padding:6px 14px;border-radius:20px;border:1px solid ${tab==='tv'?'#1db954':'var(--border)'};background:${tab==='tv'?'#1db954':'var(--bg-elevated)'};color:${tab==='tv'?'#000':'var(--text)'};cursor:pointer;font-weight:${tab==='tv'?'600':'normal'};font-size:0.8rem;">📺 Seriály (${tv.length})</button>
+                <button onclick="setFavsTab('miniseries')" id="fTab-miniseries" style="padding:6px 14px;border-radius:20px;border:1px solid ${tab==='miniseries'?'#1db954':'var(--border)'};background:${tab==='miniseries'?'#1db954':'var(--bg-elevated)'};color:${tab==='miniseries'?'#000':'var(--text)'};cursor:pointer;font-weight:${tab==='miniseries'?'600':'normal'};font-size:0.8rem;">📖 Minisérie (${miniseries.length})</button>
+                <button onclick="setFavsTab('anime')" id="fTab-anime" style="padding:6px 14px;border-radius:20px;border:1px solid ${tab==='anime'?'#1db954':'var(--border)'};background:${tab==='anime'?'#1db954':'var(--bg-elevated)'};color:${tab==='anime'?'#000':'var(--text)'};cursor:pointer;font-weight:${tab==='anime'?'600':'normal'};font-size:0.8rem;">🎌 Anime (${anime.length})</button>
                 <button onclick="setFavsTab('actor')" id="fTab-actor" style="padding:6px 14px;border-radius:20px;border:1px solid ${tab==='actor'?'#1db954':'var(--border)'};background:${tab==='actor'?'#1db954':'var(--bg-elevated)'};color:${tab==='actor'?'#000':'var(--text)'};cursor:pointer;font-weight:${tab==='actor'?'600':'normal'};font-size:0.8rem;">👥 Herci (${actors.length})</button>
             </div>
             <div style="display:flex;gap:6px;margin:0 16px 14px;flex-wrap:wrap;align-items:center;">
@@ -10887,6 +10943,15 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 arr = arr.filter(a => a.nationality === window._favsActorNationality);
             }
             items = arr.map(f => ({...f, media_type: 'actor', title: f.name, poster_path: f.poster, vote_average: 0}));
+        } else if (tab === 'miniseries' || tab === 'anime') {
+            items = state.favs.filter(f => (f.type || 'movie') === 'tv' && state.favsTvClass[f.id] === tab)
+                .map(f => ({...f, media_type: 'tv', poster_path: f.poster}));
+        } else if (tab === 'tv') {
+            items = state.favs.filter(f => {
+                if ((f.type || 'movie') !== 'tv') return false;
+                const c = state.favsTvClass[f.id];
+                return c !== 'miniseries' && c !== 'anime';
+            }).map(f => ({...f, media_type: 'tv', poster_path: f.poster}));
         } else {
             items = state.favs.filter(f => (f.type || 'movie') === tab).map(f => ({...f, media_type: f.type || 'movie', poster_path: f.poster}));
         }
