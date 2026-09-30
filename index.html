@@ -3882,6 +3882,9 @@ header .logo-container.logo-mini ~ .header-actions{
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-30e', date: '30. 9. 2026', items: [
+            'Populární streamy — u Oneplay a Voyo přibyly navíc 🇨🇿 Česká tvorba a 🇸🇰 Slovenská tvorba (jen domácí filmy a seriály na dané službě, filmy i seriály pohromadě)'
+        ] },
         { version: '2026-09-30d', date: '30. 9. 2026', items: [
             'Seznamy — nová položka 📡 Populární streamy: Netflix, Disney+, HBO Max/Max, Prime Video, Apple TV+, Voyo, SkyShowtime a další (podle toho, co je reálně dostupné v ČR), s oficiálními logy z TMDB. Klik na službu → Filmy/Seriály → nekonečný scroll toho, co tam teď mají v nabídce'
         ] },
@@ -17049,6 +17052,14 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const right = $('modalNavRight');
         if (right) right.innerHTML = `<button class="modal-close-btn" onclick="openStreamingModal()" title="Zpět na Populární streamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Streamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
         const logo = logoPath ? `<img src="${IMG}w185${logoPath}" style="width:40px;height:40px;border-radius:9px;object-fit:cover;vertical-align:middle;margin-right:10px;">` : '';
+        // U Oneplay a Voyo (hlavní CZ/SK streamy) navíc zkratka na jen domácí tvorbu —
+        // u mezinárodních služeb (Netflix, Disney+...) by taková položka skoro nic nenašla.
+        const isCzSkProvider = /oneplay|voyo/i.test(name);
+        const origBtn = (cc, flag, label) => `
+            <button onclick="openStreamingResults('mixed',${id},'${jsq(name)}','${logoPath||''}','${cc}')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+                <span style="font-size:1.6rem;">${flag}</span>
+                <div><div style="color:#1db954;font-weight:700;">${label}</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Jen ${label==='Česká tvorba'?'české':'slovenské'} filmy a seriály na ${name}</div></div>
+            </button>`;
         $('modalScrollBody').innerHTML = `<div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
             <div style="display:flex;align-items:center;font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:700;color:#fff;margin-bottom:4px;">${logo}${name}</div>
             <button onclick="openStreamingResults('movie',${id},'${jsq(name)}','${logoPath||''}')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
@@ -17059,17 +17070,25 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 <span style="font-size:1.6rem;">📺</span>
                 <div><div style="color:#1db954;font-weight:700;">Seriály</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co teď nabízí ${name}</div></div>
             </button>
+            ${isCzSkProvider ? origBtn('CZ','🇨🇿','Česká tvorba') + origBtn('SK','🇸🇰','Slovenská tvorba') : ''}
         </div>`;
     }
     window.openStreamingProviderPicker = openStreamingProviderPicker;
 
     // ── Výsledky pro konkrétní službu — nekonečný scroll (stejný princip
     // jako u tematických seznamů výše, jen dotaz jde přes with_watch_providers).
+    // "mixed" (Česká/Slovenská tvorba) kombinuje filmy i seriály v jednom
+    // scrollu, každý typ má proto vlastní stránkování (moviePage/tvPage).
+    function _streamMixedDone(st) {
+        const movieDone = st.moviePage > 0 && st.moviePage >= st.movieTotalPages;
+        const tvDone = st.tvPage > 0 && st.tvPage >= st.tvTotalPages;
+        return movieDone && tvDone;
+    }
     function _streamFullScrollHandler() {
         const st = state._streamFull;
         const sb = $('modalScrollBody');
         if (!st || !sb || st.loading) return;
-        if (st.page > 0 && st.page >= st.totalPages) return;
+        if (st.type === 'mixed' ? _streamMixedDone(st) : (st.page > 0 && st.page >= st.totalPages)) return;
         if (sb.scrollTop + sb.clientHeight >= sb.scrollHeight - 500) {
             _streamFullLoadMore();
         }
@@ -17078,9 +17097,47 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     async function _streamFullLoadMore() {
         const st = state._streamFull;
         if (!st || st.loading) return;
+        const statusEl = $('streamFullStatus');
+        const grid = $('streamFullGrid');
+
+        if (st.type === 'mixed') {
+            if (_streamMixedDone(st)) return;
+            st.loading = true;
+            if (statusEl) statusEl.textContent = '⏳ Načítám další…';
+            const origin = `&with_origin_country=${st.originCountry}`;
+            const movieDone = st.moviePage > 0 && st.moviePage >= st.movieTotalPages;
+            const tvDone = st.tvPage > 0 && st.tvPage >= st.tvTotalPages;
+            try {
+                const jobs = [];
+                if (!movieDone) jobs.push(fetch(`${BASE}/discover/movie?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&watch_region=CZ&with_watch_providers=${st.providerId}&with_watch_monetization_types=flatrate${origin}&sort_by=popularity.desc&page=${st.moviePage+1}`).then(r=>r.json()).then(d=>({kind:'movie', d})));
+                if (!tvDone) jobs.push(fetch(`${BASE}/discover/tv?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&watch_region=CZ&with_watch_providers=${st.providerId}&with_watch_monetization_types=flatrate${origin}&sort_by=popularity.desc&page=${st.tvPage+1}`).then(r=>r.json()).then(d=>({kind:'tv', d})));
+                const results = await Promise.all(jobs);
+                let merged = [];
+                results.forEach(({kind, d}) => {
+                    if (kind === 'movie') { st.moviePage = d.page || (st.moviePage+1); st.movieTotalPages = d.total_pages || st.moviePage; }
+                    else { st.tvPage = d.page || (st.tvPage+1); st.tvTotalPages = d.total_pages || st.tvPage; }
+                    (d.results||[]).forEach(it => {
+                        const key = kind + '_' + it.id;
+                        if (!st.seenIds.has(key)) { st.seenIds.add(key); merged.push({ ...it, media_type: kind }); }
+                    });
+                });
+                merged.sort((a, b) => (b.popularity||0) - (a.popularity||0));
+                if (grid) grid.insertAdjacentHTML('beforeend', merged.map(it => cardHtml(it)).join(''));
+                const allDone = _streamMixedDone(st);
+                if (statusEl) statusEl.textContent = allDone ? (st.seenIds.size ? `✅ Načteno vše (${st.seenIds.size})` : '') : '';
+                if (!st.seenIds.size && allDone && grid) {
+                    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted);">Momentálně se nepodařilo najít žádné tituly s předplatným u téhle služby.</div>`;
+                }
+            } catch(e) {
+                if (statusEl) statusEl.textContent = '❌ Chyba načítání, zkus posunout znovu.';
+            } finally {
+                st.loading = false;
+            }
+            return;
+        }
+
         if (st.page > 0 && st.page >= st.totalPages) return;
         st.loading = true;
-        const statusEl = $('streamFullStatus');
         if (statusEl) statusEl.textContent = '⏳ Načítám další…';
         const nextPage = st.page + 1;
         try {
@@ -17089,14 +17146,12 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             st.page = data.page || nextPage;
             st.totalPages = data.total_pages || nextPage;
             const items = (data.results||[]).filter(it => !st.seenIds.has(it.id)).map(it => { st.seenIds.add(it.id); return { ...it, media_type: st.type }; });
-            const grid = $('streamFullGrid');
             if (grid) grid.insertAdjacentHTML('beforeend', items.map(it => cardHtml(it)).join(''));
             if (statusEl) statusEl.textContent = (st.page >= st.totalPages)
                 ? (st.seenIds.size ? `✅ Načteno vše (${st.seenIds.size})` : '')
                 : '';
-            if (!st.seenIds.size && st.page >= st.totalPages) {
-                const grid2 = $('streamFullGrid');
-                if (grid2) grid2.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted);">Momentálně se nepodařilo najít žádné tituly s předplatným u téhle služby.</div>`;
+            if (!st.seenIds.size && st.page >= st.totalPages && grid) {
+                grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted);">Momentálně se nepodařilo najít žádné tituly s předplatným u téhle služby.</div>`;
             }
         } catch(e) {
             if (statusEl) statusEl.textContent = '❌ Chyba načítání, zkus posunout znovu.';
@@ -17105,15 +17160,20 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         }
     }
 
-    function openStreamingResults(type, providerId, name, logoPath) {
+    function openStreamingResults(type, providerId, name, logoPath, originCountry) {
         state._backTo = 'streaming';
-        state._streamFull = { type, providerId, name, page: 0, totalPages: 1, loading: false, seenIds: new Set() };
+        state._streamFull = {
+            type, providerId, name, originCountry: originCountry || null,
+            page: 0, totalPages: 1, moviePage: 0, movieTotalPages: 1, tvPage: 0, tvTotalPages: 1,
+            loading: false, seenIds: new Set()
+        };
         const right = $('modalNavRight');
         const logo = logoPath ? `<img src="${IMG}w185${logoPath}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:8px;">` : '';
         if (right) right.innerHTML = `<button class="modal-close-btn" onclick="openStreamingProviderPicker(${providerId},'${jsq(name)}','${logoPath||''}')" title="Zpět" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← ${name}</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+        const label = type === 'mixed' ? (originCountry === 'CZ' ? '🇨🇿 Česká tvorba' : '🇸🇰 Slovenská tvorba') : (type === 'movie' ? 'Filmy' : 'Seriály');
         $('modalScrollBody').innerHTML = `
             <div style="padding:16px;">
-                <div style="display:flex;align-items:center;font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:14px;">${logo}${name} · ${type === 'movie' ? 'Filmy' : 'Seriály'}</div>
+                <div style="display:flex;align-items:center;font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:14px;">${logo}${name} · ${label}</div>
                 <div id="streamFullGrid" class="results" style="grid-template-columns:repeat(2,1fr);gap:4px;padding:0;width:100%;"></div>
                 <div id="streamFullStatus" style="text-align:center;padding:16px;color:var(--text-muted);font-size:0.85rem;"></div>
             </div>`;
