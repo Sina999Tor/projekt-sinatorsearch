@@ -3882,6 +3882,9 @@ header .logo-container.logo-mini ~ .header-actions{
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-30c', date: '30. 9. 2026', items: [
+            'Oblíbené — herci se teď dělí i na Herci / Režiséři (nový tab vedle Herců); rozřazení doběhne na pozadí i pro už dřív přidané oblíbené osoby'
+        ] },
         { version: '2026-09-30b', date: '30. 9. 2026', items: [
             'Oblíbené — seriály se teď dělí na Seriály / Minisérie / Anime (nové taby vedle Filmů), stejně jako v hlavních záložkách appky; rozřazení doběhne na pozadí i pro už dřív přidané oblíbené seriály'
         ] },
@@ -4817,6 +4820,7 @@ header .logo-container.logo-mini ~ .header-actions{
         $('modal').style.zIndex = '9999';
         $('modalContent')?.classList.add('watched-full');
         classifyFavsTv();
+        classifyFavsPersons();
         // Obnovit scroll pozici po návratu z detailu
         if (state._favsScrollTop) {
             requestAnimationFrame(() => {
@@ -10821,8 +10825,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const miniseries = allTv.filter(f => state.favsTvClass[f.id] === 'miniseries');
         const anime = allTv.filter(f => state.favsTvClass[f.id] === 'anime');
         const tv = allTv.filter(f => { const c = state.favsTvClass[f.id]; return c !== 'miniseries' && c !== 'anime'; });
-        const actors = state.actorFavs;
-        const total = movies.length + allTv.length + actors.length;
+        const actors = state.actorFavs.filter(a => a.isDirector !== true);
+        const directors = state.actorFavs.filter(a => a.isDirector === true);
+        const total = movies.length + allTv.length + state.actorFavs.length;
 
         const tab = state._favsTab || 'all';
         const sort = state._favsSort || 'default';
@@ -10838,6 +10843,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 <button onclick="setFavsTab('miniseries')" id="fTab-miniseries" style="padding:6px 14px;border-radius:20px;border:1px solid ${tab==='miniseries'?'#1db954':'var(--border)'};background:${tab==='miniseries'?'#1db954':'var(--bg-elevated)'};color:${tab==='miniseries'?'#000':'var(--text)'};cursor:pointer;font-weight:${tab==='miniseries'?'600':'normal'};font-size:0.8rem;">📖 Minisérie (${miniseries.length})</button>
                 <button onclick="setFavsTab('anime')" id="fTab-anime" style="padding:6px 14px;border-radius:20px;border:1px solid ${tab==='anime'?'#1db954':'var(--border)'};background:${tab==='anime'?'#1db954':'var(--bg-elevated)'};color:${tab==='anime'?'#000':'var(--text)'};cursor:pointer;font-weight:${tab==='anime'?'600':'normal'};font-size:0.8rem;">🎌 Anime (${anime.length})</button>
                 <button onclick="setFavsTab('actor')" id="fTab-actor" style="padding:6px 14px;border-radius:20px;border:1px solid ${tab==='actor'?'#1db954':'var(--border)'};background:${tab==='actor'?'#1db954':'var(--bg-elevated)'};color:${tab==='actor'?'#000':'var(--text)'};cursor:pointer;font-weight:${tab==='actor'?'600':'normal'};font-size:0.8rem;">👥 Herci (${actors.length})</button>
+                <button onclick="setFavsTab('director')" id="fTab-director" style="padding:6px 14px;border-radius:20px;border:1px solid ${tab==='director'?'#1db954':'var(--border)'};background:${tab==='director'?'#1db954':'var(--bg-elevated)'};color:${tab==='director'?'#000':'var(--text)'};cursor:pointer;font-weight:${tab==='director'?'600':'normal'};font-size:0.8rem;">🎥 Režiséři (${directors.length})</button>
             </div>
             <div style="display:flex;gap:6px;margin:0 16px 14px;flex-wrap:wrap;align-items:center;">
                 <span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-right:2px;">Řadit:</span>
@@ -10847,7 +10853,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 <button onclick="setFavsSort('year')" id="fSort-year" style="padding:4px 11px;border-radius:14px;border:1px solid ${sort==='year'?'#1db954':'var(--border)'};background:${sort==='year'?'#1db954':'var(--bg-elevated)'};color:${sort==='year'?'#000':'var(--text)'};cursor:pointer;font-size:0.75rem;font-weight:${sort==='year'?'600':'normal'};">🗓 Rok</button>
                 <button id="favsGridToggleBtn" onclick="favsToggleGridCols()" title="Přepnout zobrazení" style="margin-left:auto;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:4px 11px;border-radius:14px;font-size:0.75rem;cursor:pointer;white-space:nowrap;">${(window._favsGridCols||2)===1?'▤ 1 sloupec':'▦ 2 sloupce'}</button>
             </div>
-            ${tab === 'actor' ? `<div style="display:flex;gap:6px;margin:0 16px 14px;flex-wrap:wrap;align-items:center;">
+            ${(tab === 'actor' || tab === 'director') ? `<div style="display:flex;gap:6px;margin:0 16px 14px;flex-wrap:wrap;align-items:center;">
                 <span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-right:2px;">Zobrazit:</span>
                 <button onclick="setFavsActorFilterMode('all')" style="padding:4px 11px;border-radius:14px;border:1px solid ${(window._favsActorFilterMode||'all')==='all'?'#1db954':'var(--border)'};background:${(window._favsActorFilterMode||'all')==='all'?'#1db954':'var(--bg-elevated)'};color:${(window._favsActorFilterMode||'all')==='all'?'#000':'var(--text)'};cursor:pointer;font-size:0.75rem;font-weight:${(window._favsActorFilterMode||'all')==='all'?'600':'normal'};">Všichni</button>
                 <button onclick="setFavsActorFilterMode('nationality')" style="padding:4px 11px;border-radius:14px;border:1px solid ${window._favsActorFilterMode==='nationality'?'#1db954':'var(--border)'};background:${window._favsActorFilterMode==='nationality'?'#1db954':'var(--bg-elevated)'};color:${window._favsActorFilterMode==='nationality'?'#000':'var(--text)'};cursor:pointer;font-size:0.75rem;font-weight:${window._favsActorFilterMode==='nationality'?'600':'normal'};">🌍 Dle národnosti</button>
@@ -10899,6 +10905,45 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     // Dotáhne a do sinator_actor_favs natrvalo uloží zemi narození (poslední
     // část TMDB "place_of_birth", např. "Seoul, South Korea" -> "South Korea").
     // Dělá se jen jednou na herce - další otevření si to už bere z cache.
+    // ── Klasifikace oblíbených osob: Herci vs. Režiséři ──────────────────────
+    // toggleActorFav ukládá jen {id,name,poster} bez informace o profesi.
+    // Doplní se proto na pozadí (po dávkách) přes TMDB /person detail, stejně
+    // jako klasifikace seriálů/minisérií/anime výše — výsledek (a.isDirector)
+    // se natrvalo uloží přímo do state.actorFavs, spolu s národností, pokud
+    // ještě chybí (refreshActorNationalities pak už jen doplní zbytek).
+    let _favsPersonsClassifying = false;
+    async function classifyFavsPersons() {
+        if (_favsPersonsClassifying || !tmdbApiKey) return;
+        const todo = state.actorFavs.filter(a => a.isDirector === undefined);
+        if (!todo.length) return;
+        _favsPersonsClassifying = true;
+        try {
+            for (let i = 0; i < todo.length; i += 6) {
+                const batch = todo.slice(i, i + 6);
+                await Promise.all(batch.map(async a => {
+                    try {
+                        const r = await fetch(`${BASE}/person/${a.id}?api_key=${tmdbApiKey}&language=cs-CZ`);
+                        const d = await r.json();
+                        a.isDirector = d.known_for_department === 'Directing';
+                        if (!a.nationality) {
+                            const pob = d.place_of_birth || '';
+                            const parts = pob.split(',').map(s => s.trim()).filter(Boolean);
+                            a.nationality = parts.length ? parts[parts.length - 1] : 'Neznámá';
+                        }
+                    } catch(e) { a.isDirector = false; }
+                }));
+                _store.setItem('sinator_actor_favs', JSON.stringify(state.actorFavs));
+                if ($('modal')?.classList.contains('open') && $('favsGrid')) {
+                    const _sb = $('modalScrollBody');
+                    const _top = _sb ? _sb.scrollTop : 0;
+                    renderFavsModal();
+                    const _sb2 = $('modalScrollBody');
+                    if (_sb2) _sb2.scrollTop = _top;
+                }
+            }
+        } finally { _favsPersonsClassifying = false; }
+    }
+
     async function refreshActorNationalities() {
         const need = state.actorFavs.filter(a => !a.nationality);
         if (!need.length || !tmdbApiKey) return;
@@ -10937,8 +10982,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 ...state.favs.map(f => ({...f, media_type: f.type || 'movie', poster_path: f.poster})),
                 ...state.actorFavs.map(f => ({...f, media_type: 'actor', title: f.name, poster_path: f.poster, vote_average: 0}))
             ];
-        } else if (tab === 'actor') {
-            let arr = state.actorFavs;
+        } else if (tab === 'actor' || tab === 'director') {
+            let arr = state.actorFavs.filter(a => (tab === 'director') === (a.isDirector === true));
             if (window._favsActorFilterMode === 'nationality' && window._favsActorNationality) {
                 arr = arr.filter(a => a.nationality === window._favsActorNationality);
             }
@@ -11015,7 +11060,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             // (bez object-fit:cover crop na pevnou výšku) - vidět je tak celý plakát,
             // stejně jako u ostatních seznamů (myBackend, hlavní mřížka...).
             return `<div onclick="${clickAction}" style="position:relative;cursor:pointer;overflow:hidden;background:var(--bg-elevated);border-radius:0;">
-                ${poster ? `<img src="${poster}" loading="lazy" style="width:100%;height:auto;display:block;object-fit:contain;">` : `<div style="width:100%;aspect-ratio:2/3;display:grid;place-items:center;font-size:3rem;">${isActor?'👤':(mediaType==='tv'?'📺':'🎬')}</div>`}
+                ${poster ? `<img src="${poster}" loading="lazy" style="width:100%;height:auto;display:block;object-fit:contain;">` : `<div style="width:100%;aspect-ratio:2/3;display:grid;place-items:center;font-size:3rem;">${isActor?(it.isDirector?'🎥':'👤'):(mediaType==='tv'?'📺':'🎬')}</div>`}
                 <button onclick="${favAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.85rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;">❤️</button>
                 <div style="padding:8px 4px 12px;">
                     <div style="font-weight:700;font-size:0.9rem;">${title}</div>
@@ -11024,7 +11069,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             </div>`;
         }
         return `<div onclick="${clickAction}" style="position:relative;cursor:pointer;overflow:hidden;background:var(--bg-elevated);display:flex;align-items:flex-end;height:220px;border-radius:8px;">
-            ${poster ? `<img src="${poster}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="position:absolute;inset:0;display:grid;place-items:center;font-size:3rem;">${isActor?'👤':(mediaType==='tv'?'📺':'🎬')}</div>`}
+            ${poster ? `<img src="${poster}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="position:absolute;inset:0;display:grid;place-items:center;font-size:3rem;">${isActor?(it.isDirector?'🎥':'👤'):(mediaType==='tv'?'📺':'🎬')}</div>`}
             <button onclick="${favAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.85rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;">❤️</button>
             <div style="position:relative;z-index:1;width:100%;background:linear-gradient(transparent,rgba(0,0,0,0.9));padding:8px 8px 6px;">
                 <div style="font-weight:700;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
