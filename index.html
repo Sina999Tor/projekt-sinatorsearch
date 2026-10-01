@@ -17151,6 +17151,14 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         } catch(e) { return null; }
     }
     async function _theme2Params(theme) {
+        // Ženské hlavní role: jeden TMDB keyword může být příliš úzký / vracet 0 výsledků.
+        // Použijeme více souvisejících keywordů přes OR a velmi nízký vote limit.
+        if (theme.name === 'V hlavní roli ženy') {
+            const terms = ['strong female lead', 'female protagonist', 'independent woman', 'female hero'];
+            const ids = (await Promise.all(terms.map(resolveThemeKeyword))).filter(Boolean);
+            const unique = [...new Set(ids)];
+            return unique.length ? `with_keywords=${unique.join('|')}&primary_release_date.gte=1980-01-01&sort_by=popularity.desc&vote_count.gte=5` : 'primary_release_date.gte=1980-01-01&sort_by=popularity.desc&vote_count.gte=5';
+        }
         if (!theme.keywordTerm) return theme.params;
         const kwId = await resolveThemeKeyword(theme.keywordTerm);
         return kwId ? `with_keywords=${kwId}&${theme.params}` : theme.params;
