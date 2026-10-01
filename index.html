@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-28T18:08:00Z -->
+<!-- BUILD: 2026-10-01T16:20:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -16948,7 +16948,40 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const nextPage = st.page + 1;
         try {
             const url = `${BASE}/discover/${st.theme.type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&${st.theme.params}&page=${nextPage}`;
-            const data = await fetch(url).then(r=>r.json());
+            let data;
+            if (st._broadened) {
+                const base = `${BASE}/discover/${st.theme.type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=popularity.desc`;
+                const [cz, sk] = await Promise.all([
+                    fetch(`${base}&with_origin_country=CZ&page=${nextPage}`).then(r=>r.json()),
+                    fetch(`${base}&with_origin_country=SK&page=${nextPage}`).then(r=>r.json())
+                ]);
+                const merged = [...(cz.results||[]), ...(sk.results||[])];
+                const uniq = []; const ids = new Set();
+                merged.forEach(it => { if (!ids.has(it.id)) { ids.add(it.id); uniq.push(it); } });
+                uniq.sort((a,b) => (b.popularity||0) - (a.popularity||0));
+                data = { page: nextPage, total_pages: Math.max(cz.total_pages||1, sk.total_pages||1), results: uniq };
+            } else {
+                data = await fetch(url).then(r=>r.json());
+            }
+
+            // Některá témata jsou v TMDB zbytečně úzká (typicky CZ/SK):
+            // pokud první dotaz vrátí málo titulů, rozšíříme ho o české a
+            // slovenské tituly samostatně a sloučíme výsledky bez duplicit.
+            if (nextPage === 1 && st.theme.broaden === 'czsk' && (data.total_results || 0) < (st.theme.minResults || 0)) {
+                const base = `${BASE}/discover/${st.theme.type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=popularity.desc`;
+                const [cz, sk] = await Promise.all([
+                    fetch(`${base}&with_origin_country=CZ&page=1`).then(r=>r.json()),
+                    fetch(`${base}&with_origin_country=SK&page=1`).then(r=>r.json())
+                ]);
+                const merged = [...(cz.results||[]), ...(sk.results||[])];
+                const uniq = [];
+                const ids = new Set();
+                merged.forEach(it => { if (!ids.has(it.id)) { ids.add(it.id); uniq.push(it); } });
+                uniq.sort((a,b) => (b.popularity||0) - (a.popularity||0));
+                data = { page:1, total_pages: Math.max(cz.total_pages||1, sk.total_pages||1), total_results: Math.max(cz.total_results||0, sk.total_results||0), results: uniq };
+                st._broadened = true;
+                st._broadenedCountryPages = { cz: cz.total_pages||1, sk: sk.total_pages||1 };
+            }
             st.page = data.page || nextPage;
             st.totalPages = data.total_pages || nextPage;
             const items = (data.results||[]).filter(it => !st.seenIds.has(it.id)).map(it => { st.seenIds.add(it.id); return { ...it, media_type: st.theme.type }; });
@@ -17060,7 +17093,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         { emoji:'🧟', name:'Zombie', type:'movie', keywordTerm:'zombie', params:'sort_by=popularity.desc&vote_count.gte=50' },
         { emoji:'🤼', name:'Zápasníci', type:'movie', keywordTerm:'wrestling', params:'sort_by=popularity.desc&vote_count.gte=5' },
         { emoji:'🕵️', name:'Únos a zmizení', type:'movie', keywordTerm:'kidnapping', params:'sort_by=popularity.desc&vote_count.gte=50' },
-        { emoji:'🇨🇿', name:'České a slovenské filmy', type:'movie', params:'with_origin_country=CZ,SK&sort_by=popularity.desc&vote_count.gte=5' },
+        { emoji:'🇨🇿', name:'České a slovenské filmy', type:'movie', params:'with_origin_country=CZ,SK&sort_by=popularity.desc', minResults:80, broaden:'czsk' },
         { emoji:'🧚', name:'České pohádky', type:'movie', params:'with_origin_country=CZ&with_genres=14,10751&sort_by=popularity.desc&vote_count.gte=3' },
         { emoji:'🦈', name:'Žraloci', type:'movie', keywordTerm:'shark', params:'sort_by=popularity.desc&vote_count.gte=15' },
         { emoji:'🎄', name:'Vánoční pohádky a filmy', type:'movie', params:'with_genres=14,10751&with_keywords=207317&sort_by=popularity.desc&vote_count.gte=3' }
