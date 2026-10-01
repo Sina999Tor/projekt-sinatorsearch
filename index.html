@@ -3882,6 +3882,9 @@ header .logo-container.logo-mini ~ .header-actions{
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-09-30f', date: '30. 9. 2026', items: [
+            'Populární streamy — návrat z detailu titulu teď vrátí do rozjetého seznamu (Filmy/Seriály/Česká tvorba…) a na stejné místo scrollu, místo skoku až na úvodní výběr služby'
+        ] },
         { version: '2026-09-30e', date: '30. 9. 2026', items: [
             'Populární streamy — u Oneplay a Voyo přibyly navíc 🇨🇿 Česká tvorba a 🇸🇰 Slovenská tvorba (jen domácí filmy a seriály na dané službě, filmy i seriály pohromadě)'
         ] },
@@ -12158,6 +12161,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             else if (backTo === 'streaming') {
                 openStreamingModal();
             }
+            else if (backTo === 'streamingResults') {
+                reopenStreamingResults();
+            }
             else if (backTo === 'smartlist') {
                 if (window._reopenSmartList) window._reopenSmartList();
             }
@@ -12209,7 +12215,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     // Helper: generates sticky modal nav bar HTML
     function modalNav(title, hasBack, extraBtns = '') {
         const backTo = state._backTo;
-        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'thematic' ? '← Tematické seznamy' : backTo === 'streaming' ? '← Streamy' : backTo === 'smartlist' ? '← Smart seznamy' : backTo === 'smartlist-sources' ? '← Smart seznamy' : '← Zpět';
+        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'thematic' ? '← Tematické seznamy' : backTo === 'streaming' ? '← Streamy' : backTo === 'streamingResults' ? `← ${(state._streamFull && state._streamFull.name) || 'Streamy'}` : backTo === 'smartlist' ? '← Smart seznamy' : backTo === 'smartlist-sources' ? '← Smart seznamy' : '← Zpět';
         const back = hasBack ? `<button class="modal-back-btn" onclick="navigateBack()">${backLabel}</button>` : '';
         const nav = $('modalNavBar'); const left = $('modalNavLeft'); const right = $('modalNavRight');
         if(nav && left && right) {
@@ -17122,7 +17128,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                     });
                 });
                 merged.sort((a, b) => (b.popularity||0) - (a.popularity||0));
-                if (grid) grid.insertAdjacentHTML('beforeend', merged.map(it => cardHtml(it)).join(''));
+                st.items.push(...merged);
+                if (grid) grid.insertAdjacentHTML('beforeend', merged.map(it => streamCardHtml(it)).join(''));
                 const allDone = _streamMixedDone(st);
                 if (statusEl) statusEl.textContent = allDone ? (st.seenIds.size ? `✅ Načteno vše (${st.seenIds.size})` : '') : '';
                 if (!st.seenIds.size && allDone && grid) {
@@ -17146,7 +17153,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             st.page = data.page || nextPage;
             st.totalPages = data.total_pages || nextPage;
             const items = (data.results||[]).filter(it => !st.seenIds.has(it.id)).map(it => { st.seenIds.add(it.id); return { ...it, media_type: st.type }; });
-            if (grid) grid.insertAdjacentHTML('beforeend', items.map(it => cardHtml(it)).join(''));
+            st.items.push(...items);
+            if (grid) grid.insertAdjacentHTML('beforeend', items.map(it => streamCardHtml(it)).join(''));
             if (statusEl) statusEl.textContent = (st.page >= st.totalPages)
                 ? (st.seenIds.size ? `✅ Načteno vše (${st.seenIds.size})` : '')
                 : '';
@@ -17160,12 +17168,24 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         }
     }
 
+    // Karty ve výsledcích streamovací služby — stejné jako běžná karta, jen
+    // klik jde přes openDetailFromStreaming, aby šlo po návratu z detailu
+    // obnovit přesně tenhle seznam (ne skočit zpět na úvodní výběr služby).
+    function streamCardHtml(it) {
+        return cardHtml(it).replace('onclick="openDetail(', 'onclick="openDetailFromStreaming(');
+    }
+    window.openDetailFromStreaming = (id, type) => {
+        state._streamScrollTop = $('modalScrollBody')?.scrollTop || 0;
+        state._backTo = 'streamingResults';
+        openDetail(id, type);
+    };
+
     function openStreamingResults(type, providerId, name, logoPath, originCountry) {
         state._backTo = 'streaming';
         state._streamFull = {
-            type, providerId, name, originCountry: originCountry || null,
+            type, providerId, name, logoPath: logoPath || '', originCountry: originCountry || null,
             page: 0, totalPages: 1, moviePage: 0, movieTotalPages: 1, tvPage: 0, tvTotalPages: 1,
-            loading: false, seenIds: new Set()
+            loading: false, seenIds: new Set(), items: []
         };
         const right = $('modalNavRight');
         const logo = logoPath ? `<img src="${IMG}w185${logoPath}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:8px;">` : '';
@@ -17182,6 +17202,36 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         _streamFullLoadMore();
     }
     window.openStreamingResults = openStreamingResults;
+
+    // Návrat z detailu titulu zpět do rozjetého seznamu (Filmy/Seriály/Česká
+    // tvorba…) — obnoví už natažené karty ze state._streamFull.items (bez
+    // nového fetche) a vrátí scroll tam, kde uživatel skončil; stránkování
+    // (moviePage/tvPage/…) zůstává netknuté, takže scroll dolů pokračuje dál.
+    function reopenStreamingResults() {
+        const st = state._streamFull;
+        if (!st) { openStreamingModal(); return; }
+        state._backTo = 'streamingResults';
+        const right = $('modalNavRight');
+        const logo = st.logoPath ? `<img src="${IMG}w185${st.logoPath}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:8px;">` : '';
+        if (right) right.innerHTML = `<button class="modal-close-btn" onclick="openStreamingProviderPicker(${st.providerId},'${jsq(st.name)}','${st.logoPath||''}')" title="Zpět" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← ${st.name}</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+        const label = st.type === 'mixed' ? (st.originCountry === 'CZ' ? '🇨🇿 Česká tvorba' : '🇸🇰 Slovenská tvorba') : (st.type === 'movie' ? 'Filmy' : 'Seriály');
+        $('modalScrollBody').innerHTML = `
+            <div style="padding:16px;">
+                <div style="display:flex;align-items:center;font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:14px;">${logo}${st.name} · ${label}</div>
+                <div id="streamFullGrid" class="results" style="grid-template-columns:repeat(2,1fr);gap:4px;padding:0;width:100%;">${st.items.map(it => streamCardHtml(it)).join('')}</div>
+                <div id="streamFullStatus" style="text-align:center;padding:16px;color:var(--text-muted);font-size:0.85rem;"></div>
+            </div>`;
+        const sb = $('modalScrollBody');
+        if (sb) sb.onscroll = _streamFullScrollHandler;
+        $('modal')?.classList.add('open');
+        $('modalContent')?.classList.add('watched-full');
+        if (!st.items.length) _streamFullLoadMore();
+        requestAnimationFrame(() => {
+            const sb2 = $('modalScrollBody');
+            if (sb2) sb2.scrollTop = state._streamScrollTop || 0;
+        });
+    }
+    window.reopenStreamingResults = reopenStreamingResults;
 
     // ══ TRAKT WATCHLIST + LIST PICKER ════════════════════════════════════════
 
