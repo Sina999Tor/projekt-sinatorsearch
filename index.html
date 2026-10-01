@@ -16842,14 +16842,20 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);">😕 Zatím se nepodařilo najít žádné seznamy.<br><button onclick="state._thematicListsCache=null;loadThematicLists()" style="margin-top:12px;padding:8px 16px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;">🔄 Zkusit znovu</button></div>`;
             return;
         }
-        let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-                <button onclick="state._thematicListsCache=null;loadThematicLists()" style="padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);cursor:pointer;font-size:0.78rem;">🔄 Obnovit</button>
-            </div>`;
+        let html = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;position:sticky;top:0;z-index:5;padding:4px 0 8px;background:var(--bg);">
+                <div style="display:flex;align-items:center;gap:7px;flex:1;min-width:0;">
+                    <span style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;">🔤 Začíná na</span>
+                    <input id="thematicLetterFilter" type="text" maxlength="1" inputmode="text" autocomplete="off" autocapitalize="characters" placeholder="A" oninput="filterThematicListsByLetter(this.value)" style="width:42px;height:36px;box-sizing:border-box;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:1rem;font-weight:700;outline:none;">
+                    <button onclick="$('thematicLetterFilter').value='';filterThematicListsByLetter('');" style="padding:7px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);cursor:pointer;font-size:0.76rem;">Vše</button>
+                </div>
+                <button onclick="state._thematicListsCache=null;loadThematicLists()" style="padding:7px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);cursor:pointer;font-size:0.78rem;white-space:nowrap;">🔄 Obnovit</button>
+            </div>
+            <div id="thematicFilterStatus" style="display:none;color:var(--text-muted);font-size:0.78rem;margin:-2px 0 12px;"></div>`;
 
         if(curated.length) {
             html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin:4px 0 12px;">🎨 Tematické výběry</div>`;
             html += curated.map(sec => `
-            <div style="margin-bottom:22px;">
+            <div data-thematic-name="${(sec.name||'').replace(/\"/g,'&quot;')}" style="margin-bottom:22px;">
                 <div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;color:#fb923c;">${sec.emoji} ${sec.name}</div>
                 <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;">
                     ${sec.items.map(it => `<div style="flex:0 0 118px;width:118px;">${cardHtml(it)}</div>`).join('')}
@@ -16864,7 +16870,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         if(community.length) {
             html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin:18px 0 12px;border-top:1px solid var(--border);padding-top:16px;">👥 Komunitní seznamy z TMDB</div>`;
             html += community.map(sec => `
-            <div style="margin-bottom:22px;">
+            <div data-thematic-name="${(sec.genreName||'').replace(/\"/g,'&quot;')}" style="margin-bottom:22px;">
                 <div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;color:#fb923c;">${_thematicEmoji(sec.genreName)} ${sec.genreName} <span style="color:var(--text-muted);font-weight:400;font-size:0.78rem;">— podle diváků na TMDB</span></div>
                 <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;">
                     ${sec.lists.map(l => {
@@ -16883,7 +16889,33 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         }
 
         body.innerHTML = html;
+        filterThematicListsByLetter($('thematicLetterFilter')?.value || '');
     }
+
+    function _thematicStartsWith(value, letter) {
+        const a = String(value || '').trim().charAt(0).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        const b = String(letter || '').trim().charAt(0).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        return !b || a === b;
+    }
+
+    function filterThematicListsByLetter(value) {
+        const letter = String(value || '').trim().charAt(0);
+        const body = $('thematicListsBody');
+        if (!body) return;
+        const sections = body.querySelectorAll('[data-thematic-name]');
+        let visible = 0;
+        sections.forEach(el => {
+            const match = _thematicStartsWith(el.getAttribute('data-thematic-name'), letter);
+            el.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+        const status = $('thematicFilterStatus');
+        if (status) {
+            status.style.display = letter ? 'block' : 'none';
+            status.textContent = letter ? `🔤 Filtr: „${letter.toUpperCase()}“ · nalezeno ${visible} tematických sekcí` : '';
+        }
+    }
+    window.filterThematicListsByLetter = filterThematicListsByLetter;
 
     async function openThematicListDetail(listId, name) {
         state._backTo = 'thematic';
@@ -17129,10 +17161,16 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             nav.style.display = 'flex';
         }
         $('modalScrollBody').innerHTML = `<div style="padding:16px;">
-            <p style="color:var(--text-muted);font-size:0.85rem;margin:0 0 14px;">Další tematické výběry — klikni na téma a uvidíš celý nekonečný seznam.</p>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;">
+            <p style="color:var(--text-muted);font-size:0.85rem;margin:0 0 12px;">Další tematické výběry — klikni na téma a uvidíš celý nekonečný seznam.</p>
+            <div style="display:flex;gap:8px;align-items:center;position:sticky;top:0;z-index:5;padding:4px 0 10px;background:var(--bg);margin-bottom:4px;">
+                <span style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;">🔤 Začíná na</span>
+                <input id="thematic2LetterFilter" type="text" maxlength="1" inputmode="text" autocomplete="off" autocapitalize="characters" placeholder="A" oninput="filterThematicLists2ByLetter(this.value)" style="width:42px;height:36px;box-sizing:border-box;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:1rem;font-weight:700;outline:none;">
+                <button onclick="$('thematic2LetterFilter').value='';filterThematicLists2ByLetter('');" style="padding:7px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);cursor:pointer;font-size:0.76rem;">Vše</button>
+            </div>
+            <div id="thematic2FilterStatus" style="display:none;color:var(--text-muted);font-size:0.78rem;margin:0 0 10px;"></div>
+            <div id="thematic2ThemeGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;">
                 ${CURATED_THEMATIC_THEMES_2.map((t, idx) => `
-                <button onclick="openThematicThemeFull2(${idx})" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:12px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;text-align:left;">
+                <button data-thematic2-name="${(t.name||'').replace(/\"/g,'&quot;')}" onclick="openThematicThemeFull2(${idx})" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:12px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;text-align:left;">
                     <span style="font-size:1.3rem;flex-shrink:0;">${t.emoji}</span>
                     <span style="font-size:0.8rem;font-weight:600;color:var(--text);line-height:1.25;">${t.name}</span>
                 </button>`).join('')}
@@ -17143,8 +17181,26 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         if (state._thematic2ScrollTop) {
             requestAnimationFrame(() => { const sb=$('modalScrollBody'); if (sb) sb.scrollTop = state._thematic2ScrollTop; state._thematic2ScrollTop = 0; });
         }
+        filterThematicLists2ByLetter($('thematic2LetterFilter')?.value || '');
     }
     window.openThematicListsModal2 = openThematicListsModal2;
+
+    function filterThematicLists2ByLetter(value) {
+        const letter = String(value || '').trim().charAt(0);
+        const buttons = document.querySelectorAll('[data-thematic2-name]');
+        let visible = 0;
+        buttons.forEach(btn => {
+            const match = _thematicStartsWith(btn.getAttribute('data-thematic2-name'), letter);
+            btn.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+        const status = $('thematic2FilterStatus');
+        if (status) {
+            status.style.display = letter ? 'block' : 'none';
+            status.textContent = letter ? `🔤 Filtr: „${letter.toUpperCase()}“ · nalezeno ${visible} témat` : '';
+        }
+    }
+    window.filterThematicLists2ByLetter = filterThematicLists2ByLetter;
 
     function _thematicFull2ScrollHandler() {
         const st = state._thematicFull2;
