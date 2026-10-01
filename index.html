@@ -3882,6 +3882,9 @@ header .logo-container.logo-mini ~ .header-actions{
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-01a', date: '1. 10. 2026', items: [
+            'Seznamy — nová položka 🎞️ Tematické seznamy 2: přes 65 dalších témat (klasiky, sporty, studia Disney/Pixar/DreamWorks/A24/Ghibli/MCU, Zombie, Vlkodlaci, Upíři, Žraloci, České a slovenské filmy, České pohádky, Vánoční pohádky a filmy a další), nekonečný scroll, návrat z detailu na stejné místo'
+        ] },
         { version: '2026-09-30f', date: '30. 9. 2026', items: [
             'Populární streamy — návrat z detailu titulu teď vrátí do rozjetého seznamu (Filmy/Seriály/Česká tvorba…) a na stejné místo scrollu, místo skoku až na úvodní výběr služby'
         ] },
@@ -12164,6 +12167,12 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             else if (backTo === 'streamingResults') {
                 reopenStreamingResults();
             }
+            else if (backTo === 'thematic2') {
+                openThematicListsModal2();
+            }
+            else if (backTo === 'thematic2results') {
+                reopenThematicThemeFull2();
+            }
             else if (backTo === 'smartlist') {
                 if (window._reopenSmartList) window._reopenSmartList();
             }
@@ -12215,7 +12224,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     // Helper: generates sticky modal nav bar HTML
     function modalNav(title, hasBack, extraBtns = '') {
         const backTo = state._backTo;
-        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'thematic' ? '← Tematické seznamy' : backTo === 'streaming' ? '← Streamy' : backTo === 'streamingResults' ? `← ${(state._streamFull && state._streamFull.name) || 'Streamy'}` : backTo === 'smartlist' ? '← Smart seznamy' : backTo === 'smartlist-sources' ? '← Smart seznamy' : '← Zpět';
+        const backLabel = backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'thematic' ? '← Tematické seznamy' : backTo === 'thematic2' ? '← Tematické seznamy 2' : backTo === 'thematic2results' ? `← ${(state._thematicFull2 && state._thematicFull2.theme && state._thematicFull2.theme.name) || 'Tematické seznamy 2'}` : backTo === 'streaming' ? '← Streamy' : backTo === 'streamingResults' ? `← ${(state._streamFull && state._streamFull.name) || 'Streamy'}` : backTo === 'smartlist' ? '← Smart seznamy' : backTo === 'smartlist-sources' ? '← Smart seznamy' : '← Zpět';
         const back = hasBack ? `<button class="modal-back-btn" onclick="navigateBack()">${backLabel}</button>` : '';
         const nav = $('modalNavBar'); const left = $('modalNavLeft'); const right = $('modalNavRight');
         if(nav && left && right) {
@@ -16979,6 +16988,234 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         renderThematicListsSections(state._thematicListsCache || {});
     }
 
+    // ══ TEMATICKÉ SEZNAMY 2 — další výběry (klasiky, sporty, studia, tropy…) ══
+    // Druhá, samostatná sada témat (jiný seznam než CURATED_THEMATIC_THEMES
+    // výše) — jednodušší UI: jen mřížka tlačítek bez živých náhledů (aby
+    // otevření nestálo desítky TMDB dotazů najednou). Žánr/studio jde přes
+    // with_genres/with_companies napevno; u tropů bez vlastního žánru
+    // (Zombie, Vlkodlaci, Cestování časem…) se ID klíčového slova dohledá
+    // za běhu přes /search/keyword (resolveThemeKeyword) a nakešuje, aby se
+    // při druhém kliknutí na stejné téma znovu nefetchovalo.
+    const CURATED_THEMATIC_THEMES_2 = [
+        { emoji:'🎬', name:'200 klasik z let 1970–1999', type:'movie', params:'primary_release_date.gte=1970-01-01&primary_release_date.lte=1999-12-31&sort_by=vote_average.desc&vote_count.gte=300' },
+        { emoji:'🎞️', name:'200 klasik z let 2000–nyní', type:'movie', params:'primary_release_date.gte=2000-01-01&sort_by=vote_average.desc&vote_count.gte=300' },
+        { emoji:'🏈', name:'Americký fotbal', type:'movie', keywordTerm:'american football', params:'sort_by=popularity.desc&vote_count.gte=5' },
+        { emoji:'🏰', name:'Animáky od Disney', type:'movie', params:'with_companies=2&with_genres=16&sort_by=popularity.desc&vote_count.gte=50' },
+        { emoji:'🎈', name:'Animáky od Pixar', type:'movie', params:'with_companies=3&sort_by=popularity.desc&vote_count.gte=50' },
+        { emoji:'🐉', name:'Animáky studia DreamWorks', type:'movie', params:'with_companies=521&sort_by=popularity.desc&vote_count.gte=50' },
+        { emoji:'⚾', name:'Baseball', type:'movie', keywordTerm:'baseball', params:'sort_by=popularity.desc&vote_count.gte=5' },
+        { emoji:'🏀', name:'Basketbal', type:'movie', keywordTerm:'basketball', params:'sort_by=popularity.desc&vote_count.gte=5' },
+        { emoji:'📔', name:'Biografie', type:'movie', keywordTerm:'biography', params:'sort_by=popularity.desc&vote_count.gte=50' },
+        { emoji:'⏳', name:'Cestování časem', type:'movie', keywordTerm:'time travel', params:'sort_by=popularity.desc&vote_count.gte=80' },
+        { emoji:'🦇', name:'DC Universe', type:'movie', params:'with_companies=9993,128064&sort_by=popularity.desc&vote_count.gte=20' },
+        { emoji:'😢', name:'Dojemné', type:'movie', params:'with_genres=18&sort_by=vote_average.desc&vote_count.gte=300' },
+        { emoji:'🎖️', name:'Druhá světová válka', type:'movie', keywordTerm:'world war ii', params:'sort_by=popularity.desc&vote_count.gte=80' },
+        { emoji:'🏙️', name:'Dystopické', type:'movie', keywordTerm:'dystopia', params:'sort_by=popularity.desc&vote_count.gte=80' },
+        { emoji:'👶', name:'Dětské animáky 1980–současnost', type:'movie', params:'with_genres=16,10751&primary_release_date.gte=1980-01-01&sort_by=popularity.desc&vote_count.gte=50' },
+        { emoji:'🙂', name:'Feelgood a komfortní filmy', type:'movie', params:'with_genres=35,18&sort_by=vote_average.desc&vote_count.gte=200' },
+        { emoji:'🎮', name:'Filmy podle videoher', type:'movie', keywordTerm:'video game', params:'sort_by=popularity.desc&vote_count.gte=20' },
+        { emoji:'📚', name:'Filmy podle Young Adult knih', type:'movie', keywordTerm:'young adult', params:'sort_by=popularity.desc&vote_count.gte=50' },
+        { emoji:'⚽', name:'Fotbal', type:'movie', keywordTerm:'soccer', params:'sort_by=popularity.desc&vote_count.gte=5' },
+        { emoji:'🔫', name:'Gangsterky', type:'movie', params:'with_genres=80&sort_by=vote_average.desc&vote_count.gte=150' },
+        { emoji:'🔪', name:'Horor slashery', type:'movie', keywordTerm:'slasher', params:'sort_by=popularity.desc&vote_count.gte=20' },
+        { emoji:'🏆', name:'IMDB Top 250', type:'movie', params:'sort_by=vote_average.desc&vote_count.gte=5000' },
+        { emoji:'🌿', name:'Komedie s trávou', type:'movie', keywordTerm:'stoner comedy', params:'sort_by=popularity.desc&vote_count.gte=10' },
+        { emoji:'🎤', name:'Koncerty', type:'movie', params:'with_genres=10402&sort_by=popularity.desc&vote_count.gte=10' },
+        { emoji:'🇰🇷', name:'Korejské drama', type:'tv', params:'with_origin_country=KR&with_genres=18&sort_by=popularity.desc&vote_count.gte=30' },
+        { emoji:'💰', name:'Loupeže, krádeže a přepadení', type:'movie', keywordTerm:'heist', params:'sort_by=popularity.desc&vote_count.gte=50' },
+        { emoji:'👽', name:'Mimozemšťané a monstra', type:'movie', params:'with_genres=878,27&sort_by=popularity.desc&vote_count.gte=100' },
+        { emoji:'🤯', name:'Mindfuck filmy', type:'movie', keywordTerm:'mindfuck', params:'sort_by=popularity.desc&vote_count.gte=30' },
+        { emoji:'🎵', name:'Muzikálové filmy', type:'movie', keywordTerm:'musical', params:'sort_by=popularity.desc&vote_count.gte=30' },
+        { emoji:'👻', name:'Nadpřirozeno', type:'movie', keywordTerm:'supernatural', params:'sort_by=popularity.desc&vote_count.gte=80' },
+        { emoji:'🏅', name:'Nejlepší filmy roku 2025', type:'movie', params:'primary_release_year=2025&sort_by=vote_average.desc&vote_count.gte=50' },
+        { emoji:'🏟️', name:'Nejlepší sportovní filmy', type:'movie', keywordTerm:'sport', params:'sort_by=vote_average.desc&vote_count.gte=80' },
+        { emoji:'🔮', name:'Nejočekávanější filmy 2026–2027', type:'movie', params:'primary_release_date.gte=2026-01-01&primary_release_date.lte=2027-12-31&sort_by=popularity.desc' },
+        { emoji:'🌀', name:'Nečekané zvraty', type:'movie', keywordTerm:'plot twist', params:'sort_by=popularity.desc&vote_count.gte=80' },
+        { emoji:'📼', name:'Nostalgie 80s a 90s', type:'movie', params:'primary_release_date.gte=1980-01-01&primary_release_date.lte=1999-12-31&sort_by=popularity.desc&vote_count.gte=150' },
+        { emoji:'🕯️', name:'Okultismus', type:'movie', keywordTerm:'occult', params:'sort_by=popularity.desc&vote_count.gte=20' },
+        { emoji:'🏆', name:'Oscaroví kandidáti', type:'movie', params:'sort_by=vote_average.desc&vote_count.gte=3000' },
+        { emoji:'👻', name:'Paranormální aktivita', type:'movie', keywordTerm:'paranormal', params:'sort_by=popularity.desc&vote_count.gte=20' },
+        { emoji:'🎭', name:'Parodie', type:'movie', keywordTerm:'parody', params:'sort_by=popularity.desc&vote_count.gte=15' },
+        { emoji:'😂', name:'Populární komedie z let 1995–2010', type:'movie', params:'with_genres=35&primary_release_date.gte=1995-01-01&primary_release_date.lte=2010-12-31&sort_by=popularity.desc&vote_count.gte=150' },
+        { emoji:'☢️', name:'Postapokalyptické', type:'movie', keywordTerm:'post-apocalyptic', params:'sort_by=popularity.desc&vote_count.gte=80' },
+        { emoji:'💁‍♀️', name:'Pro holky', type:'movie', params:'with_genres=10749,35&sort_by=popularity.desc&vote_count.gte=100' },
+        { emoji:'🧠', name:'Psychologické thrillery', type:'movie', keywordTerm:'psychological thriller', params:'sort_by=popularity.desc&vote_count.gte=100' },
+        { emoji:'🚗', name:'Road trip', type:'movie', keywordTerm:'road trip', params:'sort_by=popularity.desc&vote_count.gte=20' },
+        { emoji:'🤖', name:'Roboti', type:'movie', keywordTerm:'robot', params:'sort_by=popularity.desc&vote_count.gte=80' },
+        { emoji:'👨‍👩‍👧‍👦', name:'Rodinné filmy 1980–současnost', type:'movie', params:'with_genres=10751&primary_release_date.gte=1980-01-01&sort_by=popularity.desc&vote_count.gte=100' },
+        { emoji:'💘', name:'Romantické komedie', type:'movie', params:'with_genres=10749,35&sort_by=vote_average.desc&vote_count.gte=200' },
+        { emoji:'🏅', name:'Sportovní dokumenty', type:'movie', keywordTerm:'sport', params:'with_genres=99&sort_by=popularity.desc&vote_count.gte=10' },
+        { emoji:'🅰️', name:'Studio — A24', type:'movie', params:'with_companies=41077&sort_by=popularity.desc&vote_count.gte=15' },
+        { emoji:'🎐', name:'Studio — Ghibli', type:'movie', params:'with_companies=10342&sort_by=popularity.desc&vote_count.gte=15' },
+        { emoji:'🦸', name:'Studio — Marvel Cinematic Universe', type:'movie', params:'with_companies=420&sort_by=popularity.desc&vote_count.gte=30' },
+        { emoji:'⚔️', name:'Středověk', type:'movie', keywordTerm:'medieval', params:'sort_by=popularity.desc&vote_count.gte=30' },
+        { emoji:'🦸', name:'Superhrdinové', type:'movie', keywordTerm:'superhero', params:'with_genres=28&sort_by=popularity.desc&vote_count.gte=150' },
+        { emoji:'🔪', name:'Sérioví vrazi', type:'movie', keywordTerm:'serial killer', params:'sort_by=popularity.desc&vote_count.gte=80' },
+        { emoji:'📼', name:'True Crime dokumenty', type:'movie', keywordTerm:'true crime', params:'with_genres=99&sort_by=popularity.desc&vote_count.gte=10' },
+        { emoji:'🧛', name:'Upíři', type:'movie', keywordTerm:'vampire', params:'sort_by=popularity.desc&vote_count.gte=50' },
+        { emoji:'👩', name:'V hlavní roli ženy', type:'movie', keywordTerm:'strong female lead', params:'sort_by=popularity.desc&vote_count.gte=80' },
+        { emoji:'🌌', name:'Vesmírné', type:'movie', keywordTerm:'space', params:'with_genres=878&sort_by=popularity.desc&vote_count.gte=100' },
+        { emoji:'🐺', name:'Vlkodlaci', type:'movie', keywordTerm:'werewolf', params:'sort_by=popularity.desc&vote_count.gte=20' },
+        { emoji:'🤠', name:'Westernovky', type:'movie', params:'with_genres=37&sort_by=popularity.desc&vote_count.gte=50' },
+        { emoji:'🧟', name:'Zombie', type:'movie', keywordTerm:'zombie', params:'sort_by=popularity.desc&vote_count.gte=50' },
+        { emoji:'🤼', name:'Zápasníci', type:'movie', keywordTerm:'wrestling', params:'sort_by=popularity.desc&vote_count.gte=5' },
+        { emoji:'🕵️', name:'Únos a zmizení', type:'movie', keywordTerm:'kidnapping', params:'sort_by=popularity.desc&vote_count.gte=50' },
+        { emoji:'🇨🇿', name:'České a slovenské filmy', type:'movie', params:'with_origin_country=CZ,SK&sort_by=popularity.desc&vote_count.gte=5' },
+        { emoji:'🧚', name:'České pohádky', type:'movie', params:'with_origin_country=CZ&with_genres=14,10751&sort_by=popularity.desc&vote_count.gte=3' },
+        { emoji:'🦈', name:'Žraloci', type:'movie', keywordTerm:'shark', params:'sort_by=popularity.desc&vote_count.gte=15' },
+        { emoji:'🎄', name:'Vánoční pohádky a filmy', type:'movie', params:'with_genres=14,10751&with_keywords=207317&sort_by=popularity.desc&vote_count.gte=3' }
+    ];
+
+    // /search/keyword → najde číselné ID klíčového slova; nakešováno ve
+    // state._kw2Cache, takže se stejný dotaz nefetchuje podruhé.
+    async function resolveThemeKeyword(term) {
+        if (!state._kw2Cache) state._kw2Cache = {};
+        if (state._kw2Cache[term] !== undefined) return state._kw2Cache[term];
+        try {
+            const data = await fetch(`${BASE}/search/keyword?api_key=${tmdbApiKey}&query=${encodeURIComponent(term)}`).then(r=>r.json());
+            const match = (data.results||[]).find(k => k.name.toLowerCase() === term.toLowerCase()) || (data.results||[])[0];
+            const id = match ? match.id : null;
+            state._kw2Cache[term] = id;
+            return id;
+        } catch(e) { return null; }
+    }
+    async function _theme2Params(theme) {
+        if (!theme.keywordTerm) return theme.params;
+        const kwId = await resolveThemeKeyword(theme.keywordTerm);
+        return kwId ? `with_keywords=${kwId}&${theme.params}` : theme.params;
+    }
+
+    function openThematicListsModal2() {
+        const sbClear = $('modalScrollBody'); if (sbClear) sbClear.onscroll = null;
+        state._thematicFull2 = null;
+        state._backTo = 'thematic2';
+        const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
+        if (nav && left && right) {
+            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;background:none;-webkit-text-fill-color:#fb923c;color:#fb923c;" title="Zpět nahoru">🎞️ Tematické seznamy 2 ↑</span>`;
+            right.innerHTML = `<button class="modal-close-btn" onclick="closeModal();openListsModal();" title="Zpět na Seznamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Seznamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+            nav.style.display = 'flex';
+        }
+        $('modalScrollBody').innerHTML = `<div style="padding:16px;">
+            <p style="color:var(--text-muted);font-size:0.85rem;margin:0 0 14px;">Další tematické výběry — klikni na téma a uvidíš celý nekonečný seznam.</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;">
+                ${CURATED_THEMATIC_THEMES_2.map((t, idx) => `
+                <button onclick="openThematicThemeFull2(${idx})" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:12px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;text-align:left;">
+                    <span style="font-size:1.3rem;flex-shrink:0;">${t.emoji}</span>
+                    <span style="font-size:0.8rem;font-weight:600;color:var(--text);line-height:1.25;">${t.name}</span>
+                </button>`).join('')}
+            </div>
+        </div>`;
+        $('modal')?.classList.add('open');
+        $('modalContent')?.classList.add('watched-full');
+        if (state._thematic2ScrollTop) {
+            requestAnimationFrame(() => { const sb=$('modalScrollBody'); if (sb) sb.scrollTop = state._thematic2ScrollTop; state._thematic2ScrollTop = 0; });
+        }
+    }
+    window.openThematicListsModal2 = openThematicListsModal2;
+
+    function _thematicFull2ScrollHandler() {
+        const st = state._thematicFull2;
+        const sb = $('modalScrollBody');
+        if (!st || !sb || st.loading) return;
+        if (st.page > 0 && st.page >= st.totalPages) return;
+        if (sb.scrollTop + sb.clientHeight >= sb.scrollHeight - 500) {
+            _thematicFull2LoadMore();
+        }
+    }
+
+    async function _thematicFull2LoadMore() {
+        const st = state._thematicFull2;
+        if (!st || st.loading) return;
+        if (st.page > 0 && st.page >= st.totalPages) return;
+        st.loading = true;
+        const statusEl = $('thematic2FullStatus');
+        if (statusEl) statusEl.textContent = '⏳ Načítám další…';
+        const nextPage = st.page + 1;
+        try {
+            if (!st.resolvedParams) st.resolvedParams = await _theme2Params(st.theme);
+            const url = `${BASE}/discover/${st.theme.type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&${st.resolvedParams}&page=${nextPage}`;
+            const data = await fetch(url).then(r=>r.json());
+            st.page = data.page || nextPage;
+            st.totalPages = data.total_pages || nextPage;
+            const items = (data.results||[]).filter(it => !st.seenIds.has(it.id)).map(it => { st.seenIds.add(it.id); return { ...it, media_type: st.theme.type }; });
+            st.items.push(...items);
+            const grid = $('thematic2FullGrid');
+            if (grid) grid.insertAdjacentHTML('beforeend', items.map(it => theme2CardHtml(it)).join(''));
+            if (statusEl) statusEl.textContent = (st.page >= st.totalPages)
+                ? (st.seenIds.size ? `✅ Načteno vše (${st.seenIds.size})` : '')
+                : '';
+            if (!st.seenIds.size && st.page >= st.totalPages && grid) {
+                grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted);">Pro tohle téma se momentálně nic nenašlo.</div>`;
+            }
+        } catch(e) {
+            if (statusEl) statusEl.textContent = '❌ Chyba načítání, zkus posunout znovu.';
+        } finally {
+            st.loading = false;
+        }
+    }
+
+    // Stejný trik jako u Streamů — klik na kartu jde přes vlastní handler,
+    // aby se po návratu z detailu dalo obnovit přesně rozjetý seznam.
+    function theme2CardHtml(it) {
+        return cardHtml(it).replace('onclick="openDetail(', 'onclick="openDetailFromThematic2(');
+    }
+    window.openDetailFromThematic2 = (id, type) => {
+        state._thematic2FullScrollTop = $('modalScrollBody')?.scrollTop || 0;
+        state._backTo = 'thematic2results';
+        openDetail(id, type);
+    };
+
+    function openThematicThemeFull2(idx) {
+        const theme = CURATED_THEMATIC_THEMES_2[idx];
+        if (!theme) return;
+        state._backTo = 'thematic2';
+        state._thematicFull2 = { idx, theme, page: 0, totalPages: 1, loading: false, seenIds: new Set(), items: [], resolvedParams: null };
+        const right = $('modalNavRight');
+        if (right) right.innerHTML = `<button class="modal-close-btn" onclick="closeThematicThemeFull2()" title="Zpět na Tematické seznamy 2" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Tematické seznamy 2</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+        $('modalScrollBody').innerHTML = `<div style="padding:16px;">
+            <div style="font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:700;margin-bottom:14px;color:#fff;">${theme.emoji} ${theme.name}</div>
+            <div id="thematic2FullGrid" class="results" style="grid-template-columns:repeat(2,1fr);gap:4px;padding:0;width:100%;"></div>
+            <div id="thematic2FullStatus" style="text-align:center;padding:16px;color:var(--text-muted);font-size:0.85rem;"></div>
+        </div>`;
+        const sb = $('modalScrollBody');
+        if (sb) sb.onscroll = _thematicFull2ScrollHandler;
+        _thematicFull2LoadMore();
+    }
+    window.openThematicThemeFull2 = openThematicThemeFull2;
+
+    function closeThematicThemeFull2() {
+        const sb = $('modalScrollBody');
+        if (sb) sb.onscroll = null;
+        state._thematicFull2 = null;
+        openThematicListsModal2();
+    }
+    window.closeThematicThemeFull2 = closeThematicThemeFull2;
+
+    // Návrat z detailu titulu zpět do rozjetého tématu — obnoví karty z
+    // cache (bez nového fetche) a vrátí scroll tam, kde uživatel skončil.
+    function reopenThematicThemeFull2() {
+        const st = state._thematicFull2;
+        if (!st) { openThematicListsModal2(); return; }
+        state._backTo = 'thematic2results';
+        const right = $('modalNavRight');
+        if (right) right.innerHTML = `<button class="modal-close-btn" onclick="closeThematicThemeFull2()" title="Zpět na Tematické seznamy 2" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Tematické seznamy 2</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
+        $('modalScrollBody').innerHTML = `<div style="padding:16px;">
+            <div style="font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:700;margin-bottom:14px;color:#fff;">${st.theme.emoji} ${st.theme.name}</div>
+            <div id="thematic2FullGrid" class="results" style="grid-template-columns:repeat(2,1fr);gap:4px;padding:0;width:100%;">${st.items.map(it => theme2CardHtml(it)).join('')}</div>
+            <div id="thematic2FullStatus" style="text-align:center;padding:16px;color:var(--text-muted);font-size:0.85rem;"></div>
+        </div>`;
+        const sb = $('modalScrollBody');
+        if (sb) sb.onscroll = _thematicFull2ScrollHandler;
+        $('modal')?.classList.add('open');
+        $('modalContent')?.classList.add('watched-full');
+        if (!st.items.length) _thematicFull2LoadMore();
+        requestAnimationFrame(() => {
+            const sb2 = $('modalScrollBody');
+            if (sb2) sb2.scrollTop = state._thematic2FullScrollTop || 0;
+        });
+    }
+    window.reopenThematicThemeFull2 = reopenThematicThemeFull2;
+
     // ══ POPULÁRNÍ STREAMY — Netflix, Disney+, HBO Max a další ═════════════════
     // Loga i seznam poskytovatelů se berou přímo z TMDB (/watch/providers),
     // takže jsou vždy aktuální a licenčně v pořádku (stejný zdroj, ze kterého
@@ -18033,6 +18270,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <button onclick="closeListsModal();openThematicListsModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🧵</span>
             <div><div style="color:#fb923c;font-weight:700;">Tematické seznamy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Komunitní seznamy z TMDB podle témat</div></div>
+        </button>
+        <button onclick="closeListsModal();openThematicListsModal2()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎞️</span>
+            <div><div style="color:#fb923c;font-weight:700;">Tematické seznamy 2</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Další výběry — od klasik po žraloky a vánoční pohádky</div></div>
         </button>
         <button onclick="closeListsModal();openStreamingModal()" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📡</span>
