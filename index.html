@@ -365,7 +365,7 @@ header .logo-container.logo-mini ~ .header-actions{
 </div>
 
 <!-- ═══ ŽÁDOST O PŘÍSTUP DO APPKY ════════════════════════════════════ -->
-<div id="accessReqOverlay" style="display:none;position:fixed;inset:0;z-index:2000000000;background:rgba(6,6,10,0.97);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:24px;">
+<div id="accessReqOverlay" style="display:none;position:fixed;inset:0;z-index:2147483647;background:rgba(6,6,10,0.97);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:24px;">
   <div style="max-width:380px;width:100%;background:#141414;border:1px solid rgba(255,215,0,0.3);border-radius:16px;padding:28px 22px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.6);">
     <div style="font-size:2.2rem;margin-bottom:8px;">📩</div>
     <h2 style="font-family:'Playfair Display',serif;color:#ffd700;font-size:1.25rem;margin-bottom:8px;">Žádost o přístup</h2>
@@ -1437,6 +1437,17 @@ header .logo-container.logo-mini ~ .header-actions{
                     <button class="settings-btn-small" onclick="changeUserNickname()">✏️ Změnit</button>
                 </div>
                 <div style="font-size:0.7rem;color:var(--text-muted);opacity:0.7;margin-top:4px;">Toto jméno vidí ostatní uživatelé aplikace (např. u doporučení).</div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section" style="background:rgba(37,211,102,0.06);border:1px solid rgba(37,211,102,0.25);border-radius:12px;padding:14px 16px;">
+                <span class="settings-label" style="color:#4ade80;">📨 Pozvat kamaráda</span>
+                <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">Pošli odkaz na appku přes Messenger nebo WhatsApp, případně si ho zkopíruj. Kamarád si na zamykací obrazovce požádá o přístup.</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
+                    <button class="settings-btn-small" onclick="inviteViaMessenger()" style="flex:1;min-width:120px;">💬 Messenger</button>
+                    <button class="settings-btn-small" onclick="inviteViaWhatsApp()" style="flex:1;min-width:120px;">🟢 WhatsApp</button>
+                    <button class="settings-btn-small" onclick="copyInviteLink()" style="flex:1;min-width:120px;">📋 Kopírovat odkaz</button>
+                </div>
+                <div id="inviteLinkPreview" style="font-size:0.7rem;color:var(--text-muted);opacity:0.7;margin-top:8px;word-break:break-all;"></div>
             </div>
             <div class="settings-divider"></div>
             <div class="settings-section" style="background:rgba(229,9,20,0.07);border:1px solid rgba(229,9,20,0.25);border-radius:12px;padding:14px 16px;">
@@ -3906,6 +3917,10 @@ header .logo-container.logo-mini ~ .header-actions{
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-02a', date: '2. 10. 2026', items: [
+            'Oprava — okno „Žádost o přístup“ (zadání přezdívky) se zobrazovalo rozmazaně pod zamykací obrazovkou; teď je vždy v popředí a jde do něj normálně psát',
+            'Nastavení → Ostatní — nová sekce 📨 Pozvat kamaráda: odeslání odkazu na appku přes Messenger nebo WhatsApp, případně 📋 zkopírování odkazu'
+        ] },
         { version: '2026-10-01d', date: '1. 10. 2026', items: [
             'Oprava — v Tematických seznamech 2 i Populárních streamech po návratu z detailu titulu někdy zůstávalo viset staré tlačítko "Zpět" přes nové (dvě tlačítka přes sebe)',
             'Oprava — 🇨🇿 České a slovenské filmy (Tematické seznamy 2) vracelo jen pár desítek titulů; chyba byla v tom, že TMDB bere čárku jako "a zároveň", ne "nebo" — opraveno na filmy z ČR NEBO SR'
@@ -40547,10 +40562,63 @@ document.addEventListener('DOMContentLoaded', function() {
             if (el) { el.textContent = text || ''; el.style.color = color || '#aaa'; }
         });
     };
+    // ── Zvací odkaz (Nastavení → Ostatní → Pozvat kamaráda) ──
+    window._getInviteUrl = function() {
+        try {
+            var l = window.location;
+            if (l && (l.protocol === 'https:' || l.protocol === 'http:')) return l.origin + (l.pathname || '/').replace(/index\.html$/, '');
+        } catch (e) {}
+        return 'https://projekt-sinatorsearch.vercel.app/';
+    };
+    window._getInviteText = function() {
+        return '🎬 Zkus Sinator Search – filmy, seriály, TV a radio na jednom místě. Otevři odkaz a na zamykací obrazovce klikni na „Požádat o přístup“: ' + window._getInviteUrl();
+    };
+    window._copyText = async function(txt) {
+        try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(txt); return true; } } catch (e) {}
+        try {
+            var ta = document.createElement('textarea');
+            ta.value = txt; ta.style.cssText = 'position:fixed;opacity:0;left:-9999px;';
+            document.body.appendChild(ta); ta.select();
+            var ok = document.execCommand('copy');
+            document.body.removeChild(ta);
+            return !!ok;
+        } catch (e) { return false; }
+    };
+    window._inviteToast = function(m) { if (typeof showToast === 'function') showToast(m); else alert(m); };
+    window.copyInviteLink = async function() {
+        var ok = await window._copyText(window._getInviteUrl());
+        window._inviteToast(ok ? '📋 Odkaz zkopírován' : '⚠️ Kopírování se nezdařilo: ' + window._getInviteUrl());
+    };
+    window.inviteViaWhatsApp = function() {
+        window.open('https://wa.me/?text=' + encodeURIComponent(window._getInviteText()), '_blank');
+    };
+    window.inviteViaMessenger = async function() {
+        var url = window._getInviteUrl();
+        var left = false;
+        var onHide = function() { if (document.hidden) left = true; };
+        document.addEventListener('visibilitychange', onHide);
+        try { window.location.href = 'fb-messenger://share/?link=' + encodeURIComponent(url); } catch (e) {}
+        // Když se Messenger neotevře (není nainstalovaný / desktop), odkaz se zkopíruje
+        setTimeout(async function() {
+            document.removeEventListener('visibilitychange', onHide);
+            if (!left) {
+                var ok = await window._copyText(window._getInviteText());
+                window._inviteToast(ok ? '📋 Messenger se neotevřel – odkaz je zkopírovaný, vlož ho do chatu' : '⚠️ Messenger se neotevřel');
+            }
+        }, 1800);
+    };
+    (function() {
+        var fill = function() { var el = document.getElementById('inviteLinkPreview'); if (el) el.textContent = window._getInviteUrl(); };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill); else fill();
+    })();
+
     window.openAccessRequestModal = function() {
         var ov = document.getElementById('accessReqOverlay');
         var inp = document.getElementById('accessReqNick');
         if (!ov) return;
+        // Okno žádosti musí být vždy nad zamykací obrazovkou: přesun na konec <body> + nejvyšší z-index
+        try { document.body.appendChild(ov); } catch (e) {}
+        ov.style.zIndex = '2147483647';
         ov.style.display = 'flex';
         if (inp && !inp.value) {
             try { inp.value = localStorage.getItem('sinator_access_nick') || localStorage.getItem('sinator_user_nick') || ''; } catch (e) {}
