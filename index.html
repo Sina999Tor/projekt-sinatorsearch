@@ -3933,10 +3933,23 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-02b', date: '2. 10. 2026', items: [
+            'Admin → Registrovaní uživatelé — po schválení žádosti adminem (level 2) se uživatel automaticky přesune ze „Žádostí o přístup“ mezi běžné registrované uživatele; vidíš jeho online/offline stav a můžeš mu dát Admin práva, resetovat appku, odebrat přístup apod. Dokud appku po schválení poprvé nespustí, je v seznamu jako offline („schválen · ještě nepřipojen“)',
+            '„Žádosti o přístup“ teď ukazují jen čekající žádosti; odebrání přístupu schválenému uživateli se dělá tlačítkem ⛔ v seznamu uživatelů'
+        ] },
         { version: '2026-10-02a', date: '2. 10. 2026', items: [
             'Oprava — okno „Žádost o přístup“ (zadání přezdívky) bylo rozmazané a nešlo do něj psát, protože zamčená appka blokuje vše mimo zamykací obrazovku; okno se teď vkládá přímo do ní a rozmazání i blokace jsou pro něj vypnuté',
             'Oprava — okno „Co je nového“ se už nezobrazuje zamčené appce ani novému uživateli před zadáním přezdívky (blokovalo psaní); ukáže se až po odemčení a zadání přezdívky',
             'Nastavení → Ostatní — nová sekce 📨 Pozvat kamaráda: odeslání odkazu na appku přes Messenger nebo WhatsApp, případně 📋 zkopírování odkazu'
+        ] },
+        { version: '2026-10-01z3', date: 'Doplněno zpětně', items: [
+            'Žádost o přístup do appky — zamčená appka nabízí odeslání přezdívky adminovi; admin level 2 žádost schválí ✅ nebo zamítne ❌ v Nastavení → Admin. Po schválení se appka sama odemkne a heslo je defaultně vypnuté („Nikdy nevyžadovat heslo“)',
+            'Admin level 2 — správa uživatelů na dálku: 🛡️➕ udělit Admin level 1, 🛡️➖ odebrat Admin level 1, 🔄 resetovat appku (znovu heslo + jméno), ⛔ odebrat přístup do appky (zamknout + smazat jméno), 🗑️ smazat uživatele',
+            'Přehled registrovaných uživatelů (online/offline v reálném čase, ⭐ = Admin level 1, ⭐⭐ = Admin level 2) a zobrazení/mazání API klíčů je dostupné jen pro Admin level 2'
+        ] },
+        { version: '2026-10-01z2', date: 'Doplněno zpětně', items: [
+            'Nefunkční TV streamy — Admin level 2 může kanál označit 🚫 jako nefunkční nebo ↺ obnovit; označení je sdílené přes Firebase pro všechny uživatele, celé značení lze vypnout přepínačem v Nastavení',
+            'Správa IPTV kanálů (Admin level 2) — všechny kanály ze všech zdrojů pod sebou, zap/vyp kanálů, přejmenování názvů; nastavení je sdílené pro všechny uživatele'
         ] },
         { version: '2026-10-01d', date: '1. 10. 2026', items: [
             'Oprava — v Tematických seznamech 2 i Populárních streamech po návratu z detailu titulu někdy zůstávalo viset staré tlačítko "Zpět" přes nové (dvě tlačítka přes sebe)',
@@ -41813,9 +41826,10 @@ function _renderAccessRequests(all) {
     .filter(([k, v]) => k.indexOf('_req_') === 0 && v && v.rn)
     .map(([k, v]) => ({ rk: k, nick: v.rn, st: v.st, ts: v.ts || 0 }));
   const pending = reqs.filter(r => r.st === 'pending').sort((a, b) => a.ts - b.ts);
-  const approved = reqs.filter(r => r.st === 'approved').sort((a, b) => a.nick.localeCompare(b.nick, 'cs'));
+  // Schválení uživatelé se zobrazují v seznamu registrovaných uživatelů níže (online/offline + správa),
+  // tady zůstávají jen čekající žádosti.
   if (cnt) cnt.textContent = pending.length ? `(${pending.length} nových)` : '';
-  if (!pending.length && !approved.length) {
+  if (!pending.length) {
     wrap.innerHTML = '<div style="color:#888;font-size:0.8rem;">Žádné žádosti.</div>';
     return;
   }
@@ -41827,12 +41841,6 @@ function _renderAccessRequests(all) {
         <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">⏳ ${_escapeHtmlU(r.nick)}</span>
         <span style="font-size:0.7rem;color:#888;">${_formatLastSeen(r.ts)}</span>
         ${btn('approve', r, '✅ Schválit', '#22c55e', 'Schválit přístup')}${btn('reject', r, '❌', '#ff6b6b', 'Zamítnout')}
-      </div>`).join('') +
-    approved.map(r => `
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-elevated);border-radius:8px;">
-        <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">✅ ${_escapeHtmlU(r.nick)}</span>
-        <span style="font-size:0.7rem;color:#888;">schválen</span>
-        ${btn('revoke', r, '⛔ Odebrat', '#ff9f43', 'Odebrat přístup do appky')}
       </div>`).join('');
 }
 
@@ -41948,6 +41956,14 @@ function attachAdminUsersListener() {
         adminLevel: u.adminLevel || (u.admin ? 1 : 0),
         online: (now - (u.t || 0)) < USER_STALE_MS
       }));
+    // Schválení uživatelé, kteří ještě nemají vlastní záznam (po schválení appku ještě nespustili) —
+    // přidáme je mezi uživatele jako offline, ať je admin vidí a může jim dát práva.
+    Object.entries(all).forEach(([k, v]) => {
+      if (k.indexOf('_req_') !== 0 || !v || !v.rn || v.st !== 'approved') return;
+      const uk = k.slice(5);
+      if (all[uk] && all[uk].nick) return;
+      users.push({ key: uk, nick: v.rn, lastSeen: 0, isAdmin: false, adminLevel: 0, online: false, pendingFirst: true });
+    });
     if (!users.length) {
       wrap.innerHTML = '<div style="color:#888;font-size:0.8rem;">Zatím žádní registrovaní uživatelé.</div>';
       return;
@@ -41958,7 +41974,7 @@ function attachAdminUsersListener() {
       users.map(u => {
         const star = u.adminLevel === 2 ? '⭐⭐ ' : (u.adminLevel === 1 ? '⭐ ' : '');
         const isSelf = u.key === myKey;
-        const delBtn = (isLvl2 && !isSelf)
+        const delBtn = (isLvl2 && !isSelf && !u.pendingFirst)
           ? `<button class="admin-del-user-btn" data-key="${_escapeHtmlU(u.key)}" data-nick="${_escapeHtmlU(u.nick)}" title="Smazat uživatele (bude si muset znovu zadat jméno)" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:1rem;padding:2px 6px;">🗑️</button>`
           : '';
         const resetBtn = (isLvl2 && !isSelf)
@@ -41977,7 +41993,7 @@ function attachAdminUsersListener() {
         <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-elevated);border-radius:8px;">
           <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:${u.online ? '#22c55e' : '#555'};box-shadow:${u.online ? '0 0 6px #22c55e' : 'none'};"></span>
           <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">${star}${_escapeHtmlU(u.nick)}</span>
-          <span style="font-size:0.7rem;color:#888;">${u.online ? 'online' : _formatLastSeen(u.lastSeen)}</span>
+          <span style="font-size:0.7rem;color:#888;">${u.online ? 'online' : (u.pendingFirst ? 'schválen · ještě nepřipojen' : _formatLastSeen(u.lastSeen))}</span>
           ${grantBtn}${revokeBtn}${resetBtn}${noAccessBtn}${delBtn}
         </div>`;
       }).join('');
