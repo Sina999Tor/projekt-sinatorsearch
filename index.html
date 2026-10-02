@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-10-01T16:20:00Z -->
+<!-- BUILD: 2026-10-01T17:05:00Z -->
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -3882,6 +3882,16 @@ header .logo-container.logo-mini ~ .header-actions{
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-01d', date: '1. 10. 2026', items: [
+            'Oprava — v Tematických seznamech 2 i Populárních streamech po návratu z detailu titulu někdy zůstávalo viset staré tlačítko "Zpět" přes nové (dvě tlačítka přes sebe)',
+            'Oprava — 🇨🇿 České a slovenské filmy (Tematické seznamy 2) vracelo jen pár desítek titulů; chyba byla v tom, že TMDB bere čárku jako "a zároveň", ne "nebo" — opraveno na filmy z ČR NEBO SR'
+        ] },
+        { version: '2026-10-01c', date: '1. 10. 2026', items: [
+            'Oprava — 👩 V hlavní roli ženy (Tematické seznamy 2) se mohlo zobrazovat prázdné; jeden úzký klíčový výraz nahrazen kombinací víc souvisejících výrazů a snížen limit počtu hlasů, aby TMDB vracelo víc výsledků'
+        ] },
+        { version: '2026-10-01b', date: '1. 10. 2026', items: [
+            'Tematické seznamy 2 — nové položky: 🦕 Dinosauři, 🎬 Podle skutečných událostí, 😂 Nejlepší komedie 1980–současnost, 🇨🇿🇸🇰 Nejlepší české a slovenské filmy 1980–současnost, 👻 Nejlepší horory 1980–současnost, ⛓️ Vězení, 🦸 MCU – Marvel Studios'
+        ] },
         { version: '2026-10-01a', date: '1. 10. 2026', items: [
             'Seznamy — nová položka 🎞️ Tematické seznamy 2: přes 65 dalších témat (klasiky, sporty, studia Disney/Pixar/DreamWorks/A24/Ghibli/MCU, Zombie, Vlkodlaci, Upíři, Žraloci, České a slovenské filmy, České pohádky, Vánoční pohádky a filmy a další), nekonečný scroll, návrat z detailu na stejné místo'
         ] },
@@ -17131,7 +17141,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         { emoji:'🧟', name:'Zombie', type:'movie', keywordTerm:'zombie', params:'sort_by=popularity.desc&vote_count.gte=50' },
         { emoji:'🤼', name:'Zápasníci', type:'movie', keywordTerm:'wrestling', params:'sort_by=popularity.desc&vote_count.gte=5' },
         { emoji:'🕵️', name:'Únos a zmizení', type:'movie', keywordTerm:'kidnapping', params:'sort_by=popularity.desc&vote_count.gte=50' },
-        { emoji:'🇨🇿', name:'České a slovenské filmy', type:'movie', params:'with_origin_country=CZ,SK&sort_by=popularity.desc', minResults:80, broaden:'czsk' },
+        { emoji:'🇨🇿', name:'České a slovenské filmy', type:'movie', params:'with_origin_country=CZ|SK&sort_by=popularity.desc&vote_count.gte=5' },
         { emoji:'🧚', name:'České pohádky', type:'movie', params:'with_origin_country=CZ&with_genres=14,10751&sort_by=popularity.desc&vote_count.gte=3' },
         { emoji:'⛓️', name:'Vězení', type:'movie', keywordTerm:'prison', params:'sort_by=popularity.desc&vote_count.gte=5' },
         { emoji:'🦈', name:'Žraloci', type:'movie', keywordTerm:'shark', params:'sort_by=popularity.desc&vote_count.gte=15' },
@@ -17274,6 +17284,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         if (!theme) return;
         state._backTo = 'thematic2';
         state._thematicFull2 = { idx, theme, page: 0, totalPages: 1, loading: false, seenIds: new Set(), items: [], resolvedParams: null };
+        const left = $('modalNavLeft'); if (left) left.innerHTML = '';
         const right = $('modalNavRight');
         if (right) right.innerHTML = `<button class="modal-close-btn" onclick="closeThematicThemeFull2()" title="Zpět na Tematické seznamy 2" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Tematické seznamy 2</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
         $('modalScrollBody').innerHTML = `<div style="padding:16px;">
@@ -17301,6 +17312,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const st = state._thematicFull2;
         if (!st) { openThematicListsModal2(); return; }
         state._backTo = 'thematic2results';
+        const left = $('modalNavLeft'); if (left) left.innerHTML = '';
         const right = $('modalNavRight');
         if (right) right.innerHTML = `<button class="modal-close-btn" onclick="closeThematicThemeFull2()" title="Zpět na Tematické seznamy 2" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Tematické seznamy 2</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
         $('modalScrollBody').innerHTML = `<div style="padding:16px;">
@@ -17396,6 +17408,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
     function openStreamingProviderPicker(id, name, logoPath) {
         state._backTo = 'streaming';
+        const left = $('modalNavLeft'); if (left) left.innerHTML = '';
         const right = $('modalNavRight');
         if (right) right.innerHTML = `<button class="modal-close-btn" onclick="openStreamingModal()" title="Zpět na Populární streamy" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← Streamy</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
         const logo = logoPath ? `<img src="${IMG}w185${logoPath}" style="width:40px;height:40px;border-radius:9px;object-fit:cover;vertical-align:middle;margin-right:10px;">` : '';
@@ -17528,6 +17541,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             page: 0, totalPages: 1, moviePage: 0, movieTotalPages: 1, tvPage: 0, tvTotalPages: 1,
             loading: false, seenIds: new Set(), items: []
         };
+        const left = $('modalNavLeft'); if (left) left.innerHTML = '';
         const right = $('modalNavRight');
         const logo = logoPath ? `<img src="${IMG}w185${logoPath}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:8px;">` : '';
         if (right) right.innerHTML = `<button class="modal-close-btn" onclick="openStreamingProviderPicker(${providerId},'${jsq(name)}','${logoPath||''}')" title="Zpět" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← ${name}</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
@@ -17552,6 +17566,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const st = state._streamFull;
         if (!st) { openStreamingModal(); return; }
         state._backTo = 'streamingResults';
+        const left = $('modalNavLeft'); if (left) left.innerHTML = '';
         const right = $('modalNavRight');
         const logo = st.logoPath ? `<img src="${IMG}w185${st.logoPath}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:8px;">` : '';
         if (right) right.innerHTML = `<button class="modal-close-btn" onclick="openStreamingProviderPicker(${st.providerId},'${jsq(st.name)}','${st.logoPath||''}')" title="Zpět" style="width:auto;padding:0 12px;border-radius:17px;font-size:0.85rem;">← ${st.name}</button><button class="modal-close-btn" onclick="closeModal()" title="Zavřít">✕</button>`;
