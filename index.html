@@ -3926,6 +3926,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // - "version" musí být unikátní řetězec (stačí datum) — podle něj appka
     //   pozná, že jde o novou verzi, a znovu ukáže okno "Co je nového".
     // - "date" je jen hezky čitelné datum pro zobrazení v historii.
+    // - Položka, která se týká Adminu (level 1/2), se zapíše jako objekt
+    //   { admin: true, text: '...' } — vidí ji jen Admin level 2, ostatním se
+    //   v historii změn nezobrazí (záznam bez viditelných položek se skryje celý).
     // - Nic jiného mazat/měnit netřeba, staré položky zůstávají v poli
     //   a tvoří historii zobrazenou v Nastavení → Ostatní → Historie změn.
     // Uživateli se okno "Co je nového" zobrazí jen jednou pro nejnovější
@@ -3934,8 +3937,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-02b', date: '2. 10. 2026', items: [
-            'Admin → Registrovaní uživatelé — po schválení žádosti adminem (level 2) se uživatel automaticky přesune ze „Žádostí o přístup“ mezi běžné registrované uživatele; vidíš jeho online/offline stav a můžeš mu dát Admin práva, resetovat appku, odebrat přístup apod. Dokud appku po schválení poprvé nespustí, je v seznamu jako offline („schválen · ještě nepřipojen“)',
-            '„Žádosti o přístup“ teď ukazují jen čekající žádosti; odebrání přístupu schválenému uživateli se dělá tlačítkem ⛔ v seznamu uživatelů'
+            { admin: true, text: 'Admin → Registrovaní uživatelé — po schválení žádosti adminem (level 2) se uživatel automaticky přesune ze „Žádostí o přístup“ mezi běžné registrované uživatele; vidíš jeho online/offline stav a můžeš mu dát Admin práva, resetovat appku, odebrat přístup apod. Dokud appku po schválení poprvé nespustí, je v seznamu jako offline („schválen · ještě nepřipojen“)' },
+            { admin: true, text: '„Žádosti o přístup“ teď ukazují jen čekající žádosti; odebrání přístupu schválenému uživateli se dělá tlačítkem ⛔ v seznamu uživatelů' },
+            { admin: true, text: 'Historie změn — všechny úpravy týkající se Admin level 1 a 2 (správa uživatelů, žádosti o přístup, správa IPTV kanálů, značení nefunkčních streamů…) vidí jen Admin level 2; ostatním uživatelům se v historii změn ani v okně „Aplikace byla aktualizována“ nezobrazují' }
         ] },
         { version: '2026-10-02a', date: '2. 10. 2026', items: [
             'Oprava — okno „Žádost o přístup“ (zadání přezdívky) bylo rozmazané a nešlo do něj psát, protože zamčená appka blokuje vše mimo zamykací obrazovku; okno se teď vkládá přímo do ní a rozmazání i blokace jsou pro něj vypnuté',
@@ -3943,13 +3947,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             'Nastavení → Ostatní — nová sekce 📨 Pozvat kamaráda: odeslání odkazu na appku přes Messenger nebo WhatsApp, případně 📋 zkopírování odkazu'
         ] },
         { version: '2026-10-01z3', date: 'Doplněno zpětně', items: [
-            'Žádost o přístup do appky — zamčená appka nabízí odeslání přezdívky adminovi; admin level 2 žádost schválí ✅ nebo zamítne ❌ v Nastavení → Admin. Po schválení se appka sama odemkne a heslo je defaultně vypnuté („Nikdy nevyžadovat heslo“)',
-            'Admin level 2 — správa uživatelů na dálku: 🛡️➕ udělit Admin level 1, 🛡️➖ odebrat Admin level 1, 🔄 resetovat appku (znovu heslo + jméno), ⛔ odebrat přístup do appky (zamknout + smazat jméno), 🗑️ smazat uživatele',
-            'Přehled registrovaných uživatelů (online/offline v reálném čase, ⭐ = Admin level 1, ⭐⭐ = Admin level 2) a zobrazení/mazání API klíčů je dostupné jen pro Admin level 2'
+            { admin: true, text: 'Žádost o přístup do appky — zamčená appka nabízí odeslání přezdívky adminovi; admin level 2 žádost schválí ✅ nebo zamítne ❌ v Nastavení → Admin. Po schválení se appka sama odemkne a heslo je defaultně vypnuté („Nikdy nevyžadovat heslo“)' },
+            { admin: true, text: 'Admin level 2 — správa uživatelů na dálku: 🛡️➕ udělit Admin level 1, 🛡️➖ odebrat Admin level 1, 🔄 resetovat appku (znovu heslo + jméno), ⛔ odebrat přístup do appky (zamknout + smazat jméno), 🗑️ smazat uživatele' },
+            { admin: true, text: 'Přehled registrovaných uživatelů (online/offline v reálném čase, ⭐ = Admin level 1, ⭐⭐ = Admin level 2) a zobrazení/mazání API klíčů je dostupné jen pro Admin level 2' }
         ] },
         { version: '2026-10-01z2', date: 'Doplněno zpětně', items: [
-            'Nefunkční TV streamy — Admin level 2 může kanál označit 🚫 jako nefunkční nebo ↺ obnovit; označení je sdílené přes Firebase pro všechny uživatele, celé značení lze vypnout přepínačem v Nastavení',
-            'Správa IPTV kanálů (Admin level 2) — všechny kanály ze všech zdrojů pod sebou, zap/vyp kanálů, přejmenování názvů; nastavení je sdílené pro všechny uživatele'
+            { admin: true, text: 'Nefunkční TV streamy — Admin level 2 může kanál označit 🚫 jako nefunkční nebo ↺ obnovit; označení je sdílené přes Firebase pro všechny uživatele, celé značení lze vypnout přepínačem v Nastavení' },
+            { admin: true, text: 'Správa IPTV kanálů (Admin level 2) — všechny kanály ze všech zdrojů pod sebou, zap/vyp kanálů, přejmenování názvů; nastavení je sdílené pro všechny uživatele' }
         ] },
         { version: '2026-10-01d', date: '1. 10. 2026', items: [
             'Oprava — v Tematických seznamech 2 i Populárních streamech po návratu z detailu titulu někdy zůstávalo viset staré tlačítko "Zpět" přes nové (dvě tlačítka přes sebe)',
@@ -4076,7 +4080,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         // dat jednotlivých změn (ta appka dřív nezaznamenávala), pořadí je
         // jen orientační od novějšího k staršímu.
         { version: 'legacy', date: 'Starší aktualizace', items: [
-            'Nová Správa IPTV kanálů, Kanály 2–6, přesun kanálů mezi skupinami',
+            { admin: true, text: 'Nová Správa IPTV kanálů, Kanály 2–6, přesun kanálů mezi skupinami' },
             'iVysílání ČT integrace žánrových dlaždic',
             'Zábava: náhodný výběr, návrhy podle nálady, hádací hry, žebříčky',
             'Minisérie tab, Directors tab s kurátorovanými CZ/SK režiséry, anime tab s CJK překladem názvů',
@@ -4136,8 +4140,21 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     }
     window._maybeShowWhatsNew = function() { setTimeout(showWhatsNewIfNeeded, 700); };
 
+    // Viditelnost položek changelogu: admin-only položky vidí jen Admin level 2
+    function _clIsAdmin2() { return typeof window._isAdminLevel2 === 'function' && !!window._isAdminLevel2(); }
+    function _clVisibleItems(entry) {
+        const adm = _clIsAdmin2();
+        return (entry.items || [])
+            .filter(it => adm || !(it && typeof it === 'object' && it.admin))
+            .map(it => (it && typeof it === 'object') ? it.text : it);
+    }
+    // Nejnovější záznam, který má pro daného uživatele aspoň jednu viditelnou položku
+    function _clLatestVisible() {
+        return CHANGELOG_HISTORY.find(e => _clVisibleItems(e).length) || null;
+    }
+
     async function showWhatsNewIfNeeded() {
-        const latest = CHANGELOG_HISTORY[0];
+        const latest = _clLatestVisible();
         if (!latest) return;
         try {
             if (localStorage.getItem('sinator_whatsnew_seen') === latest.version) return;
@@ -4166,7 +4183,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         document.body.appendChild(overlay);
     }
     window.closeWhatsNewOverlay = function() {
-        const latest = CHANGELOG_HISTORY[0];
+        const latest = _clLatestVisible();
         try { if (latest) localStorage.setItem('sinator_whatsnew_seen', latest.version); } catch(e) {}
         const el = document.getElementById('whatsNewOverlay');
         if (el) el.remove();
@@ -4179,12 +4196,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     function _buildChangelogGroups() {
         const groups = [];
         for (const entry of CHANGELOG_HISTORY) {
+            const vis = _clVisibleItems(entry);
+            if (!vis.length) continue;
             const key = entry.date || entry.version || '';
             const last = groups[groups.length - 1];
             if (last && last.date === key) {
-                last.items = last.items.concat(entry.items || []);
+                last.items = last.items.concat(vis);
             } else {
-                groups.push({ date: key, items: (entry.items || []).slice() });
+                groups.push({ date: key, items: vis });
             }
         }
         return groups;
