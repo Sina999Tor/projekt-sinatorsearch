@@ -365,6 +365,22 @@ header .logo-container.logo-mini ~ .header-actions{
 </div>
 
 <!-- ═══ ŽÁDOST O PŘÍSTUP DO APPKY ════════════════════════════════════ -->
+<style>
+/* Okno „Žádost o přístup“ nesmí být rozmazané ani blokované zamčenou appkou */
+html body.app-locked #accessReqOverlay,
+html body #accessReqOverlay,
+html body #accessReqOverlay * {
+    filter: none !important;
+    -webkit-filter: none !important;
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    visibility: visible !important;
+}
+html body #accessReqOverlay[style*="display:none"], html body #accessReqOverlay[style*="display: none"] { display: none !important; }
+html body #accessReqNick { -webkit-user-select: text !important; user-select: text !important; -webkit-appearance: none; }
+</style>
 <div id="accessReqOverlay" style="display:none;position:fixed;inset:0;z-index:2147483647;background:rgba(6,6,10,0.97);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:24px;">
   <div style="max-width:380px;width:100%;background:#141414;border:1px solid rgba(255,215,0,0.3);border-radius:16px;padding:28px 22px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.6);">
     <div style="font-size:2.2rem;margin-bottom:8px;">📩</div>
@@ -3918,7 +3934,7 @@ header .logo-container.logo-mini ~ .header-actions{
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-02a', date: '2. 10. 2026', items: [
-            'Oprava — okno „Žádost o přístup“ (zadání přezdívky) se zobrazovalo rozmazaně pod zamykací obrazovkou; teď je vždy v popředí a jde do něj normálně psát',
+            'Oprava — okno „Žádost o přístup“ (zadání přezdívky) bylo rozmazané a nešlo do něj psát, protože zamčená appka blokuje vše mimo zamykací obrazovku; okno se teď vkládá přímo do ní a rozmazání i blokace jsou pro něj vypnuté',
             'Nastavení → Ostatní — nová sekce 📨 Pozvat kamaráda: odeslání odkazu na appku přes Messenger nebo WhatsApp, případně 📋 zkopírování odkazu'
         ] },
         { version: '2026-10-01d', date: '1. 10. 2026', items: [
@@ -40617,7 +40633,12 @@ document.addEventListener('DOMContentLoaded', function() {
         var inp = document.getElementById('accessReqNick');
         if (!ov) return;
         // Okno žádosti musí být vždy nad zamykací obrazovkou: přesun na konec <body> + nejvyšší z-index
-        try { document.body.appendChild(ov); } catch (e) {}
+        // (zamčená appka rozmazává/blokuje vše mimo #lockScreen, proto se okno vloží přímo DO zamykací obrazovky)
+        try {
+            var lk = document.getElementById('lockScreen');
+            if (lk && document.body.classList.contains('app-locked')) lk.appendChild(ov);
+            else document.body.appendChild(ov);
+        } catch (e) {}
         ov.style.zIndex = '2147483647';
         ov.style.display = 'flex';
         if (inp && !inp.value) {
