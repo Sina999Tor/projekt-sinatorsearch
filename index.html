@@ -358,7 +358,25 @@ header .logo-container.logo-mini ~ .header-actions{
                onkeydown="if(event.key==='Enter')checkLockPassword()">
         <button id="lockSubmitBtn" onclick="checkLockPassword()">Odemknout</button>
         <div id="lockError"></div>
+        <button id="lockRequestBtn" type="button" onclick="openAccessRequestModal()"
+                style="width:100%;margin-top:14px;padding:12px;border-radius:12px;border:1px solid #444;background:transparent;color:#ddd;font-size:0.95rem;font-weight:600;cursor:pointer;">📩 Požádat o přístup</button>
+        <div id="lockReqStatus" style="margin-top:10px;font-size:0.82rem;min-height:16px;"></div>
     </div>
+</div>
+
+<!-- ═══ ŽÁDOST O PŘÍSTUP DO APPKY ════════════════════════════════════ -->
+<div id="accessReqOverlay" style="display:none;position:fixed;inset:0;z-index:2000000000;background:rgba(6,6,10,0.97);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:24px;">
+  <div style="max-width:380px;width:100%;background:#141414;border:1px solid rgba(255,215,0,0.3);border-radius:16px;padding:28px 22px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.6);">
+    <div style="font-size:2.2rem;margin-bottom:8px;">📩</div>
+    <h2 style="font-family:'Playfair Display',serif;color:#ffd700;font-size:1.25rem;margin-bottom:8px;">Žádost o přístup</h2>
+    <p style="color:#aaa;font-size:0.88rem;line-height:1.55;margin-bottom:16px;">Zadej svou přezdívku a pošli žádost adminovi. Po schválení se appka sama odemkne.</p>
+    <input type="text" id="accessReqNick" maxlength="24" placeholder="Tvoje přezdívka…" autocomplete="off"
+           style="width:100%;padding:13px 14px;border-radius:10px;border:1px solid #333;background:#1c1c1c;color:#fff;font-size:1rem;text-align:center;box-sizing:border-box;"
+           onkeydown="if(event.key==='Enter')submitAccessRequest()">
+    <div id="accessReqMsg" style="font-size:0.84rem;margin-top:10px;min-height:18px;line-height:1.4;"></div>
+    <button id="accessReqSendBtn" type="button" onclick="submitAccessRequest()" style="width:100%;margin-top:12px;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,#ffd700,#e5a800);color:#1a1a1a;font-weight:800;font-size:1rem;cursor:pointer;">Odeslat adminovi</button>
+    <button type="button" onclick="closeAccessRequestModal()" style="width:100%;margin-top:8px;padding:11px;border-radius:10px;border:1px solid #333;background:transparent;color:#aaa;font-size:0.9rem;cursor:pointer;">Zavřít</button>
+  </div>
 </div>
 <!-- ════════════════════════════════════════════════════════════════════ -->
 
@@ -1532,6 +1550,12 @@ header .logo-container.logo-mini ~ .header-actions{
                 <span class="settings-label" style="color:#4fc3f7;">👥 Registrovaní uživatelé</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 10px;line-height:1.4;">
                     Přehled všech jmen/přezdívek nastavených v appce a jejich aktuální online stav (aktualizuje se v reálném čase).
+                </div>
+                <div style="margin-bottom:14px;">
+                    <span class="settings-label" style="color:#ffd700;">📩 Žádosti o přístup <span id="adminAccessReqCount"></span></span>
+                    <div id="adminAccessReqList" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+                        <div style="color:#888;font-size:0.8rem;">Žádné žádosti.</div>
+                    </div>
                 </div>
                 <div id="adminUsersList" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;">
                     <div style="color:#888;font-size:0.8rem;">Načítám…</div>
@@ -40514,6 +40538,50 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.setItem('sinator_adult_content', 'false');
     }
 
+    window._unlockApp = _unlock;
+
+    // ── Žádost o přístup (UI) — vlastní odeslání řeší Firebase modul (_submitAccessRequest) ──
+    window._setAccessReqStatus = function(text, color) {
+        ['accessReqMsg', 'lockReqStatus'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) { el.textContent = text || ''; el.style.color = color || '#aaa'; }
+        });
+    };
+    window.openAccessRequestModal = function() {
+        var ov = document.getElementById('accessReqOverlay');
+        var inp = document.getElementById('accessReqNick');
+        if (!ov) return;
+        ov.style.display = 'flex';
+        if (inp && !inp.value) {
+            try { inp.value = localStorage.getItem('sinator_access_nick') || localStorage.getItem('sinator_user_nick') || ''; } catch (e) {}
+        }
+        setTimeout(function() { if (inp) inp.focus(); }, 150);
+    };
+    window.closeAccessRequestModal = function() {
+        var ov = document.getElementById('accessReqOverlay');
+        if (ov) ov.style.display = 'none';
+    };
+    window.submitAccessRequest = async function() {
+        var inp = document.getElementById('accessReqNick');
+        var btn = document.getElementById('accessReqSendBtn');
+        var val = ((inp && inp.value) || '').trim();
+        if (val.length < 2) { window._setAccessReqStatus('⚠️ Zadej alespoň 2 znaky.', '#ff6b6b'); return; }
+        if (val.length > 24) { window._setAccessReqStatus('⚠️ Max. 24 znaků.', '#ff6b6b'); return; }
+        if (typeof window._submitAccessRequest !== 'function') {
+            window._setAccessReqStatus('⚠️ Server nedostupný, zkus to za chvíli.', '#ff6b6b');
+            return;
+        }
+        if (btn) btn.disabled = true;
+        try {
+            var r = await window._submitAccessRequest(val);
+            window._setAccessReqStatus(r.msg, r.ok ? '#22c55e' : '#ff6b6b');
+        } catch (e) {
+            window._setAccessReqStatus('⚠️ Odeslání se nezdařilo.', '#ff6b6b');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    };
+
     window.checkLockPassword = async function() {
         var input = document.getElementById('lockPwdInput');
         var errEl = document.getElementById('lockError');
@@ -41406,6 +41474,10 @@ function _startUserPresenceHeartbeat(nick) {
         if (_ownCommandsUnsub) { _ownCommandsUnsub(); _ownCommandsUnsub = null; }
         alert('🔄 Aplikace byla resetována správcem — zadejte prosím heslo a jméno znovu.');
       }
+      if (cmd && cmd.revokeAccess) {
+        // Odebrání přístupu do appky správcem: zamknout + smazat jméno
+        _revokeLocalAccess('⛔ Přístup do aplikace vám byl odebrán správcem.');
+      }
       if (cmd && cmd.grantAdmin && localStorage.getItem('sinator_admin_mode') !== '1') {
         localStorage.setItem('sinator_admin_mode', '1');
         localStorage.removeItem('sinator_admin_level'); // level 1
@@ -41513,6 +41585,166 @@ function initNickGate() {
 // _unlock() poté, co je appka odemčena (heslem nebo bez hesla).
 window._checkNickGate = initNickGate;
 
+// ---- ŽÁDOST O PŘÍSTUP DO APPKY (bez hesla → schvaluje Admin level 2) ----
+// Žádost = presence/_req_<klíč> {rn, st: pending|approved|rejected|revoked, did, ts}
+// (záměrně bez pole "t" a "nick", aby se nepočítala do online-počítadla ani do seznamu uživatelů).
+const ACCESS_NICK_KEY = 'sinator_access_nick';
+const ACCESS_GRANTED_KEY = 'sinator_access_granted';
+const DEVICE_ID_KEY = 'sinator_device_id';
+let _accessReqUnsub = null;
+let _accessManual = false;
+
+function _getDeviceId() {
+  try {
+    let d = localStorage.getItem(DEVICE_ID_KEY);
+    if (!d) { d = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem(DEVICE_ID_KEY, d); }
+    return d;
+  } catch(e) { return 'x' + Math.random().toString(36).slice(2); }
+}
+function _setAccessStatus(t, c) { if (typeof window._setAccessReqStatus === 'function') window._setAccessReqStatus(t, c); }
+
+// Lokální odebrání přístupu: zamknout appku (i přes "Nikdy nevyžadovat heslo"), smazat jméno, zastavit heartbeat
+function _revokeLocalAccess(msg) {
+  try { localStorage.removeItem(ACCESS_GRANTED_KEY); } catch(e) {}
+  try { localStorage.removeItem(USER_NICK_KEY); } catch(e) {}
+  try { localStorage.removeItem('sinator_d_nick'); } catch(e) {}
+  if (_userHeartbeatTimer) { clearInterval(_userHeartbeatTimer); _userHeartbeatTimer = null; }
+  if (_ownPresenceUnsub) { _ownPresenceUnsub(); _ownPresenceUnsub = null; }
+  if (_ownCommandsUnsub) { _ownCommandsUnsub(); _ownCommandsUnsub = null; }
+  _nickGateChecked = false;
+  if (typeof window._forceRelockApp === 'function') window._forceRelockApp();
+  if (msg) alert(msg);
+}
+
+function _attachAccessReqListener(nick) {
+  const key = _sanitizeNickKey(nick);
+  if (!key) return;
+  if (_accessReqUnsub) { _accessReqUnsub(); _accessReqUnsub = null; }
+  const did = _getDeviceId();
+  _accessReqUnsub = onValue(ref(rtdb, 'presence/_req_' + key), (snap) => {
+    const granted = localStorage.getItem(ACCESS_GRANTED_KEY) === '1';
+    if (!snap.exists()) {
+      if (granted) _revokeLocalAccess('⛔ Přístup do aplikace vám byl odebrán správcem.');
+      return;
+    }
+    const r = snap.val() || {};
+    if (r.did && r.did !== did) return; // žádost z jiného zařízení
+    if (r.st === 'approved') {
+      const locked = document.body.classList.contains('app-locked');
+      if (!granted) {
+        // První schválení: heslo defaultně vypnuté ("Nikdy nevyžadovat heslo")
+        try {
+          localStorage.setItem(ACCESS_GRANTED_KEY, '1');
+          localStorage.setItem('sinator_pwd_never_required', '1');
+          localStorage.removeItem('sinator_pwd_always_required');
+          if (!localStorage.getItem(USER_NICK_KEY)) localStorage.setItem(USER_NICK_KEY, r.rn || nick);
+          if (!localStorage.getItem('sinator_d_nick')) localStorage.setItem('sinator_d_nick', r.rn || nick);
+        } catch(e) {}
+        if (typeof window._updatePwdNeverToggleUI === 'function') window._updatePwdNeverToggleUI();
+        if (typeof window._updatePwdAlwaysToggleUI === 'function') window._updatePwdAlwaysToggleUI();
+      }
+      if (locked && (!granted || _accessManual)) {
+        _setAccessStatus('✅ Přístup schválen!', '#22c55e');
+        if (typeof window.closeAccessRequestModal === 'function') window.closeAccessRequestModal();
+        if (typeof window._unlockApp === 'function') window._unlockApp();
+      }
+    } else if (r.st === 'pending') {
+      _setAccessStatus('⏳ Žádost odeslána — čeká na schválení adminem.', '#ffd700');
+    } else if (r.st === 'rejected') {
+      _setAccessStatus('❌ Žádost byla zamítnuta.', '#ff6b6b');
+    } else if (r.st === 'revoked') {
+      if (granted) _revokeLocalAccess('⛔ Přístup do aplikace vám byl odebrán správcem.');
+      _setAccessStatus('⛔ Přístup byl odebrán.', '#ff6b6b');
+    }
+  });
+}
+
+window._submitAccessRequest = async function(nick) {
+  nick = String(nick || '').trim();
+  const key = _sanitizeNickKey(nick);
+  const did = _getDeviceId();
+  const rRef = ref(rtdb, 'presence/_req_' + key);
+  try {
+    const [reqSnap, userSnap] = await Promise.all([get(rRef), get(ref(rtdb, 'presence/' + key))]);
+    const ex = reqSnap.exists() ? reqSnap.val() : null;
+    const taken = '⚠️ Tato přezdívka je už obsazená, zvol jinou.';
+    if (ex && ex.did && ex.did !== did && (ex.st === 'pending' || ex.st === 'approved')) return { ok: false, msg: taken };
+    const ownNick = (localStorage.getItem(USER_NICK_KEY) || '').toLowerCase();
+    const sameDeviceReq = !!(ex && ex.did === did);
+    if (userSnap.exists() && userSnap.val() && userSnap.val().nick && !sameDeviceReq && ownNick !== nick.toLowerCase()) {
+      return { ok: false, msg: taken };
+    }
+    _accessManual = true;
+    localStorage.setItem(ACCESS_NICK_KEY, nick);
+    if (!(ex && ex.did === did && ex.st === 'approved')) {
+      await set(rRef, { rn: nick, st: 'pending', did: did, ts: Date.now() });
+    }
+    _attachAccessReqListener(nick);
+    return { ok: true, msg: '📨 Žádost odeslána adminovi. Po schválení se appka odemkne sama.' };
+  } catch(e) {
+    return { ok: false, msg: '⚠️ Odeslání se nezdařilo: ' + (e && e.message || e) };
+  }
+};
+
+// Po startu: pokud toto zařízení už žádost podalo, sleduj její stav (schválení / odebrání na dálku)
+try {
+  const _an = localStorage.getItem(ACCESS_NICK_KEY);
+  if (_an) _attachAccessReqListener(_an);
+} catch(e) {}
+
+// Admin: seznam žádostí (čekající + schválení)
+function _renderAccessRequests(all) {
+  const wrap = document.getElementById('adminAccessReqList');
+  const cnt = document.getElementById('adminAccessReqCount');
+  if (!wrap) return;
+  const reqs = Object.entries(all || {})
+    .filter(([k, v]) => k.indexOf('_req_') === 0 && v && v.rn)
+    .map(([k, v]) => ({ rk: k, nick: v.rn, st: v.st, ts: v.ts || 0 }));
+  const pending = reqs.filter(r => r.st === 'pending').sort((a, b) => a.ts - b.ts);
+  const approved = reqs.filter(r => r.st === 'approved').sort((a, b) => a.nick.localeCompare(b.nick, 'cs'));
+  if (cnt) cnt.textContent = pending.length ? `(${pending.length} nových)` : '';
+  if (!pending.length && !approved.length) {
+    wrap.innerHTML = '<div style="color:#888;font-size:0.8rem;">Žádné žádosti.</div>';
+    return;
+  }
+  const btn = (act, r, label, color, title) =>
+    `<button class="admin-access-btn" data-act="${act}" data-rk="${_escapeHtmlU(r.rk)}" data-nick="${_escapeHtmlU(r.nick)}" title="${title}" style="background:none;border:1px solid ${color};color:${color};cursor:pointer;font-size:0.8rem;padding:4px 9px;border-radius:8px;">${label}</button>`;
+  wrap.innerHTML =
+    pending.map(r => `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.25);border-radius:8px;">
+        <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">⏳ ${_escapeHtmlU(r.nick)}</span>
+        <span style="font-size:0.7rem;color:#888;">${_formatLastSeen(r.ts)}</span>
+        ${btn('approve', r, '✅ Schválit', '#22c55e', 'Schválit přístup')}${btn('reject', r, '❌', '#ff6b6b', 'Zamítnout')}
+      </div>`).join('') +
+    approved.map(r => `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-elevated);border-radius:8px;">
+        <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">✅ ${_escapeHtmlU(r.nick)}</span>
+        <span style="font-size:0.7rem;color:#888;">schválen</span>
+        ${btn('revoke', r, '⛔ Odebrat', '#ff9f43', 'Odebrat přístup do appky')}
+      </div>`).join('');
+}
+
+function _bindAccessReqActions() {
+  const wrap = document.getElementById('adminAccessReqList');
+  if (!wrap || wrap.dataset.bound) return;
+  wrap.dataset.bound = '1';
+  wrap.addEventListener('click', function(e) {
+    const b = e.target.closest('.admin-access-btn');
+    if (!b || !window._isAdminLevel2()) return;
+    const act = b.getAttribute('data-act');
+    const rk = b.getAttribute('data-rk');
+    const nick = b.getAttribute('data-nick');
+    const newSt = act === 'approve' ? 'approved' : (act === 'reject' ? 'rejected' : 'revoked');
+    if (act === 'revoke' && !confirm(`Odebrat uživateli "${nick}" přístup do appky? Appka se mu hned zamkne.`)) return;
+    if (act === 'reject' && !confirm(`Zamítnout žádost uživatele "${nick}"?`)) return;
+    const rRef = ref(rtdb, 'presence/' + rk);
+    get(rRef).then(s => {
+      if (!s.exists()) return;
+      return set(rRef, Object.assign({}, s.val(), { st: newSt, ts: Date.now() }));
+    }).catch(err => alert('❌ Akce se nezdařila: ' + (err && err.message || err)));
+  });
+}
+
 // ---- ADMIN: přehled registrovaných uživatelů (online/offline + ⭐ admin) ----
 let _adminUsersListenerAttached = false;
 
@@ -41521,6 +41753,7 @@ function attachAdminUsersListener() {
   if (_adminUsersListenerAttached) return;
   _adminUsersListenerAttached = true;
   const usersRef = ref(rtdb, 'presence');
+  _bindAccessReqActions();
   const wrapEl = document.getElementById('adminUsersList');
   // Delegovaný listener na tlačítka v řádcích (přidá se jednou, přežije překreslení innerHTML)
   if (wrapEl && !wrapEl.dataset.adminActionsBound) {
@@ -41555,6 +41788,20 @@ function attachAdminUsersListener() {
           .catch(err => alert('❌ Reset se nezdařil: ' + (err && err.message || err)));
         return;
       }
+      const noAccessBtn = e.target.closest('.admin-noaccess-user-btn');
+      if (noAccessBtn) {
+        if (!window._isAdminLevel2()) return;
+        const key = noAccessBtn.getAttribute('data-key');
+        const nick = noAccessBtn.getAttribute('data-nick');
+        if (!confirm(`Odebrat uživateli "${nick}" přístup do appky? Appka se mu hned zamkne a smaže se jeho jméno. (Pokud přístup získal schválením žádosti, bez nové žádosti se už nedostane dovnitř.)`)) return;
+        set(ref(rtdb, 'presence/_cmd_' + key), { revokeAccess: true, ts: Date.now() })
+          .catch(err => alert('❌ Odebrání přístupu se nezdařilo: ' + (err && err.message || err)));
+        const rRef = ref(rtdb, 'presence/_req_' + key);
+        get(rRef).then(s => {
+          if (s.exists() && (s.val() || {}).st === 'approved') return set(rRef, Object.assign({}, s.val(), { st: 'revoked', ts: Date.now() }));
+        }).catch(() => {});
+        return;
+      }
       const grantBtn = e.target.closest('.admin-grant-user-btn');
       if (grantBtn) {
         if (!window._isAdminLevel2()) return;
@@ -41569,6 +41816,7 @@ function attachAdminUsersListener() {
   onValue(usersRef, (snap) => {
     const wrap = document.getElementById('adminUsersList');
     if (!wrap) return;
+    _renderAccessRequests(snap.exists() ? snap.val() : {});
     if (!snap.exists()) {
       wrap.innerHTML = '<div style="color:#888;font-size:0.8rem;">Zatím žádní registrovaní uživatelé.</div>';
       return;
@@ -41607,6 +41855,9 @@ function attachAdminUsersListener() {
         const revokeBtn = (isLvl2 && !isSelf && u.adminLevel === 1)
           ? `<button class="admin-revoke-user-btn" data-key="${_escapeHtmlU(u.key)}" data-nick="${_escapeHtmlU(u.nick)}" title="Odebrat Admin level 1" style="background:none;border:none;color:#ff9f43;cursor:pointer;font-size:1rem;padding:2px 6px;">🛡️➖</button>`
           : '';
+        const noAccessBtn = (isLvl2 && !isSelf)
+          ? `<button class="admin-noaccess-user-btn" data-key="${_escapeHtmlU(u.key)}" data-nick="${_escapeHtmlU(u.nick)}" title="Odebrat přístup do appky (zamknout + smazat jméno)" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:1rem;padding:2px 6px;">⛔</button>`
+          : '';
         const grantBtn = (isLvl2 && !isSelf && u.adminLevel === 0)
           ? `<button class="admin-grant-user-btn" data-key="${_escapeHtmlU(u.key)}" data-nick="${_escapeHtmlU(u.nick)}" title="Udělit Admin level 1 na dálku" style="background:none;border:none;color:#4fc3f7;cursor:pointer;font-size:1rem;padding:2px 6px;">🛡️➕</button>`
           : '';
@@ -41615,7 +41866,7 @@ function attachAdminUsersListener() {
           <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:${u.online ? '#22c55e' : '#555'};box-shadow:${u.online ? '0 0 6px #22c55e' : 'none'};"></span>
           <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">${star}${_escapeHtmlU(u.nick)}</span>
           <span style="font-size:0.7rem;color:#888;">${u.online ? 'online' : _formatLastSeen(u.lastSeen)}</span>
-          ${grantBtn}${revokeBtn}${resetBtn}${delBtn}
+          ${grantBtn}${revokeBtn}${resetBtn}${noAccessBtn}${delBtn}
         </div>`;
       }).join('');
   }, (err) => {
