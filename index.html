@@ -3935,6 +3935,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     const CHANGELOG_HISTORY = [
         { version: '2026-10-02a', date: '2. 10. 2026', items: [
             'Oprava — okno „Žádost o přístup“ (zadání přezdívky) bylo rozmazané a nešlo do něj psát, protože zamčená appka blokuje vše mimo zamykací obrazovku; okno se teď vkládá přímo do ní a rozmazání i blokace jsou pro něj vypnuté',
+            'Oprava — okno „Co je nového“ se už nezobrazuje zamčené appce ani novému uživateli před zadáním přezdívky (blokovalo psaní); ukáže se až po odemčení a zadání přezdívky',
             'Nastavení → Ostatní — nová sekce 📨 Pozvat kamaráda: odeslání odkazu na appku přes Messenger nebo WhatsApp, případně 📋 zkopírování odkazu'
         ] },
         { version: '2026-10-01d', date: '1. 10. 2026', items: [
@@ -4106,6 +4107,22 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         return fallback || '';
     }
 
+    // „Co je nového“ smí vyskočit jen odemčené appce a po zadání přezdívky
+    function _canShowWhatsNew() {
+        try {
+            if (document.body.classList.contains('app-locked')) return false;
+            var ls = document.getElementById('lockScreen');
+            if (ls && !ls.classList.contains('hidden')) return false;
+            var nk = document.getElementById('nickSetupOverlay');
+            if (nk && nk.style.display && nk.style.display !== 'none') return false;
+            var ar = document.getElementById('accessReqOverlay');
+            if (ar && ar.style.display && ar.style.display !== 'none') return false;
+            if (!(localStorage.getItem('sinator_user_nick') || localStorage.getItem('sinator_d_nick'))) return false;
+        } catch (e) {}
+        return true;
+    }
+    window._maybeShowWhatsNew = function() { setTimeout(showWhatsNewIfNeeded, 700); };
+
     async function showWhatsNewIfNeeded() {
         const latest = CHANGELOG_HISTORY[0];
         if (!latest) return;
@@ -4113,8 +4130,11 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             if (localStorage.getItem('sinator_whatsnew_seen') === latest.version) return;
         } catch(e) {}
         if (document.getElementById('whatsNewOverlay')) return;
+        // Nezobrazovat zamčené appce ani novému uživateli bez přezdívky (okno by blokovalo psaní)
+        if (!_canShowWhatsNew()) return;
         const deployedText = await _getDeployedDateTimeText(latest.date);
         if (document.getElementById('whatsNewOverlay')) return; // mezitím už otevřeno jinak
+        if (!_canShowWhatsNew()) return; // během čekání se mohla appka zamknout
         const overlay = document.createElement('div');
         overlay.id = 'whatsNewOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
@@ -40558,12 +40578,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (typeof updateAdultToggleUI === 'function') updateAdultToggleUI();
         // ✅ OPRAVA: přezdívka se teď ptá až PO odemčení heslem, ne nad zamykací obrazovkou
         if (typeof window._checkNickGate === 'function') window._checkNickGate();
+        if (typeof window._maybeShowWhatsNew === 'function') window._maybeShowWhatsNew();
     }
 
     function _showLock() {
         var el = _getLockEl();
         if (el) el.classList.remove('hidden');
         document.body.classList.add('app-locked');
+        try { var wn = document.getElementById('whatsNewOverlay'); if (wn) wn.remove(); } catch (e) {}
         localStorage.removeItem(_SK);
         sessionStorage.removeItem(_TK);
         localStorage.setItem('sinator_adult_content', 'false');
@@ -41628,6 +41650,7 @@ window.submitUserNickname = function() {
   const overlay = document.getElementById('nickSetupOverlay');
   if (overlay) overlay.style.display = 'none';
   _startUserPresenceHeartbeat(val);
+  if (typeof window._maybeShowWhatsNew === 'function') window._maybeShowWhatsNew();
 };
 
 // Volitelná pozdější změna jména (např. z Nastavení → Ostatní)
