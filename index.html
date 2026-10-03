@@ -3937,6 +3937,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-03', date: '3. 10. 2026', items: [
+            'Detail filmu/seriálu — při vypnutých „Barevných ikonách tlačítek“ jsou i čipy (hodnocení, premiéra, typ uvedení, PG, Trailer, Soundtrack…) a tlačítka Přehrát v jedné barvě; „Shlédnuto“ zůstává zelené (včetně Shlédnuto (Sinator), které bylo modré)',
             { admin: true, text: 'Admin → Registrovaní uživatelé — nové řazení: Admin level 2 vždy úplně nahoře, pak online uživatelé (Admin level 1 před běžnými), pak offline uživatelé (opět Admin level 1 před běžnými); uvnitř skupin podle abecedy' },
             'Oblíbené — nový filtr 🔤 „Začíná na“ (stejný jako v Tematických seznamech): napiš písmeno a zobrazí se jen filmy, seriály, herci i režiséři začínající na něj (bez ohledu na diakritiku a velikost písmen); tlačítko „Vše“ filtr zruší. Funguje v každé záložce a kombinuje se s řazením i filtrem národnosti'
         ] },
@@ -5110,7 +5111,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             if(!style) {
                 const s = document.createElement('style');
                 s.id = 'iconColorStyle';
-                s.textContent = `.action-btn.icon .btn-icon { filter: grayscale(1) brightness(0.9); } .action-btn.icon:hover .btn-icon { filter: grayscale(1) brightness(1.25); } .action-btn.icon.active .btn-icon { filter: grayscale(1) brightness(1.35); } .menu-row-btn > span:first-child, .action-btn-modal:not([style*="3a6ea5"]), .card-fav, .modal-genre { filter: grayscale(1); } .modal-fav-btn { filter: grayscale(1); } .modal-fav-btn.liked { filter: grayscale(1); }`;
+                s.textContent = `.action-btn.icon .btn-icon { filter: grayscale(1) brightness(0.9); } .action-btn.icon:hover .btn-icon { filter: grayscale(1) brightness(1.25); } .action-btn.icon.active .btn-icon { filter: grayscale(1) brightness(1.35); } .menu-row-btn > span:first-child, .action-btn-modal:not([style*="3a6ea5"]), .card-fav, .modal-genre { filter: grayscale(1); } .modal-fav-btn { filter: grayscale(1); } .modal-fav-btn.liked { filter: grayscale(1); } /* Detail filmu/seriálu: čipy (Trailer, PG, Fyzické médium, premiéra…) i tlačítka Přehrát v jedné barvě */ .modal-chips .modal-chip, .modal-chips button.modal-chip { background: var(--bg-elevated) !important; border: 1px solid var(--border) !important; color: var(--text) !important; } .modal-chips .modal-chip * { color: inherit !important; } #modalScrollBody button.action-btn-modal[style*="3a6ea5"], #modalScrollBody button.action-btn-modal[style*="8b5cf6"] { background: var(--bg-elevated) !important; border-color: var(--border) !important; color: var(--text) !important; }`;
                 document.head.appendChild(s);
             }
         }
@@ -13436,9 +13437,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     // ── SHLÉDNUTOST NA SINATOR BACKENDU (odznak vedle lokálního/Trakt) ─────────
     function applyMySinatorWatchedBadgeStyle(btn, watched) {
         btn.dataset.watched = watched ? '1' : '0';
-        btn.style.border = '1px solid ' + (watched ? '#6090ff' : 'var(--border)');
-        btn.style.background = watched ? 'rgba(96,144,255,0.15)' : 'transparent';
-        btn.style.color = watched ? '#6090ff' : 'var(--text-muted)';
+        // Barevné ikony vypnuté → „Shlédnuto“ zelené (stejně jako lokální Shlédnuto); zapnuté → modré
+        const _wc = (localStorage.getItem('coloredIcons') === '1') ? ['#6090ff','rgba(96,144,255,0.15)'] : ['#1db954','rgba(29,185,84,0.15)'];
+        btn.style.border = '1px solid ' + (watched ? _wc[0] : 'var(--border)');
+        btn.style.background = watched ? _wc[1] : 'transparent';
+        btn.style.color = watched ? _wc[0] : 'var(--text-muted)';
         btn.textContent = watched ? '✅ Shlédnuto (Sinator)' : '☐ Shlédnuto (Sinator)';
     }
     async function initMySinatorWatchedBadge(id, type) {
