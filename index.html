@@ -3937,6 +3937,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-03', date: '3. 10. 2026', items: [
+            { admin: true, text: 'Admin → Registrovaní uživatelé — nové řazení: Admin level 2 vždy úplně nahoře, pak online uživatelé (Admin level 1 před běžnými), pak offline uživatelé (opět Admin level 1 před běžnými); uvnitř skupin podle abecedy' },
             'Oblíbené — nový filtr 🔤 „Začíná na“ (stejný jako v Tematických seznamech): napiš písmeno a zobrazí se jen filmy, seriály, herci i režiséři začínající na něj (bez ohledu na diakritiku a velikost písmen); tlačítko „Vše“ filtr zruší. Funguje v každé záložce a kombinuje se s řazením i filtrem národnosti'
         ] },
         { version: '2026-10-02b', date: '2. 10. 2026', items: [
@@ -42009,7 +42010,16 @@ function attachAdminUsersListener() {
       wrap.innerHTML = '<div style="color:#888;font-size:0.8rem;">Zatím žádní registrovaní uživatelé.</div>';
       return;
     }
-    users.sort((a, b) => (b.online - a.online) || a.nick.localeCompare(b.nick, 'cs'));
+    // Řazení: Admin level 2 vždy úplně nahoře; dál online před offline,
+    // v obou skupinách Admin level 1 před běžnými uživateli; nakonec podle abecedy.
+    users.sort((a, b) => {
+      const a2 = a.adminLevel >= 2 ? 1 : 0, b2 = b.adminLevel >= 2 ? 1 : 0;
+      if (a2 !== b2) return b2 - a2;
+      if (a.online !== b.online) return (b.online ? 1 : 0) - (a.online ? 1 : 0);
+      const a1 = a.adminLevel >= 1 ? 1 : 0, b1 = b.adminLevel >= 1 ? 1 : 0;
+      if (a1 !== b1) return b1 - a1;
+      return a.nick.localeCompare(b.nick, 'cs');
+    });
     const onlineCount = users.filter(u => u.online).length;
     wrap.innerHTML = `<div style="font-size:0.72rem;color:#888;margin-bottom:2px;">Celkem: ${users.length} · 🟢 online: ${onlineCount}</div>` +
       users.map(u => {
