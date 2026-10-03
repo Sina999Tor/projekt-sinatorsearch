@@ -49,6 +49,152 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
     <script>(function(){try{var t=localStorage.getItem('sinator_theme')||'dark';document.documentElement.setAttribute('data-theme',t);var m=document.getElementById('theme-color-meta');if(m)m.setAttribute('content', t==='light' ? '#f4f4f6' : '#0a0a0a');}catch(e){}})();</script>
+
+    <script>
+    /* 🖌️ Vlastní vzhled aplikace — barvy, písma, velikost písma (ukládá se v zařízení uživatele) */
+    window.SinatorLook = (function () {
+      var KEY = 'sinator_custom_look';
+      var FONTS = {
+        '': { label: 'Výchozí' },
+        'playfair': { label: 'Playfair Display', css: "'Playfair Display', serif", gf: 'Playfair Display' },
+        'merriweather': { label: 'Merriweather', css: "'Merriweather', serif", gf: 'Merriweather' },
+        'lora': { label: 'Lora', css: "'Lora', serif", gf: 'Lora' },
+        'cormorant': { label: 'Cormorant Garamond', css: "'Cormorant Garamond', serif", gf: 'Cormorant Garamond' },
+        'baskerville': { label: 'Libre Baskerville', css: "'Libre Baskerville', serif", gf: 'Libre Baskerville' },
+        'robotoslab': { label: 'Roboto Slab', css: "'Roboto Slab', serif", gf: 'Roboto Slab' },
+        'inter': { label: 'Inter', css: "'Inter', sans-serif", gf: 'Inter' },
+        'poppins': { label: 'Poppins', css: "'Poppins', sans-serif", gf: 'Poppins' },
+        'montserrat': { label: 'Montserrat', css: "'Montserrat', sans-serif", gf: 'Montserrat' },
+        'nunito': { label: 'Nunito', css: "'Nunito', sans-serif", gf: 'Nunito' },
+        'raleway': { label: 'Raleway', css: "'Raleway', sans-serif", gf: 'Raleway' },
+        'roboto': { label: 'Roboto', css: "'Roboto', sans-serif", gf: 'Roboto' },
+        'opensans': { label: 'Open Sans', css: "'Open Sans', sans-serif", gf: 'Open Sans' },
+        'firasans': { label: 'Fira Sans', css: "'Fira Sans', sans-serif", gf: 'Fira Sans' },
+        'oswald': { label: 'Oswald', css: "'Oswald', sans-serif", gf: 'Oswald' },
+        'comfortaa': { label: 'Comfortaa', css: "'Comfortaa', sans-serif", gf: 'Comfortaa' },
+        'caveat': { label: 'Caveat (rukopis)', css: "'Caveat', cursive", gf: 'Caveat' },
+        'mono': { label: 'JetBrains Mono', css: "'JetBrains Mono', monospace", gf: 'JetBrains Mono' },
+        'system': { label: 'Systémové písmo', css: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" },
+        'georgia': { label: 'Georgia', css: "Georgia, 'Times New Roman', serif" }
+      };
+      var COLORS = [
+        { k: 'bg',     label: 'Pozadí aplikace',            vars: ['--bg', '--bg-dark'], probe: { v: '--bg' } },
+        { k: 'win',    label: 'Okna (detail, nastavení)',   probe: { sel: '.modal', fb: '--bg-card' } },
+        { k: 'card',   label: 'Karty a bloky',              vars: ['--bg-card'], probe: { v: '--bg-card' } },
+        { k: 'btn',    label: 'Tlačítka, čipy a pole',      vars: ['--bg-elevated'], probe: { v: '--bg-elevated' } },
+        { k: 'menu',   label: 'Horní menu (tlačítka)',      probe: { sel: '.action-btn', fb: '--bg-elevated' } },
+        { k: 'border', label: 'Okraje a čáry',              vars: ['--border'], probe: { v: '--border' } },
+        { k: 'text',   label: 'Hlavní text',                vars: ['--text', '--text-main'], probe: { v: '--text' } },
+        { k: 'muted',  label: 'Tlumený text',               vars: ['--text-muted'], probe: { v: '--text-muted' } },
+        { k: 'accent', label: 'Akcent (aktivní prvky)',     vars: ['--accent'], probe: { v: '--accent' } },
+        { k: 'gold',   label: 'Zlatá (nadpisy, zvýraznění)', vars: ['--gold'], probe: { v: '--gold' } },
+        { k: 'title',  label: 'Název filmu / seriálu',      probe: { v: '--gold' } }
+      ];
+      var PRESETS = {
+        amoled:  { label: '⚫ AMOLED černá', c: { bg: '#000000', win: '#050505', card: '#0a0a0a', btn: '#141414', menu: '#111111', border: '#222222' } },
+        midnight:{ label: '🌌 Půlnoční modrá', c: { bg: '#0b1220', win: '#0f1829', card: '#121b2e', btn: '#1a2640', menu: '#16213a', border: '#26365a', accent: '#4da3ff', gold: '#ffd166' } },
+        forest:  { label: '🌲 Les', c: { bg: '#0b140f', win: '#0e1913', card: '#12201a', btn: '#1a2d24', menu: '#16281f', border: '#25402f', accent: '#3ddc84', gold: '#e6c34a' } },
+        purple:  { label: '🔮 Fialová noc', c: { bg: '#120b1a', win: '#170e20', card: '#1b1228', btn: '#271a3a', menu: '#221535', border: '#3a2956', accent: '#b388ff', gold: '#ffcc66' } },
+        warm:    { label: '🔥 Teplá hnědá', c: { bg: '#16100b', win: '#1b130d', card: '#20170f', btn: '#2c2015', menu: '#271c12', border: '#44331f', accent: '#ff9f43', gold: '#ffd27a' } }
+      };
+      function def() { return { colors: { dark: {}, light: {} }, fonts: {}, scale: 100 }; }
+      function load() {
+        try {
+          var o = JSON.parse(localStorage.getItem(KEY) || 'null');
+          if (o && typeof o === 'object') {
+            var d = def();
+            d.colors.dark = (o.colors && o.colors.dark) || {};
+            d.colors.light = (o.colors && o.colors.light) || {};
+            d.fonts = o.fonts || {};
+            d.scale = o.scale || 100;
+            return d;
+          }
+        } catch (e) {}
+        return def();
+      }
+      function save(st) { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+      function mode() { return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
+      function cssFor(st) {
+        var out = [];
+        ['dark', 'light'].forEach(function (m) {
+          var c = st.colors[m] || {}, pre = 'html[data-theme="' + m + '"]:root';
+          var vars = [];
+          COLORS.forEach(function (d) {
+            if (c[d.k] && d.vars) d.vars.forEach(function (v) { vars.push(v + ':' + c[d.k]); });
+          });
+          if (vars.length) out.push(pre + '{' + vars.join(';') + '}');
+          if (c.bg) out.push(pre + ',' + pre + ' body{background:' + c.bg + ' !important;}');
+          if (c.win) out.push(pre + ' .modal,' + pre + ' .settings-modal{background:' + c.win + ' !important;}');
+          if (c.card) out.push(pre + ' .card{background:' + c.card + ' !important;}');
+          if (c.menu) out.push(pre + ' .action-btn{background:' + c.menu + ' !important;}');
+          if (c.title) out.push(pre + ' .modal-title{background:none !important;-webkit-text-fill-color:' + c.title + ' !important;color:' + c.title + ' !important;}' +
+                                pre + ' .card-title{color:' + c.title + ' !important;}');
+        });
+        var f = st.fonts || {};
+        function ff(id) { return FONTS[id] && FONTS[id].css; }
+        if (ff(f.base)) out.push('body,button,input,textarea,select{font-family:' + ff(f.base) + ';}');
+        if (ff(f.title)) out.push('h1,h2,h3,.modal-title,.card-title,[style*="Playfair"]{font-family:' + ff(f.title) + ' !important;}');
+        if (ff(f.menu)) out.push('.action-btn,.settings-tab-btn,.page-nav-btn,.search-btn,.menu-row-btn{font-family:' + ff(f.menu) + ' !important;}');
+        if (ff(f.modal)) out.push('.modal,.settings-modal,.modal button,.modal input,.modal textarea,.modal select,.settings-modal button,.settings-modal input,.settings-modal textarea,.settings-modal select{font-family:' + ff(f.modal) + ' !important;}');
+        if (st.scale && st.scale !== 100) out.push('html{font-size:' + st.scale + '%;}');
+        return out.join('\n');
+      }
+      function fontsUrl(st) {
+        var names = {};
+        Object.keys(st.fonts || {}).forEach(function (k) {
+          var fd = FONTS[st.fonts[k]];
+          if (fd && fd.gf) names[fd.gf] = 1;
+        });
+        var fam = Object.keys(names).map(function (n) { return 'family=' + n.replace(/ /g, '+') + ':wght@400;700'; });
+        return fam.length ? 'https://fonts.googleapis.com/css2?' + fam.join('&') + '&display=swap' : '';
+      }
+      function apply() {
+        var st = load();
+        var el = document.getElementById('customLookStyle');
+        if (!el) { el = document.createElement('style'); el.id = 'customLookStyle'; document.head.appendChild(el); }
+        el.textContent = cssFor(st);
+        var url = fontsUrl(st), lk = document.getElementById('customLookFonts');
+        if (url) {
+          if (!lk) { lk = document.createElement('link'); lk.id = 'customLookFonts'; lk.rel = 'stylesheet'; document.head.appendChild(lk); }
+          if (lk.getAttribute('href') !== url) lk.setAttribute('href', url);
+        } else if (lk) { lk.remove(); }
+        var meta = document.getElementById('theme-color-meta'), m = mode(), bg = st.colors[m] && st.colors[m].bg;
+        if (meta) meta.setAttribute('content', bg || (m === 'light' ? '#f4f4f6' : '#0a0a0a'));
+      }
+      function hexOf(css) {
+        var r = /rgba?\((\d+)[ ,]+(\d+)[ ,]+(\d+)(?:[ ,/]+([\d.]+))?/.exec(css || '');
+        if (!r) return null;
+        if (r[4] !== undefined && parseFloat(r[4]) === 0) return null;
+        return '#' + [r[1], r[2], r[3]].map(function (n) { return ('0' + (+n).toString(16)).slice(-2); }).join('');
+      }
+      function probeVar(v) {
+        var t = document.createElement('span'); t.style.cssText = 'position:absolute;visibility:hidden;color:var(' + v + ')';
+        document.body.appendChild(t); var h = hexOf(getComputedStyle(t).color); t.remove(); return h;
+      }
+      function defaultHex(d) {
+        var pr = d.probe, h = null;
+        if (pr.sel) { var e = document.querySelector(pr.sel); if (e) h = hexOf(getComputedStyle(e).backgroundColor); if (!h && pr.fb) h = probeVar(pr.fb); }
+        else h = probeVar(pr.v);
+        return h || '#808080';
+      }
+      var api = {
+        FONTS: FONTS, COLORS: COLORS, PRESETS: PRESETS, load: load, apply: apply, mode: mode, defaultHex: defaultHex,
+        setColor: function (k, v) { var st = load(); st.colors[mode()][k] = v; save(st); apply(); },
+        resetColor: function (k) { var st = load(); delete st.colors[mode()][k]; save(st); apply(); if (api.refreshUI) api.refreshUI(); },
+        setFont: function (k, id) { var st = load(); if (id) st.fonts[k] = id; else delete st.fonts[k]; save(st); apply(); if (api.refreshUI) api.refreshUI(); },
+        setScale: function (n) { var st = load(); st.scale = Math.max(80, Math.min(130, parseInt(n, 10) || 100)); save(st); apply(); },
+        preset: function (id) {
+          var st = load();
+          st.colors.dark = (PRESETS[id] && JSON.parse(JSON.stringify(PRESETS[id].c))) || {};
+          save(st); apply(); if (api.refreshUI) api.refreshUI();
+        },
+        resetAll: function () { try { localStorage.removeItem(KEY); } catch (e) {} apply(); if (api.refreshUI) api.refreshUI(); },
+        isCustomColor: function (k) { var c = load().colors[mode()]; return !!(c && c[k]); }
+      };
+      try { apply(); } catch (e) {}
+      return api;
+    })();
+    </script>
     <title>Sinator Search - Filmové Vyhledávání</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
@@ -1390,6 +1536,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     <div class="theme-toggle-knob" id="themeToggleKnob">💡</div>
                 </div>
             </div>
+            <div class="settings-divider"></div>
+            <div id="customLookRoot"></div>
             <div class="settings-divider"></div>
             <div class="settings-section">
                 <span class="settings-label">🎨 Ikony</span>
@@ -3947,6 +4095,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-03', date: '3. 10. 2026', items: [
+            'Nastavení → Vzhled → 🖌️ Přizpůsobit vzhled — vlastní vzhled aplikace: předvolby barev (AMOLED, Půlnoční modrá, Les, Fialová noc, Teplá), barvy pozadí, oken, karet, tlačítek, horního menu, okrajů, textu, akcentu i názvu filmu (zvlášť pro tmavý a světlý režim), výběr písma pro nadpisy, menu, okna i zbytek aplikace (21 písem) a velikost písma 80–130 %. Změny se projeví hned a ukládají se v zařízení; tlačítko „Obnovit výchozí vzhled“ vše vrátí',
             'Světlý režim — název filmu/seriálu v detailu a nadpisy seznamů byly na bílém pozadí špatně čitelné; teď mají tmavý přechod do zlatohnědé',
             'Detail filmu/seriálu — při vypnutých „Barevných ikonách tlačítek“ jsou i čipy (hodnocení, premiéra, typ uvedení, PG, Trailer, Soundtrack…) a tlačítka Přehrát v jedné barvě včetně jejich ikon (šedé stejně jako ve spodních tlačítkách), při zapnutých zůstávají barevné; „Shlédnuto“ zůstává zelené (včetně Shlédnuto (Sinator), které bylo modré)',
             { admin: true, text: 'Admin → Registrovaní uživatelé — nové řazení: Admin level 2 vždy úplně nahoře, pak online uživatelé (Admin level 1 před běžnými), pak offline uživatelé (opět Admin level 1 před běžnými); uvnitř skupin podle abecedy' },
@@ -5001,6 +5150,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         document.documentElement.setAttribute('data-theme', next);
         const meta = $('theme-color-meta');
         if (meta) meta.setAttribute('content', next === 'light' ? '#f4f4f6' : '#0a0a0a');
+        if (window.SinatorLook) { SinatorLook.apply(); if (SinatorLook.refreshUI) SinatorLook.refreshUI(); }
         updateThemeToggleUI();
     }
     function switchKeysSubTab(tab) {
@@ -5047,6 +5197,70 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     }
     window.syncConnectServiceDots = syncConnectServiceDots;
 
+
+    // ===== 🖌️ Přizpůsobení vzhledu — UI v Nastavení → Vzhled =====
+    (function () {
+        const L = window.SinatorLook;
+        if (!L) return;
+        const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        const FONT_ROWS = [
+            ['title', '🔤 Nadpisy (názvy filmů, nadpisy oken)'],
+            ['menu',  '🧭 Menu (horní tlačítka, záložky, navigace)'],
+            ['modal', '🪟 Okna (detail, Oblíbené, Nastavení)'],
+            ['base',  '📝 Základní písmo (zbytek aplikace)']
+        ];
+        const btnStyle = 'padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.8rem;';
+        function render() {
+            const root = document.getElementById('customLookRoot');
+            if (!root) return;
+            const st = L.load(), m = L.mode();
+            const modeLabel = m === 'light' ? 'světlý režim' : 'tmavý režim';
+            let h = `<div class="settings-section">
+                <span class="settings-label">🖌️ Přizpůsobit vzhled</span>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">Barvy, písma a velikost textu si nastavíš podle sebe. Změny se projeví hned a ukládají se jen v tomto zařízení.</div>`;
+            if (m === 'dark') {
+                h += `<div style="margin-top:12px;font-size:0.8rem;color:var(--text-muted);">Předvolby barev</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+                    <button style="${btnStyle}" onclick="SinatorLook.resetAll()">🎯 Výchozí</button>
+                    ${Object.keys(L.PRESETS).map(id => `<button style="${btnStyle}" onclick="SinatorLook.preset('${id}')">${esc(L.PRESETS[id].label)}</button>`).join('')}
+                </div>`;
+            }
+            h += `<div style="margin-top:14px;font-size:0.8rem;color:var(--text-muted);">Barvy — ${modeLabel} <span style="opacity:.7;">(pro druhý režim se nastavují zvlášť)</span></div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">`;
+            L.COLORS.forEach(d => {
+                const custom = L.isCustomColor(d.k);
+                const val = (st.colors[m] && st.colors[m][d.k]) || L.defaultHex(d);
+                h += `<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;">
+                    <span style="flex:1;font-size:0.82rem;color:var(--text);">${esc(d.label)}${custom ? ' <span style="color:var(--gold);">●</span>' : ''}</span>
+                    <input type="color" value="${val}" oninput="SinatorLook.setColor('${d.k}', this.value)" style="width:42px;height:30px;border:none;background:none;padding:0;cursor:pointer;">
+                    <button title="Vrátit výchozí" onclick="SinatorLook.resetColor('${d.k}')" style="${btnStyle}padding:5px 9px;${custom ? '' : 'opacity:.35;'}">↺</button>
+                </div>`;
+            });
+            h += `</div><div style="margin-top:16px;font-size:0.8rem;color:var(--text-muted);">Písma</div>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:6px;">`;
+            FONT_ROWS.forEach(([k, label]) => {
+                const cur = st.fonts[k] || '';
+                const css = (L.FONTS[cur] && L.FONTS[cur].css) || 'inherit';
+                h += `<div>
+                    <div style="font-size:0.82rem;color:var(--text);margin-bottom:4px;">${esc(label)}</div>
+                    <select onchange="SinatorLook.setFont('${k}', this.value)" style="width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.9rem;">
+                        ${Object.keys(L.FONTS).map(id => `<option value="${id}" ${id === cur ? 'selected' : ''}>${esc(L.FONTS[id].label)}</option>`).join('')}
+                    </select>
+                    <div style="margin-top:4px;font-size:1.05rem;color:var(--text-muted);font-family:${css};">Ukázka: Zootropolis, Příběh hraček 5</div>
+                </div>`;
+            });
+            h += `</div><div style="margin-top:16px;font-size:0.8rem;color:var(--text-muted);">Velikost písma: <b id="customLookScaleVal" style="color:var(--text);">${st.scale}%</b></div>
+            <input type="range" min="80" max="130" step="5" value="${st.scale}" oninput="document.getElementById('customLookScaleVal').textContent=this.value+'%';SinatorLook.setScale(this.value)" style="width:100%;margin-top:6px;">
+            <button style="${btnStyle}width:100%;margin-top:14px;color:#ff6b6b;" onclick="if(confirm('Obnovit výchozí vzhled (barvy, písma i velikost)?'))SinatorLook.resetAll()">↺ Obnovit výchozí vzhled</button>
+            <div style="font-size:0.68rem;color:var(--text-muted);margin-top:8px;line-height:1.5;">Písma se stahují z Google Fonts, bez připojení k internetu se použije výchozí písmo.</div>
+            </div>`;
+            root.innerHTML = h;
+        }
+        L.refreshUI = render;
+        window.renderCustomLookUI = render;
+        render();
+    })();
+
     function switchSettingsTab(tab) {
         const tabs = { keys: 'Keys', appearance: 'Appearance', other: 'Other', admin: 'Admin' };
         Object.keys(tabs).forEach(function(key) {
@@ -5055,6 +5269,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             if(content) content.classList.toggle('active', key === tab);
             if(btn) btn.classList.toggle('active', key === tab);
         });
+        if (tab === 'appearance' && typeof window.renderCustomLookUI === 'function') window.renderCustomLookUI();
     }
     window.switchSettingsTab = switchSettingsTab;
 
