@@ -84,7 +84,7 @@
         { k: 'btn',    label: 'Tlačítka, čipy a pole',      vars: ['--bg-elevated'], probe: { v: '--bg-elevated' } },
         { k: 'menu',   label: 'Horní menu (tlačítka)',      probe: { sel: '.action-btn', fb: '--bg-elevated' } },
         { k: 'border', label: 'Okraje a čáry',              vars: ['--border'], probe: { v: '--border' } },
-        { k: 'text',   label: 'Hlavní text',                vars: ['--text', '--text-main'], probe: { v: '--text' } },
+        { k: 'text',   label: 'Hlavní text',                vars: ['--text'], probe: { v: '--text' } },
         { k: 'muted',  label: 'Tlumený text',               vars: ['--text-muted'], probe: { v: '--text-muted' } },
         { k: 'accent', label: 'Akcent (aktivní prvky)',     vars: ['--accent'], probe: { v: '--accent' } },
         { k: 'gold',   label: 'Zlatá (nadpisy, zvýraznění)', vars: ['--gold'], probe: { v: '--gold' } },
@@ -114,6 +114,10 @@
       }
       function save(st) { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
       function mode() { return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
+      // Všechna „okna“ (celoobrazovkové i vyskakovací modaly) podle styles.css
+      var WIN = ['.modal','.settings-modal','.websites-modal','.music-modal','.ai-modal','.ivysilani-modal','.iprima-modal','.trakt-modal','.favs-modal','.sources-modal','.ts-modal','.radio-modal','.kino-modal','#slozkyModal','#slozkyPicker','.slozky-picker-box'];
+      var MENU_FONT = '.action-btn,.settings-tab-btn,.page-nav-btn,.search-btn,.menu-row-btn,.tab,.tabs-dropdown-toggle,.tab-sort-btn,.tab-sort-opt,.filter-tab,.favs-subtab,.settings-subtab-btn,.person-tab,.page-num,.ivysilani-tab,.iprima-tab,.coll-tab,.radio-source-tab,.tv-group-tab';
+      function scoped(pre, list, tail) { return list.map(function (x) { return pre + ' ' + x + (tail || ''); }).join(','); }
       function cssFor(st) {
         var out = [];
         ['dark', 'light'].forEach(function (m) {
@@ -122,20 +126,34 @@
           COLORS.forEach(function (d) {
             if (c[d.k] && d.vars) d.vars.forEach(function (v) { vars.push(v + ':' + c[d.k]); });
           });
+          if (c.accent) vars.push('--accent-glow:color-mix(in srgb,' + c.accent + ' 40%,transparent)');
+          if (c.win) vars.push('--sl-card:var(--bg-card)');
           if (vars.length) out.push(pre + '{' + vars.join(';') + '}');
-          if (c.bg) out.push(pre + ',' + pre + ' body{background:' + c.bg + ' !important;}');
-          if (c.win) out.push(pre + ' .modal,' + pre + ' .settings-modal{background:' + c.win + ' !important;}');
+          if (c.bg) {
+            out.push(pre + '{background:' + c.bg + ';}');
+            out.push(pre + ' header{background:color-mix(in srgb,' + c.bg + ' 96%,transparent) !important;}');
+          }
+          if (c.win) {
+            out.push(scoped(pre, WIN) + '{background:' + c.win + ' !important;--bg-card:' + c.win + ';}');
+            out.push(scoped(pre, WIN, ' .card') + '{background:var(--sl-card) !important;}');
+            out.push(pre + ' .modal-nav{background:color-mix(in srgb,' + c.win + ' 98%,transparent) !important;}');
+            out.push(pre + ' .music-modal-header,' + pre + ' .slozky-header,' + pre + ' .settings-modal .modal-header-row,' + pre + ' .ts-modal .modal-header-row{background:' + c.win + ' !important;}');
+          }
           if (c.card) out.push(pre + ' .card{background:' + c.card + ' !important;}');
-          if (c.menu) out.push(pre + ' .action-btn{background:' + c.menu + ' !important;}');
-          if (c.title) out.push(pre + ' .modal-title{background:none !important;-webkit-text-fill-color:' + c.title + ' !important;color:' + c.title + ' !important;}' +
+          if (c.menu) out.push(pre + ' .action-btn.icon{background:linear-gradient(170deg,color-mix(in srgb,' + c.menu + ' 88%,#fff),' + c.menu + ' 50%,color-mix(in srgb,' + c.menu + ' 70%,#000)) !important;}');
+          if (c.title) out.push(pre + ' .modal-title,' + pre + ' .modal-nav-title{background:none !important;-webkit-text-fill-color:' + c.title + ' !important;color:' + c.title + ' !important;}' +
                                 pre + ' .card-title{color:' + c.title + ' !important;}');
         });
         var f = st.fonts || {};
         function ff(id) { return FONTS[id] && FONTS[id].css; }
         if (ff(f.base)) out.push('body,button,input,textarea,select{font-family:' + ff(f.base) + ';}');
-        if (ff(f.title)) out.push('h1,h2,h3,.modal-title,.card-title,[style*="Playfair"]{font-family:' + ff(f.title) + ' !important;}');
-        if (ff(f.menu)) out.push('.action-btn,.settings-tab-btn,.page-nav-btn,.search-btn,.menu-row-btn{font-family:' + ff(f.menu) + ' !important;}');
-        if (ff(f.modal)) out.push('.modal,.settings-modal,.modal button,.modal input,.modal textarea,.modal select,.settings-modal button,.settings-modal input,.settings-modal textarea,.settings-modal select{font-family:' + ff(f.modal) + ' !important;}');
+        if (ff(f.title)) out.push('h1,h2,h3,.modal-title,.modal-nav-title,.card-title,.logo,[style*="Playfair"]{font-family:' + ff(f.title) + ' !important;}');
+        if (ff(f.menu)) out.push(MENU_FONT + '{font-family:' + ff(f.menu) + ' !important;}');
+        if (ff(f.modal)) {
+          var sel = [];
+          WIN.forEach(function (w) { sel.push(w, w + ' button', w + ' input', w + ' textarea', w + ' select'); });
+          out.push(sel.join(',') + '{font-family:' + ff(f.modal) + ' !important;}');
+        }
         if (st.scale && st.scale !== 100) out.push('html{font-size:' + st.scale + '%;}');
         return out.join('\n');
       }
@@ -199,16 +217,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
   <style>#__vercel_toolbar_container, vercel-live-feedback { display: none !important; }
-    /* Světlý režim: nadpisy s přechodem z bílé do zlaté (název filmu v detailu, nadpisy seznamů) byly na bílém pozadí nečitelné */
-    html[data-theme="light"] .modal-title,
-    html[data-theme="light"] [style*="linear-gradient(135deg,#fff"],
-    html[data-theme="light"] [style*="linear-gradient(135deg, #fff"] {
-        background: linear-gradient(135deg, #1a1a1a, #8a6a00) !important;
-        -webkit-background-clip: text !important;
-        background-clip: text !important;
-        -webkit-text-fill-color: transparent !important;
-        color: #1a1a1a !important;
-    }
 .tv-dd{ position:relative; }
 .tv-dd-btn{
     width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px;

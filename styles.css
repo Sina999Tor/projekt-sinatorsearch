@@ -1258,3 +1258,14 @@
     width:100%; padding:12px; margin-top:10px; border-radius:10px;
     background:#2a2a2a; border:none; color:#aaa; font-size:0.9rem; cursor:pointer;
 }
+
+/* ─── LIGHT THEME: nadpisy s přechodem z bílé do zlaté (název filmu v detailu, nadpisy seznamů) byly na bílém pozadí nečitelné ─── */
+html[data-theme="light"] .modal-title,
+html[data-theme="light"] [style*="linear-gradient(135deg,#fff"],
+html[data-theme="light"] [style*="linear-gradient(135deg, #fff"] {
+    background: linear-gradient(135deg, #1a1a1a, #8a6a00) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    color: #1a1a1a !important;
+}
