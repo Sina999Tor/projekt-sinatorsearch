@@ -4103,7 +4103,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-03', date: '3. 10. 2026', items: [
-            'Nastavení → Vzhled → 🖌️ Přizpůsobit vzhled — vlastní vzhled aplikace: předvolby barev (AMOLED, Půlnoční modrá, Les, Fialová noc, Teplá), barvy pozadí, oken, karet, tlačítek, horního menu, okrajů, textu, akcentu i názvu filmu (zvlášť pro tmavý a světlý režim), výběr písma pro nadpisy, menu, okna i zbytek aplikace (21 písem) a velikost písma 80–130 %. Změny se projeví hned a ukládají se v zařízení; tlačítko „Obnovit výchozí vzhled“ vše vrátí',
+            'Nastavení → Vzhled → 🖌️ Přizpůsobit vzhled — vlastní vzhled aplikace: předvolby barev (AMOLED, Půlnoční modrá, Les, Fialová noc, Teplá), barvy pozadí, oken, karet, tlačítek, horního menu, okrajů, textu, akcentu i názvu filmu (zvlášť pro tmavý a světlý režim), výběr písma pro nadpisy, menu, okna i zbytek aplikace (21 písem) a velikost písma 80–130 %. Vlastní barvu vybereš v okně s paletou (84 barev), jezdci Odstín / Sytost / Jas nebo zadáním HEX kódu. Změny se projeví hned a ukládají se v zařízení; tlačítko „Obnovit výchozí vzhled“ vše vrátí',
             'Světlý režim — název filmu/seriálu v detailu a nadpisy seznamů byly na bílém pozadí špatně čitelné; teď mají tmavý přechod do zlatohnědé',
             'Detail filmu/seriálu — při vypnutých „Barevných ikonách tlačítek“ jsou i čipy (hodnocení, premiéra, typ uvedení, PG, Trailer, Soundtrack…) a tlačítka Přehrát v jedné barvě včetně jejich ikon (šedé stejně jako ve spodních tlačítkách), při zapnutých zůstávají barevné; „Shlédnuto“ zůstává zelené (včetně Shlédnuto (Sinator), které bylo modré)',
             { admin: true, text: 'Admin → Registrovaní uživatelé — nové řazení: Admin level 2 vždy úplně nahoře, pak online uživatelé (Admin level 1 před běžnými), pak offline uživatelé (opět Admin level 1 před běžnými); uvnitř skupin podle abecedy' },
@@ -5240,7 +5240,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 const val = (st.colors[m] && st.colors[m][d.k]) || L.defaultHex(d);
                 h += `<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;">
                     <span style="flex:1;font-size:0.82rem;color:var(--text);">${esc(d.label)}${custom ? ' <span style="color:var(--gold);">●</span>' : ''}</span>
-                    <input type="color" value="${val}" oninput="SinatorLook.setColor('${d.k}', this.value)" style="width:42px;height:30px;border:none;background:none;padding:0;cursor:pointer;">
+                    <button id="clkSw_${d.k}" onclick="openCustomColorPicker('${d.k}')" title="Vybrat barvu" style="width:46px;height:30px;border-radius:8px;border:1px solid var(--border);background:${val};cursor:pointer;padding:0;"></button>
                     <button title="Vrátit výchozí" onclick="SinatorLook.resetColor('${d.k}')" style="${btnStyle}padding:5px 9px;${custom ? '' : 'opacity:.35;'}">↺</button>
                 </div>`;
             });
@@ -5264,6 +5264,98 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             </div>`;
             root.innerHTML = h;
         }
+
+        // ===== 🎨 Vlastní výběr barvy: paleta, jezdci Odstín/Sytost/Jas, HEX =====
+        function hexToHsl(hex) {
+            hex = String(hex || '#808080').replace('#', '');
+            if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
+            const r = parseInt(hex.slice(0, 2), 16) / 255, g = parseInt(hex.slice(2, 4), 16) / 255, b = parseInt(hex.slice(4, 6), 16) / 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+            let h = 0, sat = 0;
+            if (max !== min) {
+                const d = max - min;
+                sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+                else if (max === g) h = (b - r) / d + 2;
+                else h = (r - g) / d + 4;
+                h *= 60;
+            }
+            return [Math.round(h), Math.round(sat * 100), Math.round(l * 100)];
+        }
+        function hslToHex(h, sat, l) {
+            sat /= 100; l /= 100;
+            const k = n => (n + h / 30) % 12, a = sat * Math.min(l, 1 - l);
+            const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+            return '#' + [f(0), f(8), f(4)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
+        }
+        window.openCustomColorPicker = function (k) {
+            const def = L.COLORS.find(d => d.k === k);
+            if (!def || document.getElementById('clkPickerOv')) return;
+            const st = L.load(), m = L.mode();
+            const hadCustom = !!(st.colors[m] && st.colors[m][k]);
+            const startHex = (hadCustom && st.colors[m][k]) || L.defaultHex(def);
+            let [H, S, Lg] = hexToHsl(startHex), cur = startHex;
+            const grays = [0, 8, 15, 22, 30, 40, 50, 62, 75, 85, 93, 100].map(l => hslToHex(0, 0, l));
+            const hues = [0, 30, 60, 90, 150, 180, 200, 220, 260, 290, 320, 345];
+            const lights = [10, 18, 28, 40, 52, 65, 80];
+            let pal = grays.map(c => `<button data-c="${c}" style="background:${c};"></button>`).join('');
+            lights.forEach(l => hues.forEach(h => { const c = hslToHex(h, l < 20 ? 45 : 70, l); pal += `<button data-c="${c}" style="background:${c};"></button>`; }));
+            const ov = document.createElement('div');
+            ov.id = 'clkPickerOv';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;';
+            const rng = 'width:100%;height:26px;margin:2px 0 10px;-webkit-appearance:none;appearance:none;border-radius:13px;outline:none;border:1px solid var(--border);';
+            ov.innerHTML = `<style>#clkPickerOv .clk-pal{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;}#clkPickerOv .clk-pal button{aspect-ratio:1;border-radius:6px;border:1px solid rgba(128,128,128,.35);padding:0;cursor:pointer;}#clkPickerOv input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.5);}#clkPickerOv input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid #333;}</style>
+            <div style="width:100%;max-width:520px;max-height:92vh;overflow-y:auto;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));box-sizing:border-box;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                    <div style="flex:1;font-weight:700;font-size:0.95rem;">${esc(def.label)}</div>
+                    <div id="clkPrev" style="width:54px;height:34px;border-radius:8px;border:1px solid var(--border);"></div>
+                </div>
+                <div class="clk-pal" id="clkPal">${pal}</div>
+                <div style="margin-top:14px;font-size:0.76rem;color:var(--text-muted);">Odstín</div>
+                <input id="clkH" type="range" min="0" max="360" style="${rng}">
+                <div style="font-size:0.76rem;color:var(--text-muted);">Sytost</div>
+                <input id="clkS" type="range" min="0" max="100" style="${rng}">
+                <div style="font-size:0.76rem;color:var(--text-muted);">Jas</div>
+                <input id="clkL" type="range" min="0" max="100" style="${rng}">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                    <span style="font-size:0.8rem;color:var(--text-muted);">HEX</span>
+                    <input id="clkHex" type="text" maxlength="7" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:1rem;font-family:monospace;">
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button id="clkCancel" style="${btnStyle}flex:1;padding:11px;">Zrušit</button>
+                    <button id="clkDone" style="${btnStyle}flex:1;padding:11px;background:var(--gold);color:#000;border-color:var(--gold);font-weight:700;">Hotovo</button>
+                </div>
+            </div>`;
+            document.body.appendChild(ov);
+            const q = id => ov.querySelector('#' + id);
+            function paint(updateSliders, exact, noApply) {
+                cur = exact || hslToHex(H, S, Lg);
+                q('clkPrev').style.background = cur;
+                if (document.activeElement !== q('clkHex')) q('clkHex').value = cur;
+                if (updateSliders) { q('clkH').value = H; q('clkS').value = S; q('clkL').value = Lg; }
+                q('clkH').style.background = 'linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)';
+                q('clkS').style.background = `linear-gradient(90deg,${hslToHex(H, 0, Lg)},${hslToHex(H, 100, Lg)})`;
+                q('clkL').style.background = `linear-gradient(90deg,#000,${hslToHex(H, S, 50)},#fff)`;
+                if (!noApply) L.setColor(k, cur);
+                const sw = document.getElementById('clkSw_' + k);
+                if (sw) sw.style.background = cur;
+            }
+            function setHex(hex) { [H, S, Lg] = hexToHsl(hex); paint(true, hex); }
+            q('clkPal').addEventListener('click', e => { const c = e.target.closest('button')?.dataset.c; if (c) setHex(c); });
+            q('clkH').addEventListener('input', e => { H = +e.target.value; paint(false); });
+            q('clkS').addEventListener('input', e => { S = +e.target.value; paint(false); });
+            q('clkL').addEventListener('input', e => { Lg = +e.target.value; paint(false); });
+            q('clkHex').addEventListener('input', e => {
+                let v = e.target.value.trim(); if (v && v[0] !== '#') v = '#' + v;
+                if (/^#[0-9a-fA-F]{6}$/.test(v)) { [H, S, Lg] = hexToHsl(v); paint(true, v.toLowerCase()); q('clkHex').value = e.target.value; }
+            });
+            const close = () => { ov.remove(); render(); };
+            q('clkDone').onclick = close;
+            q('clkCancel').onclick = () => { if (hadCustom) L.setColor(k, startHex); else L.resetColor(k); ov.remove(); render(); };
+            ov.addEventListener('click', e => { if (e.target === ov) close(); });
+            paint(true, startHex, true);
+        };
+
         L.refreshUI = render;
         window.renderCustomLookUI = render;
         render();
