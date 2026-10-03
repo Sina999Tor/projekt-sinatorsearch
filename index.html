@@ -97,7 +97,7 @@
         purple:  { label: '🔮 Fialová noc', c: { bg: '#120b1a', win: '#170e20', card: '#1b1228', btn: '#271a3a', menu: '#221535', border: '#3a2956', accent: '#b388ff', gold: '#ffcc66' } },
         warm:    { label: '🔥 Teplá hnědá', c: { bg: '#16100b', win: '#1b130d', card: '#20170f', btn: '#2c2015', menu: '#271c12', border: '#44331f', accent: '#ff9f43', gold: '#ffd27a' } }
       };
-      function def() { return { colors: { dark: {}, light: {} }, fonts: {}, styles: {}, scale: 100 }; }
+      function def() { return { colors: { dark: {}, light: {} }, fonts: {}, styles: {}, sizes: {}, scale: 100 }; }
       function load() {
         try {
           var o = JSON.parse(localStorage.getItem(KEY) || 'null');
@@ -107,6 +107,7 @@
             d.colors.light = (o.colors && o.colors.light) || {};
             d.fonts = o.fonts || {};
             d.styles = o.styles || {};
+            d.sizes = o.sizes || {};
             d.scale = o.scale || 100;
             return d;
           }
@@ -122,6 +123,8 @@
       var MENU_SEL = MENU_FONT.split(',');
       var MODAL_SEL = []; WIN.forEach(function (w) { MODAL_SEL.push(w, w + ' button', w + ' input', w + ' textarea', w + ' select'); });
       var BASE_SEL = ['body'];
+      var TMENU_SEL = ['.action-btn.icon .btn-label'];
+      var CARD_SEL = ['.card-info'];
       function withKids(list) { return list.concat(list.map(function (x) { return x + ' *'; })); }
       function styleRules(flags, list) {
         var f = flags || {}, d = [], o = [];
@@ -169,8 +172,14 @@
           WIN.forEach(function (w) { sel.push(w, w + ' button', w + ' input', w + ' textarea', w + ' select'); });
           out.push(sel.join(',') + '{font-family:' + ff(f.modal) + ' !important;}');
         }
+        // Popisky pod ikonami horního menu a texty na kartách filmů (název, rok, hodnocení) — vlastní písmo
+        if (ff(f.tmenu)) out.push('.action-btn.icon,.action-btn.icon .btn-label{font-family:' + ff(f.tmenu) + ' !important;}');
+        if (ff(f.card)) out.push('.card-info,.card-title,.card-meta,.card-rating,.card-badge{font-family:' + ff(f.card) + ' !important;}');
+        var sz = st.sizes || {};
+        if (sz.tmenu && sz.tmenu !== 100) out.push('.action-btn.icon .btn-label{font-size:calc(0.42rem * ' + (sz.tmenu / 100) + ') !important;}');
+        if (sz.card && sz.card !== 100) out.push('.card-title{font-size:calc(0.9rem * ' + (sz.card / 100) + ') !important;}.card-meta{font-size:calc(0.75rem * ' + (sz.card / 100) + ') !important;}');
         var sy = st.styles || {};
-        [['base', BASE_SEL], ['title', TITLE_SEL], ['menu', MENU_SEL], ['modal', MODAL_SEL]].forEach(function (g) {
+        [['base', BASE_SEL], ['title', TITLE_SEL], ['menu', MENU_SEL], ['modal', MODAL_SEL], ['tmenu', TMENU_SEL], ['card', CARD_SEL]].forEach(function (g) {
           var r = styleRules(sy[g[0]], g[1]); if (r) out.push(r);
         });
         if (st.scale && st.scale !== 100) out.push('html{font-size:' + st.scale + '%;}');
@@ -224,6 +233,11 @@
           if (f[flag]) delete f[flag]; else f[flag] = 1;
           if (!Object.keys(f).length) delete st.styles[g];
           save(st); apply(); if (api.refreshUI) api.refreshUI();
+        },
+        setSize: function (g, n) {
+          var st = load(); st.sizes = st.sizes || {}; n = Math.max(80, Math.min(140, parseInt(n, 10) || 100));
+          if (n === 100) delete st.sizes[g]; else st.sizes[g] = n;
+          save(st); apply();
         },
         setScale: function (n) { var st = load(); st.scale = Math.max(80, Math.min(130, parseInt(n, 10) || 100)); save(st); apply(); },
         preset: function (id) {
@@ -4127,6 +4141,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-03d', date: '3. 10. 2026', items: [
+            'Vlastní vzhled → Písma — nové samostatné skupiny: popisky pod ikonami horního menu (Hledat, Filtry, Hudba…) a texty na kartách filmů (název, rok, hodnocení); každá má vlastní písmo, styl (tučné, kurzíva, podtržené, verzálky) a velikost 80–140 %'
+        ] },
         { version: '2026-10-03c', date: '3. 10. 2026', items: [
             'Vlastní vzhled → Písma — ke každé skupině písma (nadpisy, menu, okna, základní) lze zapnout styl: Tučné, Kurzíva, Podtržené a Verzálky (u základního písma Tučné a Kurzíva); ukázka pod výběrem se mění hned'
         ] },
@@ -5261,7 +5278,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
         const FONT_ROWS = [
             ['title', '🔤 Nadpisy (názvy filmů, nadpisy oken)'],
-            ['menu',  '🧭 Menu (horní tlačítka, záložky, navigace)'],
+            ['menu',  '🧭 Menu (záložky, tlačítka, navigace)'],
+            ['tmenu', '🏷️ Horní menu — popisky pod ikonami (Hledat, Filtry…)'],
+            ['card',  '🎞️ Karty filmů — název, rok, hodnocení'],
             ['modal', '🪟 Okna (detail, Oblíbené, Nastavení)'],
             ['base',  '📝 Základní písmo (zbytek aplikace)']
         ];
@@ -5309,6 +5328,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     </select>
                     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${chips}</div>
                     <div style="margin-top:6px;font-size:1.05rem;color:var(--text-muted);font-family:${css};${pv}">Ukázka: Zootropolis, Příběh hraček 5</div>
+                    ${(k === 'tmenu' || k === 'card') ? `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:8px;">Velikost: <b style="color:var(--text);">${(st.sizes && st.sizes[k]) || 100}%</b></div>
+                    <input type="range" min="80" max="140" step="5" value="${(st.sizes && st.sizes[k]) || 100}" oninput="this.previousElementSibling.querySelector('b').textContent=this.value+'%';SinatorLook.setSize('${k}',this.value)" style="width:100%;">` : ''}
                 </div>`;
             });
             h += `</div><div style="margin-top:16px;font-size:0.8rem;color:var(--text-muted);">Velikost písma: <b id="customLookScaleVal" style="color:var(--text);">${st.scale}%</b></div>
