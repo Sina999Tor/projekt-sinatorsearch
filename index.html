@@ -246,6 +246,25 @@
           save(st); apply(); if (api.refreshUI) api.refreshUI();
         },
         resetAll: function () { try { localStorage.removeItem(KEY); } catch (e) {} apply(); if (api.refreshUI) api.refreshUI(); },
+        slots: function () {
+          try { var a = JSON.parse(localStorage.getItem('sinator_custom_look_slots') || 'null'); if (Array.isArray(a)) { while (a.length < 3) a.push(null); return a.slice(0, 3); } } catch (e) {}
+          return [null, null, null];
+        },
+        saveSlot: function (i, name) {
+          var a = api.slots();
+          a[i] = { name: String(name || ('Vzhled ' + (i + 1))).slice(0, 24), ts: Date.now(), data: JSON.parse(JSON.stringify(load())) };
+          try { localStorage.setItem('sinator_custom_look_slots', JSON.stringify(a)); } catch (e) {}
+          if (api.refreshUI) api.refreshUI();
+        },
+        applySlot: function (i) {
+          var a = api.slots(); if (!a[i] || !a[i].data) return;
+          save(a[i].data); apply(); if (api.refreshUI) api.refreshUI();
+        },
+        deleteSlot: function (i) {
+          var a = api.slots(); a[i] = null;
+          try { localStorage.setItem('sinator_custom_look_slots', JSON.stringify(a)); } catch (e) {}
+          if (api.refreshUI) api.refreshUI();
+        },
         isCustomColor: function (k) { var c = load().colors[mode()]; return !!(c && c[k]); }
       };
       try { apply(); } catch (e) {}
@@ -4141,6 +4160,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-03e', date: '3. 10. 2026', items: [
+            'Vlastní vzhled → 💾 Moje vzhledy — 3 místa pro uložení vlastního vzhledu (barvy, písma, styly i velikosti): 💾 Uložit / Přepsat, ▶ Použít a 🗑️ Smazat; každý vzhled má vlastní název a náhled barev. „Obnovit výchozí vzhled“ uložené vzhledy nemaže'
+        ] },
         { version: '2026-10-03d', date: '3. 10. 2026', items: [
             'Vlastní vzhled → Písma — nové samostatné skupiny: popisky pod ikonami horního menu (Hledat, Filtry, Hudba…) a texty na kartách filmů (název, rok, hodnocení); každá má vlastní písmo, styl (tučné, kurzíva, podtržené, verzálky) a velikost 80–140 %'
         ] },
@@ -5285,6 +5307,31 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             ['base',  '📝 Základní písmo (zbytek aplikace)']
         ];
         const btnStyle = 'padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.8rem;';
+        function slotsHtml() {
+            return L.slots().map((sl, i) => {
+                if (!sl) {
+                    return `<div style="padding:10px 12px;background:var(--bg-elevated);border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;gap:10px;">
+                        <span style="flex:1;font-size:0.82rem;color:var(--text-muted);">${i + 1}. prázdné místo</span>
+                        <button style="${btnStyle}" onclick="clkSlotSave(${i})">💾 Uložit aktuální</button>
+                    </div>`;
+                }
+                const cd = (sl.data && sl.data.colors && sl.data.colors.dark) || {};
+                const dots = ['bg', 'win', 'card', 'btn', 'accent', 'gold', 'title'].filter(k => cd[k]).map(k => `<span style="width:12px;height:12px;border-radius:50%;background:${cd[k]};border:1px solid rgba(128,128,128,.5);display:inline-block;"></span>`).join('');
+                const when = new Date(sl.ts).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                return `<div style="padding:10px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-size:0.88rem;font-weight:700;color:var(--text);">${i + 1}. ${esc(sl.name)}</span>
+                        <span style="display:inline-flex;gap:3px;">${dots}</span>
+                    </div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);margin:2px 0 8px;">Uloženo ${esc(when)}</div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <button style="${btnStyle}border-color:var(--gold);color:var(--gold);" onclick="clkSlotApply(${i})">▶ Použít</button>
+                        <button style="${btnStyle}" onclick="clkSlotSave(${i})">💾 Přepsat</button>
+                        <button style="${btnStyle}color:#ff6b6b;" onclick="clkSlotDelete(${i})">🗑️ Smazat</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
         function render() {
             const root = document.getElementById('customLookRoot');
             if (!root) return;
@@ -5335,6 +5382,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             h += `</div><div style="margin-top:16px;font-size:0.8rem;color:var(--text-muted);">Velikost písma: <b id="customLookScaleVal" style="color:var(--text);">${st.scale}%</b></div>
             <input type="range" min="80" max="130" step="5" value="${st.scale}" oninput="document.getElementById('customLookScaleVal').textContent=this.value+'%';SinatorLook.setScale(this.value)" style="width:100%;margin-top:6px;">
             <button style="${btnStyle}width:100%;margin-top:14px;color:#ff6b6b;" onclick="if(confirm('Obnovit výchozí vzhled (barvy, písma i velikost)?'))SinatorLook.resetAll()">↺ Obnovit výchozí vzhled</button>
+            <div style="margin-top:18px;font-size:0.8rem;color:var(--text-muted);">💾 Moje vzhledy <span style="opacity:.7;">(3 místa pro uložení)</span></div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">${slotsHtml()}</div>
             <div style="font-size:0.68rem;color:var(--text-muted);margin-top:8px;line-height:1.5;">Písma se stahují z Google Fonts, bez připojení k internetu se použije výchozí písmo.</div>
             </div>`;
             root.innerHTML = h;
@@ -5431,6 +5480,25 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             paint(true, startHex, true);
         };
 
+        window.clkSlotSave = function (i) {
+            const cur = L.slots()[i];
+            if (cur && !confirm('Přepsat uložený vzhled „' + cur.name + '“ aktuálním nastavením?')) return;
+            const name = prompt('Název vzhledu (max. 24 znaků):', cur ? cur.name : 'Vzhled ' + (i + 1));
+            if (name === null) return;
+            L.saveSlot(i, name.trim() || 'Vzhled ' + (i + 1));
+        };
+        window.clkSlotApply = function (i) {
+            const cur = L.slots()[i];
+            if (!cur) return;
+            if (!confirm('Použít vzhled „' + cur.name + '“? Aktuální nastavení se nahradí (neuložené změny se ztratí).')) return;
+            L.applySlot(i);
+        };
+        window.clkSlotDelete = function (i) {
+            const cur = L.slots()[i];
+            if (!cur) return;
+            if (!confirm('Smazat uložený vzhled „' + cur.name + '“?')) return;
+            L.deleteSlot(i);
+        };
         L.refreshUI = render;
         window.renderCustomLookUI = render;
         render();
