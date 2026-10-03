@@ -4161,7 +4161,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-03e', date: '3. 10. 2026', items: [
-            'Vlastní vzhled → 💾 Moje vzhledy — 3 místa pro uložení vlastního vzhledu (barvy, písma, styly i velikosti): 💾 Uložit / Přepsat, ▶ Použít a 🗑️ Smazat; každý vzhled má vlastní název a náhled barev. „Obnovit výchozí vzhled“ uložené vzhledy nemaže'
+            'Vlastní vzhled → 💾 Moje vzhledy — 3 místa pro uložení vlastního vzhledu (barvy, písma, styly i velikosti): 💾 Uložit / Přepsat, ▶ Použít a 🗑️ Smazat; každý vzhled má vlastní název a náhled barev. „Obnovit výchozí vzhled“ uložené vzhledy nemaže. Ukázka textu u písem je „Film, Seriál“'
         ] },
         { version: '2026-10-03d', date: '3. 10. 2026', items: [
             'Vlastní vzhled → Písma — nové samostatné skupiny: popisky pod ikonami horního menu (Hledat, Filtry, Hudba…) a texty na kartách filmů (název, rok, hodnocení); každá má vlastní písmo, styl (tučné, kurzíva, podtržené, verzálky) a velikost 80–140 %'
@@ -5374,7 +5374,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                         ${Object.keys(L.FONTS).map(id => `<option value="${id}" ${id === cur ? 'selected' : ''}>${esc(L.FONTS[id].label)}</option>`).join('')}
                     </select>
                     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${chips}</div>
-                    <div style="margin-top:6px;font-size:1.05rem;color:var(--text-muted);font-family:${css};${pv}">Ukázka: Zootropolis, Příběh hraček 5</div>
+                    <div style="margin-top:6px;font-size:1.05rem;color:var(--text-muted);font-family:${css};${pv}">Film, Seriál</div>
                     ${(k === 'tmenu' || k === 'card') ? `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:8px;">Velikost: <b style="color:var(--text);">${(st.sizes && st.sizes[k]) || 100}%</b></div>
                     <input type="range" min="80" max="140" step="5" value="${(st.sizes && st.sizes[k]) || 100}" oninput="this.previousElementSibling.querySelector('b').textContent=this.value+'%';SinatorLook.setSize('${k}',this.value)" style="width:100%;">` : ''}
                 </div>`;
