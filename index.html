@@ -3936,6 +3936,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-03', date: '3. 10. 2026', items: [
+            'Oblíbené — nový filtr 🔤 „Začíná na“ (stejný jako v Tematických seznamech): napiš písmeno a zobrazí se jen filmy, seriály, herci i režiséři začínající na něj (bez ohledu na diakritiku a velikost písmen); tlačítko „Vše“ filtr zruší. Funguje v každé záložce a kombinuje se s řazením i filtrem národnosti'
+        ] },
         { version: '2026-10-02b', date: '2. 10. 2026', items: [
             { admin: true, text: 'Admin → Registrovaní uživatelé — po schválení žádosti adminem (level 2) se uživatel automaticky přesune ze „Žádostí o přístup“ mezi běžné registrované uživatele; vidíš jeho online/offline stav a můžeš mu dát Admin práva, resetovat appku, odebrat přístup apod. Dokud appku po schválení poprvé nespustí, je v seznamu jako offline („schválen · ještě nepřipojen“)' },
             { admin: true, text: '„Žádosti o přístup“ teď ukazují jen čekající žádosti; odebrání přístupu schválenému uživateli se dělá tlačítkem ⛔ v seznamu uživatelů' },
@@ -4961,6 +4964,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     }
     
     function closeFavsModal() { 
+        window._favsLetter = '';
         $('btnFavToggle')?.classList.remove('active');
         $('modal')?.classList.remove('open');
         if($('modal')) $('modal').style.zIndex = '';
@@ -10982,6 +10986,11 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 <button onclick="setFavsSort('year')" id="fSort-year" style="padding:4px 11px;border-radius:14px;border:1px solid ${sort==='year'?'#1db954':'var(--border)'};background:${sort==='year'?'#1db954':'var(--bg-elevated)'};color:${sort==='year'?'#000':'var(--text)'};cursor:pointer;font-size:0.75rem;font-weight:${sort==='year'?'600':'normal'};">🗓 Rok</button>
                 <button id="favsGridToggleBtn" onclick="favsToggleGridCols()" title="Přepnout zobrazení" style="margin-left:auto;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:4px 11px;border-radius:14px;font-size:0.75rem;cursor:pointer;white-space:nowrap;">${(window._favsGridCols||2)===1?'▤ 1 sloupec':'▦ 2 sloupce'}</button>
             </div>
+            <div style="display:flex;gap:7px;margin:0 16px 14px;align-items:center;">
+                <span style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;">🔤 Začíná na</span>
+                <input id="favsLetterFilter" type="text" maxlength="1" inputmode="text" autocomplete="off" autocapitalize="characters" placeholder="A" value="${(window._favsLetter||'').replace(/"/g,'')}" oninput="setFavsLetter(this.value)" style="width:42px;height:36px;box-sizing:border-box;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:1rem;font-weight:700;outline:none;">
+                <button onclick="setFavsLetter('');const i=$('favsLetterFilter');if(i)i.value='';" style="padding:7px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);cursor:pointer;font-size:0.76rem;">Vše</button>
+            </div>
             ${(tab === 'actor' || tab === 'director') ? `<div style="display:flex;gap:6px;margin:0 16px 14px;flex-wrap:wrap;align-items:center;">
                 <span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-right:2px;">Zobrazit:</span>
                 <button onclick="setFavsActorFilterMode('all')" style="padding:4px 11px;border-radius:14px;border:1px solid ${(window._favsActorFilterMode||'all')==='all'?'#1db954':'var(--border)'};background:${(window._favsActorFilterMode||'all')==='all'?'#1db954':'var(--bg-elevated)'};color:${(window._favsActorFilterMode||'all')==='all'?'#000':'var(--text)'};cursor:pointer;font-size:0.75rem;font-weight:${(window._favsActorFilterMode||'all')==='all'?'600':'normal'};">Všichni</button>
@@ -11094,6 +11103,16 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         _store.setItem('sinator_actor_favs', JSON.stringify(state.actorFavs));
     }
 
+    // 🔤 Filtr „Začíná na“ v Oblíbených — bez diakritiky a bez ohledu na velikost písmen
+    window._favsLetter = window._favsLetter || '';
+    function _favsNormLetter(v) {
+        return String(v || '').trim().charAt(0).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    }
+    window.setFavsLetter = function(value) {
+        window._favsLetter = String(value || '').trim().charAt(0);
+        renderFavsGrid(); // jen mřížka, ať input neztratí fokus
+    };
+
     function setFavsSort(sort) {
         state._favsSort = sort;
         renderFavsModal();
@@ -11130,12 +11149,15 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             items = state.favs.filter(f => (f.type || 'movie') === tab).map(f => ({...f, media_type: f.type || 'movie', poster_path: f.poster}));
         }
 
+        const _fl = _favsNormLetter(window._favsLetter);
+        if (_fl) items = items.filter(it => _favsNormLetter(it.title || it.name || '') === _fl);
+
         if (sort === 'default') items.sort((a,b) => (b.addedAt||0) - (a.addedAt||0));
         else if (sort === 'az') items.sort((a,b) => (a.title||a.name||'').localeCompare(b.title||b.name||'','cs'));
         else if (sort === 'za') items.sort((a,b) => (b.title||b.name||'').localeCompare(a.title||a.name||'','cs'));
         else if (sort === 'year') items.sort((a,b) => (b.year||0) - (a.year||0));
 
-        if (!items.length) { grid.innerHTML = '<div style="grid-column:span 2;text-align:center;padding:40px;color:var(--text-muted);">😕 Žádné oblíbené položky</div>'; renderWatchedAzBar([]); return; }
+        if (!items.length) { grid.innerHTML = `<div style="grid-column:span 2;text-align:center;padding:40px;color:var(--text-muted);">😕 ${_fl ? 'Žádné oblíbené položky na písmeno „' + String(window._favsLetter).toUpperCase() + '“' : 'Žádné oblíbené položky'}</div>`; renderWatchedAzBar([]); return; }
 
         const cols = window._favsGridCols || 2;
         const cols1 = cols === 1;
