@@ -53,6 +53,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
   <style>#__vercel_toolbar_container, vercel-live-feedback { display: none !important; }
+    /* Světlý režim: nadpisy s přechodem z bílé do zlaté (název filmu v detailu, nadpisy seznamů) byly na bílém pozadí nečitelné */
+    html[data-theme="light"] .modal-title,
+    html[data-theme="light"] [style*="linear-gradient(135deg,#fff"],
+    html[data-theme="light"] [style*="linear-gradient(135deg, #fff"] {
+        background: linear-gradient(135deg, #1a1a1a, #8a6a00) !important;
+        -webkit-background-clip: text !important;
+        background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        color: #1a1a1a !important;
+    }
 .tv-dd{ position:relative; }
 .tv-dd-btn{
     width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px;
@@ -3937,6 +3947,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-03', date: '3. 10. 2026', items: [
+            'Světlý režim — název filmu/seriálu v detailu a nadpisy seznamů byly na bílém pozadí špatně čitelné; teď mají tmavý přechod do zlatohnědé',
             'Detail filmu/seriálu — při vypnutých „Barevných ikonách tlačítek“ jsou i čipy (hodnocení, premiéra, typ uvedení, PG, Trailer, Soundtrack…) a tlačítka Přehrát v jedné barvě včetně jejich ikon (šedé stejně jako ve spodních tlačítkách), při zapnutých zůstávají barevné; „Shlédnuto“ zůstává zelené (včetně Shlédnuto (Sinator), které bylo modré)',
             { admin: true, text: 'Admin → Registrovaní uživatelé — nové řazení: Admin level 2 vždy úplně nahoře, pak online uživatelé (Admin level 1 před běžnými), pak offline uživatelé (opět Admin level 1 před běžnými); uvnitř skupin podle abecedy' },
             'Oblíbené — nový filtr 🔤 „Začíná na“ (stejný jako v Tematických seznamech): napiš písmeno a zobrazí se jen filmy, seriály, herci i režiséři začínající na něj (bez ohledu na diakritiku a velikost písmen); tlačítko „Vše“ filtr zruší. Funguje v každé záložce a kombinuje se s řazením i filtrem národnosti'
