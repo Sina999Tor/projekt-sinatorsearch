@@ -97,7 +97,7 @@
         purple:  { label: '🔮 Fialová noc', c: { bg: '#120b1a', win: '#170e20', card: '#1b1228', btn: '#271a3a', menu: '#221535', border: '#3a2956', accent: '#b388ff', gold: '#ffcc66' } },
         warm:    { label: '🔥 Teplá hnědá', c: { bg: '#16100b', win: '#1b130d', card: '#20170f', btn: '#2c2015', menu: '#271c12', border: '#44331f', accent: '#ff9f43', gold: '#ffd27a' } }
       };
-      function def() { return { colors: { dark: {}, light: {} }, fonts: {}, scale: 100 }; }
+      function def() { return { colors: { dark: {}, light: {} }, fonts: {}, styles: {}, scale: 100 }; }
       function load() {
         try {
           var o = JSON.parse(localStorage.getItem(KEY) || 'null');
@@ -106,6 +106,7 @@
             d.colors.dark = (o.colors && o.colors.dark) || {};
             d.colors.light = (o.colors && o.colors.light) || {};
             d.fonts = o.fonts || {};
+            d.styles = o.styles || {};
             d.scale = o.scale || 100;
             return d;
           }
@@ -117,6 +118,20 @@
       // Všechna „okna“ (celoobrazovkové i vyskakovací modaly) podle styles.css
       var WIN = ['.modal','.settings-modal','.websites-modal','.music-modal','.ai-modal','.ivysilani-modal','.iprima-modal','.trakt-modal','.favs-modal','.sources-modal','.ts-modal','.radio-modal','.kino-modal','#slozkyModal','#slozkyPicker','.slozky-picker-box'];
       var MENU_FONT = '.action-btn,.settings-tab-btn,.page-nav-btn,.search-btn,.menu-row-btn,.tab,.tabs-dropdown-toggle,.tab-sort-btn,.tab-sort-opt,.filter-tab,.favs-subtab,.settings-subtab-btn,.person-tab,.page-num,.ivysilani-tab,.iprima-tab,.coll-tab,.radio-source-tab,.tv-group-tab';
+      var TITLE_SEL = ['h1', 'h2', 'h3', '.modal-title', '.modal-nav-title', '.card-title', '.logo', '[style*="Playfair"]'];
+      var MENU_SEL = MENU_FONT.split(',');
+      var MODAL_SEL = []; WIN.forEach(function (w) { MODAL_SEL.push(w, w + ' button', w + ' input', w + ' textarea', w + ' select'); });
+      var BASE_SEL = ['body'];
+      function withKids(list) { return list.concat(list.map(function (x) { return x + ' *'; })); }
+      function styleRules(flags, list) {
+        var f = flags || {}, d = [], o = [];
+        if (f.b) d.push('font-weight:700 !important');
+        if (f.i) d.push('font-style:italic !important');
+        if (f.c) d.push('text-transform:uppercase !important');
+        if (d.length) o.push(withKids(list).join(',') + '{' + d.join(';') + '}');
+        if (f.u) o.push(list.join(',') + '{text-decoration:underline !important;}');
+        return o.join('\n');
+      }
       function scoped(pre, list, tail) { return list.map(function (x) { return pre + ' ' + x + (tail || ''); }).join(','); }
       function cssFor(st) {
         var out = [];
@@ -154,6 +169,10 @@
           WIN.forEach(function (w) { sel.push(w, w + ' button', w + ' input', w + ' textarea', w + ' select'); });
           out.push(sel.join(',') + '{font-family:' + ff(f.modal) + ' !important;}');
         }
+        var sy = st.styles || {};
+        [['base', BASE_SEL], ['title', TITLE_SEL], ['menu', MENU_SEL], ['modal', MODAL_SEL]].forEach(function (g) {
+          var r = styleRules(sy[g[0]], g[1]); if (r) out.push(r);
+        });
         if (st.scale && st.scale !== 100) out.push('html{font-size:' + st.scale + '%;}');
         return out.join('\n');
       }
@@ -200,6 +219,12 @@
         setColor: function (k, v) { var st = load(); st.colors[mode()][k] = v; save(st); apply(); },
         resetColor: function (k) { var st = load(); delete st.colors[mode()][k]; save(st); apply(); if (api.refreshUI) api.refreshUI(); },
         setFont: function (k, id) { var st = load(); if (id) st.fonts[k] = id; else delete st.fonts[k]; save(st); apply(); if (api.refreshUI) api.refreshUI(); },
+        toggleStyle: function (g, flag) {
+          var st = load(); st.styles = st.styles || {}; var f = st.styles[g] = st.styles[g] || {};
+          if (f[flag]) delete f[flag]; else f[flag] = 1;
+          if (!Object.keys(f).length) delete st.styles[g];
+          save(st); apply(); if (api.refreshUI) api.refreshUI();
+        },
         setScale: function (n) { var st = load(); st.scale = Math.max(80, Math.min(130, parseInt(n, 10) || 100)); save(st); apply(); },
         preset: function (id) {
           var st = load();
@@ -4102,6 +4127,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-03c', date: '3. 10. 2026', items: [
+            'Vlastní vzhled → Písma — ke každé skupině písma (nadpisy, menu, okna, základní) lze zapnout styl: Tučné, Kurzíva, Podtržené a Verzálky (u základního písma Tučné a Kurzíva); ukázka pod výběrem se mění hned'
+        ] },
         { version: '2026-10-03b', date: '3. 10. 2026', items: [
             'Vlastní vzhled — vlastní barvu teď vybereš v okně s paletou (84 barev), jezdci Odstín / Sytost / Jas nebo zadáním HEX kódu',
             'Okno „Aplikace byla aktualizována“ se po aktualizaci zobrazuje spolehlivě — vždy až po odemčení appky a přihlášení schváleného uživatele, i když se appka odemkne se zpožděním'
@@ -5269,12 +5297,18 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             FONT_ROWS.forEach(([k, label]) => {
                 const cur = st.fonts[k] || '';
                 const css = (L.FONTS[cur] && L.FONTS[cur].css) || 'inherit';
+                const fl = (st.styles && st.styles[k]) || {};
+                const flags = k === 'base' ? [['b', 'B', 'Tučné'], ['i', 'I', 'Kurzíva']] : [['b', 'B', 'Tučné'], ['i', 'I', 'Kurzíva'], ['u', 'U', 'Podtržené'], ['c', 'AA', 'Verzálky']];
+                const symStyle = { b: 'font-weight:700;', i: 'font-style:italic;', u: 'text-decoration:underline;', c: '' };
+                const chips = flags.map(([f, sym, name]) => `<button onclick="SinatorLook.toggleStyle('${k}','${f}')" style="${btnStyle}padding:6px 10px;${fl[f] ? 'border-color:var(--gold);color:var(--gold);background:rgba(255,215,0,0.12);' : ''}"><span style="${symStyle[f]}">${sym}</span> ${name}</button>`).join('');
+                const pv = (fl.b ? 'font-weight:700;' : '') + (fl.i ? 'font-style:italic;' : '') + (fl.u ? 'text-decoration:underline;' : '') + (fl.c ? 'text-transform:uppercase;' : '');
                 h += `<div>
                     <div style="font-size:0.82rem;color:var(--text);margin-bottom:4px;">${esc(label)}</div>
                     <select onchange="SinatorLook.setFont('${k}', this.value)" style="width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.9rem;">
                         ${Object.keys(L.FONTS).map(id => `<option value="${id}" ${id === cur ? 'selected' : ''}>${esc(L.FONTS[id].label)}</option>`).join('')}
                     </select>
-                    <div style="margin-top:4px;font-size:1.05rem;color:var(--text-muted);font-family:${css};">Ukázka: Zootropolis, Příběh hraček 5</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${chips}</div>
+                    <div style="margin-top:6px;font-size:1.05rem;color:var(--text-muted);font-family:${css};${pv}">Ukázka: Zootropolis, Příběh hraček 5</div>
                 </div>`;
             });
             h += `</div><div style="margin-top:16px;font-size:0.8rem;color:var(--text-muted);">Velikost písma: <b id="customLookScaleVal" style="color:var(--text);">${st.scale}%</b></div>
