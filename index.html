@@ -4102,8 +4102,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-03b', date: '3. 10. 2026', items: [
+            'Vlastní vzhled — vlastní barvu teď vybereš v okně s paletou (84 barev), jezdci Odstín / Sytost / Jas nebo zadáním HEX kódu',
+            'Okno „Aplikace byla aktualizována“ se po aktualizaci zobrazuje spolehlivě — vždy až po odemčení appky a přihlášení schváleného uživatele, i když se appka odemkne se zpožděním'
+        ] },
         { version: '2026-10-03', date: '3. 10. 2026', items: [
-            'Nastavení → Vzhled → 🖌️ Přizpůsobit vzhled — vlastní vzhled aplikace: předvolby barev (AMOLED, Půlnoční modrá, Les, Fialová noc, Teplá), barvy pozadí, oken, karet, tlačítek, horního menu, okrajů, textu, akcentu i názvu filmu (zvlášť pro tmavý a světlý režim), výběr písma pro nadpisy, menu, okna i zbytek aplikace (21 písem) a velikost písma 80–130 %. Vlastní barvu vybereš v okně s paletou (84 barev), jezdci Odstín / Sytost / Jas nebo zadáním HEX kódu. Změny se projeví hned a ukládají se v zařízení; tlačítko „Obnovit výchozí vzhled“ vše vrátí',
+            'Nastavení → Vzhled → 🖌️ Přizpůsobit vzhled — vlastní vzhled aplikace: předvolby barev (AMOLED, Půlnoční modrá, Les, Fialová noc, Teplá), barvy pozadí, oken, karet, tlačítek, horního menu, okrajů, textu, akcentu i názvu filmu (zvlášť pro tmavý a světlý režim), výběr písma pro nadpisy, menu, okna i zbytek aplikace (21 písem) a velikost písma 80–130 %. Změny se projeví hned a ukládají se v zařízení; tlačítko „Obnovit výchozí vzhled“ vše vrátí',
             'Světlý režim — název filmu/seriálu v detailu a nadpisy seznamů byly na bílém pozadí špatně čitelné; teď mají tmavý přechod do zlatohnědé',
             'Detail filmu/seriálu — při vypnutých „Barevných ikonách tlačítek“ jsou i čipy (hodnocení, premiéra, typ uvedení, PG, Trailer, Soundtrack…) a tlačítka Přehrát v jedné barvě včetně jejich ikon (šedé stejně jako ve spodních tlačítkách), při zapnutých zůstávají barevné; „Shlédnuto“ zůstává zelené (včetně Shlédnuto (Sinator), které bylo modré)',
             { admin: true, text: 'Admin → Registrovaní uživatelé — nové řazení: Admin level 2 vždy úplně nahoře, pak online uživatelé (Admin level 1 před běžnými), pak offline uživatelé (opět Admin level 1 před běžnými); uvnitř skupin podle abecedy' },
@@ -4311,7 +4315,23 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         } catch (e) {}
         return true;
     }
-    window._maybeShowWhatsNew = function() { setTimeout(showWhatsNewIfNeeded, 700); };
+    // Okno se zobrazí až ve chvíli, kdy je appka odemčená a uživatel má jméno (schválený/přihlášený).
+    // Dřív se kontrola spustila jen jednou — když se appka odemkla později (heslo, schválení adminem,
+    // zadání jména), okno už nevyskočilo. Teď se kontrola opakuje, dokud se okno nezobrazí.
+    let _wnTimer = null;
+    function _scheduleWhatsNew() {
+        if (_wnTimer) return;
+        let tries = 0;
+        _wnTimer = setInterval(function () {
+            tries++;
+            const latest = _clLatestVisible();
+            let done = !latest;
+            try { if (latest && localStorage.getItem('sinator_whatsnew_seen') === latest.version) done = true; } catch (e) {}
+            if (done || document.getElementById('whatsNewOverlay') || tries > 400) { clearInterval(_wnTimer); _wnTimer = null; return; }
+            if (_canShowWhatsNew()) { clearInterval(_wnTimer); _wnTimer = null; showWhatsNewIfNeeded(); }
+        }, 1500);
+    }
+    window._maybeShowWhatsNew = _scheduleWhatsNew;
 
     // Viditelnost položek changelogu: admin-only položky vidí jen Admin level 2
     function _clIsAdmin2() { return typeof window._isAdminLevel2 === 'function' && !!window._isAdminLevel2(); }
@@ -4423,7 +4443,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
 
     document.addEventListener('DOMContentLoaded', async () => {
         setupPWA();
-        setTimeout(showWhatsNewIfNeeded, 600);
+        _scheduleWhatsNew();
         
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
