@@ -1269,3 +1269,32 @@ html[data-theme="light"] [style*="linear-gradient(135deg, #fff"] {
     -webkit-text-fill-color: transparent !important;
     color: #1a1a1a !important;
 }
+
+/* ===== Nastavení: menu + samostatná okna ===== */
+#settingsModal .settings-modal-body > .settings-tab-content{display:none !important;}
+#settingsModal .settings-modal-body{padding-top:14px;}
+.sw-menu{padding:14px 16px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.sw-group{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted,#888);margin:12px 4px 2px;opacity:.85;}
+.sw-group:first-child{margin-top:0;}
+.sw-item{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid var(--border,rgba(255,255,255,.12));border-radius:14px;background:var(--bg-elevated,rgba(255,255,255,.04));color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s,border-color .15s,transform .1s;}
+.sw-item:active{transform:scale(.985);}
+.sw-item:hover{border-color:var(--c,#ffd700);}
+.sw-ico{flex:0 0 42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:1.35rem;background:color-mix(in srgb,var(--c,#ffd700) 16%,transparent);border:1px solid color-mix(in srgb,var(--c,#ffd700) 38%,transparent);}
+.sw-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.sw-name{font-weight:700;font-size:.95rem;color:var(--c,#ffd700);line-height:1.2;}
+.sw-sub{font-size:.72rem;color:var(--text-muted,#888);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sw-chev{flex:0 0 auto;font-size:1.4rem;color:var(--text-muted,#888);opacity:.7;line-height:1;}
+.sw-window{position:fixed;inset:0;display:none;flex-direction:column;background:var(--bg-card,#14161f);overflow:hidden;}
+.sw-window.open{display:flex;}
+.sw-head{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:calc(12px + env(safe-area-inset-top,0px)) 14px 12px;border-bottom:1px solid var(--border,rgba(255,255,255,.12));background:var(--bg-card,#14161f);}
+.sw-back{background:none;border:1px solid var(--border,rgba(255,255,255,.2));color:inherit;padding:7px 13px;border-radius:20px;cursor:pointer;font:inherit;font-size:.85rem;white-space:nowrap;}
+.sw-title{flex:1;min-width:0;margin:0;font-size:1.05rem;color:var(--gold,#ffd700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sw-x{flex:0 0 auto;width:36px;height:36px;border-radius:50%;background:none;border:1px solid var(--border,rgba(255,255,255,.2));color:inherit;cursor:pointer;font-size:1rem;display:grid;place-items:center;padding:0;}
+.sw-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:16px 16px calc(28px + env(safe-area-inset-bottom,0px));}
+.sw-body > .settings-tab-content,.sw-body > .sw-page{display:block !important;}
+.sw-body .settings-subtabs{display:none !important;}
+
+/* menu zabírá celou výšku modalu; původní (nyní prázdné) tělo se sbalí */
+.settings-modal > .sw-menu{flex:1;min-height:0;}
+#settingsModal .settings-modal .settings-modal-body{flex:0 0 0 !important;height:0;min-height:0;padding:0 !important;overflow:hidden;}
+html[data-theme="light"] .sw-item{background:rgba(0,0,0,.03);}

@@ -117,7 +117,7 @@
       function save(st) { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
       function mode() { return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
       // Všechna „okna“ (celoobrazovkové i vyskakovací modaly) podle styles.css
-      var WIN = ['.modal','.settings-modal','.websites-modal','.music-modal','.ai-modal','.ivysilani-modal','.iprima-modal','.trakt-modal','.favs-modal','.sources-modal','.ts-modal','.radio-modal','.kino-modal','#slozkyModal','#slozkyPicker','.slozky-picker-box'];
+      var WIN = ['.modal','.settings-modal','.websites-modal','.music-modal','.ai-modal','.ivysilani-modal','.iprima-modal','.trakt-modal','.favs-modal','.sources-modal','.ts-modal','.radio-modal','.kino-modal','.sw-window','#slozkyModal','#slozkyPicker','.slozky-picker-box'];
       var MENU_FONT = '.action-btn,.settings-tab-btn,.page-nav-btn,.search-btn,.menu-row-btn,.tab,.tabs-dropdown-toggle,.tab-sort-btn,.tab-sort-opt,.filter-tab,.favs-subtab,.settings-subtab-btn,.person-tab,.page-num,.ivysilani-tab,.iprima-tab,.coll-tab,.radio-source-tab,.tv-group-tab';
       var TITLE_SEL = ['h1', 'h2', 'h3', '.modal-title', '.modal-nav-title', '.card-title', '.logo', '[style*="Playfair"]'];
       var MENU_SEL = MENU_FONT.split(',');
@@ -1288,12 +1288,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             <h2>🔧 Nastavení</h2>
             <button class="close-settings" onclick="closeSettingsModal()" title="Zavřít">✕</button>
         </div>
-        <div class="settings-tabs">
-            <div class="settings-tab-btn active" id="settingsTabBtnKeys" onclick="switchSettingsTab('keys')"><span class="settings-tab-icon">🔑</span><span>Klíče</span></div>
-            <div class="settings-tab-btn" id="settingsTabBtnAppearance" onclick="switchSettingsTab('appearance')"><span class="settings-tab-icon">🎨</span><span>Vzhled</span></div>
-            <div class="settings-tab-btn" id="settingsTabBtnOther" onclick="switchSettingsTab('other')"><span class="settings-tab-icon">⚙️</span><span>Ostatní</span></div>
-            <div class="settings-tab-btn" id="settingsTabBtnAdmin" onclick="switchSettingsTab('admin')"><span class="settings-tab-icon">🛡️</span><span>Admin</span></div>
-        </div>
+        <div class="sw-menu" id="settingsMenu"></div>
         <div class="settings-modal-body">
             <!-- ============ TAB: KLÍČE ============ -->
             <div class="settings-tab-content active" id="settingsTabContentKeys">
@@ -1670,6 +1665,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             </div>
             <!-- ============ TAB: OSTATNÍ ============ -->
             <div class="settings-tab-content" id="settingsTabContentOther">
+            <div class="sw-page" id="swPageProfile">
             <div class="settings-section" style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.2);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:var(--gold,#ffd700);">👤 Tvoje jméno / přezdívka</span>
                 <div style="display:flex;align-items:center;gap:10px;margin-top:6px;">
@@ -1689,7 +1685,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 </div>
                 <div id="inviteLinkPreview" style="font-size:0.7rem;color:var(--text-muted);opacity:0.7;margin-top:8px;word-break:break-all;"></div>
             </div>
+            </div><!-- /swPageProfile -->
             <div class="settings-divider"></div>
+            <div class="sw-page" id="swPageSecurity">
             <div class="settings-section" style="background:rgba(229,9,20,0.07);border:1px solid rgba(229,9,20,0.25);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:#ff6b6b;">🔐 Přístupové heslo aplikace</span>
                 <div id="appPwdManageBox" style="display:none;font-size:0.78rem;color:#888;margin-top:8px;padding:10px;background:rgba(0,0,0,0.25);border-radius:8px;line-height:1.5;">
@@ -1735,7 +1733,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 </div>
                 <div style="font-size:0.7rem;color:var(--text-muted);opacity:0.6;margin-top:4px;">Zobrazuje filmy a seriály s explicitním obsahem ve výsledcích TMDB</div>
             </div>
+            </div><!-- /swPageSecurity -->
             <div class="settings-divider"></div>
+            <div class="sw-page" id="swPageUpdate">
             <div class="settings-section" style="background:rgba(29,185,84,0.07);border:1px solid rgba(29,185,84,0.25);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:#1db954;">🔄 Aktualizace aplikace</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;line-height:1.5;">
@@ -1753,7 +1753,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 </div>
                 <button class="settings-btn-small" onclick="openChangelogModal()" style="width:100%;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.35);color:var(--gold,#ffd700);font-weight:600;padding:10px;">🕘 Zobrazit historii změn</button>
             </div>
+            </div><!-- /swPageUpdate -->
             <div class="settings-divider"></div>
+            <div class="sw-page" id="swPageBackup">
             <div class="settings-section">
                 <span class="settings-label">Záloha dat</span>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Kompletní záloha úplně všeho v appce — oblíbené, shlédnuté, všechny API klíče, Trakt/Simkl/Sinator backend přihlášení, IPTV údaje, vzhled i všechna ostatní nastavení.</div>
@@ -1764,7 +1766,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     </label>
                 </div>
             </div>
+            </div><!-- /swPageBackup -->
             <div class="settings-divider"></div>
+            <div class="sw-page" id="swPageApps">
             <div class="settings-section">
                 <span class="settings-label">Instalace do externí aplikace</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">
@@ -1781,6 +1785,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <div id="externalPlayAppsList" style="display:flex;flex-direction:column;gap:8px;"></div>
                 <button class="settings-btn-small" onclick="addCustomExternalPlayApp()" style="width:100%;margin-top:10px;background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;font-weight:600;padding:10px;">➕ Přidat vlastní aplikaci</button>
             </div>
+            </div><!-- /swPageApps -->
             </div>
             <!-- ============ TAB: ADMIN ============ -->
             <div class="settings-tab-content" id="settingsTabContentAdmin">
@@ -5610,21 +5615,15 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     })();
 
     function switchSettingsTab(tab) {
-        const tabs = { keys: 'Keys', appearance: 'Appearance', other: 'Other', admin: 'Admin' };
-        Object.keys(tabs).forEach(function(key) {
-            const content = $('settingsTabContent' + tabs[key]);
-            const btn = $('settingsTabBtn' + tabs[key]);
-            if(content) content.classList.toggle('active', key === tab);
-            if(btn) btn.classList.toggle('active', key === tab);
-        });
-        if (tab === 'appearance' && typeof window.renderCustomLookUI === 'function') window.renderCustomLookUI();
+        // Zpětná kompatibilita: dřívější „taby“ se teď otevírají jako samostatná okna.
+        var map = { keys: 'tmdb', appearance: 'look', other: 'profile', admin: 'admin' };
+        if (window.swOpen && map[tab]) window.swOpen(map[tab]);
     }
     window.switchSettingsTab = switchSettingsTab;
 
     function openSettingsModal() {
         closeHelperModals();
-        switchSettingsTab('keys');
-        switchKeysSubTab('tmdb');
+        if(window.swShowMenu) window.swShowMenu();
         if($('geminiApiKeyInput')) $('geminiApiKeyInput').value = geminiApiKey;
         if($('groqApiKeyInput')) $('groqApiKeyInput').value = groqApiKey;
         if($('openRouterKeyInput')) $('openRouterKeyInput').value = openRouterKey;
@@ -6938,7 +6937,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const m = $('externalInstallModal');
         if(m) m.style.display = 'none';
         if(typeof openSettingsModal === 'function') openSettingsModal();
-        if(typeof switchSettingsTab === 'function') switchSettingsTab('other');
+        if(window.swOpen) window.swOpen('apps');
     }
     window.closeExternalInstallModal = closeExternalInstallModal;
 
@@ -7438,7 +7437,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
         if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
             alert('Nejprve v Nastavení > Klíče > Propojení > Trakt.tv vyplň vlastní Client ID a Client Secret.');
-            openSettingsModal(); switchSettingsTab('keys'); switchKeysSubTab('connect'); switchConnectService('trakt');
+            openSettingsModal(); if(window.swOpen) window.swOpen('connect'); switchConnectService('trakt');
             return;
         }
         const authUrl = `https://trakt.tv/oauth/authorize?response_type=code&client_id=${TRAKT_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
@@ -45103,6 +45102,108 @@ window.addEventListener('load', function() {
         if (window._restoreLastZabavaList) window._restoreLastZabavaList();
     }, 400);
 });
+</script>
+<script id="swEngine">
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var GROUPS = [
+    ['Klíče a propojení', ['ai','tmdb','connect']],
+    ['Aplikace', ['look','apps']],
+    ['Účet', ['profile','security']],
+    ['Údržba', ['update','backup']],
+    ['Správa', ['admin']]
+  ];
+  var PAGES = {
+    ai:      {icon:'🤖', name:'AI klíče',          sub:'Gemini, Groq, OpenRouter',                 c:'#a78bfa', node:'settingsTabContentKeys', pre:function(){ window.switchKeysSubTab('ai'); }},
+    tmdb:    {icon:'🎬', name:'TMDB a OMDb',       sub:'API klíče pro filmová data',               c:'#00b4d8', node:'settingsTabContentKeys', pre:function(){ window.switchKeysSubTab('tmdb'); }},
+    connect: {icon:'🔗', name:'Propojení účtů',    sub:'Trakt, Simkl, Sinator, Histra, iVysílání', c:'#1cb99a', node:'settingsTabContentKeys', pre:function(){ window.switchKeysSubTab('connect'); }},
+    look:    {icon:'🎨', name:'Vzhled',            sub:'Téma, písma, ikony, fullscreen',           c:'#f472b6', node:'settingsTabContentAppearance', pre:function(){ if(window.renderCustomLookUI) window.renderCustomLookUI(); }},
+    apps:    {icon:'📱', name:'Aplikace',          sub:'Instalace, Stremio/Nuvio, externí přehrávání', c:'#818cf8', node:'swPageApps'},
+    profile: {icon:'👤', name:'Profil a pozvánka', sub:function(){ var n=$('currentUserNickDisplay'); return n && n.textContent && n.textContent.trim()!=='—' ? n.textContent.trim() : 'Přezdívka, pozvat kamaráda'; }, c:'#ffd700', node:'swPageProfile'},
+    security:{icon:'🔐', name:'Heslo a obsah',     sub:'Přístupové heslo, explicitní obsah',       c:'#ff6b6b', node:'swPageSecurity'},
+    update:  {icon:'🔄', name:'Aktualizace',       sub:'Kontrola verze a historie změn',           c:'#1db954', node:'swPageUpdate'},
+    backup:  {icon:'💾', name:'Záloha dat',        sub:'Export a import',                          c:'#8bc34a', node:'swPageBackup'},
+    admin:   {icon:'🛡️', name:'Admin',             sub:function(){ var l=$('adminModeLabel'); return 'Admin: ' + (l ? l.textContent : 'Neaktivní'); }, c:'#ffaa00', node:'settingsTabContentAdmin'}
+  };
+
+  // PWA instalace patří k „Aplikace“
+  function movePwa(){
+    var inst=$('installAppSection'), apps=$('swPageApps');
+    if(!inst || !apps || inst.__swMoved) return;
+    var prev=inst.previousElementSibling;
+    if(prev && prev.classList.contains('settings-divider')) prev.remove();
+    apps.insertBefore(inst, apps.firstChild);
+    var d=document.createElement('div'); d.className='settings-divider';
+    apps.insertBefore(d, inst.nextSibling);
+    inst.__swMoved=true;
+  }
+
+  var win=null, current=null;
+  function build(){
+    if(win) return win;
+    win=document.createElement('div');
+    win.className='sw-window'; win.id='swWindow';
+    win.innerHTML='<div class="sw-head"><button class="sw-back" type="button">← Zpět</button><h3 class="sw-title" id="swTitle"></h3><button class="sw-x" type="button" title="Zavřít">✕</button></div><div class="sw-body" id="swBody"></div>';
+    document.body.appendChild(win);
+    win.querySelector('.sw-back').onclick=function(){ closeWin(); };
+    win.querySelector('.sw-x').onclick=function(){ closeWin(); if(window.closeSettingsModal) window.closeSettingsModal(); };
+    return win;
+  }
+  function restore(){
+    if(!current) return;
+    var n=$(PAGES[current].node);
+    if(n && n.__swPh && n.__swPh.parentNode) n.__swPh.parentNode.insertBefore(n, n.__swPh);
+    current=null;
+  }
+  function closeWin(){
+    restore();
+    if(win) win.classList.remove('open');
+    renderMenu();
+    var m=$('settingsMenu'); if(m) m.scrollTop=m.__swScroll||0;
+  }
+  function openPage(key){
+    var def=PAGES[key]; if(!def) return;
+    movePwa(); build();
+    var m=$('settingsMenu'); if(m) m.__swScroll=m.scrollTop;
+    restore();
+    var n=$(def.node); if(!n) return;
+    if(!n.__swPh){ n.__swPh=document.createComment('sw'); n.parentNode.insertBefore(n.__swPh,n); }
+    var z=parseInt(getComputedStyle($('settingsModal')).zIndex,10);
+    win.style.zIndex=(isNaN(z)?10000:z)+1;
+    $('swBody').appendChild(n);
+    $('swTitle').textContent=def.icon+' '+def.name;
+    current=key;
+    try{ if(def.pre) def.pre(); }catch(e){ console.warn('sw pre',e); }
+    $('swBody').scrollTop=0;
+    win.classList.add('open');
+  }
+  function renderMenu(){
+    var m=$('settingsMenu'); if(!m) return;
+    var h='';
+    GROUPS.forEach(function(g){
+      h+='<div class="sw-group">'+g[0]+'</div>';
+      g[1].forEach(function(k){
+        var d=PAGES[k], s=typeof d.sub==='function'?d.sub():d.sub;
+        h+='<button type="button" class="sw-item" style="--c:'+d.c+'" data-sw="'+k+'"><span class="sw-ico">'+d.icon+'</span><span class="sw-txt"><span class="sw-name">'+d.name+'</span><span class="sw-sub"></span></span><span class="sw-chev">›</span></button>';
+      });
+    });
+    m.innerHTML=h;
+    var items=m.querySelectorAll('.sw-item');
+    for(var i=0;i<items.length;i++){
+      (function(b){ var k=b.getAttribute('data-sw'), d=PAGES[k], s=typeof d.sub==='function'?d.sub():d.sub; b.querySelector('.sw-sub').textContent=s; b.onclick=function(){ openPage(k); }; })(items[i]);
+    }
+  }
+  window.swOpen=openPage;
+  window.swShowMenu=function(){ closeWin(); };
+  window.swCloseWin=closeWin;
+
+  function init(){
+    movePwa(); renderMenu();
+    var sm=$('settingsModal');
+    if(sm) new MutationObserver(function(){ if(!sm.classList.contains('open') && win && win.classList.contains('open')) closeWin(); }).observe(sm,{attributes:true,attributeFilter:['class']});
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+})();
 </script>
 </body>
 </html>
