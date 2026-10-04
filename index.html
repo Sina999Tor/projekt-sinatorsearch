@@ -4160,6 +4160,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-04', date: '4. 10. 2026', items: [
+            'Detail seriálu — název sezóny se už neopakuje („Sezóna 1: 1. sezóna“); když TMDB vrátí jen obecný název, zobrazí se prostě „Sezóna 1“, zvláštní název sezóny (např. „Sezóna 3: Válka světů“) zůstává'
+        ] },
         { version: '2026-10-03e', date: '3. 10. 2026', items: [
             'Vlastní vzhled → 💾 Moje vzhledy — 3 místa pro uložení vlastního vzhledu (barvy, písma, styly i velikosti): 💾 Uložit / Přepsat, ▶ Použít a 🗑️ Smazat; každý vzhled má vlastní název a náhled barev. „Obnovit výchozí vzhled“ uložené vzhledy nemaže. Ukázka textu u písem je „Film, Seriál“'
         ] },
@@ -13069,6 +13072,15 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     async function fetchSeasons(tvId) { try { const res = await fetch(`${BASE}/tv/${tvId}?api_key=${tmdbApiKey}&language=cs-CZ`); const data = await res.json(); return data.seasons?.filter(s => s.season_number > 0) || []; } catch(e) { return []; } }
     async function fetchEpisodes(tvId, seasonNumber) { try { const res = await fetch(`${BASE}/tv/${tvId}/season/${seasonNumber}?api_key=${tmdbApiKey}&language=cs-CZ`); const data = await res.json(); return data.episodes || []; } catch(e) { return []; } }
 
+    // Název sezóny: TMDB často vrací jen obecný název („1. sezóna“, „Season 1“), který by se
+    // s předponou „Sezóna 1:“ zopakoval — v tom případě ukážeme jen „Sezóna 1“.
+    function _seasonLabel(season) {
+        const n = season.season_number;
+        const name = String(season.name || '').trim();
+        const generic = new RegExp('^(\\d+\\s*\\.?\\s*(sezóna|sezona|série|serie|season)|(sezóna|sezona|série|serie|season)\\s*\\d+)\\.?$', 'i');
+        if (!name || generic.test(name)) return n === 0 ? 'Speciály' : 'Sezóna ' + n;
+        return 'Sezóna ' + n + ': ' + name;
+    }
     function renderSeasons(seasons, tvId) {
         if(!seasons.length) return '<p style="color:var(--text-muted)">Žádné sezóny k zobrazení.</p>';
         return seasons.map(season => {
@@ -13081,7 +13093,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const borderStyle = allWatched ? 'border-left:3px solid #1db954;' : someWatched ? 'border-left:3px solid #f5c518;' : '';
             return `<div class="season-item" id="seasonItem_${tvId}_${season.season_number}" style="${borderStyle}">
                 <button class="season-toggle" id="seasonToggleBtn_${tvId}_${season.season_number}" onclick="toggleEpisodes(${tvId}, ${season.season_number}, this)" style="${allWatched?'color:#1db954;':''}">
-                    <span id="seasonIndicatorText_${tvId}_${season.season_number}">📺 Sezóna ${season.season_number}: ${season.name || 'Neznámá'}${indicator}</span>
+                    <span id="seasonIndicatorText_${tvId}_${season.season_number}">📺 ${_seasonLabel(season)}${indicator}</span>
                     <span class="toggle-icon">▼</span>
                     <span style="font-size:0.8rem;color:var(--text-muted);margin-left:8px;">${total} epizod</span>
                 </button>
@@ -13172,7 +13184,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const toggleBtn = document.getElementById(`seasonToggleBtn_${tvId}_${seasonNumber}`);
         if (toggleBtn) toggleBtn.style.color = allWatched ? '#1db954' : '';
         const indicatorSpan = document.getElementById(`seasonIndicatorText_${tvId}_${seasonNumber}`);
-        if (indicatorSpan) indicatorSpan.textContent = `📺 Sezóna ${seasonNumber}: ${season.name || 'Neznámá'}${indicator}`;
+        if (indicatorSpan) indicatorSpan.textContent = `📺 ${_seasonLabel(Object.assign({}, season, { season_number: seasonNumber }))}${indicator}`;
     }
     window.refreshSeasonHeader = refreshSeasonHeader;
 
