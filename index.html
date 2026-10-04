@@ -655,7 +655,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         <button class="action-btn icon" id="btnTvRadioToggle" onclick="openTvRadioModal()" title="TV / Rádio / Kino">
             <span class="btn-icon">📺</span><span class="btn-label">Živá TV</span>
         </button>
-        <button class="action-btn icon" id="btnFavToggle" onclick="openFavsModal()" title="Oblíbené">
+        <button class="action-btn icon" id="btnFavToggle" onclick="favsOpenMenu()" title="Oblíbené">
             <span class="btn-icon">❤️</span><span class="btn-label">Oblíbené</span>
             <span class="badge fav" id="favBadge" style="display:none">0</span>
         </button>
@@ -4240,6 +4240,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-04k', date: '4. 10. 2026', items: [
+            'Nastavení — přehlednější: místo záložek je menu karet pod sebou (stejný vzhled jako Seznamy) a každá sekce se otevře ve vlastním okně se „← Zpět“: 🤖 AI klíče, 🎬 TMDB a OMDb, 🔗 Propojení účtů, 🎨 Vzhled, 📱 Aplikace, 👤 Profil a pozvánka, 🔐 Heslo a obsah, 🔄 Aktualizace, 💾 Záloha dat, 🛡️ Admin',
+            'Nové okno 📱 Aplikace — instalace aplikace (PWA), instalace do Stremia/Nuvia a nastavení přehrávání v externí aplikaci jsou teď pohromadě na jednom místě',
+            'Oblíbené — po otevření se nejdřív zobrazí menu karet pod sebou (Vše, Filmy, Seriály, Minisérie, Anime, Herci, Režiséři s počty); klepnutí otevře seznam dané kategorie, „← Zpět“ vrátí do menu',
+            'Moje složky — složky jsou karty pod sebou místo dvou sloupců a hlavička má stejný vzhled jako Seznamy'
+        ] },
         { version: '2026-10-04j', date: '4. 10. 2026', items: [
             'Přehrát v externí aplikaci — odstraněna položka „ModernTV (aplikace)“ (z prohlížeče ji spustit nejde), zůstává „ModernTV (web)“; všechny externí aplikace jsou u nových uživatelů výchozně vypnuté, v detailu i v Zábavě'
         ] },
@@ -5308,8 +5314,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         // Render inside main modal (same as watched)
         const nav = $('modalNavBar'), left = $('modalNavLeft'), right = $('modalNavRight');
         if(nav && left && right) {
-            left.innerHTML = `<span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">❤️ Oblíbené ↑</span>`;
-            right.innerHTML = `<button class="modal-close-btn" onclick="closeFavsModal()" title="Zavřít">✕</button>`;
+            window.favsUpdateNav();
             nav.style.display = 'flex';
         }
         state._favsSort = state._favsSort || 'default';
@@ -5338,9 +5343,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         $('modalContent')?.classList.remove('watched-full');
     }
 
-    window._openFavsModal = () => openFavsModal();
+    window._openFavsModal = () => window.favsOpenMenu();
     window._openWatchedModal = () => openWatchedModal();
-    window._openFavsModalTab = (tab) => { state._favsTab = tab; openFavsModal(); };
+    window._openFavsModalTab = (tab) => { state._favsTab = tab; state._favsView = 'list'; openFavsModal(); };
     window._openWatchedModalTab = (tab) => { state._watchedTab = tab; openWatchedModal(); };
 
     function getAppTheme() { try { return localStorage.getItem('sinator_theme') || 'dark'; } catch(e) { return 'dark'; } }
@@ -11527,6 +11532,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     function setFavFilter(type) { setFavsTab(type); }
 
     function renderFavsModal() {
+        if (state._favsView !== 'list') { window.favsUpdateNav(); return renderFavsMenu(); }
+        window.favsUpdateNav();
         const movies = state.favs.filter(f => (f.type || 'movie') === 'movie');
         const allTv = state.favs.filter(f => (f.type || 'movie') === 'tv');
         // Rozdělení podle klasifikace na pozadí (viz classifyFavsTv); dokud
@@ -11580,6 +11587,43 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         renderFavsGrid();
     }
 
+
+    // ── Oblíbené: menu pod sebou (jako Seznamy) → klik otevře seznam dané kategorie ──
+    window.favsUpdateNav = function() {
+        const left = $('modalNavLeft'), right = $('modalNavRight');
+        if (!left || !right) return;
+        const inList = state._favsView === 'list';
+        left.innerHTML = inList
+            ? `<button onclick="favsBackToMenu()" style="background:none;border:1px solid var(--border);color:inherit;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;margin-right:10px;">← Zpět</button><span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">❤️ Oblíbené ↑</span>`
+            : `<span class="modal-nav-title">❤️ Oblíbené</span>`;
+        right.innerHTML = `<button class="modal-close-btn" onclick="favsCloseAll()" title="Zavřít">✕</button>`;
+    };
+    window.favsOpenMenu = function() { state._favsView = 'menu'; openFavsModal(); };
+    window.favsCloseAll = function() { state._favsView = 'menu'; closeFavsModal(); };
+    window.favsBackToMenu = function() { state._favsView = 'menu'; window._favsLetter = ''; renderFavsModal(); const sb = $('modalScrollBody'); if (sb) sb.scrollTop = 0; };
+    window.favsOpenTab = function(tab) { state._favsTab = tab; state._favsView = 'list'; renderFavsModal(); const sb = $('modalScrollBody'); if (sb) sb.scrollTop = 0; };
+    function renderFavsMenu() {
+        const allTv = state.favs.filter(f => (f.type || 'movie') === 'tv');
+        const movies = state.favs.filter(f => (f.type || 'movie') === 'movie');
+        const mini = allTv.filter(f => state.favsTvClass[f.id] === 'miniseries');
+        const anime = allTv.filter(f => state.favsTvClass[f.id] === 'anime');
+        const tv = allTv.filter(f => { const c = state.favsTvClass[f.id]; return c !== 'miniseries' && c !== 'anime'; });
+        const actors = state.actorFavs.filter(a => a.isDirector !== true);
+        const dirs = state.actorFavs.filter(a => a.isDirector === true);
+        const total = movies.length + allTv.length + state.actorFavs.length;
+        const rows = [
+            ['all','❤️','Vše','#ffd700',total,'Všechny oblíbené položky'],
+            ['movie','🎬','Filmy','#60a5fa',movies.length,'Oblíbené filmy'],
+            ['tv','📺','Seriály','#4ade80',tv.length,'Oblíbené seriály'],
+            ['miniseries','📖','Minisérie','#ce93d8',mini.length,'Krátké uzavřené seriály'],
+            ['anime','🎌','Anime','#f472b6',anime.length,'Oblíbené anime'],
+            ['actor','👥','Herci','#fb923c',actors.length,'Oblíbení herci'],
+            ['director','🎥','Režiséři','#5dade2',dirs.length,'Oblíbení režiséři']
+        ];
+        $('modalScrollBody').innerHTML = '<div style="padding:16px;display:flex;flex-direction:column;gap:10px;">' + rows.map(r =>
+            `<button onclick="favsOpenTab('${r[0]}')" class="menu-row-btn"><span style="font-size:1.6rem;">${r[1]}</span><div><div style="color:${r[3]};font-weight:700;">${r[2]} <span style="color:var(--text-muted);font-weight:400;">(${r[4]})</span></div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${r[5]}</div></div></button>`
+        ).join('') + '</div>';
+    }
     function setFavsTab(tab) {
         state._favsTab = tab;
         renderFavsModal();
@@ -40624,9 +40668,9 @@ function castToScreen() {
 
 <div id="slozkyModal">
     <div class="slozky-header">
-        <button onclick="closeSlozkyModal()">✕</button>
         <h2>📁 Moje složky</h2>
         <button onclick="showNewSlozkaDialog()" style="color:#e55;font-size:1rem;font-weight:700;">+ Nová</button>
+        <button class="slozky-x" onclick="closeSlozkyModal()" title="Zavřít">✕</button>
     </div>
     <div class="slozky-body" id="slozkyBody"></div>
 </div>
@@ -40685,13 +40729,13 @@ window.renderSlozkyList = function renderSlozkyList() {
             <div style="font-size:0.9rem;">Zatím žádné složky.<br>Vytvořte první složku!</div>
         </div>`;
     } else {
-        html += `<div class="slozky-grid">`;
+        html += `<div style="display:flex;flex-direction:column;gap:10px;margin-top:6px;">`;
+        const SK_COL = ['#ffd700','#60a5fa','#4ade80','#ce93d8','#fb923c','#f472b6','#5dade2'];
         folders.forEach((f, i) => {
-            html += `<div class="slozka-card" onclick="openSlozkaDetail(${i})">
-                <button class="slozka-del" onclick="event.stopPropagation();deleteSlozka(${i})" title="Smazat složku">🗑</button>
-                <div class="slozka-emoji">${f.emoji||'📁'}</div>
-                <div class="slozka-name">${escHtml(f.name)}</div>
-                <div class="slozka-count">${f.items.length} položek</div>
+            html += `<div class="menu-row-btn" role="button" tabindex="0" onclick="openSlozkaDetail(${i})">
+                <span style="font-size:1.6rem;">${f.emoji||'📁'}</span>
+                <div style="flex:1;min-width:0;"><div style="color:${SK_COL[i % SK_COL.length]};font-weight:700;word-break:break-word;">${escHtml(f.name)}</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;font-weight:400;">${f.items.length} položek</div></div>
+                <button onclick="event.stopPropagation();deleteSlozka(${i})" title="Smazat složku" style="background:none;border:none;font-size:1.1rem;cursor:pointer;padding:6px;">🗑</button>
             </div>`;
         });
         html += `</div>`;

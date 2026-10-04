@@ -1285,3 +1285,14 @@ html[data-theme="light"] .sw-title,html[data-theme="light"] .sw-back,html[data-t
 .settings-modal > .sw-menu{flex:1;min-height:0;}
 #settingsModal .settings-modal:has(> .sw-menu) .settings-modal-body > .settings-tab-content{display:none !important;}
 #settingsModal .settings-modal:has(> .sw-menu) .settings-modal-body{flex:0 0 0 !important;height:0;min-height:0;padding:0 !important;overflow:hidden;}
+/* hlavička nastavení = hlavička Seznamů */
+.settings-modal:has(> .sw-menu) .modal-header-row{display:flex;align-items:center;justify-content:space-between;padding:14px 16px !important;border-bottom:1px solid var(--border);background:var(--bg-card);}
+.settings-modal:has(> .sw-menu) .settings-modal-header h2{font-family:'Playfair Display',serif !important;font-size:1.1rem;font-weight:700;background:none !important;-webkit-background-clip:initial !important;-webkit-text-fill-color:#fff !important;color:#fff !important;text-transform:none !important;margin:0;}
+.settings-modal:has(> .sw-menu) .close-settings{width:34px;height:34px;font-size:1rem;background:none;color:#fff;}
+html[data-theme="light"] .settings-modal:has(> .sw-menu) .settings-modal-header h2,html[data-theme="light"] .settings-modal:has(> .sw-menu) .close-settings{-webkit-text-fill-color:#111 !important;color:#111 !important;}
+
+/* Moje složky: hlavička jako Seznamy */
+.slozky-header h2{font-family:'Playfair Display',serif;}
+.slozky-header .slozky-x{width:34px;height:34px;padding:0;border:1px solid var(--border);border-radius:50%;color:#fff;font-size:1rem;display:grid;place-items:center;}
+.slozky-body{padding:16px;}
+html[data-theme="light"] .slozky-header .slozky-x{color:var(--text);}
