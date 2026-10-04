@@ -45143,7 +45143,7 @@ window.addEventListener('load', function() {
     if(win) return win;
     win=document.createElement('div');
     win.className='sw-window'; win.id='swWindow';
-    win.innerHTML='<div class="sw-head"><button class="sw-back" type="button">← Zpět</button><h3 class="sw-title" id="swTitle"></h3><button class="sw-x" type="button" title="Zavřít">✕</button></div><div class="sw-body" id="swBody"></div>';
+    win.innerHTML='<div class="sw-head"><button class="sw-back" type="button">← Zpět</button><h3 class="sw-title" id="swTitle" style="font-family:\'Playfair Display\',serif;"></h3><button class="sw-x" type="button" title="Zavřít">✕</button></div><div class="sw-body" id="swBody"></div>';
     document.body.appendChild(win);
     win.querySelector('.sw-back').onclick=function(){ closeWin(); };
     win.querySelector('.sw-x').onclick=function(){ closeWin(); if(window.closeSettingsModal) window.closeSettingsModal(); };
@@ -45181,10 +45181,9 @@ window.addEventListener('load', function() {
     var m=$('settingsMenu'); if(!m) return;
     var h='';
     GROUPS.forEach(function(g){
-      h+='<div class="sw-group">'+g[0]+'</div>';
       g[1].forEach(function(k){
-        var d=PAGES[k], s=typeof d.sub==='function'?d.sub():d.sub;
-        h+='<button type="button" class="sw-item" style="--c:'+d.c+'" data-sw="'+k+'"><span class="sw-ico">'+d.icon+'</span><span class="sw-txt"><span class="sw-name">'+d.name+'</span><span class="sw-sub"></span></span><span class="sw-chev">›</span></button>';
+        var d=PAGES[k];
+        h+='<button type="button" class="menu-row-btn sw-item" data-sw="'+k+'"><span style="font-size:1.6rem;">'+d.icon+'</span><div><div class="sw-name" style="color:'+d.c+';font-weight:700;">'+d.name+'</div><div class="sw-sub" style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;"></div></div></button>';
       });
     });
     m.innerHTML=h;
