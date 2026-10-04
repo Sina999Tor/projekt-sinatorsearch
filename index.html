@@ -3896,30 +3896,24 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // funguje jen na Androidu) a název necháme zkopírovaný ve schránce,
     // aby šel po otevření appky vložit ručně do vyhledávání.
     const DEFAULT_EXTERNAL_PLAY_APPS = [
-        { id:'stremio',   name:'Stremio',   emoji:'🟣', urlTemplate:'stremio:///search?search={query}', enabled:false, builtin:true },
-        { id:'nuvio',     name:'Nuvio',     emoji:'🎬', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.nuvio.app;end', enabled:false, builtin:true },
+        { id:'stremio',   name:'Stremio',   emoji:'🟣', urlTemplate:'stremio:///search?search={query}', enabled:false, zabavaEnabled:false, builtin:true },
+        { id:'nuvio',     name:'Nuvio',     emoji:'🎬', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.nuvio.app;end', enabled:false, zabavaEnabled:false, builtin:true },
         // Nuvio Enhanced má na Androidu VLASTNÍ, odlišný package (com.nuvio.enhanced,
         // ověřeno přímo v Podrobnostech o aplikaci) — nejde tedy o stejnou appku jako
         // Nuvio výš, obě jdou mít nainstalované vedle sebe a tenhle intent cílí přesně
         // na Enhanced verzi.
-        { id:'nuvio_enhanced', name:'Nuvio Enhanced', emoji:'🎞️', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.enhanced;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2FNuvioMedia%2FNuvioMobile-Enhanced%2Freleases;end', enabled:false, builtin:true },
-        { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, builtin:true },
+        { id:'nuvio_enhanced', name:'Nuvio Enhanced', emoji:'🎞️', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.enhanced;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2FNuvioMedia%2FNuvioMobile-Enhanced%2Freleases;end', enabled:false, zabavaEnabled:false, builtin:true },
+        { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, zabavaEnabled:false, builtin:true },
         // SmartTube / YouTube: schéma youtube://search?q={query} (ověřeno na telefonu) otevře vyhledávání
         // v SmartTube; kdo SmartTube nemá, tomu se stejným odkazem otevře appka YouTube. Odkaz z prohlížeče
         // přes intent:// s balíčkem SmartTube NEFUNGUJE (ERR_UNKNOWN_URL_SCHEME), proto holé schéma.
-        { id:'smarttube', name:'SmartTube / YouTube', emoji:'▶️', urlTemplate:'youtube://search?q={query}', enabled:false, builtin:true },
-        // ModernTV: Android appka eu.moderntv.android (ModernTV 2.0) + webová verze moderntv.cz.
-        // Web: otevře se v novém panelu na stránce hledání (název je zkopírovaný ve schránce; parametr
-        // ?q= je odhad — jestli ho web ignoruje, název se vloží ručně). Appka: odkaz přes intent://
-        // s balíčkem eu.moderntv.android — funguje jen pokud appka přijímá odkazy moderntv.cz; jinak
-        // prohlížeč vrátí ERR_UNKNOWN_URL_SCHEME (pak je tu varianta Web). 'openUrl' = jen otevření bez hledání.
-        { id:'moderntv_app', name:'ModernTV (aplikace)', emoji:'📡',
-          urlTemplate:'intent://moderntv.cz/search?q={query}#Intent;scheme=https;package=eu.moderntv.android;S.browser_fallback_url=https%3A%2F%2Fmoderntv.cz%2Fsearch;end',
-          openUrl:'intent://moderntv.cz/#Intent;scheme=https;package=eu.moderntv.android;S.browser_fallback_url=https%3A%2F%2Fmoderntv.cz%2F;end',
-          enabled:false, builtin:true },
+        { id:'smarttube', name:'SmartTube / YouTube', emoji:'▶️', urlTemplate:'youtube://search?q={query}', enabled:false, zabavaEnabled:false, builtin:true },
+        // ModernTV (web): otevře se v novém panelu na stránce hledání moderntv.cz (název je zkopírovaný
+        // ve schránce; parametr ?q= je odhad — jestli ho web ignoruje, název se vloží ručně).
+        // Android appku ModernTV 2.0 z prohlížeče spustit nejde, proto tu pro ni záznam není.
         { id:'moderntv_web', name:'ModernTV (web)', emoji:'🌐',
           urlTemplate:'https://moderntv.cz/search?q={query}', openUrl:'https://moderntv.cz/',
-          enabled:false, builtin:true }
+          enabled:false, zabavaEnabled:false, builtin:true }
     ];
     // Migrace: pokud má uživatel uložené staré (nefunkční) odhady odkazů
     // z dřívější verze, potichu je nahradíme opravenými výchozími hodnotami —
@@ -3937,7 +3931,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // bezpečnostní opatření) — zpátky odstraněny. Komu se přesto uložily do
     // localStorage, tomu je tenhle úklid tiše smaže, ať appka nenabízí appky,
     // co beztak nejdou spustit.
-    const _REMOVED_EXTERNAL_PLAY_APP_IDS = ['kodi', 'moderntv'];
+    const _REMOVED_EXTERNAL_PLAY_APP_IDS = ['kodi', 'moderntv', 'moderntv_app'];
 
     function getExternalPlayApps() {
         try {
@@ -4241,6 +4235,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-04j', date: '4. 10. 2026', items: [
+            'Přehrát v externí aplikaci — odstraněna položka „ModernTV (aplikace)“ (z prohlížeče ji spustit nejde), zůstává „ModernTV (web)“; všechny externí aplikace jsou u nových uživatelů výchozně vypnuté, v detailu i v Zábavě'
+        ] },
         { version: '2026-10-04i', date: '4. 10. 2026', items: [
             'Přehrát v externí aplikaci — u každé aplikace jsou teď dva nezávislé přepínače: 🔎 Detail filmu (tlačítko „Přehrát v externí aplikaci“) a 🚀 Zábava (Zábava → Externí aplikace); vypnutím na jednom místě se aplikace neschová na druhém'
         ] },
