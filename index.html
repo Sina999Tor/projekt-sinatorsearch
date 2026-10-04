@@ -1776,7 +1776,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             <div class="settings-section">
                 <span class="settings-label">▶️ Přehrávání v externí aplikaci</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">
-                    Tlačítko "📱 Přehrát v externí aplikaci" u filmu/seriálu otevře zapnutou appku a zkopíruje název do schránky. Zapni appky, které máš v telefonu (pokud máš víc zapnutých, appka se před spuštěním zeptá, kterou použít). Výchozí stav je vypnuto. Stremio a Streamlet umí rovnou otevřít vyhledávání s názvem; Nuvio zatím nemá veřejný odkaz na vyhledávání, takže appku jen otevře a název vlož ručně (zkopírovaný už bude ve schránce). Odkazy si můžeš kdykoliv upravit v "⚙️ Nastavit".
+                    Tlačítko "📱 Přehrát v externí aplikaci" u filmu/seriálu otevře zapnutou appku a zkopíruje název do schránky. Zapni appky, které máš v telefonu — zvlášť pro 🔎 detail filmu/seriálu a zvlášť pro 🚀 Zábavu → Externí aplikace (pokud máš víc zapnutých, appka se před spuštěním zeptá, kterou použít). Výchozí stav je vypnuto. Stremio a Streamlet umí rovnou otevřít vyhledávání s názvem; Nuvio zatím nemá veřejný odkaz na vyhledávání, takže appku jen otevře a název vlož ručně (zkopírovaný už bude ve schránce). Odkazy si můžeš kdykoliv upravit v "⚙️ Nastavit".
                 </div>
                 <div id="externalPlayAppsList" style="display:flex;flex-direction:column;gap:8px;"></div>
                 <button class="settings-btn-small" onclick="addCustomExternalPlayApp()" style="width:100%;margin-top:10px;background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;font-weight:600;padding:10px;">➕ Přidat vlastní aplikaci</button>
@@ -3981,10 +3981,29 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     }
     window.getEnabledExternalPlayApps = getEnabledExternalPlayApps;
 
+    // Dva nezávislé přepínače u každé appky: 🔎 detail filmu/seriálu (pole `enabled`) a 🚀 Zábava → Externí
+    // aplikace (pole `zabavaEnabled`; když chybí, řídí se hodnotou `enabled` — tak fungovaly starší verze).
+    function _isZabavaEnabled(a) { return a.zabavaEnabled === undefined ? !!a.enabled : !!a.zabavaEnabled; }
+    function getEnabledZabavaExternalApps() {
+        return getExternalPlayApps().filter(_isZabavaEnabled);
+    }
+    window.getEnabledZabavaExternalApps = getEnabledZabavaExternalApps;
+    function toggleExternalPlayAppZabava(id) {
+        const apps = getExternalPlayApps();
+        const app = apps.find(a => a.id === id);
+        if(!app) return;
+        app.zabavaEnabled = !_isZabavaEnabled(app);
+        saveExternalPlayApps(apps);
+        renderExternalPlayAppsSettings();
+    }
+    window.toggleExternalPlayAppZabava = toggleExternalPlayAppZabava;
+
     function toggleExternalPlayApp(id) {
         const apps = getExternalPlayApps();
         const app = apps.find(a => a.id === id);
         if(!app) return;
+        // zafixovat stav pro Zábavu, ať změna v detailu neovlivní i Zábavu
+        if(app.zabavaEnabled === undefined) app.zabavaEnabled = !!app.enabled;
         app.enabled = !app.enabled;
         saveExternalPlayApps(apps);
         renderExternalPlayAppsSettings();
@@ -3995,16 +4014,20 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const container = document.getElementById('externalPlayAppsList');
         if(!container) return;
         const apps = getExternalPlayApps();
+        const sw = (on, fn, id) => `<div onclick="${fn}('${id}')" style="width:44px;height:24px;border-radius:12px;background:${on ? '#1db954' : '#333'};position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;"><div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${on ? '22px' : '2px'};transition:left 0.2s;pointer-events:none;"></div></div>`;
         container.innerHTML = apps.map(app => `
-            <div style="display:flex;align-items:center;gap:10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:10px 12px;">
-                <span style="font-size:1.3rem;flex-shrink:0;">${app.emoji || '📱'}</span>
-                <div style="flex:1;min-width:0;">
-                    <div style="font-weight:600;color:#eee;font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_copyTitleEsc(app.name)}</div>
-                    <div style="font-size:0.68rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(app.urlTemplate || app.openUrl) ? ((app.urlTemplate ? '🔎 ' + _copyTitleEsc(app.urlTemplate) : '') + (app.urlTemplate && app.openUrl ? ' · ' : '') + (app.openUrl ? '🚀 ' + _copyTitleEsc(app.openUrl) : '')) : 'Odkaz nenastaven — appka se jen otevře'}</div>
+            <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:10px 12px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:1.3rem;flex-shrink:0;">${app.emoji || '📱'}</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:600;color:#eee;font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_copyTitleEsc(app.name)}</div>
+                        <div style="font-size:0.68rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(app.urlTemplate || app.openUrl) ? ((app.urlTemplate ? '🔎 ' + _copyTitleEsc(app.urlTemplate) : '') + (app.urlTemplate && app.openUrl ? ' · ' : '') + (app.openUrl ? '🚀 ' + _copyTitleEsc(app.openUrl) : '')) : 'Odkaz nenastaven — appka se jen otevře'}</div>
+                    </div>
+                    <button onclick="openConfigureExternalPlayApp('${app.id}')" style="flex-shrink:0;background:none;border:1px solid var(--border);color:var(--text-muted);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;">⚙️ Nastavit</button>
                 </div>
-                <button onclick="openConfigureExternalPlayApp('${app.id}')" style="flex-shrink:0;background:none;border:1px solid var(--border);color:var(--text-muted);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;">⚙️ Nastavit</button>
-                <div onclick="toggleExternalPlayApp('${app.id}')" style="width:44px;height:24px;border-radius:12px;background:${app.enabled ? '#1db954' : '#333'};position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
-                    <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${app.enabled ? '22px' : '2px'};transition:left 0.2s;pointer-events:none;"></div>
+                <div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+                    <div style="display:flex;align-items:center;gap:8px;"><span style="font-size:0.78rem;color:var(--text-muted);">🔎 Detail filmu</span>${sw(!!app.enabled, 'toggleExternalPlayApp', app.id)}</div>
+                    <div style="display:flex;align-items:center;gap:8px;"><span style="font-size:0.78rem;color:var(--text-muted);">🚀 Zábava</span>${sw(_isZabavaEnabled(app), 'toggleExternalPlayAppZabava', app.id)}</div>
                 </div>
             </div>
         `).join('');
@@ -4218,6 +4241,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-04i', date: '4. 10. 2026', items: [
+            'Přehrát v externí aplikaci — u každé aplikace jsou teď dva nezávislé přepínače: 🔎 Detail filmu (tlačítko „Přehrát v externí aplikaci“) a 🚀 Zábava (Zábava → Externí aplikace); vypnutím na jednom místě se aplikace neschová na druhém'
+        ] },
         { version: '2026-10-04h', date: '4. 10. 2026', items: [
             'Oprava: ⚙️ Nastavit aplikaci — uložený 🚀 odkaz pro spuštění se u SmartTube po otevření okna ztrácel; teď se ukládá správně'
         ] },
@@ -6813,7 +6839,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     function renderZabavaExternalAppsList() {
         const box = $('zabavaExternalAppsList');
         if (!box) return;
-        const apps = (typeof getEnabledExternalPlayApps === 'function') ? getEnabledExternalPlayApps() : [];
+        const apps = (typeof getEnabledZabavaExternalApps === 'function') ? getEnabledZabavaExternalApps() : [];
         if (!apps.length) {
             box.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.88rem;">Žádná aplikace není zapnutá.<br>Zapni si appku v <b>Nastavení → Ostatní → Přehrávání v externí aplikaci</b>.</div>`;
             return;
