@@ -3903,7 +3903,15 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         // Nuvio výš, obě jdou mít nainstalované vedle sebe a tenhle intent cílí přesně
         // na Enhanced verzi.
         { id:'nuvio_enhanced', name:'Nuvio Enhanced', emoji:'🎞️', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.enhanced;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2FNuvioMedia%2FNuvioMobile-Enhanced%2Freleases;end', enabled:false, builtin:true },
-        { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, builtin:true }
+        { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, builtin:true },
+        // SmartTube (YouTube klient pro Android, balíček org.smarttube.stable — ověřeno v Podrobnostech
+        // o aplikaci). Nemá vlastní URL schéma, ale zachytává odkazy youtube.com, takže ho otevřeme přes
+        // intent:// s explicitním balíčkem: s názvem filmu → vyhledávání na YouTube, bez názvu
+        // (Zábava → Externí aplikace) → jen otevření (openUrl). Beta verze má jiný balíček (org.smarttube.beta).
+        { id:'smarttube', name:'SmartTube', emoji:'▶️',
+          urlTemplate:'intent://www.youtube.com/results?search_query={query}#Intent;scheme=https;package=org.smarttube.stable;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2Fyuliskov%2FSmartTube%2Freleases;end',
+          openUrl:'intent://www.youtube.com/#Intent;scheme=https;package=org.smarttube.stable;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2Fyuliskov%2FSmartTube%2Freleases;end',
+          enabled:false, builtin:true }
     ];
     // Migrace: pokud má uživatel uložené staré (nefunkční) odhady odkazů
     // z dřívější verze, potichu je nahradíme opravenými výchozími hodnotami —
@@ -4160,6 +4168,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-04b', date: '4. 10. 2026', items: [
+            'Přehrávání v externí aplikaci — přidána aplikace SmartTube (Nastavení → Ostatní → Přehrávání v externí aplikaci): u filmu/seriálu otevře vyhledávání názvu na YouTube přímo v SmartTube, v Zábava → Externí aplikace ji jen spustí'
+        ] },
         { version: '2026-10-04', date: '4. 10. 2026', items: [
             'Detail seriálu — název sezóny se už neopakuje („Sezóna 1: 1. sezóna“); když TMDB vrátí jen obecný název, zobrazí se prostě „Sezóna 1“, zvláštní název sezóny (např. „Sezóna 3: Válka světů“) zůstává'
         ] },
@@ -6724,6 +6735,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // což appku spolehlivě otevře. Šablony bez placeholderu (např. Nuviin
     // intent:// odkaz) appku otevírají samy o sobě, použijí se beze změny.
     function getAppOpenOnlyUrl(app) {
+        if (app.openUrl) return app.openUrl;
         if (!app.urlTemplate) return null;
         if (!/\{query\}|\{title\}/.test(app.urlTemplate)) return app.urlTemplate;
         const m = app.urlTemplate.match(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)/);
