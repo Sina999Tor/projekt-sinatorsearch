@@ -4093,12 +4093,24 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     <button onclick="document.getElementById('externalPlayAppChooserOverlay').remove()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;line-height:1;">✕</button>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:10px;">
+                    ${apps.length ? '' : '<div style="font-size:0.82rem;color:var(--text-muted);line-height:1.5;">Žádná appka není zapnutá — zapni si je v Nastavení → Ostatní → Přehrávání v externí aplikaci, nebo vyber appku v systémovém okně níže.</div>'}
                     ${apps.map((a,i) => `<button onclick="window._extPlayChooserPick(${i})" style="text-align:left;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:#fff;cursor:pointer;font-size:0.92rem;font-weight:600;">
                         <span style="font-size:1.3rem;">${a.emoji || '📱'}</span> ${_copyTitleEsc(a.name)}
                     </button>`).join('')}
+                    ${typeof navigator.share === 'function' ? `<button onclick="window._extPlayShare()" style="text-align:left;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;border:1px dashed var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:0.92rem;font-weight:600;">
+                        <span style="font-size:1.3rem;">📤</span> <span>Jiná aplikace…<br><span style="font-size:0.72rem;font-weight:400;color:var(--text-muted);">otevře systémové okno, vybereš appku</span></span>
+                    </button>` : ''}
                 </div>
             </div>`;
         document.body.appendChild(overlay);
+        // 📤 Systémové okno Android „Sdílet“ (Web Share API): zobrazí všechny appky v telefonu,
+        // které umí přijmout text — název se zároveň zkopíruje do schránky.
+        window._extPlayShare = async () => {
+            const t = (window._extPlayChooserData || {}).title || '';
+            try { navigator.clipboard && navigator.clipboard.writeText(t); } catch(e) {}
+            try { await navigator.share({ title: t, text: t }); } catch(e) { /* uživatel okno zavřel */ }
+            document.getElementById('externalPlayAppChooserOverlay')?.remove();
+        };
         window._extPlayChooserPick = (i) => {
             const data = window._extPlayChooserData;
             launchExternalPlayApp(data.apps[i], data.title);
@@ -4106,10 +4118,17 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     }
     window.showExternalPlayAppChooser = showExternalPlayAppChooser;
 
+    // Tlačítko „Přehrát v externí aplikaci“ se ukazuje, když je zapnutá aspoň jedna appka NEBO
+    // zařízení umí systémové okno „Sdílet“ (navigator.share).
+    function _extPlayAvailable() {
+        return getEnabledExternalPlayApps().length > 0 || typeof navigator.share === 'function';
+    }
+    window._extPlayAvailable = _extPlayAvailable;
     function playInExternalApp(title) {
         const apps = getEnabledExternalPlayApps();
-        if(!apps.length) { try{ showToast('Nastav appku v Nastavení → Ostatní'); }catch(e){} return; }
-        if(apps.length === 1) { launchExternalPlayApp(apps[0], title); return; }
+        const canShare = typeof navigator.share === 'function';
+        if(!apps.length && !canShare) { try{ showToast('Nastav appku v Nastavení → Ostatní'); }catch(e){} return; }
+        if(apps.length === 1 && !canShare) { launchExternalPlayApp(apps[0], title); return; }
         showExternalPlayAppChooser(apps, title);
     }
     window.playInExternalApp = playInExternalApp;
@@ -4167,6 +4186,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-04d', date: '4. 10. 2026', items: [
+            'Přehrát v externí aplikaci — okno výběru má nově volbu 📤 „Jiná aplikace…“, která otevře systémové okno Androidu (Sdílet) se všemi appkami v telefonu; název se zároveň zkopíruje do schránky. Okno se ukazuje vždy, tlačítko je dostupné i bez zapnuté externí aplikace'
+        ] },
         { version: '2026-10-04c', date: '4. 10. 2026', items: [
             'SmartTube — prohlížeč ji z webové appky spustit nedovolí (SmartTube je určená pro Android TV), proto ji appka už nepokouší otevřít odkazem (chyba „Tento web není dostupný“); u filmu/seriálu místo toho zkopíruje název do schránky a ty SmartTube otevřeš ručně a název vložíš do vyhledávání'
         ] },
@@ -13308,7 +13330,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     <p class="modal-overview">${ep.overview || 'Popis není dostupný.'}</p>
                     <div class="rating-display"><div class="rating-item tmdb" onclick="window.open('https://www.themoviedb.org/tv/${tvId}','_blank')" style="cursor:pointer;" title="Otevřít na TMDB"><span class="rating-value">★ ${rating}</span><span class="rating-source">TMDB ↗</span></div><div class="rating-item csfd" id="csfdRating_ep_${tvId}" style="cursor:pointer;" title="Načítám..."><span class="rating-value" id="csfdRatingVal_ep_${tvId}">…</span><span class="rating-source">Trakt</span></div></div>
                     <div id="mySinatorEpWatchHistorySlot_${tvId}_${seasonNumber}_${episodeNumber}"></div>
-                    ${(typeof getEnabledExternalPlayApps === 'function' && getEnabledExternalPlayApps().length) ? `<button class="action-btn-modal" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#c4b5fd;font-size:1em;font-weight:700;padding:14px;width:100%;margin:0 0 14px;display:block;" onclick="window.playInExternalApp('${seriesTitleJs} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}')">📱 Přehrát v externí aplikaci</button>` : ''}
+                    ${(typeof window._extPlayAvailable === 'function' && window._extPlayAvailable()) ? `<button class="action-btn-modal" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#c4b5fd;font-size:1em;font-weight:700;padding:14px;width:100%;margin:0 0 14px;display:block;" onclick="window.playInExternalApp('${seriesTitleJs} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}')">📱 Přehrát v externí aplikaci</button>` : ''}
                     <div class="action-buttons">
                         <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${seriesTitleJs} S${String(seasonNumber).padStart(2,'0')}E${String(episodeNumber).padStart(2,'0')}'))">▶️ Přehrát</button>
                         <button class="action-btn-modal youtube" onclick="openYouTube('${seriesTitleJs} S${seasonNumber}E${episodeNumber}')">▶️ Trailer</button>
@@ -13568,7 +13590,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const posterPath = d.poster_path || '';
             const playBtn = `<button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;font-size:1.5em;font-weight:700;padding:18px;width:100%;margin:14px 0;display:block;" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeTitle}'))">▶️ Přehrát</button>`;
             const enabledExtPlayApps = (typeof getEnabledExternalPlayApps === 'function') ? getEnabledExternalPlayApps() : [];
-            const externalPlayBtn = enabledExtPlayApps.length ? `<button class="action-btn-modal" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#c4b5fd;font-size:1em;font-weight:700;padding:14px;width:100%;margin:0 0 14px;display:block;" onclick="window.playInExternalApp('${safeTitle}')">📱 Přehrát v externí aplikaci</button>` : '';
+            const externalPlayBtn = (enabledExtPlayApps.length || (typeof window._extPlayAvailable === 'function' && window._extPlayAvailable())) ? `<button class="action-btn-modal" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#c4b5fd;font-size:1em;font-weight:700;padding:14px;width:100%;margin:0 0 14px;display:block;" onclick="window.playInExternalApp('${safeTitle}')">📱 Přehrát v externí aplikaci</button>` : '';
             const abGrid = 'display:grid;grid-template-columns:1fr;gap:8px;margin:14px 0;';
             const abSubGrid = 'display:none;grid-template-columns:1fr;gap:8px;margin-top:4px;grid-column:1/-1;';
             const coreBtns = `<div class="action-buttons" style="${abGrid}">
