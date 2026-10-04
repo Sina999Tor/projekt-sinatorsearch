@@ -11608,6 +11608,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     window.favsBackToMenu = function() { state._favsView = 'menu'; window._favsLetter = ''; renderFavsModal(); const sb = $('modalScrollBody'); if (sb) sb.scrollTop = 0; };
     window.favsOpenTab = function(tab) { state._favsTab = tab; state._favsView = 'list'; renderFavsModal(); const sb = $('modalScrollBody'); if (sb) sb.scrollTop = 0; };
     function renderFavsMenu() {
+        const pl = (n, a, b, c) => n === 1 ? a : (n >= 2 && n <= 4 ? b : c);
         const allTv = state.favs.filter(f => (f.type || 'movie') === 'tv');
         const movies = state.favs.filter(f => (f.type || 'movie') === 'movie');
         const mini = allTv.filter(f => state.favsTvClass[f.id] === 'miniseries');
@@ -11617,16 +11618,16 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const dirs = state.actorFavs.filter(a => a.isDirector === true);
         const total = movies.length + allTv.length + state.actorFavs.length;
         const rows = [
-            ['all','❤️','Vše','#ffd700',total,'Všechny oblíbené položky'],
-            ['movie','🎬','Filmy','#60a5fa',movies.length,'Oblíbené filmy'],
-            ['tv','📺','Seriály','#4ade80',tv.length,'Oblíbené seriály'],
-            ['miniseries','📖','Minisérie','#ce93d8',mini.length,'Krátké uzavřené seriály'],
-            ['anime','🎌','Anime','#f472b6',anime.length,'Oblíbené anime'],
-            ['actor','👥','Herci','#fb923c',actors.length,'Oblíbení herci'],
-            ['director','🎥','Režiséři','#5dade2',dirs.length,'Oblíbení režiséři']
+            ['all','❤️','Vše','#ffd700',total,[movies.length ? movies.length + ' ' + pl(movies.length,'film','filmy','filmů') : '', allTv.length ? allTv.length + ' ' + pl(allTv.length,'seriál','seriály','seriálů') : '', state.actorFavs.length ? state.actorFavs.length + ' ' + pl(state.actorFavs.length,'osobnost','osobnosti','osobností') : ''].filter(Boolean).join(' · ')],
+            ['movie','🎬','Filmy','#60a5fa',movies.length,''],
+            ['tv','📺','Seriály','#4ade80',tv.length,''],
+            ['miniseries','📖','Minisérie','#ce93d8',mini.length,''],
+            ['anime','🎌','Anime','#f472b6',anime.length,''],
+            ['actor','👥','Herci','#fb923c',actors.length,''],
+            ['director','🎥','Režiséři','#5dade2',dirs.length,'']
         ];
         $('modalScrollBody').innerHTML = '<div style="padding:16px;display:flex;flex-direction:column;gap:10px;">' + rows.map(r =>
-            `<button onclick="favsOpenTab('${r[0]}')" class="menu-row-btn"><span style="font-size:1.6rem;">${r[1]}</span><div><div style="color:${r[3]};font-weight:700;">${r[2]} <span style="color:var(--text-muted);">(${r[4]})</span></div></div></button>`
+            `<button onclick="favsOpenTab('${r[0]}')" class="menu-row-btn"><span style="font-size:1.6rem;">${r[1]}</span><div><div style="color:${r[3]};font-weight:700;">${r[2]} <span style="color:var(--text-muted);">(${r[4]})</span></div>${r[5] ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${r[5]}</div>` : ''}</div></button>`
         ).join('') + '</div>';
     }
     function setFavsTab(tab) {
