@@ -3904,16 +3904,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         // na Enhanced verzi.
         { id:'nuvio_enhanced', name:'Nuvio Enhanced', emoji:'🎞️', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.enhanced;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2FNuvioMedia%2FNuvioMobile-Enhanced%2Freleases;end', enabled:false, builtin:true },
         { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, builtin:true },
-        // SmartTube je určená pro Android TV (na telefonech ji autor nepodporuje) a nenabízí vstup, který by
-        // prohlížeč smí z webu spustit (Brave/Chrome vrátí ERR_UNKNOWN_URL_SCHEME — stejný limit jako u Kodi
-        // a ModernTV). Proto ruční režim: appka jen zkopíruje název do schránky a vyzve k ručnímu otevření.
-        { id:'smarttube', name:'SmartTube', emoji:'▶️', urlTemplate:'', enabled:false, builtin:true }
+        // SmartTube / YouTube: schéma youtube://search?q={query} (ověřeno na telefonu) otevře vyhledávání
+        // v SmartTube; kdo SmartTube nemá, tomu se stejným odkazem otevře appka YouTube. Odkaz z prohlížeče
+        // přes intent:// s balíčkem SmartTube NEFUNGUJE (ERR_UNKNOWN_URL_SCHEME), proto holé schéma.
+        { id:'smarttube', name:'SmartTube / YouTube', emoji:'▶️', urlTemplate:'youtube://search?q={query}', enabled:false, builtin:true }
     ];
     // Migrace: pokud má uživatel uložené staré (nefunkční) odhady odkazů
     // z dřívější verze, potichu je nahradíme opravenými výchozími hodnotami —
     // ale jen pokud si je sám ručně nezměnil (jinak bychom přepsali jeho úpravu).
     const _OLD_EXTERNAL_PLAY_APP_TEMPLATES = {
-        smarttube: 'intent://www.youtube.com/results?search_query={query}#Intent;scheme=https;package=org.smarttube.stable;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2Fyuliskov%2FSmartTube%2Freleases;end',
+        smarttube: ['intent://www.youtube.com/results?search_query={query}#Intent;scheme=https;package=org.smarttube.stable;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2Fyuliskov%2FSmartTube%2Freleases;end', ''],
         stremio: 'stremio://search?query={query}',
         nuvio:   ['nuvio://search?q={query}', 'nuvio://', 'intent://search?query={query}#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.nuvio.app;end'],
         // Nuvio Enhanced se v prvním nasazení omylem mířil na stejný package jako
@@ -4186,11 +4186,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-04e', date: '4. 10. 2026', items: [
+            'Přehrát v externí aplikaci — SmartTube nově funguje: odkaz youtube://search?q={query} otevře vyhledávání názvu rovnou v SmartTube; kdo SmartTube nemá, tomu se otevře aplikace YouTube. Appka se jmenuje „SmartTube / YouTube“'
+        ] },
         { version: '2026-10-04d', date: '4. 10. 2026', items: [
             'Přehrát v externí aplikaci — okno výběru má nově volbu 📤 „Jiná aplikace…“, která otevře systémové okno Androidu (Sdílet) se všemi appkami v telefonu; název se zároveň zkopíruje do schránky. Okno se ukazuje vždy, tlačítko je dostupné i bez zapnuté externí aplikace'
         ] },
         { version: '2026-10-04c', date: '4. 10. 2026', items: [
-            'SmartTube — prohlížeč ji z webové appky spustit nedovolí (SmartTube je určená pro Android TV), proto ji appka už nepokouší otevřít odkazem (chyba „Tento web není dostupný“); u filmu/seriálu místo toho zkopíruje název do schránky a ty SmartTube otevřeš ručně a název vložíš do vyhledávání'
+            'SmartTube — odstraněn odkaz, který zobrazoval chybu „Tento web není dostupný“'
         ] },
         { version: '2026-10-04b', date: '4. 10. 2026', items: [
             'Přehrávání v externí aplikaci — přidána aplikace SmartTube (Nastavení → Ostatní → Přehrávání v externí aplikaci)'
