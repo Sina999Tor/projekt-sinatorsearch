@@ -167,6 +167,10 @@
         if (ff(f.base)) out.push('body,button,input,textarea,select{font-family:' + ff(f.base) + ';}');
         if (ff(f.title)) out.push('h1,h2,h3,.modal-title,.modal-nav-title,.card-title,.logo,[style*="Playfair"]{font-family:' + ff(f.title) + ' !important;}');
         if (ff(f.menu)) out.push(MENU_FONT + '{font-family:' + ff(f.menu) + ' !important;}');
+        // Karty-menu (Seznamy, Zábava…) uvnitř oken s vlastním „písmem oken“ (Oblíbené, Moje složky, Nastavení)
+        // mají mít stejné písmo jako zbytek menu — vyšší specificita přebije pravidlo pro okna.
+        var MROW = ['.modal', '#slozkyModal', '.settings-modal', '.sw-window'].map(function (s) { return s + ' .menu-row-btn'; });
+        if (ff(f.menu)) out.push(withKids(MROW).join(',') + '{font-family:' + ff(f.menu) + ' !important;}');
         if (ff(f.modal)) {
           var sel = [];
           WIN.forEach(function (w) { sel.push(w, w + ' button', w + ' input', w + ' textarea', w + ' select'); });
@@ -182,6 +186,7 @@
         [['base', BASE_SEL], ['title', TITLE_SEL], ['menu', MENU_SEL], ['modal', MODAL_SEL], ['tmenu', TMENU_SEL], ['card', CARD_SEL]].forEach(function (g) {
           var r = styleRules(sy[g[0]], g[1]); if (r) out.push(r);
         });
+        var rm = styleRules(sy.menu, MROW); if (rm) out.push(rm);
         if (st.scale && st.scale !== 100) out.push('html{font-size:' + st.scale + '%;}');
         return out.join('\n');
       }
@@ -11595,7 +11600,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const inList = state._favsView === 'list';
         left.innerHTML = inList
             ? `<button onclick="favsBackToMenu()" style="background:none;border:1px solid var(--border);color:inherit;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;margin-right:10px;">← Zpět</button><span class="modal-nav-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">❤️ Oblíbené ↑</span>`
-            : `<span class="modal-nav-title">❤️ Oblíbené</span>`;
+            : `<span class="modal-nav-title" style="background:none;-webkit-text-fill-color:#fff;color:#fff;">❤️ Oblíbené</span>`;
         right.innerHTML = `<button class="modal-close-btn" onclick="favsCloseAll()" title="Zavřít">✕</button>`;
     };
     window.favsOpenMenu = function() { state._favsView = 'menu'; openFavsModal(); };
@@ -11621,7 +11626,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             ['director','🎥','Režiséři','#5dade2',dirs.length,'Oblíbení režiséři']
         ];
         $('modalScrollBody').innerHTML = '<div style="padding:16px;display:flex;flex-direction:column;gap:10px;">' + rows.map(r =>
-            `<button onclick="favsOpenTab('${r[0]}')" class="menu-row-btn"><span style="font-size:1.6rem;">${r[1]}</span><div><div style="color:${r[3]};font-weight:700;">${r[2]} <span style="color:var(--text-muted);font-weight:400;">(${r[4]})</span></div></div></button>`
+            `<button onclick="favsOpenTab('${r[0]}')" class="menu-row-btn"><span style="font-size:1.6rem;">${r[1]}</span><div><div style="color:${r[3]};font-weight:700;">${r[2]} <span style="color:var(--text-muted);">(${r[4]})</span></div></div></button>`
         ).join('') + '</div>';
     }
     function setFavsTab(tab) {
@@ -40735,7 +40740,7 @@ window.renderSlozkyList = function renderSlozkyList() {
             html += `<div style="position:relative;">
                 <button type="button" class="menu-row-btn" onclick="openSlozkaDetail(${i})" style="padding-right:56px;">
                     <span style="font-size:1.6rem;">${f.emoji||'📁'}</span>
-                    <div><div style="color:${SK_COL[i % SK_COL.length]};font-weight:700;word-break:break-word;">${escHtml(f.name)} <span style="color:var(--text-muted);font-weight:400;">(${f.items.length})</span></div></div>
+                    <div><div style="color:${SK_COL[i % SK_COL.length]};font-weight:700;word-break:break-word;">${escHtml(f.name)} <span style="color:var(--text-muted);">(${f.items.length})</span></div></div>
                 </button>
                 <button type="button" onclick="deleteSlozka(${i})" title="Smazat složku" style="position:absolute;top:50%;right:10px;transform:translateY(-50%);background:none;border:none;font-size:1.1rem;cursor:pointer;padding:8px;">🗑</button>
             </div>`;
