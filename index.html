@@ -40735,7 +40735,7 @@ window.renderSlozkyList = function renderSlozkyList() {
             html += `<div style="position:relative;">
                 <button type="button" class="menu-row-btn" onclick="openSlozkaDetail(${i})" style="padding-right:56px;">
                     <span style="font-size:1.6rem;">${f.emoji||'📁'}</span>
-                    <div><div style="color:${SK_COL[i % SK_COL.length]};font-weight:700;word-break:break-word;">${escHtml(f.name)}</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${f.items.length} položek</div></div>
+                    <div><div style="color:${SK_COL[i % SK_COL.length]};font-weight:700;word-break:break-word;">${escHtml(f.name)} <span style="color:var(--text-muted);font-weight:400;">(${f.items.length})</span></div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${(()=>{const tv=f.items.filter(x=>x.type==='tv').length,mv=f.items.length-tv;return f.items.length?[mv?mv+' '+(mv===1?'film':mv<5?'filmy':'filmů'):'',tv?tv+' '+(tv===1?'seriál':tv<5?'seriály':'seriálů'):''].filter(Boolean).join(' · '):'Prázdná složka';})()}</div></div>
                 </button>
                 <button type="button" onclick="deleteSlozka(${i})" title="Smazat složku" style="position:absolute;top:50%;right:10px;transform:translateY(-50%);background:none;border:none;font-size:1.1rem;cursor:pointer;padding:8px;">🗑</button>
             </div>`;
