@@ -3958,8 +3958,11 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     if(def) { a.urlTemplate = def.urlTemplate; migrated = true; }
                 }
             });
-            // SmartTube: odkaz z předchozí verze nefungoval — zrušit i případný uložený openUrl
-            saved.forEach(a => { if(a.id === 'smarttube' && a.openUrl) { delete a.openUrl; migrated = true; } });
+            // SmartTube: zrušit jen starý nefungující openUrl z jedné z dřívějších verzí
+            // (vlastní openUrl, který si uživatel uložil sám, zůstává)
+            saved.forEach(a => {
+                if(a.id === 'smarttube' && a.openUrl && a.openUrl.indexOf('package=org.smarttube.stable') !== -1 && a.openUrl.indexOf('youtube.com') !== -1) { delete a.openUrl; migrated = true; }
+            });
             const savedIds = new Set(saved.map(a => a.id));
             const merged = saved.slice();
             DEFAULT_EXTERNAL_PLAY_APPS.forEach(d => { if(!savedIds.has(d.id)) merged.push({...d}); });
@@ -4215,6 +4218,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-04h', date: '4. 10. 2026', items: [
+            'Oprava: ⚙️ Nastavit aplikaci — uložený 🚀 odkaz pro spuštění se u SmartTube po otevření okna ztrácel; teď se ukládá správně'
+        ] },
         { version: '2026-10-04g', date: '4. 10. 2026', items: [
             'Přehrát v externí aplikaci → ⚙️ Nastavit aplikaci — dva samostatné odkazy: 🔎 pro hledání v detailu filmu/seriálu (s {query}) a 🚀 pro spuštění v Zábava → Externí aplikace; když je odkaz pro hledání prázdný, detail otevře appku odkazem ze spuštění a název zkopíruje'
         ] },
