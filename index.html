@@ -3907,7 +3907,19 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         // SmartTube / YouTube: schéma youtube://search?q={query} (ověřeno na telefonu) otevře vyhledávání
         // v SmartTube; kdo SmartTube nemá, tomu se stejným odkazem otevře appka YouTube. Odkaz z prohlížeče
         // přes intent:// s balíčkem SmartTube NEFUNGUJE (ERR_UNKNOWN_URL_SCHEME), proto holé schéma.
-        { id:'smarttube', name:'SmartTube / YouTube', emoji:'▶️', urlTemplate:'youtube://search?q={query}', enabled:false, builtin:true }
+        { id:'smarttube', name:'SmartTube / YouTube', emoji:'▶️', urlTemplate:'youtube://search?q={query}', enabled:false, builtin:true },
+        // ModernTV: Android appka eu.moderntv.android (ModernTV 2.0) + webová verze moderntv.cz.
+        // Web: otevře se v novém panelu na stránce hledání (název je zkopírovaný ve schránce; parametr
+        // ?q= je odhad — jestli ho web ignoruje, název se vloží ručně). Appka: odkaz přes intent://
+        // s balíčkem eu.moderntv.android — funguje jen pokud appka přijímá odkazy moderntv.cz; jinak
+        // prohlížeč vrátí ERR_UNKNOWN_URL_SCHEME (pak je tu varianta Web). 'openUrl' = jen otevření bez hledání.
+        { id:'moderntv_app', name:'ModernTV (aplikace)', emoji:'📡',
+          urlTemplate:'intent://moderntv.cz/search?q={query}#Intent;scheme=https;package=eu.moderntv.android;S.browser_fallback_url=https%3A%2F%2Fmoderntv.cz%2Fsearch;end',
+          openUrl:'intent://moderntv.cz/#Intent;scheme=https;package=eu.moderntv.android;S.browser_fallback_url=https%3A%2F%2Fmoderntv.cz%2F;end',
+          enabled:false, builtin:true },
+        { id:'moderntv_web', name:'ModernTV (web)', emoji:'🌐',
+          urlTemplate:'https://moderntv.cz/search?q={query}', openUrl:'https://moderntv.cz/',
+          enabled:false, builtin:true }
     ];
     // Migrace: pokud má uživatel uložené staré (nefunkční) odhady odkazů
     // z dřívější verze, potichu je nahradíme opravenými výchozími hodnotami —
@@ -3985,7 +3997,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <span style="font-size:1.3rem;flex-shrink:0;">${app.emoji || '📱'}</span>
                 <div style="flex:1;min-width:0;">
                     <div style="font-weight:600;color:#eee;font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_copyTitleEsc(app.name)}</div>
-                    <div style="font-size:0.68rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${app.urlTemplate ? _copyTitleEsc(app.urlTemplate) : 'Odkaz nenastaven — appka se jen otevře'}</div>
+                    <div style="font-size:0.68rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(app.urlTemplate || app.openUrl) ? ((app.urlTemplate ? '🔎 ' + _copyTitleEsc(app.urlTemplate) : '') + (app.urlTemplate && app.openUrl ? ' · ' : '') + (app.openUrl ? '🚀 ' + _copyTitleEsc(app.openUrl) : '')) : 'Odkaz nenastaven — appka se jen otevře'}</div>
                 </div>
                 <button onclick="openConfigureExternalPlayApp('${app.id}')" style="flex-shrink:0;background:none;border:1px solid var(--border);color:var(--text-muted);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;">⚙️ Nastavit</button>
                 <div onclick="toggleExternalPlayApp('${app.id}')" style="width:44px;height:24px;border-radius:12px;background:${app.enabled ? '#1db954' : '#333'};position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
@@ -4017,9 +4029,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                         <input id="cfgExtAppName" value="${_copyTitleEsc(app.name)}" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-dark);color:#fff;font-size:0.88rem;box-sizing:border-box;">
                     </div>
                     <div>
-                        <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:4px;">Odkaz pro spuštění (použij {query} pro název filmu)</label>
-                        <input id="cfgExtAppUrl" value="${_copyTitleEsc(app.urlTemplate || '')}" placeholder="např. nuvio://search?q={query}" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-dark);color:#fff;font-size:0.85rem;box-sizing:border-box;">
-                        <div style="font-size:0.68rem;color:var(--text-muted);opacity:0.7;margin-top:4px;">Pokud appka nemá odkaz na vyhledávání, nech pole prázdné — appka se jen otevře a název filmu se zkopíruje do schránky, aby šel vložit ručně.</div>
+                        <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:4px;">🔎 Odkaz pro hledání — detail filmu/seriálu (použij {query} pro název)</label>
+                        <input id="cfgExtAppUrl" value="${_copyTitleEsc(app.urlTemplate || '')}" placeholder="např. nuvio://search?q={query}" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-dark);color:#fff;font-size:0.88rem;box-sizing:border-box;">
+                        <div style="font-size:0.68rem;color:var(--text-muted);opacity:0.75;margin-top:4px;line-height:1.4;">Použije se u tlačítka „📱 Přehrát v externí aplikaci“ v detailu. Když pole nech prázdné, appka se otevře odkazem ze spuštění (níže) a název filmu se zkopíruje do schránky.</div>
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:4px;">🚀 Odkaz pro spuštění — Zábava → Externí aplikace</label>
+                        <input id="cfgExtAppOpenUrl" value="${_copyTitleEsc(app.openUrl || '')}" placeholder="${_copyTitleEsc((window.getAppOpenOnlyUrl && window.getAppOpenOnlyUrl({ urlTemplate: app.urlTemplate })) || 'např. nuvio://')}" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-dark);color:#fff;font-size:0.88rem;box-sizing:border-box;">
+                        <div style="font-size:0.68rem;color:var(--text-muted);opacity:0.75;margin-top:4px;line-height:1.4;">Použije se jen k otevření appky bez hledání. Prázdné = odvodí se automaticky z odkazu pro hledání.</div>
                     </div>
                     <div style="display:flex;gap:10px;margin-top:4px;">
                         ${isCustom ? `<button onclick="deleteCustomExternalPlayApp('${id}')" style="flex:1;padding:11px;border-radius:10px;border:1px solid rgba(229,9,20,0.4);background:rgba(229,9,20,0.12);color:#ff6b6b;font-weight:600;cursor:pointer;">🗑️ Smazat</button>` : ''}
@@ -4040,6 +4057,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const newName = (nameEl?.value || '').trim();
         if(newName) app.name = newName;
         app.urlTemplate = (urlEl?.value || '').trim();
+        const openVal = (document.getElementById('cfgExtAppOpenUrl')?.value || '').trim();
+        if (openVal) app.openUrl = openVal; else delete app.openUrl;
         saveExternalPlayApps(apps);
         document.getElementById('configureExternalPlayAppOverlay')?.remove();
         renderExternalPlayAppsSettings();
@@ -4066,6 +4085,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     }
     window.addCustomExternalPlayApp = addCustomExternalPlayApp;
 
+    // Webové odkazy (http/https) se otevřou v novém panelu, ať appka Sinator zůstane otevřená;
+    // vlastní schémata a intent:// se spouští přímo.
+    function _openExternalUrl(url) {
+        if (/^https?:\/\//i.test(url)) { window.open(url, '_blank', 'noopener'); }
+        else { window.location.href = url; }
+    }
+    window._openExternalUrl = _openExternalUrl;
     function launchExternalPlayApp(app, title) {
         try { navigator.clipboard && navigator.clipboard.writeText(title); } catch(e) {}
         try { if (navigator.vibrate) navigator.vibrate(12); } catch(e) {}
@@ -4073,7 +4099,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         if(app.urlTemplate && app.urlTemplate.trim()) {
             const url = app.urlTemplate.replace(/\{query\}/g, encodeURIComponent(title)).replace(/\{title\}/g, encodeURIComponent(title));
             try { showToast(`Otevírám ${app.name} — název "${title}" zkopírován`); } catch(e) {}
-            window.location.href = url;
+            _openExternalUrl(url);
+        } else if(app.openUrl && app.openUrl.trim()) {
+            try { showToast(`Otevírám ${app.name} — název "${title}" zkopírován, vlož ho do vyhledávání`); } catch(e) {}
+            _openExternalUrl(app.openUrl.trim());
         } else {
             try { showToast(`${app.name}: název "${title}" zkopírován, appku otevři ručně a vlož ho do vyhledávání`); } catch(e) {}
         }
@@ -4186,6 +4215,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-04g', date: '4. 10. 2026', items: [
+            'Přehrát v externí aplikaci → ⚙️ Nastavit aplikaci — dva samostatné odkazy: 🔎 pro hledání v detailu filmu/seriálu (s {query}) a 🚀 pro spuštění v Zábava → Externí aplikace; když je odkaz pro hledání prázdný, detail otevře appku odkazem ze spuštění a název zkopíruje'
+        ] },
+        { version: '2026-10-04f', date: '4. 10. 2026', items: [
+            'Přehrát v externí aplikaci — přidán ModernTV: „ModernTV (aplikace)“ (zkusí otevřít aplikaci ModernTV 2.0 v telefonu) a „ModernTV (web)“ (otevře moderntv.cz/search v novém panelu, název se zkopíruje do schránky). Zapneš je v Nastavení → Ostatní → Přehrávání v externí aplikaci. Webové odkazy se teď vždy otevírají v novém panelu, takže Sinator zůstane otevřený'
+        ] },
         { version: '2026-10-04e', date: '4. 10. 2026', items: [
             'Přehrát v externí aplikaci — SmartTube nově funguje: odkaz youtube://search?q={query} otevře vyhledávání názvu rovnou v SmartTube; kdo SmartTube nemá, tomu se otevře aplikace YouTube. Appka se jmenuje „SmartTube / YouTube“'
         ] },
@@ -6792,7 +6827,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const url = getAppOpenOnlyUrl(app);
         if (!url) { try { showToast(`${app.name}: appku najdi a spusť v telefonu ručně.`); } catch(e) {} return; }
         try { if (navigator.vibrate) navigator.vibrate(12); } catch(e) {}
-        window.location.href = url;
+        if (typeof window._openExternalUrl === 'function') window._openExternalUrl(url); else window.location.href = url;
     };
     window._returnToZabava = function() {
         const m = $('zabavaModal');
