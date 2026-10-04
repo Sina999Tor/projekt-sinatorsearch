@@ -4244,7 +4244,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             'Nastavení — přehlednější: místo záložek je menu karet pod sebou (stejný vzhled jako Seznamy) a každá sekce se otevře ve vlastním okně se „← Zpět“: 🤖 AI klíče, 🎬 TMDB a OMDb, 🔗 Propojení účtů, 🎨 Vzhled, 📱 Aplikace, 👤 Profil a pozvánka, 🔐 Heslo a obsah, 🔄 Aktualizace, 💾 Záloha dat, 🛡️ Admin',
             'Nové okno 📱 Aplikace — instalace aplikace (PWA), instalace do Stremia/Nuvia a nastavení přehrávání v externí aplikaci jsou teď pohromadě na jednom místě',
             'Oblíbené — po otevření se nejdřív zobrazí menu karet pod sebou (Vše, Filmy, Seriály, Minisérie, Anime, Herci, Režiséři s počty); klepnutí otevře seznam dané kategorie, „← Zpět“ vrátí do menu',
-            'Moje složky — složky jsou karty pod sebou místo dvou sloupců a hlavička má stejný vzhled jako Seznamy'
+            'Moje složky — složky jsou karty pod sebou místo dvou sloupců, mají stejné písmo i velikost jako Seznamy a hlavička je stejná'
         ] },
         { version: '2026-10-04j', date: '4. 10. 2026', items: [
             'Přehrát v externí aplikaci — odstraněna položka „ModernTV (aplikace)“ (z prohlížeče ji spustit nejde), zůstává „ModernTV (web)“; všechny externí aplikace jsou u nových uživatelů výchozně vypnuté, v detailu i v Zábavě'
@@ -40732,10 +40732,12 @@ window.renderSlozkyList = function renderSlozkyList() {
         html += `<div style="display:flex;flex-direction:column;gap:10px;margin-top:6px;">`;
         const SK_COL = ['#ffd700','#60a5fa','#4ade80','#ce93d8','#fb923c','#f472b6','#5dade2'];
         folders.forEach((f, i) => {
-            html += `<div class="menu-row-btn" role="button" tabindex="0" onclick="openSlozkaDetail(${i})">
-                <span style="font-size:1.6rem;">${f.emoji||'📁'}</span>
-                <div style="flex:1;min-width:0;"><div style="color:${SK_COL[i % SK_COL.length]};font-weight:700;word-break:break-word;">${escHtml(f.name)}</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;font-weight:400;">${f.items.length} položek</div></div>
-                <button onclick="event.stopPropagation();deleteSlozka(${i})" title="Smazat složku" style="background:none;border:none;font-size:1.1rem;cursor:pointer;padding:6px;">🗑</button>
+            html += `<div style="position:relative;">
+                <button type="button" class="menu-row-btn" onclick="openSlozkaDetail(${i})" style="padding-right:56px;">
+                    <span style="font-size:1.6rem;">${f.emoji||'📁'}</span>
+                    <div><div style="color:${SK_COL[i % SK_COL.length]};font-weight:700;word-break:break-word;">${escHtml(f.name)}</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${f.items.length} položek</div></div>
+                </button>
+                <button type="button" onclick="deleteSlozka(${i})" title="Smazat složku" style="position:absolute;top:50%;right:10px;transform:translateY(-50%);background:none;border:none;font-size:1.1rem;cursor:pointer;padding:8px;">🗑</button>
             </div>`;
         });
         html += `</div>`;
