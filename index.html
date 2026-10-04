@@ -3904,19 +3904,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         // na Enhanced verzi.
         { id:'nuvio_enhanced', name:'Nuvio Enhanced', emoji:'🎞️', urlTemplate:'intent://open#Intent;scheme=nuvio;package=com.nuvio.enhanced;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2FNuvioMedia%2FNuvioMobile-Enhanced%2Freleases;end', enabled:false, builtin:true },
         { id:'streamlet', name:'Streamlet', emoji:'📺', urlTemplate:'streamlet://search?q={query}',      enabled:false, builtin:true },
-        // SmartTube (YouTube klient pro Android, balíček org.smarttube.stable — ověřeno v Podrobnostech
-        // o aplikaci). Nemá vlastní URL schéma, ale zachytává odkazy youtube.com, takže ho otevřeme přes
-        // intent:// s explicitním balíčkem: s názvem filmu → vyhledávání na YouTube, bez názvu
-        // (Zábava → Externí aplikace) → jen otevření (openUrl). Beta verze má jiný balíček (org.smarttube.beta).
-        { id:'smarttube', name:'SmartTube', emoji:'▶️',
-          urlTemplate:'intent://www.youtube.com/results?search_query={query}#Intent;scheme=https;package=org.smarttube.stable;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2Fyuliskov%2FSmartTube%2Freleases;end',
-          openUrl:'intent://www.youtube.com/#Intent;scheme=https;package=org.smarttube.stable;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2Fyuliskov%2FSmartTube%2Freleases;end',
-          enabled:false, builtin:true }
+        // SmartTube je určená pro Android TV (na telefonech ji autor nepodporuje) a nenabízí vstup, který by
+        // prohlížeč smí z webu spustit (Brave/Chrome vrátí ERR_UNKNOWN_URL_SCHEME — stejný limit jako u Kodi
+        // a ModernTV). Proto ruční režim: appka jen zkopíruje název do schránky a vyzve k ručnímu otevření.
+        { id:'smarttube', name:'SmartTube', emoji:'▶️', urlTemplate:'', enabled:false, builtin:true }
     ];
     // Migrace: pokud má uživatel uložené staré (nefunkční) odhady odkazů
     // z dřívější verze, potichu je nahradíme opravenými výchozími hodnotami —
     // ale jen pokud si je sám ručně nezměnil (jinak bychom přepsali jeho úpravu).
     const _OLD_EXTERNAL_PLAY_APP_TEMPLATES = {
+        smarttube: 'intent://www.youtube.com/results?search_query={query}#Intent;scheme=https;package=org.smarttube.stable;S.browser_fallback_url=https%3A%2F%2Fgithub.com%2Fyuliskov%2FSmartTube%2Freleases;end',
         stremio: 'stremio://search?query={query}',
         nuvio:   ['nuvio://search?q={query}', 'nuvio://', 'intent://search?query={query}#Intent;scheme=nuvio;package=com.nuvio.app;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.nuvio.app;end'],
         // Nuvio Enhanced se v prvním nasazení omylem mířil na stejný package jako
@@ -3949,6 +3946,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     if(def) { a.urlTemplate = def.urlTemplate; migrated = true; }
                 }
             });
+            // SmartTube: odkaz z předchozí verze nefungoval — zrušit i případný uložený openUrl
+            saved.forEach(a => { if(a.id === 'smarttube' && a.openUrl) { delete a.openUrl; migrated = true; } });
             const savedIds = new Set(saved.map(a => a.id));
             const merged = saved.slice();
             DEFAULT_EXTERNAL_PLAY_APPS.forEach(d => { if(!savedIds.has(d.id)) merged.push({...d}); });
@@ -4168,8 +4167,11 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-04c', date: '4. 10. 2026', items: [
+            'SmartTube — prohlížeč ji z webové appky spustit nedovolí (SmartTube je určená pro Android TV), proto ji appka už nepokouší otevřít odkazem (chyba „Tento web není dostupný“); u filmu/seriálu místo toho zkopíruje název do schránky a ty SmartTube otevřeš ručně a název vložíš do vyhledávání'
+        ] },
         { version: '2026-10-04b', date: '4. 10. 2026', items: [
-            'Přehrávání v externí aplikaci — přidána aplikace SmartTube (Nastavení → Ostatní → Přehrávání v externí aplikaci): u filmu/seriálu otevře vyhledávání názvu na YouTube přímo v SmartTube, v Zábava → Externí aplikace ji jen spustí'
+            'Přehrávání v externí aplikaci — přidána aplikace SmartTube (Nastavení → Ostatní → Přehrávání v externí aplikaci)'
         ] },
         { version: '2026-10-04', date: '4. 10. 2026', items: [
             'Detail seriálu — název sezóny se už neopakuje („Sezóna 1: 1. sezóna“); když TMDB vrátí jen obecný název, zobrazí se prostě „Sezóna 1“, zvláštní název sezóny (např. „Sezóna 3: Válka světů“) zůstává'
