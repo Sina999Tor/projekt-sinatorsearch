@@ -1479,6 +1479,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Vlastní náhrada za Trakt — watchlist, seznamy, hodnocení, historie.</div>
                 <input type="password" id="myBackendKeyInput" placeholder="API_SECRET" style="width:100%;margin-bottom:8px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;">
                 <div class="settings-actions">
+                    <button class="settings-btn-small show-key-btn apikey-lvl2-btn" style="display:none;" onclick="toggleMyBackendKeyVisibility()">👁️ Zobrazit</button>
                     <button class="settings-btn-small" style="border-color:#6090ff;color:#6090ff;" onclick="saveMyBackendSettings()">💾 Uložit a otestovat</button>
                     <button class="settings-btn-small settings-btn-remove" onclick="disconnectMyBackend()">❌ Odebrat</button>
                 </div>
@@ -1525,7 +1526,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <div style="font-size:0.68rem;color:#f5a623;margin-bottom:8px;line-height:1.5;">⚠️ Histra API nepovoluje volání přímo z prohlížeče (CORS) — aby sync fungoval, potřebuješ na svém sinator-backend nasadit malý proxy endpoint <code>/api/histra-proxy</code>. Kód a instrukce od Claude, stačí zkopírovat do repa.</div>
                 <input type="password" id="histraTokenInput" placeholder="Histra token" style="width:100%;margin-bottom:8px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;" autocomplete="off">
                 <div class="settings-actions">
-                    <button class="settings-btn-small show-key-btn" onclick="toggleHistraKeyVisibility()">👁️ Zobrazit</button>
+                    <button class="settings-btn-small show-key-btn apikey-lvl2-btn" style="display:none;" onclick="toggleHistraKeyVisibility()">👁️ Zobrazit</button>
                     <button class="settings-btn-small" style="border-color:#8b5cf6;color:#8b5cf6;" onclick="saveHistraToken()">🔑 Uložit a otestovat</button>
                     <button class="settings-btn-small settings-btn-remove" onclick="disconnectHistra()">❌ Odpojit</button>
                 </div>
@@ -4957,6 +4958,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-05c', date: '5. 10. 2026', items: [
+            { admin: true, text: 'Nastavení → Propojení účtů — u klíče Sinator backendu i tokenu Histry přibylo tlačítko 👁️ Zobrazit (vidí ho jen Admin level 2)' }
+        ] },
         { version: '2026-10-05b', date: '5. 10. 2026', items: [
             { admin: true, text: 'Detail — při připojeném Sinatoru i Histře je „Shlédnuto“ jedno tlačítko napůl zelené (Sinator) a napůl fialové (Histra); stejně tak je jedna sjednocená „Historie sledování – Sinator/Histra“ (smazání ✕ maže v obou). Je-li připojená jen jedna služba, zůstává její název a barva; bez obou se ukládá lokálně' }
         ] },
@@ -7775,6 +7779,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     window.updateAdultToggleUI = updateAdultToggleUI;
 
     function toggleApiKeyVisibility() { const input = $('tmdbApiKeyInput'); if (input) input.type = input.type === 'password' ? 'text' : 'password'; }
+    function toggleMyBackendKeyVisibility() { const input = $('myBackendKeyInput'); if (input) input.type = input.type === 'password' ? 'text' : 'password'; }
     function toggleHistraKeyVisibility() { const input = $('histraTokenInput'); if (input) input.type = input.type === 'password' ? 'text' : 'password'; }
     function toggleGeminiKeyVisibility() { const input = $('geminiApiKeyInput'); if (input) input.type = input.type === 'password' ? 'text' : 'password'; }
     function toggleGroqKeyVisibility() { const input = $('groqApiKeyInput'); if (input) input.type = input.type === 'password' ? 'text' : 'password'; }
