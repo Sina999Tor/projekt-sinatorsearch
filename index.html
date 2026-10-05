@@ -2846,6 +2846,82 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         } catch (e) {}
     }
 
+
+    // ── Sjednocené tlačítko „Shlédnuto“ a historie, když jsou připojeny Sinator i Histra ──
+    function uwRestyle(btn) {
+        const id = (btn.id || '').split('_')[1];
+        const sin = btn.dataset.watched === '1';
+        const his = !!(window._uwHis && window._uwHis[id]);
+        const G = 'rgba(29,185,84,0.25)', P = 'rgba(139,92,246,0.28)', T = 'transparent';
+        btn.style.borderStyle = 'solid'; btn.style.borderWidth = '1px';
+        if (sin && his) {
+            btn.style.background = `linear-gradient(90deg, ${G} 50%, ${P} 50%)`;
+            btn.style.borderColor = '#1db954 #8b5cf6 #8b5cf6 #1db954';
+            btn.style.color = '#e5e7eb';
+            btn.textContent = '✅ Shlédnuto (Sinator + Histra)';
+        } else if (sin || his) {
+            btn.style.background = `linear-gradient(90deg, ${sin ? G : T} 50%, ${his ? P : T} 50%)`;
+            btn.style.borderColor = sin ? '#1db954' : '#8b5cf6';
+            btn.style.color = sin ? '#1db954' : '#a78bfa';
+            btn.textContent = '✅ Shlédnuto (' + (sin ? 'Sinator' : 'Histra') + ')';
+        } else {
+            btn.style.background = 'transparent';
+            btn.style.borderColor = 'var(--border)';
+            btn.style.color = 'var(--text-muted)';
+            btn.textContent = '☐ Shlédnuto (Sinator + Histra)';
+        }
+    }
+    async function initCombinedWatchHistory(id, type) {
+        const box = document.getElementById(`mySinatorWatchHistorySlot_${id}`);
+        if (!box) return;
+        let sin = [], his = [];
+        try {
+            if (type === 'tv') {
+                const [eps, shows] = await Promise.all([myHistoryGetForId('episodes', id), myHistoryGetForId('shows', id)]);
+                sin = [...eps, ...shows];
+            } else sin = await myHistoryGetForId('movies', id);
+        } catch (e) { console.warn('Sinator history load error:', e); }
+        try { his = await histraHistoryForId(id, type, false); } catch (e) { console.warn('Histra history load error:', e); }
+        const rows = (Array.isArray(sin) ? sin : []).map(it => ({ ts: it.watched_at, season: it.season, episode: it.episode, sin: it }));
+        his.forEach(h => {
+            const m = rows.find(r => !r.his && (r.season || null) == (h.season || null) && (r.episode || null) == (h.number || null) && Math.abs((r.ts || 0) - h.watchedAt) <= 120000);
+            if (m) m.his = h; else rows.push({ ts: h.watchedAt, season: h.season, episode: h.number, his: h });
+        });
+        rows.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        window._uhRows = window._uhRows || {}; window._uhRows[id] = rows;
+        if (!rows.length) { box.innerHTML = ''; return; }
+        const rowHtml = (r, idx) => {
+            const d = new Date(r.ts); if (isNaN(d)) return '';
+            const ds = `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()}`;
+            const tm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            const ep = (type === 'tv' && (r.season || r.episode)) ? ` <span style="opacity:0.7;">– S${String(r.season).padStart(2, '0')}E${String(r.episode).padStart(2, '0')}</span>` : '';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);"><span style="opacity:0.8;">🕓</span><span style="flex:1;">${ds} – ${tm}${ep}</span><button onclick="window.deleteCombinedHistory(${id},'${type}',${idx})" title="Smazat tento záznam" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;padding:2px 6px;">✕</button></div>`;
+        };
+        const older = rows.slice(1).map((r, i) => rowHtml(r, i + 1)).join('');
+        const tog = rows.length > 1 ? `<button onclick="window.toggleCombinedHistory(${id})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.8rem;display:flex;align-items:center;gap:4px;padding:4px 0;"><span id="uhArrow_${id}" style="display:inline-block;transition:transform 0.2s;">▸</span> Zobrazit celou historii (${rows.length - 1} další${rows.length - 1 === 1 ? '' : rows.length - 1 < 5 ? 'í' : 'ch'})</button>` : '';
+        box.innerHTML = `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);"><div style="font-weight:700;margin-bottom:8px;font-size:0.95rem;"><span style="background:linear-gradient(90deg,#1db954,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent;">🧩 Historie sledování – Sinator/Histra</span>${rows.length > 1 ? ` <span style="opacity:0.6;font-weight:500;font-size:0.8rem;">(${rows.length}×)</span>` : ''}</div>${rowHtml(rows[0], 0)}${tog}<div id="uhOlder_${id}" style="display:none;">${older}</div></div>`;
+    }
+    window.toggleCombinedHistory = function(id) {
+        const o = document.getElementById(`uhOlder_${id}`), a = document.getElementById(`uhArrow_${id}`);
+        if (!o) return;
+        const open = o.style.display !== 'none';
+        o.style.display = open ? 'none' : 'block';
+        if (a) a.style.transform = open ? 'rotate(0deg)' : 'rotate(90deg)';
+    };
+    window.deleteCombinedHistory = async function(id, type, idx) {
+        const r = (window._uhRows && window._uhRows[id] || [])[idx]; if (!r) return;
+        if (!confirm('Smazat záznam v Sinatoru i Histře? (Histra maže zhlédnutí celého titulu/epizody najednou.)')) return;
+        try {
+            if (r.sin) await myHistoryRemoveEntry(id, type, r.sin.watched_at, r.sin.season, r.sin.episode);
+            if (r.his) await histraRemoveHistoryEntry(r.his);
+            try { if (typeof refreshMySinatorWatchedCache === 'function') await refreshMySinatorWatchedCache(); } catch (e) {}
+            initMySinatorWatchedBadge(id, type);
+            initHistraWatchedBadge(id, type);
+            initMySinatorWatchHistory(id, type);
+            try { refreshCardWatchedBorders(id, typeof isWatched === 'function' && isWatched(id, type)); } catch (e) {}
+        } catch (e) { alert('❌ ' + _hErr(e)); }
+    };
+
     // ── Odznak "Shlédnuto (Histra)" ──
     function applyHistraWatchedBadgeStyle(btn, watched) {
         btn.dataset.watched = watched ? '1' : '0';
@@ -2861,7 +2937,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         window._histraTotalEps = window._histraTotalEps || {};
         if (total != null) window._histraTotalEps[id] = total;
         const tot = window._histraTotalEps[id] || 0;
-        btn.style.display = '';
+        btn.style.display = _hSinReady() ? 'none' : '';
         if (!btn.dataset.watched) btn.textContent = '🟣 …';
         try {
             const list = await histraHistoryForId(id, type, false);
@@ -2871,7 +2947,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 list.forEach(x => { if (x.season > 0) seen.add(x.season + '_' + x.number); });
                 watched = seen.size > 0 && (!tot || seen.size >= tot);
             } else watched = list.length > 0;
+            window._uwHis = window._uwHis || {}; window._uwHis[id] = watched;
             applyHistraWatchedBadgeStyle(btn, watched);
+            if (_hSinReady()) { const sb = document.getElementById(`mySinatorWatchedBadge_${id}`); if (sb && sb.dataset.watched != null) uwRestyle(sb); }
         } catch (e) {
             btn.textContent = '⚠️ Histra: chyba';
             btn.title = _hErr(e);
@@ -2915,6 +2993,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const box = document.getElementById(`histraWatchHistorySlot_${id}`);
         if (!box) return;
         if (!histraReady()) { box.innerHTML = ''; return; }
+        if (_hSinReady()) { box.innerHTML = ''; return initMySinatorWatchHistory(id, type); }
         try {
             const items = await histraHistoryForId(id, type, false);
             window._histraHistRows = window._histraHistRows || {};
@@ -4878,6 +4957,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-05b', date: '5. 10. 2026', items: [
+            { admin: true, text: 'Detail — při připojeném Sinatoru i Histře je „Shlédnuto“ jedno tlačítko napůl zelené (Sinator) a napůl fialové (Histra); stejně tak je jedna sjednocená „Historie sledování – Sinator/Histra“ (smazání ✕ maže v obou). Je-li připojená jen jedna služba, zůstává její název a barva; bez obou se ukládá lokálně' }
+        ] },
         { version: '2026-10-05', date: '5. 10. 2026', items: [
             { admin: true, text: 'Detail filmu/seriálu — 🟣 Histra je teď v detailu stejně jako Sinator: samostatný fialový odznak „Shlédnuto (Histra)“ pod odznakem Sinatoru, „Historie sledování – Histra“ (datum a čas, smazání záznamu ✕) a menu „🟣 Histra ▾“ (Watchlist, Shlédnuto, Do seznamu); hodnocení Histra API nenabízí, proto tam není' },
             { admin: true, text: 'Shlédnuto se zapisuje do obou služeb bez ptaní — označíš-li titul (nebo epizodu) v Sinatoru, zapíše se se stejným časem i do Histry, a naopak. Je-li připojená jen jedna služba, používá se jen ta; bez obou zůstává původní lokální „Shlédnuto“' },
@@ -14733,6 +14815,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         btn.style.background = watched ? _wc[1] : 'transparent';
         btn.style.color = watched ? _wc[0] : 'var(--text-muted)';
         btn.textContent = watched ? '✅ Shlédnuto (Sinator)' : '☐ Shlédnuto (Sinator)';
+        try { if (typeof histraReady === 'function' && histraReady()) uwRestyle(btn); } catch (e) {}
     }
     async function initMySinatorWatchedBadge(id, type) {
         const btn = document.getElementById(`mySinatorWatchedBadge_${id}`);
@@ -14886,6 +14969,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const box = document.getElementById(`mySinatorWatchHistorySlot_${id}`);
         if (!box) return;
         if (!myBackendReady()) { box.innerHTML = ''; return; }
+        if (typeof histraReady === 'function' && histraReady()) return initCombinedWatchHistory(id, type);
         try {
             let items;
             if (type === 'tv') {
