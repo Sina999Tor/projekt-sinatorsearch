@@ -45159,11 +45159,7 @@ window.addEventListener('load', function() {
 (function(){
   var $ = function(id){ return document.getElementById(id); };
   var GROUPS = [
-    ['Klíče a propojení', ['ai','tmdb','connect']],
-    ['Aplikace', ['look','apps']],
-    ['Účet', ['profile','security']],
-    ['Údržba', ['update','backup']],
-    ['Správa', ['admin']]
+    ['', ['profile','tmdb','ai','connect','look','apps','security','update','backup','admin']]
   ];
   var PAGES = {
     ai:      {icon:'🤖', name:'AI klíče',          sub:'Gemini, Groq, OpenRouter',                 c:'#a78bfa', node:'settingsTabContentKeys', pre:function(){ window.switchKeysSubTab('ai'); }},
