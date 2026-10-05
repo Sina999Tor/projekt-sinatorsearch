@@ -40741,7 +40741,7 @@ window.renderSlozkyList = function renderSlozkyList() {
             html += `<div style="position:relative;">
                 <button type="button" class="menu-row-btn" onclick="openSlozkaDetail(${i})" style="padding-right:56px;">
                     <span style="font-size:1.6rem;">${f.emoji||'📁'}</span>
-                    <div><div style="color:${SK_COL[i % SK_COL.length]};font-weight:700;word-break:break-word;">${escHtml(f.name)} <span style="color:var(--text-muted);">(${f.items.length})</span></div></div>
+                    <div><div style="color:${SK_COL[i % SK_COL.length]};font-weight:700;word-break:break-word;">${escHtml(f.name)} <span style="color:var(--text-muted);">(${f.items.length})</span></div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${(()=>{const pl=(n,a,b,c)=>n===1?a:(n>=2&&n<=4?b:c);const tv=f.items.filter(x=>x.type==='tv').length,mv=f.items.length-tv;return mv+' '+pl(mv,'film','filmy','filmů')+' · '+tv+' '+pl(tv,'seriál','seriály','seriálů');})()}</div></div>
                 </button>
                 <button type="button" onclick="deleteSlozka(${i})" title="Smazat složku" style="position:absolute;top:50%;right:10px;transform:translateY(-50%);background:none;border:none;font-size:1.1rem;cursor:pointer;padding:8px;">🗑</button>
             </div>`;
