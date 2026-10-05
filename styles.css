@@ -1300,3 +1300,5 @@ html[data-theme="light"] .slozky-header .slozky-x{color:var(--text);}
 /* Kde stáhnout: sbalitelné odkazy */
 .sw-dl > summary::-webkit-details-marker{display:none;}
 .sw-dl[open] .sw-dl-arrow{transform:rotate(180deg);}
+.sw-dl-all > summary::-webkit-details-marker{display:none;}
+.sw-dl-all[open] > summary .sw-dl-arrow{transform:rotate(180deg);}
