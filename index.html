@@ -2882,9 +2882,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             } else sin = await myHistoryGetForId('movies', id);
         } catch (e) { console.warn('Sinator history load error:', e); }
         try { his = await histraHistoryForId(id, type, false); } catch (e) { console.warn('Histra history load error:', e); }
-        const rows = (Array.isArray(sin) ? sin : []).map(it => ({ ts: it.watched_at, season: it.season, episode: it.episode, sin: it }));
+        const rows = (Array.isArray(sin) ? sin : []).map(it => ({ ts: new Date(it.watched_at).getTime(), season: it.season, episode: it.episode, sin: it }));
         his.forEach(h => {
-            const m = rows.find(r => !r.his && (r.season || null) == (h.season || null) && (r.episode || null) == (h.number || null) && Math.abs((r.ts || 0) - h.watchedAt) <= 120000);
+            const m = rows.find(r => !r.his && (r.season || null) == (h.season || null) && (r.episode || null) == (h.number || null) && Math.abs((r.ts || 0) - Number(h.watchedAt)) <= 600000);
             if (m) m.his = h; else rows.push({ ts: h.watchedAt, season: h.season, episode: h.number, his: h });
         });
         rows.sort((a, b) => (b.ts || 0) - (a.ts || 0));
