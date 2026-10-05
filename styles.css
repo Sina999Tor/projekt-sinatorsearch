@@ -1296,3 +1296,7 @@ html[data-theme="light"] .settings-modal:has(> .sw-menu) .settings-modal-header 
 .slozky-header .slozky-x{width:34px;height:34px;padding:0;border:1px solid var(--border);border-radius:50%;color:#fff;font-size:1rem;display:grid;place-items:center;}
 .slozky-body{padding:16px;}
 html[data-theme="light"] .slozky-header .slozky-x{color:var(--text);}
+
+/* Kde stáhnout: sbalitelné odkazy */
+.sw-dl > summary::-webkit-details-marker{display:none;}
+.sw-dl[open] .sw-dl-arrow{transform:rotate(180deg);}
