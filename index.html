@@ -2721,6 +2721,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             let h = `<button class="menu-row-btn" onclick="histraOpenWatchlist()"><span style="font-size:1.6rem;">⭐</span><div><div style="color:#8b5cf6;font-weight:700;">Watchlist</div></div></button>`;
             h += `<button class="menu-row-btn" onclick="histraOpenProgress('movie')"><span style="font-size:1.6rem;">🎬</span><div><div style="color:#8b5cf6;font-weight:700;">Rozkoukané filmy</div></div></button>`;
             h += `<button class="menu-row-btn" onclick="histraOpenProgress('tv')"><span style="font-size:1.6rem;">📺</span><div><div style="color:#8b5cf6;font-weight:700;">Rozkoukané seriály</div></div></button>`;
+            h += `<button class="menu-row-btn" onclick="histraOpenWatched('movie')"><span style="font-size:1.6rem;">✅</span><div><div style="color:#8b5cf6;font-weight:700;">Shlédnuté filmy</div></div></button>`;
+            h += `<button class="menu-row-btn" onclick="histraOpenWatched('tv')"><span style="font-size:1.6rem;">✅</span><div><div style="color:#8b5cf6;font-weight:700;">Shlédnuté seriály</div></div></button>`;
             lists.forEach((l, i) => {
                 const n = l.item_count ?? l.items_count ?? l.count ?? (Array.isArray(l.items) ? l.items.length : null);
                 h += `<button class="menu-row-btn" onclick="histraOpenList(${i})"><span style="font-size:1.6rem;">📋</span><div><div style="color:${colors[i % colors.length]};font-weight:700;word-break:break-word;">${_hEsc(l.name || l.title || 'Seznam')}${n != null ? ` <span style="color:var(--text-muted);">(${n})</span>` : ''}</div></div></button>`;
@@ -3258,6 +3260,21 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         if (!tm) return null;
         return { id: tm, type: isShow ? 'tv' : 'movie', title: src.title || src.name || e.title || e.name || '', year: histraExtractYear(src) || histraExtractYear(e), poster_path: src.poster_path || src.poster || src.poster_url || e.poster_path || e.poster || '' };
     }
+    window.histraOpenWatched = function(type) {
+        const wantTv = type === 'tv';
+        histraLoadItems(wantTv ? 'Shlédnuté seriály' : 'Shlédnuté filmy', async () => {
+            const kind = wantTv ? 'show' : 'movie';
+            const raw = await histraFetchAllPaged(`/api/v1/tracking/history?kind=${kind}&extended=full&lang=cs-CZ`, 100, 200);
+            const seen = new Set(), out = [];
+            raw.forEach(e => {
+                const it = histraMapProgress(e, wantTv ? 'tv' : 'movie'); if (!it) return;
+                const k = it.type + '_' + it.id; if (seen.has(k)) return;
+                seen.add(k); out.push(it);
+            });
+            return out;
+        }, x => x);
+    };
+
     window.histraOpenProgress = function(type) {
         const wantTv = type === 'tv';
         histraLoadItems(wantTv ? 'Rozkoukané seriály' : 'Rozkoukané filmy', async () => {
@@ -4972,6 +4989,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-06d', date: '6. 10. 2026', items: [
+            { admin: true, text: 'Seznamy → Histra — nové položky „Shlédnuté filmy“ a „Shlédnuté seriály“ (z historie Histry, každý titul jednou; seriály jedním záznamem na seriál)' }
+        ] },
         { version: '2026-10-06c', date: '6. 10. 2026', items: [
             { admin: true, text: 'Seznamy → Histra — tlačítko „Zpět“ se po klepnutí už neotočí a nezůstane viset (odstraněn hover efekt otáčení)' }
         ] },
