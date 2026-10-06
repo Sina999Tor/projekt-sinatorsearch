@@ -3090,10 +3090,15 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             for (let i = 1; i < titles.length; i++) if (titles[i - 1].localeCompare(titles[i], 'cs') <= 0) ok++;
             return ok >= titles.length - 1;
         }
-        function azActive(el) {
-            const trig = [...document.querySelectorAll('.watched-az-trigger,.main-az-trigger,#collAzTrigger')].some(shown);
-            return trig && looksAlpha(el);
+        // A–Z trigger zabírá pravý okraj — jezdec se s ním nehádá, jen se odsune dovnitř
+        function azOffset() {
+            let w = 0;
+            document.querySelectorAll('.watched-az-trigger,.main-az-trigger,#collAzTrigger').forEach(t => {
+                if (shown(t)) w = Math.max(w, Math.min(60, Math.round(t.getBoundingClientRect().width) || 30));
+            });
+            return w;
         }
+        function azBarOpen() { return !!document.querySelector('.watched-az-bar.visible, .main-az-bar.visible') || (() => { const c = document.getElementById('collAzBar'); return !!(c && c.style.pointerEvents === 'all'); })(); }
         function onTop(el) {
             const probe = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
             if (!probe) return false;
@@ -3112,7 +3117,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             if (el.scrollHeight < ch * 2.5) return false;
             if (!w && el.getClientRects().length === 0) return false;
             if (el.querySelectorAll('.card, [data-az]').length < 6) return false;
-            if (azActive(el)) return false;
+            if (azBarOpen()) return false;
             return onTop(el);
         }
         // Najde posouvací kontejner pod středem obrazovky (nezávisle na události scroll)
@@ -3148,11 +3153,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             bar = document.createElement('div');
             bar.style.cssText = 'position:absolute;right:14px;top:0;bottom:0;width:8px;border-radius:4px;background:rgba(255,255,255,0.55);box-shadow:0 0 0 1px rgba(0,0,0,0.5);transition:width .15s,background .15s;pointer-events:none;';
             thumb.appendChild(bar);
-            const start = (y) => { const g = geom(); dragging = true; startY = y; startScroll = g.scroller.scrollTop; setDrag(true); thumb.style.opacity = '1'; };
+            const start = (y) => { dragging = true; startY = y; setDrag(true); thumb.style.opacity = '1'; };
+            // Přírůstkově: každý pohyb prstu posune seznam o díl aktuální délky — když se dolní konec seznamu
+            // prodlouží (donačtení dalších karet), seznam se nepřilepí ke dnu a jde dál volně rolovat
             const move = (y) => {
                 const g = geom();
                 const range = Math.max(g.trackH - g.thumbH, 1);
-                g.scroller.scrollTop = Math.min(g.max, Math.max(0, startScroll + (y - startY) * (g.max / range)));
+                const dy = y - startY; startY = y;
+                g.scroller.scrollTop = Math.min(g.max, Math.max(0, g.scroller.scrollTop + dy * (g.max / range)));
                 placeThumb();
             };
             const end = () => { if (!dragging) return; dragging = false; setDrag(false); fade(); };
@@ -3167,6 +3175,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const g = geom();
             const pos = g.scroller.scrollTop / g.max;
             thumb.style.height = g.thumbH + 'px';
+            thumb.style.right = azOffset() + 'px';
             thumb.style.top = (g.top + (g.trackH - g.thumbH) * Math.min(1, Math.max(0, pos))) + 'px';
         }
         function update(active) {
@@ -5257,7 +5266,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-06i', date: '6. 10. 2026', items: [
-            { admin: true, text: 'Jezdec u pravého kraje opraven — zobrazí se i bez posouvání, širší plocha k chycení (mimo okrajové systémové gesto „zpět“) a nepotlačují ho zbylé A–Z lišty z jiné obrazovky' }
+            { admin: true, text: 'Jezdec u pravého kraje opraven — zobrazí se i bez posouvání, širší plocha k chycení (mimo okrajové systémové gesto „zpět“). Funguje i v seznamech s abecední lištou (Sinator apod.): jezdec se jen odsune dovnitř vedle lišty, a když je lišta otevřená, schová se. Při donačítání dalších karet se jezdec už nelepí ke dnu seznamu' }
         ] },
         { version: '2026-10-06h', date: '6. 10. 2026', items: [
             { admin: true, text: 'Dlouhé seznamy (ve výchozím řazení, tedy bez abecední lišty) — u pravého kraje obrazovky je jezdec: chyť ho prstem a táhni pro rychlé posouvání nahoru/dolů. Při řazení A–Z zůstává abecední lišta' }
