@@ -2688,6 +2688,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const m = $('histraListsModal'); if (!m) return;
         try { closeHelperModals(); } catch (e) {}
         m.style.display = 'flex';
+        if (window.updatePwaBtn) updatePwaBtn();
         const v = state._histraView;
         if (restore && v && v.kind === 'items') { histraRenderItems(v.title, v.items, v.scroll); return; }
         histraShowOverview();
@@ -2695,6 +2696,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     window.closeHistraListsModal = function() {
         const m = $('histraListsModal'); if (m) m.style.display = 'none';
         state._histraView = null;
+        if (window.updatePwaBtn) updatePwaBtn();
     };
     window.histraListsBack = function() {
         const v = state._histraView;
@@ -4970,6 +4972,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-06b', date: '6. 10. 2026', items: [
+            { admin: true, text: 'Seznamy → Histra — opraveno překrývání křížků: plovoucí ✕ aplikace (PWA) se teď při otevřené Histře schová, stejně jako u ostatních celoobrazovkových oken' }
+        ] },
         { version: '2026-10-06', date: '6. 10. 2026', items: [
             { admin: true, text: 'Seznamy → Histra — hlavička sjednocená se Sinatorem (nápis vlevo, vpravo „Zpět“ a ✕), opraveno překrývání křížků' },
             { admin: true, text: 'Detail z Rozkoukaných (Histra) — tlačítko „Odebrat z rozkoukaných“ pro filmy i seriály (také v menu 🟣 Histra ▾ → „Z rozkoukaných“)' }
@@ -19625,6 +19630,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
         if (window._histraSaveScroll) window._histraSaveScroll();
         const m = $('histraListsModal'); if (m) m.style.display = 'none';
+        if (window.updatePwaBtn) updatePwaBtn();
         state._backTo = 'histra';
         navigationStack.length = 0;
         navigationStack.push({ type, id });
@@ -41947,7 +41953,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var fullscreenModalIds = [
             'nahodnyTipModal','kvizModal','zebrickyModal','upcomingModal',
             'porovnaniModal','moodModal','myStatsModal','tentodenModal','koukatSModal','uzByloVKineModal',
-            'tvRadioModal','zabavaModal','zabavaAiModal','listsModal','musicModal',
+            'tvRadioModal','zabavaModal','zabavaAiModal','listsModal','histraListsModal','musicModal',
             'slozkyModal','slozkyPickerModal','doporucujiOverlay','addDoporuceniOverlay',
             'settingsModal','externalInstallModal','askSinatorModal'
         ];
