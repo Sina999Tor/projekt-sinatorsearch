@@ -3029,6 +3029,47 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         _renderMoviesProgressGrid = function(grid, items, mode) { const r = o5.apply(this, arguments); try { azxSync(mode === 'az', grid); } catch (e) {} return r; };
     })();
 
+    // ── Abecední lišty: tažení prstem jako jezdec (všechny lišty v appce) ──
+    (function() {
+        const ALL = '.watched-az-trigger,.main-az-trigger,#collAzTrigger,.watched-az-bar,.main-az-bar,#collAzBar';
+        let dragging = false, moved = false, last = null, hideT = null;
+        function activeBar() {
+            const b = document.querySelector('.watched-az-bar.visible, .main-az-bar.visible');
+            if (b) return b;
+            const c = document.getElementById('collAzBar');
+            return (c && c.style.pointerEvents === 'all') ? c : null;
+        }
+        function keepOpen(b) {
+            if (b.id === 'collAzBar') { if (typeof toggleCollAzBar === 'function') toggleCollAzBar(true); }
+            else b.classList.add('visible');
+        }
+        function closeBar(b) {
+            if (b.id === 'collAzBar') { if (typeof toggleCollAzBar === 'function') toggleCollAzBar(false); }
+            else b.classList.remove('visible');
+        }
+        document.addEventListener('touchstart', (e) => {
+            if (e.target.closest && e.target.closest(ALL)) { dragging = true; moved = false; last = null; clearTimeout(hideT); }
+        }, { passive: true, capture: true });
+        document.addEventListener('touchmove', (e) => {
+            if (!dragging) return;
+            const b = activeBar(); if (!b) return;
+            e.preventDefault();
+            const t = e.touches[0]; if (!t) return;
+            const r = b.getBoundingClientRect();
+            const x = r.left + r.width / 2;
+            const y = Math.min(Math.max(t.clientY, r.top + 2), r.bottom - 2);
+            const el = document.elementFromPoint(x, y);
+            const a = el && el.closest ? el.closest('a') : null;
+            if (a && b.contains(a) && a !== last) { last = a; moved = true; a.click(); keepOpen(b); }
+        }, { passive: false, capture: true });
+        const end = () => {
+            if (!dragging) return;
+            dragging = false;
+            if (moved) { hideT = setTimeout(() => { const b = activeBar(); if (b) closeBar(b); }, 1500); }
+        };
+        document.addEventListener('touchend', end, { passive: true, capture: true });
+        document.addEventListener('touchcancel', end, { passive: true, capture: true });
+    })();
     // ── Odznak "Shlédnuto (Histra)" ──
     function applyHistraWatchedBadgeStyle(btn, watched) {
         btn.dataset.watched = watched ? '1' : '0';
@@ -5092,6 +5133,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-06g', date: '6. 10. 2026', items: [
+            { admin: true, text: 'Abecední lišty (všude v appce) — dají se táhnout prstem jako jezdec: přejedeš po písmenech a seznam se průběžně posouvá, ne jen po klepnutí' }
+        ] },
         { version: '2026-10-06f', date: '6. 10. 2026', items: [
             { admin: true, text: 'Posuvná lišta s abecedou (stejná jako u Shlédnutých) je teď u všech seznamů s řazením A–Z: Sinator seznamy/watchlist/historie, Hodnocené filmy a seriály, Rozkoukané (seriály i filmy) a Histra seznamy. Řazení A–Z přibylo ke všem Histra seznamům (Watchlist, vlastní seznamy, rozkoukané)' }
         ] },
