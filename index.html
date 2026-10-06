@@ -3072,10 +3072,27 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     })();
     // ── Jezdec u kraje obrazovky pro rychlé posouvání dlouhých seznamů (ve výchozím řazení) ──
     (function() {
-        let thumb = null, bar = null, sc = null, fadeT = null, dragging = false, startY = 0, startScroll = 0, tick = null;
+        let thumb = null, bar = null, sc = null, fadeT = null, dragging = false, startY = 0, startScroll = 0;
         const isWin = (el) => el === document.scrollingElement || el === document.documentElement || el === document.body;
-        function azActive() {
-            return [...document.querySelectorAll('.watched-az-trigger,.main-az-trigger,#collAzTrigger')].some(t => t.getClientRects().length > 0);
+        function shown(t) {
+            if (!t || !t.isConnected) return false;
+            const cs = getComputedStyle(t);
+            return cs.display !== 'none' && cs.visibility !== 'hidden' && t.getClientRects().length > 0;
+        }
+        // Seznam je v abecedním řazení? (podle obsahu, ne podle zbylých A–Z tlačítek, která mohou zůstat v DOMu)
+        function looksAlpha(el) {
+            const cards = [...el.querySelectorAll('.card, [data-az]')].slice(0, 14);
+            if (cards.length < 6) return false;
+            const norm = (s) => String(s || '').trim().toLowerCase();
+            const titles = cards.map(c => norm(c.dataset.az || (c.querySelector('.card-title') || {}).textContent || ''));
+            if (titles.some(t => !t)) return false;
+            let ok = 0;
+            for (let i = 1; i < titles.length; i++) if (titles[i - 1].localeCompare(titles[i], 'cs') <= 0) ok++;
+            return ok >= titles.length - 1;
+        }
+        function azActive(el) {
+            const trig = [...document.querySelectorAll('.watched-az-trigger,.main-az-trigger,#collAzTrigger')].some(shown);
+            return trig && looksAlpha(el);
         }
         function onTop(el) {
             const probe = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
@@ -3095,8 +3112,17 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             if (el.scrollHeight < ch * 2.5) return false;
             if (!w && el.getClientRects().length === 0) return false;
             if (el.querySelectorAll('.card, [data-az]').length < 6) return false;
-            if (azActive()) return false;
+            if (azActive(el)) return false;
             return onTop(el);
+        }
+        // Najde posouvací kontejner pod středem obrazovky (nezávisle na události scroll)
+        function discover() {
+            const probe = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+            for (let p = probe; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+                const o = getComputedStyle(p).overflowY;
+                if ((o === 'auto' || o === 'scroll') && p.scrollHeight > p.clientHeight + 2) return p;
+            }
+            return document.scrollingElement || document.documentElement;
         }
         function geom() {
             const w = isWin(sc);
@@ -3105,55 +3131,67 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, window.innerHeight);
             const trackH = Math.max(bottom - top, 1);
             const ch = scroller.clientHeight || window.innerHeight, sh = scroller.scrollHeight;
-            const thumbH = Math.max(48, Math.min(trackH, trackH * ch / sh));
+            const thumbH = Math.max(56, Math.min(trackH, trackH * ch / sh));
             return { scroller, top, trackH, ch, sh, thumbH, max: Math.max(sh - ch, 1) };
+        }
+        function setDrag(on) {
+            if (!bar) return;
+            bar.style.width = on ? '12px' : '8px';
+            bar.style.background = on ? '#1db954' : 'rgba(255,255,255,0.55)';
         }
         function ensure() {
             if (thumb) return;
             thumb = document.createElement('div');
-            thumb.style.cssText = 'position:fixed;right:0;width:30px;z-index:5003;display:none;touch-action:none;transition:opacity .25s;';
+            thumb.id = 'fastScrollThumb';
+            // Dotyková plocha je široká 56 px a sahá dovnitř od kraje — kraj displeje zabírá systémové gesto „zpět“
+            thumb.style.cssText = 'position:fixed;right:0;width:56px;z-index:5003;display:none;touch-action:none;transition:opacity .25s;-webkit-tap-highlight-color:transparent;';
             bar = document.createElement('div');
-            bar.style.cssText = 'position:absolute;right:3px;top:0;bottom:0;width:6px;border-radius:3px;background:rgba(255,255,255,0.4);box-shadow:0 0 0 1px rgba(0,0,0,0.35);transition:width .15s,background .15s;';
+            bar.style.cssText = 'position:absolute;right:14px;top:0;bottom:0;width:8px;border-radius:4px;background:rgba(255,255,255,0.55);box-shadow:0 0 0 1px rgba(0,0,0,0.5);transition:width .15s,background .15s;pointer-events:none;';
             thumb.appendChild(bar);
-            thumb.addEventListener('touchstart', (e) => {
-                if (!sc) return;
+            const start = (y) => { const g = geom(); dragging = true; startY = y; startScroll = g.scroller.scrollTop; setDrag(true); thumb.style.opacity = '1'; };
+            const move = (y) => {
                 const g = geom();
-                dragging = true; startY = e.touches[0].clientY; startScroll = g.scroller.scrollTop;
-                bar.style.width = '10px'; bar.style.background = '#1db954'; thumb.style.opacity = '1';
-                e.preventDefault(); e.stopPropagation();
-            }, { passive: false });
-            thumb.addEventListener('touchmove', (e) => {
-                if (!dragging || !sc) return;
-                const g = geom();
-                const dy = e.touches[0].clientY - startY;
                 const range = Math.max(g.trackH - g.thumbH, 1);
-                g.scroller.scrollTop = Math.min(g.max, Math.max(0, startScroll + dy * (g.max / range)));
-                e.preventDefault(); e.stopPropagation();
-            }, { passive: false });
-            const end = () => { if (!dragging) return; dragging = false; bar.style.width = '6px'; bar.style.background = 'rgba(255,255,255,0.4)'; fade(); };
+                g.scroller.scrollTop = Math.min(g.max, Math.max(0, startScroll + (y - startY) * (g.max / range)));
+                placeThumb();
+            };
+            const end = () => { if (!dragging) return; dragging = false; setDrag(false); fade(); };
+            thumb.addEventListener('touchstart', (e) => { if (!sc || !e.touches[0]) return; start(e.touches[0].clientY); e.preventDefault(); e.stopPropagation(); }, { passive: false });
+            thumb.addEventListener('touchmove', (e) => { if (!dragging || !sc || !e.touches[0]) return; move(e.touches[0].clientY); e.preventDefault(); e.stopPropagation(); }, { passive: false });
             thumb.addEventListener('touchend', end); thumb.addEventListener('touchcancel', end);
             document.body.appendChild(thumb);
         }
-        function fade() { clearTimeout(fadeT); fadeT = setTimeout(() => { if (thumb && !dragging) thumb.style.opacity = '0.35'; }, 1200); }
+        function fade() { clearTimeout(fadeT); fadeT = setTimeout(() => { if (thumb && !dragging) thumb.style.opacity = '0.4'; }, 1200); }
         function hide() { if (thumb) thumb.style.display = 'none'; }
-        function update() {
-            if (!sc || !eligible(sc)) { hide(); return; }
-            ensure();
+        function placeThumb() {
             const g = geom();
             const pos = g.scroller.scrollTop / g.max;
-            thumb.style.display = 'block';
             thumb.style.height = g.thumbH + 'px';
             thumb.style.top = (g.top + (g.trackH - g.thumbH) * Math.min(1, Math.max(0, pos))) + 'px';
-            if (!dragging) { thumb.style.opacity = '0.9'; fade(); }
+        }
+        function update(active) {
+            if (dragging) { if (sc) placeThumb(); return; }
+            if (!sc || !eligible(sc)) { hide(); return; }
+            ensure();
+            thumb.style.display = 'block';
+            placeThumb();
+            if (active) { thumb.style.opacity = '0.95'; fade(); }
         }
         document.addEventListener('scroll', (e) => {
+            if (dragging) return;
             const t = e.target;
             const el = (t === document) ? (document.scrollingElement || document.documentElement) : t;
             if (!(el instanceof Element)) return;
             if (!eligible(el)) { if (el === sc) hide(); return; }
-            sc = el; update();
+            sc = el; update(true);
         }, true);
-        tick = setInterval(() => { if (sc) update(); }, 700);
+        // Pravidelná kontrola: najde seznam i bez posouvání a schová jezdec, když seznam zmizí / překryje ho okno
+        setInterval(() => {
+            if (dragging) return;
+            const d = discover();
+            if (d && d !== sc && eligible(d)) sc = d;
+            if (sc) update(false);
+        }, 600);
     })();
     // ── Odznak "Shlédnuto (Histra)" ──
     function applyHistraWatchedBadgeStyle(btn, watched) {
@@ -5218,6 +5256,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-06i', date: '6. 10. 2026', items: [
+            { admin: true, text: 'Jezdec u pravého kraje opraven — zobrazí se i bez posouvání, širší plocha k chycení (mimo okrajové systémové gesto „zpět“) a nepotlačují ho zbylé A–Z lišty z jiné obrazovky' }
+        ] },
         { version: '2026-10-06h', date: '6. 10. 2026', items: [
             { admin: true, text: 'Dlouhé seznamy (ve výchozím řazení, tedy bez abecední lišty) — u pravého kraje obrazovky je jezdec: chyť ho prstem a táhni pro rychlé posouvání nahoru/dolů. Při řazení A–Z zůstává abecední lišta' }
         ] },
