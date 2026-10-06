@@ -3136,7 +3136,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, window.innerHeight);
             const trackH = Math.max(bottom - top, 1);
             const ch = scroller.clientHeight || window.innerHeight, sh = scroller.scrollHeight;
-            const thumbH = Math.max(56, Math.min(trackH, trackH * ch / sh));
+            const thumbH = Math.min(trackH, 48);
             return { scroller, top, trackH, ch, sh, thumbH, max: Math.max(sh - ch, 1) };
         }
         function setDrag(on) {
@@ -3149,7 +3149,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             thumb = document.createElement('div');
             thumb.id = 'fastScrollThumb';
             // Dotyková plocha je široká 56 px a sahá dovnitř od kraje — kraj displeje zabírá systémové gesto „zpět“
-            thumb.style.cssText = 'position:fixed;right:0;width:56px;z-index:5003;display:none;touch-action:none;transition:opacity .25s;-webkit-tap-highlight-color:transparent;';
+            thumb.style.cssText = 'position:fixed;right:0;width:48px;z-index:5003;display:none;opacity:0;pointer-events:none;touch-action:none;transition:opacity .25s;-webkit-tap-highlight-color:transparent;';
             bar = document.createElement('div');
             bar.style.cssText = 'position:absolute;right:14px;top:0;bottom:0;width:8px;border-radius:4px;background:rgba(255,255,255,0.55);box-shadow:0 0 0 1px rgba(0,0,0,0.5);transition:width .15s,background .15s;pointer-events:none;';
             thumb.appendChild(bar);
@@ -3169,7 +3169,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             thumb.addEventListener('touchend', end); thumb.addEventListener('touchcancel', end);
             document.body.appendChild(thumb);
         }
-        function fade() { clearTimeout(fadeT); fadeT = setTimeout(() => { if (thumb && !dragging) thumb.style.opacity = '0.4'; }, 1200); }
+        function reveal() { if (!thumb) return; thumb.style.opacity = '0.95'; thumb.style.pointerEvents = 'auto'; fade(); }
+        // Po chvíli bez dotyku se jezdec úplně schová (a nechytá dotyky); znovu se objeví při posouvání nebo dotyku u pravého kraje
+        function fade() { clearTimeout(fadeT); fadeT = setTimeout(() => { if (thumb && !dragging) { thumb.style.opacity = '0'; thumb.style.pointerEvents = 'none'; } }, 1600); }
         function hide() { if (thumb) thumb.style.display = 'none'; }
         function placeThumb() {
             const g = geom();
@@ -3184,8 +3186,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             ensure();
             thumb.style.display = 'block';
             placeThumb();
-            if (active) { thumb.style.opacity = '0.95'; fade(); }
+            if (active) reveal();
         }
+        document.addEventListener('touchstart', (e) => {
+            const t = e.touches && e.touches[0];
+            if (!t || !thumb || thumb.style.display === 'none' || dragging) return;
+            if (t.clientX > window.innerWidth - 44) reveal();
+        }, { passive: true, capture: true });
         document.addEventListener('scroll', (e) => {
             if (dragging) return;
             const t = e.target;
@@ -5266,7 +5273,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-06i', date: '6. 10. 2026', items: [
-            { admin: true, text: 'Jezdec u pravého kraje opraven — zobrazí se i bez posouvání, širší plocha k chycení (mimo okrajové systémové gesto „zpět“). Funguje i v seznamech s abecední lištou (Sinator apod.): jezdec se jen odsune dovnitř vedle lišty, a když je lišta otevřená, schová se. Při donačítání dalších karet se jezdec už nelepí ke dnu seznamu' }
+            { admin: true, text: 'Jezdec u pravého kraje opraven — zobrazí se i bez posouvání, širší plocha k chycení (mimo okrajové systémové gesto „zpět“). Funguje i v seznamech s abecední lištou (Sinator apod.): jezdec se jen odsune dovnitř vedle lišty, a když je lišta otevřená, schová se. Při donačítání dalších karet se jezdec už nelepí ke dnu seznamu. Jezdec je menší (pevná výška) a po ~1,5 s bez dotyku se úplně schová; vrátí se při posouvání nebo dotyku u pravého kraje' }
         ] },
         { version: '2026-10-06h', date: '6. 10. 2026', items: [
             { admin: true, text: 'Dlouhé seznamy (ve výchozím řazení, tedy bez abecední lišty) — u pravého kraje obrazovky je jezdec: chyť ho prstem a táhni pro rychlé posouvání nahoru/dolů. Při řazení A–Z zůstává abecední lišta' }
