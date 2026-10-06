@@ -3070,6 +3070,91 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         document.addEventListener('touchend', end, { passive: true, capture: true });
         document.addEventListener('touchcancel', end, { passive: true, capture: true });
     })();
+    // ── Jezdec u kraje obrazovky pro rychlé posouvání dlouhých seznamů (ve výchozím řazení) ──
+    (function() {
+        let thumb = null, bar = null, sc = null, fadeT = null, dragging = false, startY = 0, startScroll = 0, tick = null;
+        const isWin = (el) => el === document.scrollingElement || el === document.documentElement || el === document.body;
+        function azActive() {
+            return [...document.querySelectorAll('.watched-az-trigger,.main-az-trigger,#collAzTrigger')].some(t => t.getClientRects().length > 0);
+        }
+        function onTop(el) {
+            const probe = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+            if (!probe) return false;
+            if (isWin(el)) {
+                for (let p = probe; p && p !== document.body; p = p.parentElement) { if (getComputedStyle(p).position === 'fixed') return false; }
+                return true;
+            }
+            return el.contains(probe);
+        }
+        function eligible(el) {
+            if (!el || !(el instanceof Element)) return false;
+            const w = isWin(el);
+            const ch = w ? window.innerHeight : el.clientHeight;
+            const cw = w ? window.innerWidth : el.clientWidth;
+            if (ch < 300 || cw < 250) return false;
+            if (el.scrollHeight < ch * 2.5) return false;
+            if (!w && el.getClientRects().length === 0) return false;
+            if (el.querySelectorAll('.card, [data-az]').length < 6) return false;
+            if (azActive()) return false;
+            return onTop(el);
+        }
+        function geom() {
+            const w = isWin(sc);
+            const scroller = w ? (document.scrollingElement || document.documentElement) : sc;
+            const r = w ? { top: 0, bottom: window.innerHeight } : sc.getBoundingClientRect();
+            const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, window.innerHeight);
+            const trackH = Math.max(bottom - top, 1);
+            const ch = scroller.clientHeight || window.innerHeight, sh = scroller.scrollHeight;
+            const thumbH = Math.max(48, Math.min(trackH, trackH * ch / sh));
+            return { scroller, top, trackH, ch, sh, thumbH, max: Math.max(sh - ch, 1) };
+        }
+        function ensure() {
+            if (thumb) return;
+            thumb = document.createElement('div');
+            thumb.style.cssText = 'position:fixed;right:0;width:30px;z-index:5003;display:none;touch-action:none;transition:opacity .25s;';
+            bar = document.createElement('div');
+            bar.style.cssText = 'position:absolute;right:3px;top:0;bottom:0;width:6px;border-radius:3px;background:rgba(255,255,255,0.4);box-shadow:0 0 0 1px rgba(0,0,0,0.35);transition:width .15s,background .15s;';
+            thumb.appendChild(bar);
+            thumb.addEventListener('touchstart', (e) => {
+                if (!sc) return;
+                const g = geom();
+                dragging = true; startY = e.touches[0].clientY; startScroll = g.scroller.scrollTop;
+                bar.style.width = '10px'; bar.style.background = '#1db954'; thumb.style.opacity = '1';
+                e.preventDefault(); e.stopPropagation();
+            }, { passive: false });
+            thumb.addEventListener('touchmove', (e) => {
+                if (!dragging || !sc) return;
+                const g = geom();
+                const dy = e.touches[0].clientY - startY;
+                const range = Math.max(g.trackH - g.thumbH, 1);
+                g.scroller.scrollTop = Math.min(g.max, Math.max(0, startScroll + dy * (g.max / range)));
+                e.preventDefault(); e.stopPropagation();
+            }, { passive: false });
+            const end = () => { if (!dragging) return; dragging = false; bar.style.width = '6px'; bar.style.background = 'rgba(255,255,255,0.4)'; fade(); };
+            thumb.addEventListener('touchend', end); thumb.addEventListener('touchcancel', end);
+            document.body.appendChild(thumb);
+        }
+        function fade() { clearTimeout(fadeT); fadeT = setTimeout(() => { if (thumb && !dragging) thumb.style.opacity = '0.35'; }, 1200); }
+        function hide() { if (thumb) thumb.style.display = 'none'; }
+        function update() {
+            if (!sc || !eligible(sc)) { hide(); return; }
+            ensure();
+            const g = geom();
+            const pos = g.scroller.scrollTop / g.max;
+            thumb.style.display = 'block';
+            thumb.style.height = g.thumbH + 'px';
+            thumb.style.top = (g.top + (g.trackH - g.thumbH) * Math.min(1, Math.max(0, pos))) + 'px';
+            if (!dragging) { thumb.style.opacity = '0.9'; fade(); }
+        }
+        document.addEventListener('scroll', (e) => {
+            const t = e.target;
+            const el = (t === document) ? (document.scrollingElement || document.documentElement) : t;
+            if (!(el instanceof Element)) return;
+            if (!eligible(el)) { if (el === sc) hide(); return; }
+            sc = el; update();
+        }, true);
+        tick = setInterval(() => { if (sc) update(); }, 700);
+    })();
     // ── Odznak "Shlédnuto (Histra)" ──
     function applyHistraWatchedBadgeStyle(btn, watched) {
         btn.dataset.watched = watched ? '1' : '0';
@@ -5133,6 +5218,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-06h', date: '6. 10. 2026', items: [
+            { admin: true, text: 'Dlouhé seznamy (ve výchozím řazení, tedy bez abecední lišty) — u pravého kraje obrazovky je jezdec: chyť ho prstem a táhni pro rychlé posouvání nahoru/dolů. Při řazení A–Z zůstává abecední lišta' }
+        ] },
         { version: '2026-10-06g', date: '6. 10. 2026', items: [
             { admin: true, text: 'Abecední lišty (všude v appce) — dají se táhnout prstem jako jezdec: přejedeš po písmenech a seznam se průběžně posouvá, ne jen po klepnutí' }
         ] },
