@@ -4972,6 +4972,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-06c', date: '6. 10. 2026', items: [
+            { admin: true, text: 'Seznamy → Histra — tlačítko „Zpět“ se po klepnutí už neotočí a nezůstane viset (odstraněn hover efekt otáčení)' }
+        ] },
         { version: '2026-10-06b', date: '6. 10. 2026', items: [
             { admin: true, text: 'Seznamy → Histra — opraveno překrývání křížků: plovoucí ✕ aplikace (PWA) se teď při otevřené Histře schová, stejně jako u ostatních celoobrazovkových oken' }
         ] },
@@ -20359,8 +20362,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);">
         <h3 id="histraListsTitle" style="flex:1;min-width:0;margin:0;font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🟣 Histra</h3>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-            <button id="histraListsBack" class="modal-close-btn" onclick="histraListsBack()" style="width:auto;padding:0 12px;height:34px;border-radius:17px;font-size:0.85rem;white-space:nowrap;">← Seznamy</button>
-            <button class="modal-close-btn" onclick="closeHistraListsModal()" title="Zavřít" style="width:34px;height:34px;">✕</button>
+            <button id="histraListsBack" onclick="histraListsBack()" style="background:rgba(255,255,255,0.08);border:1px solid var(--border);color:#fff;cursor:pointer;padding:0 12px;height:34px;border-radius:17px;font:inherit;font-size:0.85rem;white-space:nowrap;display:inline-flex;align-items:center;transform:none;">← Seznamy</button>
+            <button onclick="closeHistraListsModal()" title="Zavřít" style="background:rgba(255,255,255,0.08);border:1px solid var(--border);color:#fff;cursor:pointer;width:34px;height:34px;border-radius:50%;font-size:1rem;display:grid;place-items:center;flex-shrink:0;transform:none;">✕</button>
         </div>
     </div>
     <div id="histraListsBody" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;"></div>
