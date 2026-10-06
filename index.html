@@ -1215,16 +1215,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
 <div class="ts-modal-overlay" id="traktModal" onclick="if(event.target===this)closeTraktModal()">
     <div class="ts-modal">
         <div class="modal-header-row">
-            <h2 id="tsModalHeading">📋 <span style="color:#ed2224;">TRAKT</span><span style="opacity:.4;"> / </span><span style="opacity:.5;">SIMKL</span></h2>
+            <h2 id="tsModalHeading" onclick="tsScrollTop()" title="Zpět nahoru" role="button" style="cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;">📋 <span style="color:#ed2224;">TRAKT</span><span style="opacity:.4;"> / </span><span style="opacity:.5;">SIMKL</span></h2>
             <div style="display:flex;gap:8px;align-items:center;">
                 <button onclick="closeTraktModal();openListsModal();" title="Zpět na Seznamy" style="background:none;border:1px solid var(--border);color:var(--text);padding:0 12px;height:34px;border-radius:17px;cursor:pointer;font-size:0.85rem;">← Seznamy</button>
                 <button class="close-modal-btn" onclick="closeTraktModal()" title="Zavřít">✕</button>
             </div>
         </div>
         <div class="ts-source-tabs" id="tsSourceTabs">
-            <button class="ts-source-btn active" id="tsSrcBtnTrakt" data-src="trakt" onclick="switchTsSource('trakt')">📋 Trakt</button>
-            <button class="ts-source-btn" id="tsSrcBtnSimkl" data-src="simkl" onclick="switchTsSource('simkl')">🎯 Simkl</button>
-            <button class="ts-source-btn" id="tsSrcBtnOwn" data-src="own" onclick="switchTsSource('own')">🧩 Sinator</button>
+            <button class="ts-source-btn active" id="tsSrcBtnTrakt" data-src="trakt" onclick="tsSrcBtnClick('trakt')">📋 Trakt</button>
+            <button class="ts-source-btn" id="tsSrcBtnSimkl" data-src="simkl" onclick="tsSrcBtnClick('simkl')">🎯 Simkl</button>
+            <button class="ts-source-btn" id="tsSrcBtnOwn" data-src="own" onclick="tsSrcBtnClick('own')">🧩 Sinator</button>
         </div>
         <div id="tsNoConnectionMsg" class="empty" style="display:none;padding:40px 20px;text-align:center;">⚙️ Pro zobrazení sledovaného, hodnocení a seznamů se nejdřív připoj alespoň k jedné službě (Trakt, Simkl nebo Sinator) v Nastavení → Klíče.</div>
         <div class="ts-modal-body-scroll">
@@ -5309,7 +5309,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-06i', date: '6. 10. 2026', items: [
-            { admin: true, text: 'Jezdec u pravého kraje opraven — zobrazí se i bez posouvání, širší plocha k chycení (mimo okrajové systémové gesto „zpět“). Funguje i v seznamech s abecední lištou (Sinator apod.): jezdec se jen odsune dovnitř vedle lišty, a když je lišta otevřená, schová se. Při donačítání dalších karet se jezdec už nelepí ke dnu seznamu. Jezdec je menší (pevná výška) a po ~1,5 s bez dotyku se úplně schová; vrátí se při posouvání nebo dotyku u pravého kraje. Histra: nadpis okna je klikatelný a vrátí seznam úplně nahoru (jako u ostatních seznamů). Jezdec je neviditelný (jen tažení u pravého kraje funguje). Jezdec se teď tahá odkudkoli v pruhu u pravého kraje (netřeba trefit samotný jezdec; klepnutí na karty tam funguje dál). Po donačtení dalšího obsahu jezdec skočí doprostřed dráhy (a v hlavní mřížce nezajíždí pod hlavičku s křížkem)' }
+            { admin: true, text: 'Jezdec u pravého kraje opraven — zobrazí se i bez posouvání, širší plocha k chycení (mimo okrajové systémové gesto „zpět“). Funguje i v seznamech s abecední lištou (Sinator apod.): jezdec se jen odsune dovnitř vedle lišty, a když je lišta otevřená, schová se. Při donačítání dalších karet se jezdec už nelepí ke dnu seznamu. Jezdec je menší (pevná výška) a po ~1,5 s bez dotyku se úplně schová; vrátí se při posouvání nebo dotyku u pravého kraje. Trakt/Simkl/Sinator: klik na nadpis nebo na už aktivní záložku zdroje (např. Sinator) vrátí aktuální seznam úplně nahoru. Histra: nadpis okna je klikatelný a vrátí seznam úplně nahoru (jako u ostatních seznamů). Jezdec je neviditelný (jen tažení u pravého kraje funguje). Jezdec se teď tahá odkudkoli v pruhu u pravého kraje (netřeba trefit samotný jezdec; klepnutí na karty tam funguje dál). Po donačtení dalšího obsahu jezdec skočí doprostřed dráhy (a v hlavní mřížce nezajíždí pod hlavičku s křížkem)' }
         ] },
         { version: '2026-10-06h', date: '6. 10. 2026', items: [
             { admin: true, text: 'Dlouhé seznamy (ve výchozím řazení, tedy bez abecední lišty) — u pravého kraje obrazovky je jezdec: chyť ho prstem a táhni pro rychlé posouvání nahoru/dolů. Při řazení A–Z zůstává abecední lišta' }
@@ -6333,6 +6333,18 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         }
     }
     window.switchTsSource = switchTsSource;
+    // Návrat úplně nahoru v aktuálním seznamu (Trakt / Simkl / Sinator) — klik na nadpis nebo na už aktivní záložku zdroje
+    window.tsScrollTop = function() {
+        const m = $('traktModal'); if (!m) return;
+        const cands = [...m.querySelectorAll('.ts-modal-body-scroll, .trakt-modal-body, .ts-modal')];
+        cands.unshift(m);
+        cands.forEach(el => { if (el.scrollTop > 0) el.scrollTo({ top: 0, behavior: 'smooth' }); });
+    };
+    window.tsSrcBtnClick = function(src) {
+        const btn = document.querySelector('#tsSourceTabs .ts-source-btn[data-src="' + src + '"]');
+        if (window._tsSource === src && btn && btn.classList.contains('active')) { window.tsScrollTop(); return; }
+        switchTsSource(src);
+    };
 
     function updateTsSourceTabsVisibility() {
         const hasTrakt = !!state.trakt.accessToken;
