@@ -2758,20 +2758,21 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         }
     }
     function histraRenderItems(title, items, scroll, sortArg) {
-        const sortable = items.some(x => x._w);
+        const sortable = items.length > 0, hasW = items.some(x => x._w);
         const prevV = state._histraView;
         const sort = sortArg || (prevV && prevV.kind === 'items' && prevV.title === title && prevV.sort) || 'default';
         const shown = (sortable && sort === 'az') ? [...items].sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'cs')) : items;
         state._histraView = { kind: 'items', title, items, scroll: 0, sort };
         _hSetHeader('🟣 ' + title, '← Histra');
         const body = $('histraListsBody');
-        if (!items.length) { body.innerHTML = '<div style="text-align:center;padding:40px 10px;color:var(--text-muted);">Seznam je prázdný (nebo se z něj nepodařilo vyčíst TMDB id).</div>'; return; }
-        const sortSel = sortable ? `<select onchange="histraSetSort(this.value)" style="background:var(--bg-elevated);color:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font:inherit;font-size:0.8rem;"><option value="default"${sort === 'default' ? ' selected' : ''}>Výchozí (od nejnověji shlédnutých)</option><option value="az"${sort === 'az' ? ' selected' : ''}>Podle abecedy (A–Z)</option></select>` : '';
+        if (!items.length) { azxDetach(); body.innerHTML = '<div style="text-align:center;padding:40px 10px;color:var(--text-muted);">Seznam je prázdný (nebo se z něj nepodařilo vyčíst TMDB id).</div>'; return; }
+        const sortSel = sortable ? `<select onchange="histraSetSort(this.value)" style="background:var(--bg-elevated);color:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font:inherit;font-size:0.8rem;"><option value="default"${sort === 'default' ? ' selected' : ''}>${hasW ? 'Výchozí (od nejnověji shlédnutých)' : 'Výchozí'}</option><option value="az"${sort === 'az' ? ' selected' : ''}>Podle abecedy (A–Z)</option></select>` : '';
         body.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><div style="font-weight:700;color:var(--text-muted);">${items.length} položek</div>${sortSel}</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">` + shown.map(it => {
             const poster = it.poster_path ? (String(it.poster_path).startsWith('http') ? it.poster_path : `https://image.tmdb.org/t/p/w500${it.poster_path}`) : '';
-            return `<div onclick="openDetailFromHistra(${it.id},'${it.type}')" style="cursor:pointer;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;overflow:hidden;">${poster ? `<img src="${poster}" loading="lazy" style="width:100%;aspect-ratio:2/3;object-fit:cover;display:block;">` : `<div style="width:100%;aspect-ratio:2/3;display:grid;place-items:center;font-size:2rem;background:var(--bg-dark);">${it.type === 'tv' ? '📺' : '🎬'}</div>`}<div style="padding:8px 10px;"><div style="font-weight:700;font-size:0.85rem;line-height:1.25;">${_hEsc(it.title || ('#' + it.id))}</div><div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">${it.type === 'tv' ? '📺' : '🎬'} ${_hEsc(it.year || '')}</div></div></div>`;
+            return `<div data-az="${_hEsc(it.title || '')}" onclick="openDetailFromHistra(${it.id},'${it.type}')" style="cursor:pointer;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;overflow:hidden;">${poster ? `<img src="${poster}" loading="lazy" style="width:100%;aspect-ratio:2/3;object-fit:cover;display:block;">` : `<div style="width:100%;aspect-ratio:2/3;display:grid;place-items:center;font-size:2rem;background:var(--bg-dark);">${it.type === 'tv' ? '📺' : '🎬'}</div>`}<div style="padding:8px 10px;"><div style="font-weight:700;font-size:0.85rem;line-height:1.25;">${_hEsc(it.title || ('#' + it.id))}</div><div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">${it.type === 'tv' ? '📺' : '🎬'} ${_hEsc(it.year || '')}</div></div></div>`;
         }).join('') + '</div>';
         body.scrollTop = scroll || 0;
+        azxSync(sort === 'az', body);
     }
     window.histraOpenWatchlist = function() { histraLoadItems('Watchlist', () => histraFetchAllPaged('/api/v1/watchlist?extended=full&lang=cs-CZ', 100, 30)); };
     window.histraOpenList = function(i) {
@@ -2943,6 +2944,90 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             _hToast('🗑️ Odebráno z rozkoukaných (Histra)');
         } catch (e) { _hToast('❌ ' + _hErr(e)); }
     };
+
+    // ══ Posuvná lišta s abecedou pro všechny seznamy s řazením A–Z (stejná jako u Shlédnutých) ══
+    (function() {
+        let trigger = null, bar = null, timer = null, docHandler = null;
+        function norm(t) {
+            const m = String(t || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').match(/[A-Za-z0-9]/);
+            if (!m) return '#';
+            const ch = m[0].toUpperCase();
+            return /[A-Z]/.test(ch) ? ch : '#';
+        }
+        function findScroller(el) {
+            let p = el;
+            while (p && p !== document.body && p !== document.documentElement) {
+                const o = getComputedStyle(p).overflowY;
+                if ((o === 'auto' || o === 'scroll') && p.scrollHeight > p.clientHeight + 2) return p;
+                p = p.parentElement;
+            }
+            return null;
+        }
+        window.azxDetach = function() {
+            if (trigger) trigger.remove();
+            if (bar) bar.remove();
+            trigger = bar = null;
+            if (timer) { clearInterval(timer); timer = null; }
+            if (docHandler) { document.removeEventListener('pointerdown', docHandler, true); docHandler = null; }
+        };
+        window.azxAttach = function(container) {
+            azxDetach();
+            if (!container) return;
+            const cards = [...container.querySelectorAll('.card, [data-az]')];
+            if (cards.length < 8) return;
+            const first = {};
+            cards.forEach(c => {
+                const t = (c.querySelector('.card-title') || {}).textContent || c.dataset.az || '';
+                const l = norm(t);
+                if (!(l in first)) first[l] = c;
+            });
+            const letters = Object.keys(first).sort((a, b) => a === '#' ? -1 : b === '#' ? 1 : a.localeCompare(b));
+            const go = (card) => {
+                const sc = findScroller(container);
+                if (sc) sc.scrollTop += card.getBoundingClientRect().top - sc.getBoundingClientRect().top - 4;
+                else card.scrollIntoView({ block: 'start' });
+            };
+            trigger = document.createElement('div');
+            trigger.className = 'watched-az-trigger';
+            trigger.style.zIndex = '5001';
+            bar = document.createElement('div');
+            bar.className = 'watched-az-bar';
+            bar.style.zIndex = '5002';
+            const mk = (label, fn, style) => {
+                const a = document.createElement('a');
+                a.textContent = label;
+                if (style) a.style.cssText = style;
+                a.addEventListener('click', (e) => { e.preventDefault(); fn(); bar.classList.remove('visible'); });
+                bar.appendChild(a);
+            };
+            mk('↑', () => { const sc = findScroller(container); if (sc) sc.scrollTop = 0; }, 'color:#1db954;font-size:0.8rem;');
+            letters.forEach(l => mk(l, () => go(first[l])));
+            const show = () => bar.classList.add('visible');
+            trigger.addEventListener('touchstart', show, { passive: true });
+            trigger.addEventListener('click', show);
+            docHandler = (e) => { if (bar && !bar.contains(e.target) && e.target !== trigger) bar.classList.remove('visible'); };
+            document.addEventListener('pointerdown', docHandler, true);
+            document.body.appendChild(trigger);
+            document.body.appendChild(bar);
+            // lišta zmizí, když se seznam zavře / překreslí bez položek
+            timer = setInterval(() => {
+                if (!container.isConnected || container.getClientRects().length === 0 || !container.querySelector('.card, [data-az]')) azxDetach();
+            }, 800);
+        };
+        window.azxSync = function(isAz, container) { if (isAz) azxAttach(container); else azxDetach(); };
+    })();
+    (function() {
+        const o1 = renderMyBackendGrid;
+        renderMyBackendGrid = function() { const r = o1.apply(this, arguments); try { const s = $('myBackendSortSelect'); azxSync(!!s && s.value === 'alpha_asc', $('myBackendResultsContainer')); } catch (e) {} return r; };
+        const o2 = renderRatedMoviesGrid;
+        renderRatedMoviesGrid = function() { const r = o2.apply(this, arguments); try { azxSync(window._ratedMoviesSortMode === 'alpha_asc', $('ratedMoviesResultsContainer')); } catch (e) {} return r; };
+        const o3 = renderRatedShowsGrid;
+        renderRatedShowsGrid = function() { const r = o3.apply(this, arguments); try { azxSync(window._ratedShowsSortMode === 'alpha_asc', $('ratedShowsResultsContainer')); } catch (e) {} return r; };
+        const o4 = _renderWatchingGrid;
+        _renderWatchingGrid = function(container, items, mode) { const r = o4.apply(this, arguments); try { azxSync(mode === 'az', container); } catch (e) {} return r; };
+        const o5 = _renderMoviesProgressGrid;
+        _renderMoviesProgressGrid = function(grid, items, mode) { const r = o5.apply(this, arguments); try { azxSync(mode === 'az', grid); } catch (e) {} return r; };
+    })();
 
     // ── Odznak "Shlédnuto (Histra)" ──
     function applyHistraWatchedBadgeStyle(btn, watched) {
@@ -5007,6 +5092,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-06f', date: '6. 10. 2026', items: [
+            { admin: true, text: 'Posuvná lišta s abecedou (stejná jako u Shlédnutých) je teď u všech seznamů s řazením A–Z: Sinator seznamy/watchlist/historie, Hodnocené filmy a seriály, Rozkoukané (seriály i filmy) a Histra seznamy. Řazení A–Z přibylo ke všem Histra seznamům (Watchlist, vlastní seznamy, rozkoukané)' }
+        ] },
         { version: '2026-10-06e', date: '6. 10. 2026', items: [
             { admin: true, text: 'Histra → Shlédnuté filmy/seriály — už neobsahují rozkoukané (jen dokoukané) a přibylo řazení: Výchozí (od nejnověji shlédnutých) nebo Podle abecedy A–Z' }
         ] },
