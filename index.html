@@ -3149,32 +3149,27 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             if (thumb) return;
             thumb = document.createElement('div');
             thumb.id = 'fastScrollThumb';
-            // Dotyková plocha je široká 56 px a sahá dovnitř od kraje — kraj displeje zabírá systémové gesto „zpět“
-            thumb.style.cssText = 'position:fixed;right:0;width:48px;z-index:5003;display:none;opacity:0;pointer-events:none;touch-action:none;transition:opacity .25s;-webkit-tap-highlight-color:transparent;';
+            // Jezdec je jen ukazatel (nechytá dotyky); tahá se pruhem u kraje — viz níže
+            thumb.style.cssText = 'position:fixed;right:0;width:48px;z-index:5003;display:none;opacity:0;pointer-events:none;transition:opacity .25s;-webkit-tap-highlight-color:transparent;';
             bar = document.createElement('div');
             bar.style.cssText = 'position:absolute;right:14px;top:0;bottom:0;width:8px;border-radius:4px;background:rgba(255,255,255,0.55);box-shadow:0 0 0 1px rgba(0,0,0,0.5);transition:width .15s,background .15s;pointer-events:none;';
             thumb.appendChild(bar);
-            const start = (y) => { dragging = true; startY = y; setDrag(true); thumb.style.opacity = '1'; };
-            // Přírůstkově: každý pohyb prstu posune seznam o díl aktuální délky — když se dolní konec seznamu
-            // prodlouží (donačtení dalších karet), seznam se nepřilepí ke dnu a jde dál volně rolovat
-            const move = (y) => {
-                const g = geom();
-                const range = Math.max(g.trackH - g.thumbH, 1);
-                const dy = y - startY; startY = y;
-                g.scroller.scrollTop = Math.min(g.max, Math.max(0, g.scroller.scrollTop + dy * (g.max / range)));
-                if (g.sh > lastSh + 40) { vpos = 0.5; lastSh = g.sh; } else vpos = Math.min(1, Math.max(0, vpos + dy / range));
-                lastTop = g.scroller.scrollTop;
-                placeThumb();
-            };
-            const end = () => { if (!dragging) return; dragging = false; setDrag(false); fade(); };
-            thumb.addEventListener('touchstart', (e) => { if (!sc || !e.touches[0]) return; start(e.touches[0].clientY); e.preventDefault(); e.stopPropagation(); }, { passive: false });
-            thumb.addEventListener('touchmove', (e) => { if (!dragging || !sc || !e.touches[0]) return; move(e.touches[0].clientY); e.preventDefault(); e.stopPropagation(); }, { passive: false });
-            thumb.addEventListener('touchend', end); thumb.addEventListener('touchcancel', end);
             document.body.appendChild(thumb);
         }
-        function reveal() { if (!thumb) return; thumb.style.opacity = '0.95'; thumb.style.pointerEvents = 'auto'; fade(); }
+        // Přírůstkově: každý pohyb prstu posune seznam o díl aktuální délky — když se dolní konec seznamu
+        // prodlouží (donačtení dalších karet), seznam se nepřilepí ke dnu a jde dál volně rolovat
+        function dragMove(y) {
+            const g = geom();
+            const range = Math.max(g.trackH - g.thumbH, 1);
+            const dy = y - startY; startY = y;
+            g.scroller.scrollTop = Math.min(g.max, Math.max(0, g.scroller.scrollTop + dy * (g.max / range)));
+            if (g.sh > lastSh + 40) { vpos = 0.5; lastSh = g.sh; } else vpos = Math.min(1, Math.max(0, vpos + dy / range));
+            lastTop = g.scroller.scrollTop;
+            placeThumb();
+        }
+        function reveal() { if (!thumb) return; thumb.style.opacity = '0.95'; fade(); }
         // Po chvíli bez dotyku se jezdec úplně schová (a nechytá dotyky); znovu se objeví při posouvání nebo dotyku u pravého kraje
-        function fade() { clearTimeout(fadeT); fadeT = setTimeout(() => { if (thumb && !dragging) { thumb.style.opacity = '0'; thumb.style.pointerEvents = 'none'; } }, 1600); }
+        function fade() { clearTimeout(fadeT); fadeT = setTimeout(() => { if (thumb && !dragging) thumb.style.opacity = '0'; }, 1600); }
         function hide() { if (thumb) thumb.style.display = 'none'; }
         // Poloha jezdce sleduje posouvání; když se seznam prodlouží (donačtení), jezdec skočí zpět nahoru
         function syncPos() {
@@ -3200,11 +3195,40 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             placeThumb();
             if (active) reveal();
         }
+        // Tažení odkudkoli u pravého kraje: stačí začít prstem v pruhu u kraje a táhnout svisle — jezdec nemusíš trefit.
+        // Klepnutí na kartu v tom pruhu funguje dál (tah se převezme až po svislém pohybu).
+        let edge = null;
+        const EDGE_W = 44;
         document.addEventListener('touchstart', (e) => {
-            const t = e.touches && e.touches[0];
-            if (!t || !thumb || thumb.style.display === 'none' || dragging) return;
-            if (t.clientX > window.innerWidth - 44) reveal();
+            edge = null;
+            if (!e.touches || e.touches.length !== 1) return;
+            const t = e.touches[0];
+            if (e.target.closest && e.target.closest('.watched-az-trigger,.main-az-trigger,#collAzTrigger,.watched-az-bar,.main-az-bar,#collAzBar')) return;
+            const right = window.innerWidth - azOffset();
+            if (t.clientX > right || t.clientX < right - EDGE_W) return;
+            if (azBarOpen()) return;
+            const d = discover();
+            if (!d || !eligible(d)) return;
+            sc = d; ensure(); thumb.style.display = 'block'; syncPos(); placeThumb();
+            edge = { x0: t.clientX, y0: t.clientY };
         }, { passive: true, capture: true });
+        document.addEventListener('touchmove', (e) => {
+            const t = e.touches && e.touches[0];
+            if (!t) return;
+            if (!dragging) {
+                if (!edge) return;
+                const dx = t.clientX - edge.x0, dy = t.clientY - edge.y0;
+                if (Math.abs(dx) > 14 && Math.abs(dx) > Math.abs(dy)) { edge = null; return; }
+                if (Math.abs(dy) < 6 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
+                dragging = true; startY = edge.y0; edge = null; setDrag(true); clearTimeout(fadeT); thumb.style.opacity = '0.95';
+            }
+            if (e.cancelable) e.preventDefault();
+            e.stopPropagation();
+            dragMove(t.clientY);
+        }, { passive: false, capture: true });
+        const edgeEnd = () => { edge = null; if (!dragging) return; dragging = false; setDrag(false); fade(); };
+        document.addEventListener('touchend', edgeEnd, { passive: true, capture: true });
+        document.addEventListener('touchcancel', edgeEnd, { passive: true, capture: true });
         document.addEventListener('scroll', (e) => {
             if (dragging) return;
             const t = e.target;
@@ -5285,7 +5309,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-06i', date: '6. 10. 2026', items: [
-            { admin: true, text: 'Jezdec u pravého kraje opraven — zobrazí se i bez posouvání, širší plocha k chycení (mimo okrajové systémové gesto „zpět“). Funguje i v seznamech s abecední lištou (Sinator apod.): jezdec se jen odsune dovnitř vedle lišty, a když je lišta otevřená, schová se. Při donačítání dalších karet se jezdec už nelepí ke dnu seznamu. Jezdec je menší (pevná výška) a po ~1,5 s bez dotyku se úplně schová; vrátí se při posouvání nebo dotyku u pravého kraje. Po donačtení dalšího obsahu jezdec skočí doprostřed dráhy (a v hlavní mřížce nezajíždí pod hlavičku s křížkem)' }
+            { admin: true, text: 'Jezdec u pravého kraje opraven — zobrazí se i bez posouvání, širší plocha k chycení (mimo okrajové systémové gesto „zpět“). Funguje i v seznamech s abecední lištou (Sinator apod.): jezdec se jen odsune dovnitř vedle lišty, a když je lišta otevřená, schová se. Při donačítání dalších karet se jezdec už nelepí ke dnu seznamu. Jezdec je menší (pevná výška) a po ~1,5 s bez dotyku se úplně schová; vrátí se při posouvání nebo dotyku u pravého kraje. Jezdec se teď tahá odkudkoli v pruhu u pravého kraje (netřeba trefit samotný jezdec; klepnutí na karty tam funguje dál). Po donačtení dalšího obsahu jezdec skočí doprostřed dráhy (a v hlavní mřížce nezajíždí pod hlavičku s křížkem)' }
         ] },
         { version: '2026-10-06h', date: '6. 10. 2026', items: [
             { admin: true, text: 'Dlouhé seznamy (ve výchozím řazení, tedy bez abecední lišty) — u pravého kraje obrazovky je jezdec: chyť ho prstem a táhni pro rychlé posouvání nahoru/dolů. Při řazení A–Z zůstává abecední lišta' }
