@@ -3133,7 +3133,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         function geom() {
             const w = isWin(sc);
             const scroller = w ? (document.scrollingElement || document.documentElement) : sc;
-            const r = w ? { top: 0, bottom: window.innerHeight } : sc.getBoundingClientRect();
+            const r = w ? { top: 110, bottom: window.innerHeight - 24 } : sc.getBoundingClientRect(); // u okna je dráha pod hlavičkou (křížek apod.)
             const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, window.innerHeight);
             const trackH = Math.max(bottom - top, 1);
             const ch = scroller.clientHeight || window.innerHeight, sh = scroller.scrollHeight;
@@ -3162,7 +3162,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 const range = Math.max(g.trackH - g.thumbH, 1);
                 const dy = y - startY; startY = y;
                 g.scroller.scrollTop = Math.min(g.max, Math.max(0, g.scroller.scrollTop + dy * (g.max / range)));
-                if (g.sh > lastSh + 40) { vpos = 0; lastSh = g.sh; } else vpos = Math.min(1, Math.max(0, vpos + dy / range));
+                if (g.sh > lastSh + 40) { vpos = 0.5; lastSh = g.sh; } else vpos = Math.min(1, Math.max(0, vpos + dy / range));
                 lastTop = g.scroller.scrollTop;
                 placeThumb();
             };
@@ -3180,7 +3180,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         function syncPos() {
             const g = geom(), st = g.scroller.scrollTop;
             if (sc !== lastSc) { lastSc = sc; lastSh = g.sh; lastTop = st; vpos = st / g.max; }
-            else if (g.sh > lastSh + 40) { vpos = 0; lastSh = g.sh; lastTop = st; }
+            else if (g.sh > lastSh + 40) { vpos = 0.5; lastSh = g.sh; lastTop = st; }
             else { vpos += (st - lastTop) / g.max; lastTop = st; if (g.sh < lastSh) lastSh = g.sh; }
             vpos = Math.min(1, Math.max(0, vpos));
         }
@@ -5285,7 +5285,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-06i', date: '6. 10. 2026', items: [
-            { admin: true, text: 'Jezdec u pravého kraje opraven — zobrazí se i bez posouvání, širší plocha k chycení (mimo okrajové systémové gesto „zpět“). Funguje i v seznamech s abecední lištou (Sinator apod.): jezdec se jen odsune dovnitř vedle lišty, a když je lišta otevřená, schová se. Při donačítání dalších karet se jezdec už nelepí ke dnu seznamu. Jezdec je menší (pevná výška) a po ~1,5 s bez dotyku se úplně schová; vrátí se při posouvání nebo dotyku u pravého kraje. Po donačtení dalšího obsahu jezdec skočí zpět do horní části dráhy' }
+            { admin: true, text: 'Jezdec u pravého kraje opraven — zobrazí se i bez posouvání, širší plocha k chycení (mimo okrajové systémové gesto „zpět“). Funguje i v seznamech s abecední lištou (Sinator apod.): jezdec se jen odsune dovnitř vedle lišty, a když je lišta otevřená, schová se. Při donačítání dalších karet se jezdec už nelepí ke dnu seznamu. Jezdec je menší (pevná výška) a po ~1,5 s bez dotyku se úplně schová; vrátí se při posouvání nebo dotyku u pravého kraje. Po donačtení dalšího obsahu jezdec skočí doprostřed dráhy (a v hlavní mřížce nezajíždí pod hlavičku s křížkem)' }
         ] },
         { version: '2026-10-06h', date: '6. 10. 2026', items: [
             { admin: true, text: 'Dlouhé seznamy (ve výchozím řazení, tedy bez abecední lišty) — u pravého kraje obrazovky je jezdec: chyť ho prstem a táhni pro rychlé posouvání nahoru/dolů. Při řazení A–Z zůstává abecední lišta' }
