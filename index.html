@@ -2096,6 +2096,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <button class="source-btn" id="srcbtn-sledujfilmy" onclick="searchOnSource('sledujfilmy')"><span class="src-status"></span>🎥 SledujFilmy</button>
                 <button class="source-btn" id="srcbtn-fastshare" onclick="searchOnSource('fastshare')"><span class="src-status"></span>⚡ FastShare</button>
                 <button class="source-btn" id="srcbtn-bombuj" onclick="searchOnSource('bombuj')"><span class="src-status"></span>💣 Bombuj.si</button>
+                <button class="source-btn" id="srcbtn-uzisi" onclick="searchOnSource('uzisi')"><span class="src-status"></span>🎯 Uzi.si</button>
+                <button class="source-btn" id="srcbtn-sktorrent" onclick="searchOnSource('sktorrent')"><span class="src-status"></span>🧲 SKTorrent</button>
             </div>
             <div class="sources-section-title" style="margin-top:18px;">📦 Ostatní</div>
             <div class="sources-grid">
@@ -5310,6 +5312,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     const CHANGELOG_HISTORY = [
         { version: '2026-10-07a', date: '7. 10. 2026', items: [
             'Tematické seznamy 2 — nová položka 🏎️ Auta: filmy, kde auta hrají významnou roli (závody, honičky, muscle cary, street racing…)',
+            'Kde přehrát — nový zdroj 🧲 SKTorrent (online.sktorrent.eu), vyhledávání podle názvu',
+            'Kde přehrát — nový zdroj 🎯 Uzi.si (ww4.click/uzisi). Hledání se v něm nedá předvyplnit, proto se po klepnutí zkopíruje název filmu do schránky a otevře se web — název stačí vložit do vyhledávání',
             'Tematické seznamy 2 — Dekády: nejlepší filmy 60. let, 70. let, 80. let, 90. let, 2000–2009, 2010–2019 a 2020–současnost (řazeno podle hodnocení)',
             'Tematické seznamy 2 — 26 nových témat: Špioni, Detektivky a whodunit, Soudní dramata, Katastrofické filmy, Válečné filmy, Časová smyčka, Found footage a folk horror, Neo-noir, Černá komedie a satira, Coming of age, Přežití, Pomsta, Piráti, Bojová umění, Vikingové/gladiátoři/samurajové, Kouzla a draci, Psi a zvířata, Motorky, Letectví, Kaiju, Tanec, Vaření a restaurace, Halloween, České komedie, Československé klasiky před 1990 a Slovenské filmy'
         ] },
@@ -7481,6 +7485,11 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             'streamimdb': `https://streamimdb.ru/search?q=${title}`,
             '123moviesfree': `https://ww8.123moviesfree.net/?s=${title}`,
             'bombuj': (()=>{ const tp=state.currentSearchType||'movie'; const raw=tp==='tv'?(state.currentSearchOrigTitle||state.currentSearchTitle||''):(state.currentSearchTitle||''); const s=raw.toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); if(tp==='tv') return `https://serialy.bombuj.si/serial-${slug}#serial`; const yr=state.currentSearchYear||''; return `https://www.bombuj.si/online-film-${slug}${yr?'-'+yr:''}`; })(),
+            // Uzi.si (zrcadlo ww4.click): výsledky se zobrazují na stejné adrese bez parametru v URL,
+            // takže hledání nejde předvyplnit — otevře se stránka a název se zkopíruje do schránky.
+            'uzisi': 'https://ww4.click/uzisi/',
+            // SKTorrent: /search/videos?search_query={název} (formát potvrzen uživatelem)
+            'sktorrent': `https://online.sktorrent.eu/search/videos?search_query=${title}`,
             'uzila': `https://uzi.la/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}`,
             'mrkaj': `https://mrkaj.me/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}?t=${state.currentSearchType==='tv'?'s':'m'}`,
             'openloadmovies': `https://openloadmovies.live/?s=${title}`,
@@ -7501,6 +7510,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const urls = getAllSourceUrls();
         if(source === 'hellspy') {
             window.openHellspy(urls['hellspy']);
+        } else if(source === 'uzisi') {
+            const t = state.currentSearchTitle || '';
+            try { if (navigator.clipboard && t) navigator.clipboard.writeText(t).then(() => { try { if (typeof showToast === 'function') showToast('📋 Název zkopírován — vlož ho do hledání'); } catch(e) {} }, () => {}); } catch(e) {}
+            window.open(urls['uzisi'], '_blank');
         } else if(urls[source]) {
             window.open(urls[source], '_blank');
         }
