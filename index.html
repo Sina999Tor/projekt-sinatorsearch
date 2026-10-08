@@ -2,6 +2,38 @@
 <!-- BUILD: 2026-10-01T17:05:00Z -->
 <html lang="cs">
 <head>
+    <script>
+    // ── TEST: běžný uživatel (Admin level 2) ─────────────────────────────────
+    // Když je zapnuto, appka vidí jen TMDB klíč (+ přístup/identitu zařízení, aby nezamkla admina).
+    // Všechno ostatní (AI klíče, Sinator backend, Histra, Trakt/Simkl, admin režim, nastavení, cache…)
+    // se čte jako prázdné a zápisy jdou jen do paměti — skutečná data v telefonu se nemění.
+    // Musí běžet úplně první, před ostatními skripty, proto je to tady v <head>.
+    (function () {
+        var FLAG = 'sinator_test_user_mode', on = false;
+        try { on = window.localStorage.getItem(FLAG) === '1'; } catch (e) {}
+        window._testUserMode = on;
+        if (!on) return;
+        var PASS = {};
+        ['sinator_tmdb_api_key', FLAG,
+         'sinator_access_granted', 'sinator_access_nick', 'sinator_device_id', 'sinator_user_nick', 'sinator_d_nick',
+         'sinator_app_unlocked', 'sinator_pwd_never_required', 'sinator_pwd_always_required'].forEach(function (k) { PASS[k] = 1; });
+        var sand = { local: {}, session: {} }, P = Storage.prototype;
+        var g = P.getItem, st = P.setItem, rm = P.removeItem, cl = P.clear;
+        function which(o) { try { return o === window.localStorage ? 'local' : 'session'; } catch (e) { return 'session'; } }
+        P.getItem = function (k) { k = String(k); if (PASS[k]) return g.call(this, k); var m = sand[which(this)]; return Object.prototype.hasOwnProperty.call(m, k) ? m[k] : null; };
+        P.setItem = function (k, v) { k = String(k); if (PASS[k]) return st.call(this, k, v); sand[which(this)][k] = String(v); };
+        P.removeItem = function (k) { k = String(k); if (PASS[k]) return rm.call(this, k); delete sand[which(this)][k]; };
+        P.clear = function () { sand[which(this)] = {}; };
+        document.addEventListener('DOMContentLoaded', function () {
+            var b = document.createElement('div');
+            b.id = 'testUserBanner';
+            b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:2147483000;display:flex;align-items:center;gap:10px;background:#7a3b00;color:#fff;border:1px solid #ffb347;border-radius:999px;padding:7px 8px 7px 14px;font:600 12px/1.2 Inter,system-ui,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,0.6);max-width:94vw;';
+            b.innerHTML = '<span>🧪 TEST: běžný uživatel (jen TMDB klíč)</span><button style="background:#ffb347;color:#000;border:0;border-radius:999px;padding:6px 12px;font:700 12px Inter,system-ui,sans-serif;cursor:pointer;">Ukončit</button>';
+            b.querySelector('button').onclick = function () { try { window.localStorage.removeItem(FLAG); } catch (e) {} location.reload(); };
+            document.body.appendChild(b);
+        });
+    })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0a0a0a" id="theme-color-meta">
@@ -1839,6 +1871,18 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 Přehled a správa uživatelů (zobrazení, úpravy, mazání) jsou dostupné jen pro Admin level 2.
             </div>
             <div class="settings-divider"></div>
+            <div class="settings-section" id="testUserModeBox" style="display:none;background:rgba(255,179,71,0.07);border:1px solid rgba(255,179,71,0.35);border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+                <span class="settings-label" style="color:#ffb347;">🧪 TEST: běžný uživatel</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 10px;line-height:1.4;">
+                    Po zapnutí se appka načte jako čistý nový uživatel, který má jen platný TMDB klíč: bez AI klíčů, propojení Sinatoru, Histry, Traktu a Simklu, bez admin režimu a bez uložených nastavení. Skutečná data v telefonu se nemění (změny v testu se po ukončení zahodí). Vypnout jde pruhem „Ukončit“ dole na obrazovce. Zápisy do sdílených služeb (např. Firebase) mohou projít normálně.
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div onclick="toggleTestUserMode()" id="testUserToggle" style="width:44px;height:24px;border-radius:12px;background:#333;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
+                        <div id="testUserToggleKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;pointer-events:none;"></div>
+                    </div>
+                    <div style="font-size:0.88rem;color:#eee;font-weight:600;">Režim TEST — běžný uživatel</div>
+                </div>
+            </div>
             <div class="settings-section" id="tvBrokenSettingsBox" style="display:none;background:rgba(229,9,20,0.06);border:1px solid rgba(229,9,20,0.2);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:#ff6b6b;">🚫 Značení nefunkčních TV streamů</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 10px;line-height:1.4;">
@@ -5387,6 +5431,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     const CHANGELOG_HISTORY = [
         { version: '2026-10-07a', date: '7. 10. 2026', items: [
             'Tematické seznamy 2 — nová položka 🏎️ Auta: filmy, kde auta hrají významnou roli (závody, honičky, muscle cary, street racing…)',
+            'Admin level 2 — nový přepínač 🧪 TEST: běžný uživatel. Appka se načte jako čistý nový uživatel jen s TMDB klíčem (bez AI klíčů, Sinatoru, Histry, Traktu, admin režimu a uložených nastavení); skutečná data se nemění. Ukončení pruhem „Ukončit“ dole.',
             'Histra — ve všech seznamech jsou shlédnuté filmy a seriály označené zeleným ✓ (podle historie Histry a Sinatoru); u seriálů navíc modře poslední shlédnutá řada a epizoda (např. S2E5). Shlédnuté se jednou načtou z celé historie naráz, uloží do telefonu a pak se doplňují samy při každém zápisu — netřeba otevírat jednotlivé tituly; tlačítko 🔄 ✓ v seznamu je znovu načte ručně',
             'Kde přehrát — nový zdroj 🧲 SKTorrent (online.sktorrent.eu), vyhledávání podle názvu',
             'Kde přehrát — nový zdroj 🎯 Uzi.si (ww4.click/uzisi). Hledání se v něm nedá předvyplnit, proto se po klepnutí zkopíruje název filmu do schránky a otevře se web — název stačí vložit do vyhledávání',
@@ -43394,6 +43439,12 @@ async function sha256(str) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
+window.toggleTestUserMode = function() {
+  if (!window._isAdminLevel2()) return;
+  if (!confirm('Zapnout TEST: běžný uživatel?\n\nAppka se znovu načte jako čistý nový uživatel jen s TMDB klíčem (bez AI klíčů, Sinatoru, Histry, Traktu, admin režimu). Ukončit jde pruhem dole.')) return;
+  try { localStorage.setItem('sinator_test_user_mode', '1'); } catch (e) {}
+  location.reload();
+};
 window._isAdminLevel2 = function() {
   return localStorage.getItem('sinator_admin_mode') === '1' && localStorage.getItem('sinator_admin_level') === '2';
 };
@@ -43470,6 +43521,7 @@ function updateAdminStatus() {
   // Přepínač "Značení nefunkčních TV streamů" — vidí a mění jen Admin level 2
   const tvBrokenBox = document.getElementById('tvBrokenSettingsBox');
   if (tvBrokenBox) tvBrokenBox.style.display = isLvl2 ? 'block' : 'none';
+  const testBox = document.getElementById('testUserModeBox'); if (testBox) testBox.style.display = isLvl2 ? 'block' : 'none';
   if (isLvl2 && typeof window._updateTvBrokenToggleUI === 'function') window._updateTvBrokenToggleUI();
   // Sekce "Správa IPTV kanálů" — vidí jen Admin level 2
   const tvChAdminBox = document.getElementById('tvChannelAdminSettingsBox');
