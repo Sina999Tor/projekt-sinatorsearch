@@ -5431,6 +5431,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     const CHANGELOG_HISTORY = [
         { version: '2026-10-07a', date: '7. 10. 2026', items: [
             'Tematické seznamy 2 — nová položka 🏎️ Auta: filmy, kde auta hrají významnou roli (závody, honičky, muscle cary, street racing…)',
+            'České a slovenské tematické seznamy (České komedie, Slovenské filmy, Československé klasiky, Nejlepší české a slovenské filmy, včetně rozšířeného hledání v prvních seznamech) teď berou jen skutečně českou/slovenskou tvorbu: původní země i původní jazyk musí sedět (česky resp. slovensky mluvené), takže zmizely zahraniční filmy natáčené nebo koprodukované u nás',
             'Admin level 2 — nový přepínač 🧪 TEST: běžný uživatel. Appka se načte jako čistý nový uživatel jen s TMDB klíčem (bez AI klíčů, Sinatoru, Histry, Traktu, admin režimu a uložených nastavení); skutečná data se nemění. Ukončení pruhem „Ukončit“ dole.',
             'Histra — ve všech seznamech jsou shlédnuté filmy a seriály označené zeleným ✓ (podle historie Histry a Sinatoru); u seriálů navíc modře poslední shlédnutá řada a epizoda (např. S2E5). Shlédnuté se jednou načtou z celé historie naráz, uloží do telefonu a pak se doplňují samy při každém zápisu — netřeba otevírat jednotlivé tituly; tlačítko 🔄 ✓ v seznamu je znovu načte ručně',
             'Kde přehrát — nový zdroj 🧲 SKTorrent (online.sktorrent.eu), vyhledávání podle názvu',
@@ -19038,8 +19039,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             if (st._broadened) {
                 const base = `${BASE}/discover/${st.theme.type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=popularity.desc`;
                 const [cz, sk] = await Promise.all([
-                    fetch(`${base}&with_origin_country=CZ&page=${nextPage}`).then(r=>r.json()),
-                    fetch(`${base}&with_origin_country=SK&page=${nextPage}`).then(r=>r.json())
+                    fetch(`${base}&with_origin_country=CZ&with_original_language=cs&page=${nextPage}`).then(r=>r.json()),
+                    fetch(`${base}&with_origin_country=SK&with_original_language=sk&page=${nextPage}`).then(r=>r.json())
                 ]);
                 const merged = [...(cz.results||[]), ...(sk.results||[])];
                 const uniq = []; const ids = new Set();
@@ -19056,8 +19057,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             if (nextPage === 1 && st.theme.broaden === 'czsk' && (data.total_results || 0) < (st.theme.minResults || 0)) {
                 const base = `${BASE}/discover/${st.theme.type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=popularity.desc`;
                 const [cz, sk] = await Promise.all([
-                    fetch(`${base}&with_origin_country=CZ&page=1`).then(r=>r.json()),
-                    fetch(`${base}&with_origin_country=SK&page=1`).then(r=>r.json())
+                    fetch(`${base}&with_origin_country=CZ&with_original_language=cs&page=1`).then(r=>r.json()),
+                    fetch(`${base}&with_origin_country=SK&with_original_language=sk&page=1`).then(r=>r.json())
                 ]);
                 const merged = [...(cz.results||[]), ...(sk.results||[])];
                 const uniq = [];
@@ -19146,9 +19147,9 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         { emoji:'💃', name:'Tanec', type:'movie', keywordTerms:['dance','dancing','ballet','dancer'], params:'sort_by=popularity.desc&vote_count.gte=30' },
         { emoji:'🍳', name:'Vaření a restaurace', type:'movie', keywordTerms:['cooking','chef','restaurant'], params:'sort_by=popularity.desc&vote_count.gte=30' },
         { emoji:'🎃', name:'Halloween', type:'movie', keywordTerms:['halloween'], params:'sort_by=popularity.desc&vote_count.gte=10' },
-        { emoji:'🇨🇿', name:'České komedie', type:'movie', params:'with_origin_country=CZ&with_genres=35&sort_by=popularity.desc&vote_count.gte=3' },
-        { emoji:'🎞️', name:'Československé klasiky před 1990', type:'movie', params:'with_origin_country=CZ|SK|CS&primary_release_date.lte=1989-12-31&sort_by=vote_average.desc&vote_count.gte=10' },
-        { emoji:'🇸🇰', name:'Slovenské filmy', type:'movie', params:'with_origin_country=SK&sort_by=popularity.desc&vote_count.gte=3' },
+        { emoji:'🇨🇿', name:'České komedie', type:'movie', params:'with_origin_country=CZ&with_original_language=cs&with_genres=35&sort_by=popularity.desc&vote_count.gte=3' },
+        { emoji:'🎞️', name:'Československé klasiky před 1990', type:'movie', params:'with_origin_country=CZ|CS&with_original_language=cs&primary_release_date.lte=1989-12-31&sort_by=vote_average.desc&vote_count.gte=10', paramVariants:['with_origin_country=CZ|CS&with_original_language=cs&primary_release_date.lte=1989-12-31&sort_by=vote_average.desc&vote_count.gte=10','with_origin_country=SK|CS&with_original_language=sk&primary_release_date.lte=1989-12-31&sort_by=vote_average.desc&vote_count.gte=3'] },
+        { emoji:'🇸🇰', name:'Slovenské filmy', type:'movie', params:'with_origin_country=SK&with_original_language=sk&sort_by=popularity.desc&vote_count.gte=3' },
         { emoji:'📻', name:'Nejlepší filmy 60. let', type:'movie', params:'primary_release_date.gte=1960-01-01&primary_release_date.lte=1969-12-31&sort_by=vote_average.desc&vote_count.gte=300' },
         { emoji:'🕺', name:'Nejlepší filmy 70. let', type:'movie', params:'primary_release_date.gte=1970-01-01&primary_release_date.lte=1979-12-31&sort_by=vote_average.desc&vote_count.gte=500' },
         { emoji:'📼', name:'Nejlepší filmy 80. let', type:'movie', params:'primary_release_date.gte=1980-01-01&primary_release_date.lte=1989-12-31&sort_by=vote_average.desc&vote_count.gte=800' },
@@ -19164,7 +19165,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         { emoji:'🦸', name:'MCU – Marvel Studios', type:'movie', params:'with_companies=420&sort_by=popularity.desc&vote_count.gte=0' },
         { emoji:'🦕', name:'Dinosauři', type:'movie', keywordTerm:'dinosaur', params:'primary_release_date.gte=1980-01-01&sort_by=popularity.desc&vote_count.gte=10' },
         { emoji:'🎭', name:'Nejlepší komedie 1980–současnost', type:'movie', params:'with_genres=35&primary_release_date.gte=1980-01-01&sort_by=vote_average.desc&vote_count.gte=100' },
-        { emoji:'🇨🇿🇸🇰', name:'Nejlepší české a slovenské filmy 1980–současnost', type:'movie', params:'with_origin_country=CZ|SK&primary_release_date.gte=1980-01-01&sort_by=vote_average.desc&vote_count.gte=5' },
+        { emoji:'🇨🇿🇸🇰', name:'Nejlepší české a slovenské filmy 1980–současnost', type:'movie', params:'with_origin_country=CZ&with_original_language=cs&primary_release_date.gte=1980-01-01&sort_by=vote_average.desc&vote_count.gte=5', paramVariants:['with_origin_country=CZ&with_original_language=cs&primary_release_date.gte=1980-01-01&sort_by=vote_average.desc&vote_count.gte=5','with_origin_country=SK&with_original_language=sk&primary_release_date.gte=1980-01-01&sort_by=vote_average.desc&vote_count.gte=3'] },
         { emoji:'👻', name:'Nejlepší horory 1980–současnost', type:'movie', params:'with_genres=27&primary_release_date.gte=1980-01-01&sort_by=vote_average.desc&vote_count.gte=100' },
         { emoji:'🎬', name:'Podle skutečných událostí', type:'movie', params:'with_keywords=9672&primary_release_date.gte=1980-01-01&sort_by=popularity.desc&vote_count.gte=20' },
         { emoji:'😢', name:'Dojemné', type:'movie', params:'with_genres=18&sort_by=vote_average.desc&vote_count.gte=300' },
@@ -19344,8 +19345,18 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         const nextPage = st.page + 1;
         try {
             if (!st.resolvedParams) st.resolvedParams = await _theme2Params(st.theme);
-            const url = `${BASE}/discover/${st.theme.type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&${st.resolvedParams}&page=${nextPage}`;
-            const data = await fetch(url).then(r=>r.json());
+            const mk = (pr) => `${BASE}/discover/${st.theme.type}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&${pr}&page=${nextPage}`;
+            let data;
+            if (st.theme.paramVariants) {
+                // Víc samostatných dotazů najednou (např. česky mluvené + slovensky mluvené) → sloučit bez duplicit
+                const parts = await Promise.all(st.theme.paramVariants.map(pr => fetch(mk(pr)).then(r=>r.json()).catch(() => ({ results: [] }))));
+                const byId = new Map();
+                parts.forEach(d => (d.results||[]).forEach(it => { if (!byId.has(it.id)) byId.set(it.id, it); }));
+                const sortKey = /sort_by=vote_average/.test(st.theme.paramVariants[0]) ? 'vote_average' : 'popularity';
+                data = { page: nextPage, total_pages: Math.max(...parts.map(d => d.total_pages || 1)), results: [...byId.values()].sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0)) };
+            } else {
+                data = await fetch(mk(st.resolvedParams)).then(r=>r.json());
+            }
             st.page = data.page || nextPage;
             st.totalPages = data.total_pages || nextPage;
             const items = (data.results||[]).filter(it => !st.seenIds.has(it.id)).map(it => { st.seenIds.add(it.id); return { ...it, media_type: st.theme.type }; });
