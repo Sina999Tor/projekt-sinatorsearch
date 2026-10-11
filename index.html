@@ -1684,6 +1684,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <button class="settings-full-btn" id="pwaInstallBtn" onclick="installPWA()" style="display:none;margin-top:10px;">📲 Instalovat aplikaci (Android)</button>
                 <div id="pwaInstallInfo" style="font-size:0.7rem; color:var(--text-muted); text-align:center; margin-top:4px; display:none;">Dostupné v Chrome/Edge na Androidu přes HTTPS</div>
 
+                <!-- Přenos TMDB klíče do instalace -->
+                <button class="settings-btn-small" id="pwaCarryKeyBtn" onclick="prepareKeyForInstall()" style="display:none;width:100%;margin-top:10px;">🔑 Přenést můj TMDB klíč do instalace</button>
+                <div id="pwaCarryKeyInfo" style="display:none;font-size:0.7rem;color:var(--text-muted);line-height:1.4;margin-top:4px;">Klíč se na 10 minut přidá do adresy (za #). Když appku přidáš na plochu, vezme si ho s sebou a po prvním spuštění ho nebudeš zadávat znovu. U instalace přes tlačítko výš se to dělá samo.</div>
+
                 <!-- Android, ale prohlížeč ještě nenabídl instalaci automaticky -->
                 <div id="androidManualInstallInfo" style="display:none;background:rgba(0,180,216,0.08);border:1px solid rgba(0,180,216,0.25);border-radius:10px;padding:12px;margin-top:10px;font-size:0.8rem;line-height:1.7;color:var(--text-main);">
                     <b>🤖 Instalace na Androidu (ručně):</b><br>
@@ -1721,6 +1725,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     <button class="settings-btn-small" onclick="inviteViaMessenger()" style="flex:1;min-width:120px;">💬 Messenger</button>
                     <button class="settings-btn-small" onclick="inviteViaWhatsApp()" style="flex:1;min-width:120px;">🟢 WhatsApp</button>
                     <button class="settings-btn-small" onclick="copyInviteLink()" style="flex:1;min-width:120px;">📋 Kopírovat odkaz</button>
+                </div>
+                <div id="inviteKeyRow" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(255,179,71,0.08);border:1px solid rgba(255,179,71,0.35);border-radius:10px;">
+                    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:0.8rem;color:#eee;line-height:1.4;">
+                        <input type="checkbox" id="inviteWithKey" onchange="inviteKeyToggled(this)" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;">
+                        <span>🔑 Přidat do odkazu můj TMDB klíč<br><span style="font-size:0.7rem;color:var(--text-muted);">Kamarád ho bude mít po otevření odkazu rovnou vyplněný (jen pokud žádný nemá). Klíč je v odkazu za <b>#</b>, takže nejde na server. Kdokoli s odkazem ho ale uvidí.</span></span>
+                    </label>
                 </div>
                 <div id="inviteLinkPreview" style="font-size:0.7rem;color:var(--text-muted);opacity:0.7;margin-top:8px;word-break:break-all;"></div>
             </div>
@@ -2293,6 +2303,38 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         }
     };
 
+    // Pozvánka s klíčem: odkaz …/#tmdb=KLÍČ uloží TMDB klíč (jen když žádný ještě není) a hned smaže hash z adresy
+    (function() {
+        try {
+            var m = (location.hash || '').match(/[#&]tmdb=([A-Za-z0-9._-]{32,500})/);
+            if (!m) return;
+            if (!_store.getItem('sinator_tmdb_api_key')) { _store.setItem('sinator_tmdb_api_key', m[1]); window._tmdbFromInvite = true; }
+            var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+            if (standalone) history.replaceState(null, '', location.pathname + location.search);   // v nainstalované appce se hash hned smaže
+            else setTimeout(function() { try { window._carryKeyHash(false); } catch (e) {} }, 10 * 60 * 1000); // v prohlížeči zůstane, aby ho vzala instalace/zástupce; po 10 min zmizí
+        } catch (e) {}
+    })();
+    // Přenos klíče do instalace: když je klíč v adrese (#tmdb=…), vezme si ho i zástupce / iOS „Přidat na plochu“ /
+    // otevření v jiném prohlížeči a při prvním spuštění nainstalované appky se uloží. Manifest zůstává statický.
+    window._carryKeyHash = function(on) {
+        try {
+            var k = (localStorage.getItem('sinator_tmdb_api_key') || '').trim();
+            var base = location.pathname + location.search;
+            if (on && k) {
+                history.replaceState(null, '', base + '#tmdb=' + encodeURIComponent(k));
+                clearTimeout(window._ckT);
+                window._ckT = setTimeout(function() { window._carryKeyHash(false); }, 10 * 60 * 1000);
+                return true;
+            }
+            if (/[#&]tmdb=/.test(location.hash)) history.replaceState(null, '', base);
+        } catch (e) {}
+        return false;
+    };
+    window.prepareKeyForInstall = function() {
+        var ok = window._carryKeyHash(true);
+        var msg = ok ? '🔑 Klíč je připravený k přenosu — teď appku přidej na plochu z menu prohlížeče (platí 10 min)' : '⚠️ Nemáš uložený TMDB klíč';
+        if (typeof showToast === 'function') showToast(msg); else alert(msg);
+    };
     let tmdbApiKey = _store.getItem('sinator_tmdb_api_key') || '';
     let geminiApiKey = _store.getItem('sinator_gemini_api_key') || '';
     let groqApiKey = _store.getItem('sinator_groq_api_key') || '';
@@ -5431,6 +5473,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     const CHANGELOG_HISTORY = [
         { version: '2026-10-07a', date: '7. 10. 2026', items: [
             'Tematické seznamy 2 — nová položka 🏎️ Auta: filmy, kde auta hrají významnou roli (závody, honičky, muscle cary, street racing…)',
+            'Instalace appky: TMDB klíč se přenese do nainstalované verze — v Nastavení → Instalace aplikace je tlačítko 🔑 „Přenést můj TMDB klíč do instalace“ (přidá klíč na 10 min do adresy za #, takže ho zástupce/Přidat na plochu/iOS vezme s sebou a první spuštění ho uloží); u tlačítka Instalovat aplikaci se to dělá samo. Manifest zůstává statický',
+            'Pozvánka s TMDB klíčem (Admin level 2): v Profilu → Pozvat kamaráda je zaškrtávátko „Přidat do odkazu můj TMDB klíč“. Odkaz pak vypadá …/#tmdb=klíč; kamarád po otevření dostane klíč rovnou vyplněný (jen pokud žádný nemá) a adresa se hned vyčistí. Klíč je za #, takže nejde na server, ale kdokoli s odkazem ho uvidí',
             'České a slovenské tematické seznamy (České a slovenské filmy, České pohádky, České komedie, Slovenské filmy, Československé klasiky, Nejlepší české a slovenské filmy, včetně rozšířeného hledání v prvních seznamech) teď berou jen skutečně českou/slovenskou tvorbu: původní země i původní jazyk musí sedět (česky resp. slovensky mluvené), takže zmizely zahraniční filmy natáčené nebo koprodukované u nás. Československé klasiky před 1990 se hledají jen podle původního jazyka (česky/slovensky), protože u starých filmů TMDB často nemá vyplněnou zemi — dříve ukázaly jen 1 film',
             'Admin level 2 — nový přepínač 🧪 TEST: běžný uživatel. Appka se načte jako čistý nový uživatel jen s TMDB klíčem (bez AI klíčů, Sinatoru, Histry, Traktu, admin režimu a uložených nastavení); skutečná data se nemění. Ukončení pruhem „Ukončit“ dole.',
             'Histra — ve všech seznamech jsou shlédnuté filmy a seriály označené zeleným ✓ (podle historie Histry a Sinatoru); u seriálů navíc modře poslední shlédnutá řada a epizoda (např. S2E5). Shlédnuté se jednou načtou z celé historie naráz, uloží do telefonu a pak se doplňují samy při každém zápisu — netřeba otevírat jednotlivé tituly; tlačítko 🔄 ✓ v seznamu je znovu načte ručně',
@@ -6132,6 +6176,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const androidManual = $('androidManualInstallInfo');
         const iosInfo = $('iosInstallInfo');
         if (!already) return; // sekce ještě není v DOM (např. při prvním startu)
+        try {
+            const _hasKey = !!(localStorage.getItem('sinator_tmdb_api_key') || '').trim();
+            const _inst = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+            const _cb = $('pwaCarryKeyBtn'), _ci = $('pwaCarryKeyInfo');
+            if (_cb) _cb.style.display = (_hasKey && !_inst) ? 'block' : 'none';
+            if (_ci) _ci.style.display = (_hasKey && !_inst) ? 'block' : 'none';
+        } catch (e) {}
 
         // Reset
         [already, androidBtn, androidInfo, androidManual, iosInfo].forEach(el => { if (el) el.style.display = 'none'; });
@@ -6162,6 +6213,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     window.updateInstallSectionUI = updateInstallSectionUI;
 
     async function installPWA() {
+        try { window._carryKeyHash(true); } catch (e) {}
         if (!deferredPrompt) {
             // Prompt zatím není k dispozici — přepni na ruční instrukce
             updateInstallSectionUI();
@@ -42668,12 +42720,38 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     };
     // ── Zvací odkaz (Nastavení → Ostatní → Pozvat kamaráda) ──
-    window._getInviteUrl = function() {
+    window._getInviteBase = function() {
         try {
             var l = window.location;
             if (l && (l.protocol === 'https:' || l.protocol === 'http:')) return l.origin + (l.pathname || '/').replace(/index\.html$/, '');
         } catch (e) {}
         return 'https://projekt-sinatorsearch.vercel.app/';
+    };
+    // Odkaz s klíčem: jen když je zaškrtnuto, jsi Admin level 2 a máš TMDB klíč. Klíč je za # (nejde na server).
+    window._inviteKey = function() {
+        try {
+            var cb = document.getElementById('inviteWithKey');
+            if (!cb || !cb.checked) return '';
+            if (typeof window._isAdminLevel2 === 'function' && !window._isAdminLevel2()) return '';
+            return (localStorage.getItem('sinator_tmdb_api_key') || '').trim();
+        } catch (e) { return ''; }
+    };
+    window._getInviteUrl = function() {
+        var k = window._inviteKey();
+        return window._getInviteBase() + (k ? '#tmdb=' + encodeURIComponent(k) : '');
+    };
+    window._inviteRefreshPreview = function() {
+        var el = document.getElementById('inviteLinkPreview'); if (!el) return;
+        var k = window._inviteKey();
+        el.textContent = window._getInviteBase() + (k ? '#tmdb=' + k.slice(0, 4) + '••••••••' + k.slice(-4) : '');
+    };
+    window.inviteKeyToggled = function(cb) {
+        if (cb.checked) {
+            var k = (localStorage.getItem('sinator_tmdb_api_key') || '').trim();
+            if (!k) { cb.checked = false; window._inviteToast('⚠️ Nemáš uložený TMDB klíč'); return; }
+            if (!confirm('Odkaz bude obsahovat tvůj TMDB klíč. Kdokoli, komu odkaz pošleš (nebo kdo ho uvidí v chatu), ho může používat. Pokračovat?')) { cb.checked = false; }
+        }
+        window._inviteRefreshPreview();
     };
     window._getInviteText = function() {
         return '🎬 Zkus Sinator Search – filmy, seriály, TV a radio na jednom místě. Otevři odkaz a na zamykací obrazovce klikni na „Požádat o přístup“: ' + window._getInviteUrl();
@@ -42713,7 +42791,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 1800);
     };
     (function() {
-        var fill = function() { var el = document.getElementById('inviteLinkPreview'); if (el) el.textContent = window._getInviteUrl(); };
+        var fill = function() { window._inviteRefreshPreview(); };
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill); else fill();
     })();
 
@@ -43533,6 +43611,8 @@ function updateAdminStatus() {
   const tvBrokenBox = document.getElementById('tvBrokenSettingsBox');
   if (tvBrokenBox) tvBrokenBox.style.display = isLvl2 ? 'block' : 'none';
   const testBox = document.getElementById('testUserModeBox'); if (testBox) testBox.style.display = isLvl2 ? 'block' : 'none';
+  const inviteKeyRow = document.getElementById('inviteKeyRow'); if (inviteKeyRow) inviteKeyRow.style.display = isLvl2 ? 'block' : 'none';
+  if (!isLvl2) { const cb = document.getElementById('inviteWithKey'); if (cb) cb.checked = false; if (typeof window._inviteRefreshPreview === 'function') window._inviteRefreshPreview(); }
   if (isLvl2 && typeof window._updateTvBrokenToggleUI === 'function') window._updateTvBrokenToggleUI();
   // Sekce "Správa IPTV kanálů" — vidí jen Admin level 2
   const tvChAdminBox = document.getElementById('tvChannelAdminSettingsBox');
