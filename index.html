@@ -5494,6 +5494,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     const CHANGELOG_HISTORY = [
         { version: '2026-10-07a', date: '7. 10. 2026', items: [
             'Tematické seznamy 2 — nová položka 🏎️ Auta: filmy, kde auta hrají významnou roli (závody, honičky, muscle cary, street racing…)',
+            'Schválení „Stejný uživatel“ přenese i TMDB klíč: schválené zařízení si klíč uloží k záznamu přístupu a nové zařízení ho po schválení samo převezme (když nemá vlastní). Nemá-li původní uživatel klíč uložený, admin se zeptá, zda mu dát svůj. Pozn.: klíč je tak uložený v databázi Firebase u záznamu uživatele',
             'Žádost o přístup: když přezdívka už existuje (nová instalace appky / nové zařízení), žádost se už neodmítne jako „obsazená“, ale odešle se adminovi. V Adminu je u ní upozornění „Přezdívka už existuje — stejný uživatel, nebo nový?“ a tlačítka ✅ Stejný uživatel / ❌ Jiný — zamítnutím se původní uživatel obnoví beze změny',
             'Instalace appky: do nainstalované verze se přenese TMDB klíč, přezdívka i schválení přístupu (nemusí se znovu zadávat ani schvalovat) — v Nastavení → Instalace aplikace je tlačítko 🔑 „Přenést klíč, jméno a přístup do instalace“ (přidá je na 10 min do adresy za #, takže je zástupce/Přidat na plochu/iOS vezme s sebou a první spuštění je uloží); u tlačítka Instalovat aplikaci se to dělá samo. Pozvánky nesou jen TMDB klíč. Manifest zůstává statický',
             'Pozvánka s TMDB klíčem (Admin level 2): v Profilu → Pozvat kamaráda je zaškrtávátko „Přidat do odkazu můj TMDB klíč“. Odkaz pak vypadá …/#tmdb=klíč; kamarád po otevření dostane klíč rovnou vyplněný (jen pokud žádný nemá) a adresa se hned vyčistí. Klíč je za #, takže nejde na server, ale kdokoli s odkazem ho uvidí',
@@ -8447,6 +8448,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             else { alert('⚠️ Zadejte platný TMDB API klíč (min. 32 znaků)!'); }
         }
     }
+    // Převzetí TMDB klíče ze schválené žádosti o přístup (stejný uživatel na novém zařízení / instalaci)
+    window._applyTmdbKey = function(k) {
+        k = String(k || '').trim();
+        if (k.length < 32 || tmdbApiKey) return false;
+        tmdbApiKey = k; _store.setItem('sinator_tmdb_api_key', k);
+        try { updateTmdbStatus(); } catch (e) {}
+        return true;
+    };
     function clearApiKey() {
         if (confirm('Opravdu chcete smazat uložený TMDB API klíč?')) {
             tmdbApiKey = ''; _store.removeItem('sinator_tmdb_api_key');
@@ -43921,6 +43930,13 @@ function _attachAccessReqListener(nick) {
       return;
     }
     if (r.st === 'approved') {
+      // TMDB klíč: schválené zařízení si ho uloží k záznamu (aby ho šlo přenést při schválení „stejný uživatel“ na novém zařízení)
+      // a naopak nové zařízení bez klíče si ho z přeneseného záznamu převezme.
+      try {
+        const myKey = (localStorage.getItem('sinator_tmdb_api_key') || '').trim();
+        if (!myKey && r.tk && typeof window._applyTmdbKey === 'function') window._applyTmdbKey(r.tk);
+        else if (myKey && r.tk !== myKey && granted) set(ref(rtdb, 'presence/_req_' + key), Object.assign({}, r, { tk: myKey }));
+      } catch (e) {}
       const locked = document.body.classList.contains('app-locked');
       if (!granted) {
         // První schválení: heslo defaultně vypnuté ("Nikdy nevyžadovat heslo")
@@ -43969,7 +43985,7 @@ window._submitAccessRequest = async function(nick) {
       const rec = { rn: nick, st: 'pending', did: did, ts: Date.now() };
       if (nickInUse) {
         rec.existing = true;
-        if (ex && ex.did && ex.did !== did) rec.prev = (ex.prev && ex.st === 'pending') ? ex.prev : { did: ex.did, st: ex.st || 'approved', ts: ex.ts || 0 };
+        if (ex && ex.did && ex.did !== did) rec.prev = (ex.prev && ex.st === 'pending') ? ex.prev : Object.assign({ did: ex.did, st: ex.st || 'approved', ts: ex.ts || 0 }, ex.tk ? { tk: ex.tk } : {});
       }
       await set(rRef, rec);
     }
@@ -44034,9 +44050,18 @@ function _bindAccessReqActions() {
       const v = s.val() || {};
       if (act === 'reject' && v.prev && v.prev.did) {
         // obnovit původní záznam (původní uživatel / zařízení)
-        return set(rRef, { rn: v.rn, st: v.prev.st || 'approved', did: v.prev.did, ts: v.prev.ts || Date.now() });
+        return set(rRef, Object.assign({ rn: v.rn, st: v.prev.st || 'approved', did: v.prev.did, ts: v.prev.ts || Date.now() }, v.prev.tk ? { tk: v.prev.tk } : {}));
       }
       const nv = Object.assign({}, v, { st: newSt, ts: Date.now() });
+      if (act === 'approve' && v.existing) {
+        // Stejný uživatel na novém zařízení → přenést i jeho TMDB klíč, ať ho nezadává znovu
+        let tk = (v.prev && v.prev.tk) || '';
+        if (!tk) {
+          const adminKey = (localStorage.getItem('sinator_tmdb_api_key') || '').trim();
+          if (adminKey && confirm(`U uživatele "${nick}" není uložený žádný TMDB klíč k přenosu. Dát mu tvůj TMDB klíč, ať ho nemusí zadávat?`)) tk = adminKey;
+        }
+        if (tk) nv.tk = tk;
+      }
       delete nv.prev; delete nv.existing;
       return set(rRef, nv);
     }).catch(err => alert('❌ Akce se nezdařila: ' + (err && err.message || err)));
