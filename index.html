@@ -5494,6 +5494,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     const CHANGELOG_HISTORY = [
         { version: '2026-10-07a', date: '7. 10. 2026', items: [
             'Tematické seznamy 2 — nová položka 🏎️ Auta: filmy, kde auta hrají významnou roli (závody, honičky, muscle cary, street racing…)',
+            'Žádost o přístup: když přezdívka už existuje (nová instalace appky / nové zařízení), žádost se už neodmítne jako „obsazená“, ale odešle se adminovi. V Adminu je u ní upozornění „Přezdívka už existuje — stejný uživatel, nebo nový?“ a tlačítka ✅ Stejný uživatel / ❌ Jiný — zamítnutím se původní uživatel obnoví beze změny',
             'Instalace appky: do nainstalované verze se přenese TMDB klíč, přezdívka i schválení přístupu (nemusí se znovu zadávat ani schvalovat) — v Nastavení → Instalace aplikace je tlačítko 🔑 „Přenést klíč, jméno a přístup do instalace“ (přidá je na 10 min do adresy za #, takže je zástupce/Přidat na plochu/iOS vezme s sebou a první spuštění je uloží); u tlačítka Instalovat aplikaci se to dělá samo. Pozvánky nesou jen TMDB klíč. Manifest zůstává statický',
             'Pozvánka s TMDB klíčem (Admin level 2): v Profilu → Pozvat kamaráda je zaškrtávátko „Přidat do odkazu můj TMDB klíč“. Odkaz pak vypadá …/#tmdb=klíč; kamarád po otevření dostane klíč rovnou vyplněný (jen pokud žádný nemá) a adresa se hned vyčistí. Klíč je za #, takže nejde na server, ale kdokoli s odkazem ho uvidí',
             'České a slovenské tematické seznamy (České a slovenské filmy, České pohádky, České komedie, Slovenské filmy, Československé klasiky, Nejlepší české a slovenské filmy, včetně rozšířeného hledání v prvních seznamech) teď berou jen skutečně českou/slovenskou tvorbu: původní země i původní jazyk musí sedět (česky resp. slovensky mluvené), takže zmizely zahraniční filmy natáčené nebo koprodukované u nás. Československé klasiky před 1990 se hledají jen podle původního jazyka (česky/slovensky), protože u starých filmů TMDB často nemá vyplněnou zemi — dříve ukázaly jen 1 film',
@@ -43915,7 +43916,10 @@ function _attachAccessReqListener(nick) {
       return;
     }
     const r = snap.val() || {};
-    if (r.did && r.did !== did) return; // žádost z jiného zařízení
+    if (r.did && r.did !== did) { // záznam patří jinému zařízení (např. admin zamítl žádost a obnovil původního uživatele)
+      if (_accessManual && !granted) _setAccessStatus('❌ Žádost byla zamítnuta — přezdívka patří jinému uživateli. Zvol jinou.', '#ff6b6b');
+      return;
+    }
     if (r.st === 'approved') {
       const locked = document.body.classList.contains('app-locked');
       if (!granted) {
@@ -43954,20 +43958,25 @@ window._submitAccessRequest = async function(nick) {
   try {
     const [reqSnap, userSnap] = await Promise.all([get(rRef), get(ref(rtdb, 'presence/' + key))]);
     const ex = reqSnap.exists() ? reqSnap.val() : null;
-    const taken = '⚠️ Tato přezdívka je už obsazená, zvol jinou.';
-    if (ex && ex.did && ex.did !== did && (ex.st === 'pending' || ex.st === 'approved')) return { ok: false, msg: taken };
-    const ownNick = (localStorage.getItem(USER_NICK_KEY) || '').toLowerCase();
+    // Přezdívka už existuje (jiné zařízení / nová instalace appky)? Žádost se přesto odešle — admin posoudí,
+    // zda je to stejný uživatel, nebo nový. Původní záznam se uloží do `prev`, aby šel při zamítnutí obnovit.
     const sameDeviceReq = !!(ex && ex.did === did);
-    if (userSnap.exists() && userSnap.val() && userSnap.val().nick && !sameDeviceReq && ownNick !== nick.toLowerCase()) {
-      return { ok: false, msg: taken };
-    }
+    const nickInUse = !sameDeviceReq && ((ex && ex.did && (ex.st === 'pending' || ex.st === 'approved')) ||
+      (userSnap.exists() && userSnap.val() && userSnap.val().nick));
     _accessManual = true;
     localStorage.setItem(ACCESS_NICK_KEY, nick);
     if (!(ex && ex.did === did && ex.st === 'approved')) {
-      await set(rRef, { rn: nick, st: 'pending', did: did, ts: Date.now() });
+      const rec = { rn: nick, st: 'pending', did: did, ts: Date.now() };
+      if (nickInUse) {
+        rec.existing = true;
+        if (ex && ex.did && ex.did !== did) rec.prev = (ex.prev && ex.st === 'pending') ? ex.prev : { did: ex.did, st: ex.st || 'approved', ts: ex.ts || 0 };
+      }
+      await set(rRef, rec);
     }
     _attachAccessReqListener(nick);
-    return { ok: true, msg: '📨 Žádost odeslána adminovi. Po schválení se appka odemkne sama.' };
+    return { ok: true, msg: nickInUse
+      ? '📨 Tato přezdívka už existuje — žádost jsem odeslal adminovi, který posoudí, zda jsi to ty (nové zařízení / instalace). Po schválení se appka odemkne sama.'
+      : '📨 Žádost odeslána adminovi. Po schválení se appka odemkne sama.' };
   } catch(e) {
     return { ok: false, msg: '⚠️ Odeslání se nezdařilo: ' + (e && e.message || e) };
   }
@@ -43986,7 +43995,7 @@ function _renderAccessRequests(all) {
   if (!wrap) return;
   const reqs = Object.entries(all || {})
     .filter(([k, v]) => k.indexOf('_req_') === 0 && v && v.rn)
-    .map(([k, v]) => ({ rk: k, nick: v.rn, st: v.st, ts: v.ts || 0 }));
+    .map(([k, v]) => ({ rk: k, nick: v.rn, st: v.st, ts: v.ts || 0, existing: !!(v.existing || v.prev) }));
   const pending = reqs.filter(r => r.st === 'pending').sort((a, b) => a.ts - b.ts);
   // Schválení uživatelé se zobrazují v seznamu registrovaných uživatelů níže (online/offline + správa),
   // tady zůstávají jen čekající žádosti.
@@ -44000,9 +44009,9 @@ function _renderAccessRequests(all) {
   wrap.innerHTML =
     pending.map(r => `
       <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.25);border-radius:8px;">
-        <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">⏳ ${_escapeHtmlU(r.nick)}</span>
+        <span style="flex:1;color:#eee;font-size:0.88rem;font-weight:600;">⏳ ${_escapeHtmlU(r.nick)}${r.existing ? '<br><span style="font-size:0.7rem;font-weight:500;color:#ffb347;">⚠️ Přezdívka už existuje — je to stejný uživatel (nové zařízení / instalace), nebo nový?</span>' : ''}</span>
         <span style="font-size:0.7rem;color:#888;">${_formatLastSeen(r.ts)}</span>
-        ${btn('approve', r, '✅ Schválit', '#22c55e', 'Schválit přístup')}${btn('reject', r, '❌', '#ff6b6b', 'Zamítnout')}
+        ${btn('approve', r, r.existing ? '✅ Stejný uživatel' : '✅ Schválit', '#22c55e', r.existing ? 'Je to stejný uživatel — schválit nové zařízení' : 'Schválit přístup')}${btn('reject', r, r.existing ? '❌ Jiný / zamítnout' : '❌', '#ff6b6b', 'Zamítnout')}
       </div>`).join('');
 }
 
@@ -44018,11 +44027,18 @@ function _bindAccessReqActions() {
     const nick = b.getAttribute('data-nick');
     const newSt = act === 'approve' ? 'approved' : (act === 'reject' ? 'rejected' : 'revoked');
     if (act === 'revoke' && !confirm(`Odebrat uživateli "${nick}" přístup do appky? Appka se mu hned zamkne.`)) return;
-    if (act === 'reject' && !confirm(`Zamítnout žádost uživatele "${nick}"?`)) return;
+    if (act === 'reject' && !confirm(`Zamítnout žádost uživatele "${nick}"? Pokud přezdívka už existovala, původní uživatel zůstane beze změny a žadatel si může zvolit jinou přezdívku.`)) return;
     const rRef = ref(rtdb, 'presence/' + rk);
     get(rRef).then(s => {
       if (!s.exists()) return;
-      return set(rRef, Object.assign({}, s.val(), { st: newSt, ts: Date.now() }));
+      const v = s.val() || {};
+      if (act === 'reject' && v.prev && v.prev.did) {
+        // obnovit původní záznam (původní uživatel / zařízení)
+        return set(rRef, { rn: v.rn, st: v.prev.st || 'approved', did: v.prev.did, ts: v.prev.ts || Date.now() });
+      }
+      const nv = Object.assign({}, v, { st: newSt, ts: Date.now() });
+      delete nv.prev; delete nv.existing;
+      return set(rRef, nv);
     }).catch(err => alert('❌ Akce se nezdařila: ' + (err && err.message || err)));
   });
 }
