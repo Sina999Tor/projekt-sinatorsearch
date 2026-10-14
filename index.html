@@ -47008,7 +47008,7 @@ async function pmap(a,fn,n){var o=[];for(var c of chunk(a,n||8)){o=o.concat(awai
 function shuf(a){return a.map(function(x){return[Math.random(),x]}).sort(function(a,b){return a[0]-b[0]}).map(function(x){return x[1]})}
 function ov(id,title,html){var o=document.getElementById(id);if(o)o.remove();o=document.createElement('div');o.id=id;o.className='sfo';
  o.innerHTML='<div class="sfh"><span>'+title+'</span><button onclick="document.getElementById(\''+id+'\').remove()">✕</button></div><div class="sfb">'+html+'</div>';document.body.appendChild(o);return o.querySelector('.sfb')}
-function open_(id,t){window._siOpenDetail?window._siOpenDetail(id,t):openDetail(id,t)}
+function open_(id,t){try{window._siOpenDetail?window._siOpenDetail(id,t):openDetail(id,t)}catch(e){T('⚠️ Detail se nepodařilo otevřít')}setTimeout(function(){var m=document.getElementById('modal');if(m)m.style.zIndex='9999'},50)}
 window.sfOpen=open_;
 
 /* ── Hlavička: tlačítka ── */
@@ -47074,13 +47074,13 @@ function show(){var b=document.getElementById('sfSwB');if(!b)return;
  if(!sw.q.length){b.innerHTML='<p style="text-align:center">Došly tipy 🎉</p><div style="text-align:center"><button class="sf-btn" onclick="sfSwipeMore()">Načíst další</button></div>';return}
  var c=function(it,u){return '<div class="sfcard'+(u?' u':'')+'" style="background-image:url('+IM+'w500'+it.p+')"><div class="sflab" style="left:16px;color:#f87171;border-color:#f87171">ZAHODIT</div><div class="sflab" style="right:16px;color:#4ade80;border-color:#4ade80">WATCHLIST</div><div class="sflab" style="left:50%;margin-left:-50px;color:#22d3ee;border-color:#22d3ee">VIDĚL JSEM</div><div class="sfi"><b>'+esc(it.title)+'</b><small>'+(it.t==='tv'?'Seriál':'Film')+' · '+it.year+' · ⭐ '+(it.v?it.v.toFixed(1):'—')+'</small><p>'+esc(it.o||'')+'</p></div></div>'};
  b.innerHTML='<div class="sfdeck">'+(sw.q[1]?c(sw.q[1],1):'')+c(sw.q[0])+'</div><div class="sfact"><button style="border-color:#f87171" onclick="sfAct(\'no\')" title="Zahodit">✕</button><button style="border-color:#22d3ee" onclick="sfAct(\'seen\')" title="Už jsem viděl">👁</button><button style="border-color:#4ade80" onclick="sfAct(\'wl\')" title="Do watchlistu">🔖</button></div><p style="text-align:center;font-size:.75rem;opacity:.6">← zahodit · → watchlist · ↑ už jsem viděl · klepnutí = detail</p>';
- var el=b.querySelector('.sfcard:not(.u)'),x0,y0,dx=0,dy=0,on=0,labs=el.querySelectorAll('.sflab');
+ var el=b.querySelector('.sfcard:not(.u)'),x0,y0,t0=0,dx=0,dy=0,on=0,labs=el.querySelectorAll('.sflab');
  function lab(a,o){labs.forEach(function(l,i){l.style.opacity=(['no','wl','seen'][i]===a)?o:0})}
  function dir(){return(Math.abs(dy)>Math.abs(dx)*1.1&&dy<-20)?'seen':dx>20?'wl':dx<-20?'no':0}
- el.onpointerdown=function(e){on=1;x0=e.clientX;y0=e.clientY;dx=dy=0;el.setPointerCapture(e.pointerId);el.style.transition='none'};
+ el.onpointerdown=function(e){on=1;t0=Date.now();x0=e.clientX;y0=e.clientY;dx=dy=0;el.setPointerCapture(e.pointerId);el.style.transition='none'};
  el.onpointermove=function(e){if(!on)return;dx=e.clientX-x0;dy=e.clientY-y0;el.style.transform='translate('+dx+'px,'+dy+'px) rotate('+dx/18+'deg)';lab(dir(),Math.min(1,Math.hypot(dx,dy)/100))};
  el.onpointerup=el.onpointercancel=function(){if(!on)return;on=0;el.style.transition='';var a=dir(),d=Math.hypot(dx,dy);
-  if(a&&d>90)sfAct(a);else{el.style.transform='';lab(0,0);if(d<6)open_(sw.q[0].id,sw.q[0].t)}}}
+  if(a&&d>90)sfAct(a);else{el.style.transform='';lab(0,0);if(d<16&&Date.now()-t0<600&&sw.q[0])open_(sw.q[0].id,sw.q[0].t)}}}
 window.sfSwipeMore=async function(){await fill();show()};
 window.sfAct=async function(a){var it=sw.q.shift();if(!it)return;var el=document.querySelector('#sfSwB .sfcard:not(.u)');
  if(el){var f={no:[-650,0],wl:[650,0],seen:[0,-750]}[a];el.style.transform='translate('+f[0]+'px,'+f[1]+'px) rotate('+f[0]/20+'deg)';el.style.opacity=0}
