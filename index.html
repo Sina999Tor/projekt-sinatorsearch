@@ -5190,7 +5190,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         // Android appku ModernTV 2.0 z prohlížeče spustit nejde, proto tu pro ni záznam není.
         { id:'moderntv_web', name:'ModernTV (web)', emoji:'🌐',
           urlTemplate:'https://moderntv.cz/search?q={query}', openUrl:'https://moderntv.cz/',
-          enabled:false, zabavaEnabled:false, builtin:true }
+          enabled:false, zabavaEnabled:false, builtin:true },
+        // VLC: nemá vyhledávání — appku jen otevře (schéma vlc + package org.videolan.vlc, stejný princip jako Nuvio;
+        // nemá-li ji uživatel, otevře se Google Play). Název filmu se zkopíruje do schránky jako u ostatních.
+        { id:'vlc', name:'VLC', emoji:'🔶', urlTemplate:'intent://open#Intent;scheme=vlc;package=org.videolan.vlc;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dorg.videolan.vlc;end', enabled:false, zabavaEnabled:false, builtin:true }
     ];
     // Migrace: pokud má uživatel uložené staré (nefunkční) odhady odkazů
     // z dřívější verze, potichu je nahradíme opravenými výchozími hodnotami —
@@ -5389,7 +5392,43 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         else { window.location.href = url; }
     }
     window._openExternalUrl = _openExternalUrl;
+    // 🔶 VLC: přehraje přímý odkaz na video (např. z Hellspy: podrž video → „Otevřít v prohlížeči“ → zkopíruj adresu).
+    // Odkaz se vezme ze schránky; když tam není, zobrazí se okno, kam ho jde vložit.
+    function _playInVlc(url) {
+        url = String(url || '').trim().replace(/#.*$/, '');
+        const m = url.match(/^(https?):\/\/(.+)$/i);
+        if (!m) { try { showToast('⚠️ To není odkaz na video (http/https)'); } catch(e) {} return; }
+        document.getElementById('vlcLinkOverlay')?.remove();
+        try { showToast('▶ Spouštím VLC…'); } catch(e) {}
+        window.location.href = `intent://${m[2]}#Intent;scheme=${m[1].toLowerCase()};package=org.videolan.vlc;action=android.intent.action.VIEW;category=android.intent.category.DEFAULT;type=video/*;S.browser_fallback_url=${encodeURIComponent('https://play.google.com/store/apps/details?id=org.videolan.vlc')};end`;
+    }
+    window._playInVlc = _playInVlc;
+    async function _vlcFromLink(app, title) {
+        document.getElementById('externalPlayAppChooserOverlay')?.remove();
+        let clip = '';
+        try { clip = await navigator.clipboard.readText(); } catch(e) {}
+        const mm = (clip || '').match(/https?:\/\/[^\s"'<>]+/i);
+        const isPage = mm && /^https?:\/\/(www\.)?hellspy\.(to|cz)\/?(\?|$)/i.test(mm[0]);
+        if (mm && !isPage) { _playInVlc(mm[0]); return; }
+        const o = document.createElement('div');
+        o.id = 'vlcLinkOverlay';
+        o.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
+        o.innerHTML = `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:18px 18px 22px;max-width:520px;width:100%;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><b style="color:var(--gold);">🔶 Přehrát ve VLC</b><button onclick="document.getElementById('vlcLinkOverlay').remove()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;">✕</button></div>
+            <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;margin-bottom:10px;">V Hellspy podrž prst na videu → <b>Otevřít v prohlížeči</b> → zkopíruj adresu (odkaz na .mp4) a vlož ji sem. Příště stačí odkaz jen zkopírovat a klepnout na VLC. Odkaz po čase vyprší.</div>
+            <input id="vlcLinkInput" type="text" placeholder="https://…/file.mp4?token=…" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:inherit;margin-bottom:10px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button onclick="window._playInVlc(document.getElementById('vlcLinkInput').value)" style="flex:1 1 100%;padding:12px;border-radius:10px;border:1px solid #f60;background:rgba(255,102,0,0.15);color:#f60;font-weight:700;cursor:pointer;">▶ Přehrát ve VLC</button>
+              <button id="vlcHsBtn" style="flex:1;padding:10px;border-radius:10px;border:1px solid #3a6ea5;background:rgba(30,60,110,0.35);color:#9cc4f0;cursor:pointer;">👹 Otevřít Hellspy</button>
+              <button id="vlcOpenBtn" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:inherit;cursor:pointer;">Jen otevřít VLC</button>
+            </div></div>`;
+        document.body.appendChild(o);
+        o.querySelector('#vlcLinkInput').value = isPage ? '' : (clip && /^https?:\/\//i.test(clip.trim()) ? clip.trim() : '');
+        o.querySelector('#vlcHsBtn').onclick = () => { if (window.openHellspy) window.openHellspy('https://www.hellspy.to/?query=' + encodeURIComponent(title)); };
+        o.querySelector('#vlcOpenBtn').onclick = () => { o.remove(); _openExternalUrl(app.urlTemplate); };
+    }
     function launchExternalPlayApp(app, title) {
+        if (app && app.id === 'vlc') { _vlcFromLink(app, title); return; }
         try { navigator.clipboard && navigator.clipboard.writeText(title); } catch(e) {}
         try { if (navigator.vibrate) navigator.vibrate(12); } catch(e) {}
         document.getElementById('externalPlayAppChooserOverlay')?.remove();
@@ -5512,6 +5551,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-14b', date: '14. 10. 2026', items: [
+            'Přehrát v externí aplikaci — přidána aplikace 🔶 VLC (Nastavení → 📱 Aplikace): přehraje přímý odkaz na video. Na Hellspy podrž video → Otevřít v prohlížeči → zkopíruj adresu (.mp4), pak v Sinatoru klepni na VLC — odkaz se vezme ze schránky (nebo ho vložíš do okna) a otevře se rovnou ve VLC. Je tam i tlačítko Otevřít Hellspy a Jen otevřít VLC'
+        ] },
+        { version: '2026-10-14a', date: '14. 10. 2026', items: [
+            '🔥 Swipe tipy (tlačítko v horní liště): tipy na filmy a seriály podle tvého vkusu (zhlédnuté, oblíbené, watchlist). Táhni doleva = zahodit, doprava = do watchlistu (Sinator + Histra), nahoru = už jsem viděl; klepnutí otevře detail. Funguje i tlačítky pod kartou',
+            '📝 Soukromé poznámky: v detailu filmu/seriálu je textové pole pro vlastní recenzi nebo důvod, proč je titul ve watchlistu. Ukládá se automaticky, jen v tomto zařízení',
+            '▶️ Trailer přímo v appce: tlačítko v detailu otevře YouTube trailer (z TMDB) v plovoucím okně, které jde přetahovat; víc videí přepneš ⏭, ↗ otevře YouTube',
+            '🎞️ Wrapped — Můj filmový rok: vizuální karta (filmy, epizody, hodiny, nejčastější žánry, nejlépe hodnocené filmy) pro vybraný rok. Dá se stáhnout jako obrázek nebo sdílet',
+            '📆 Up Next: seznam, kdy vyjde další díl sledovaných seriálů, odpočet k premiérám filmů z watchlistu a nové premiéry v kinech a na VOD v ČR na 60 dní. Tlačítkem 🔔 zapneš upozornění na dnešní a zítřejší díly/premiéry (kontrola při otevření appky)'
+        ] },
         { version: '2026-10-07a', date: '7. 10. 2026', items: [
             'Tematické seznamy 2 — nová položka 🏎️ Auta: filmy, kde auta hrají významnou roli (závody, honičky, muscle cary, street racing…)',
             'Upozornění (Nastavení → Ostatní): nové epizody sledovaných seriálů a tituly z watchlistu, které se objevily na streamovací službě (CZ). Samostatný worker notify-sw.js; kontrola na pozadí v nainstalované appce na Androidu (Chrome), jinde při otevření appky. První kontrola jen zapíše výchozí stav',
@@ -46908,5 +46957,214 @@ window.addEventListener('load', function() {
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
 </script>
+<!-- ═══ SINATOR FEATURES PACK: Swipe tipy · Poznámky · Trailery · Wrapped · Up Next ═══ -->
+<style>
+.sfo{position:fixed;inset:0;z-index:9000;background:var(--bg-card,#101018);display:flex;flex-direction:column;color:inherit}
+.sfh{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border,#2a2a2a);font-weight:700}
+.sfh button{background:none;border:1px solid var(--border,#333);color:inherit;width:34px;height:34px;border-radius:50%;cursor:pointer}
+.sfb{flex:1;overflow-y:auto;padding:14px}
+.sf-btn{cursor:pointer;border:1px solid var(--border,#333);background:var(--bg-elevated,#1a1a1a);color:inherit;padding:10px 14px;border-radius:10px;font-weight:700;font-size:.9rem}
+.sf-btn.on{border-color:#22d3ee;color:#22d3ee}
+.sf-note{width:100%;box-sizing:border-box;min-height:60px;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--border,#333);background:var(--bg-elevated,#1a1a1a);color:inherit;font:inherit;resize:vertical}
+.sfdeck{position:relative;height:60vh;max-height:540px;aspect-ratio:2/3;max-width:100%;margin:6px auto 14px}
+.sfcard{position:absolute;inset:0;border-radius:18px;overflow:hidden;background:#111 center/cover;touch-action:none;cursor:grab;box-shadow:0 8px 28px #0008;transition:transform .2s,opacity .25s;user-select:none}
+.sfcard.u{transform:scale(.95) translateY(10px);pointer-events:none;filter:brightness(.6)}
+.sfi{position:absolute;left:0;right:0;bottom:0;padding:70px 14px 14px;background:linear-gradient(transparent,rgba(0,0,0,.93));color:#fff}
+.sfi b{font-size:1.15rem;display:block}.sfi small{opacity:.8}
+.sfi p{font-size:.78rem;margin:6px 0 0;opacity:.85;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.sflab{position:absolute;top:22px;padding:4px 12px;border:3px solid;border-radius:10px;font-weight:900;opacity:0;pointer-events:none}
+.sfact{display:flex;justify-content:center;gap:14px}
+.sfact button{width:62px;height:62px;border-radius:50%;border:2px solid;background:var(--bg-elevated,#1a1a1a);font-size:1.5rem;cursor:pointer}
+.sfrow{display:flex;gap:10px;align-items:center;padding:8px;border-radius:12px;background:var(--bg-elevated,#1a1a1a);margin-bottom:8px;cursor:pointer}
+.sfrow img{width:46px;height:69px;object-fit:cover;border-radius:6px;background:#222}
+.sfrow div{flex:1;min-width:0}.sfrow small{opacity:.7}
+.sfpill{background:#22d3ee22;color:#22d3ee;border-radius:20px;padding:4px 10px;font-size:.75rem;font-weight:700;white-space:nowrap}
+.sfpl{position:fixed;z-index:100001;width:min(92vw,420px);background:#000;border-radius:12px;box-shadow:0 10px 40px #000a;overflow:hidden}
+.sfpl .h{display:flex;gap:8px;align-items:center;padding:6px 10px;background:#111;color:#fff;cursor:move;touch-action:none;font-size:.8rem}
+.sfpl .h span{flex:1}.sfpl .h a,.sfpl .h button{color:#fff;background:none;border:none;cursor:pointer;font-size:1rem;text-decoration:none}
+.sfpl iframe{display:block;width:100%;aspect-ratio:16/9;border:0}
+</style>
+<script>
+(function(){
+'use strict';
+var TB='https://api.themoviedb.org/3',IM='https://image.tmdb.org/t/p/',st=window._store||localStorage;
+var K=function(){return (window._siGetKey&&window._siGetKey())||''};
+var S=function(){return (window._siState&&window._siState())||{}};
+var BE=function(){return typeof myBackendReady==='function'&&myBackendReady()};
+function jget(k,d){try{var v=JSON.parse(st.getItem(k));return v==null?d:v}catch(e){return d}}
+function jset(k,v){try{st.setItem(k,JSON.stringify(v))}catch(e){}}
+function T(m){try{showToast(m)}catch(e){alert(m)}}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function F(u){return (typeof _fetchWithTimeout==='function'?_fetchWithTimeout(u,10000):fetch(u)).then(function(r){return r.json()})}
+function tj(p,q){return F(TB+p+'?api_key='+K()+'&language=cs-CZ'+(q||''))}
+function p2(n){return n<10?'0'+n:''+n}
+function td(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
+function dd(s){return Math.round((new Date(s+'T00:00:00')-new Date(td()+'T00:00:00'))/864e5)}
+function cd(n){return n<=0?'dnes':n===1?'zítra':'za '+n+(n<5?' dny':' dní')}
+function fd(s){var a=s.split('-');return (+a[2])+'. '+(+a[1])+'.'}
+function nt(t){return (t==='tv'||t==='show'||t==='shows'||t==='episode'||t==='episodes')?'tv':'movie'}
+function chunk(a,n){var o=[];for(var i=0;i<a.length;i+=n)o.push(a.slice(i,i+n));return o}
+async function pmap(a,fn,n){var o=[];for(var c of chunk(a,n||8)){o=o.concat(await Promise.all(c.map(function(x){return fn(x).catch(function(){return null})})))}return o}
+function shuf(a){return a.map(function(x){return[Math.random(),x]}).sort(function(a,b){return a[0]-b[0]}).map(function(x){return x[1]})}
+function ov(id,title,html){var o=document.getElementById(id);if(o)o.remove();o=document.createElement('div');o.id=id;o.className='sfo';
+ o.innerHTML='<div class="sfh"><span>'+title+'</span><button onclick="document.getElementById(\''+id+'\').remove()">✕</button></div><div class="sfb">'+html+'</div>';document.body.appendChild(o);return o.querySelector('.sfb')}
+function open_(id,t){window._siOpenDetail?window._siOpenDetail(id,t):openDetail(id,t)}
+window.sfOpen=open_;
+
+/* ── Hlavička: tlačítka ── */
+(function(){var z=document.getElementById('btnZabavaToggle');if(!z)return;
+ [['🔥','Swipe','sfSwipeOpen','Swipe tipy podle tvého vkusu'],['📆','Up Next','sfUpNext','Další díly a premiéry'],['🎞️','Wrapped','sfWrapped','Můj filmový rok']].forEach(function(b){
+  z.insertAdjacentHTML('beforebegin','<button class="action-btn icon" onclick="'+b[2]+'()" title="'+b[3]+'"><span class="btn-icon">'+b[0]+'</span><span class="btn-label">'+b[1]+'</span></button>')})})();
+
+/* ── Detail titulu: trailer + soukromá poznámka ── */
+(function(){var sb=document.getElementById('modalScrollBody');if(!sb)return;
+ new MutationObserver(function(){var mb=sb.querySelector('.modal-body'),h=mb&&mb.querySelector('.modal-title');if(!h)return;
+  var ns=window._siNavStack||[],cur=ns[ns.length-1];if(!cur)return;var k=cur.type+'_'+cur.id,ex=document.getElementById('sfX');
+  if(ex&&ex.dataset.k===k)return;if(ex)ex.remove();
+  var n=(jget('sinator_notes',{})[k]||{}).t||'',b=document.createElement('div');b.id='sfX';b.dataset.k=k;b.style.margin='6px 0 10px';
+  b.innerHTML='<button class="sf-btn" style="width:100%" onclick="sfTrailer('+cur.id+',\''+cur.type+'\')">▶️ Trailer</button><textarea class="sf-note" placeholder="📝 Soukromá poznámka (recenze, proč je ve watchlistu…)">'+esc(n)+'</textarea>';
+  (mb.querySelector('.modal-tagline')||h).insertAdjacentElement('afterend',b);
+  var ta=b.querySelector('textarea'),tm;ta.oninput=function(){clearTimeout(tm);tm=setTimeout(function(){var all=jget('sinator_notes',{});
+   if(ta.value.trim())all[k]={t:ta.value,u:Date.now(),title:h.textContent};else delete all[k];jset('sinator_notes',all)},400)};
+ }).observe(sb,{childList:true})})();
+
+/* ── Trailer v plovoucím okně ── */
+window.sfTrailer=async function(id,type){
+ try{var v=[];for(var l of ['cs-CZ','en-US']){var r=await F(TB+'/'+type+'/'+id+'/videos?api_key='+K()+'&language='+l);
+   v=(r.results||[]).filter(function(x){return x.site==='YouTube'});if(v.length)break}
+  if(!v.length){T('Trailer nenalezen');return}
+  var rk=function(x){return(x.type==='Trailer'?0:x.type==='Teaser'?1:2)+(x.official?0:.5)};v.sort(function(a,b){return rk(a)-rk(b)});play(v,0)}
+ catch(e){T('Trailer se nepodařilo načíst')}};
+function play(v,i){var w=document.getElementById('sfPl');if(w)w.remove();w=document.createElement('div');w.id='sfPl';w.className='sfpl';
+ var k=v[i].key;w.innerHTML='<div class="h"><span>▶️ '+esc(v[i].type)+' '+(i+1)+'/'+v.length+'</span>'+(v.length>1?'<button id="sfPn">⏭</button>':'')+'<a target="_blank" href="https://www.youtube.com/watch?v='+k+'">↗</a><button id="sfPx">✕</button></div>'
+ +'<iframe src="https://www.youtube-nocookie.com/embed/'+k+'?autoplay=1&rel=0&playsinline=1" allow="autoplay;encrypted-media;picture-in-picture;fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+ document.body.appendChild(w);w.style.left=Math.max(4,(innerWidth-w.offsetWidth)/2)+'px';w.style.top='64px';
+ w.querySelector('#sfPx').onclick=function(){w.remove()};var n=w.querySelector('#sfPn');if(n)n.onclick=function(){play(v,(i+1)%v.length)};
+ var h=w.querySelector('.h'),ox,oy,on=0;h.onpointerdown=function(e){if(e.target.closest('a,button'))return;on=1;ox=e.clientX-w.offsetLeft;oy=e.clientY-w.offsetTop;h.setPointerCapture(e.pointerId)};
+ h.onpointermove=function(e){if(on){w.style.left=Math.min(innerWidth-60,Math.max(-w.offsetWidth+60,e.clientX-ox))+'px';w.style.top=Math.min(innerHeight-40,Math.max(0,e.clientY-oy))+'px'}};
+ h.onpointerup=h.onpointercancel=function(){on=0}}
+
+/* ── Swipe tipy ── */
+var sw={q:[],t:null,busy:0};
+async function taste(){var s=S(),seen=jget('sinator_swipe_seen',{}),ex={},sd=[];
+ function add(id,t){id=+id;if(!id)return;t=nt(t);ex[t+'_'+id]=1;sd.push({id:id,t:t})}
+ Object.keys(seen).forEach(function(k){ex[k]=1});
+ Object.values(s.watched||{}).forEach(function(w){add(w.type==='episode'?w.tvId:w.id,w.type)});
+ (s.favs||[]).forEach(function(f){add(f.id,f.type||'movie')});
+ jget('sinator_swipe_wl',[]).forEach(function(f){add(f.id,f.type)});
+ if(BE()){try{var r=await Promise.all([myWatchlistGet(),myHistoryGetAll('movies'),myHistoryGetAll('shows')]);
+  r[0].forEach(function(x){add(x.id,x.type)});r[1].forEach(function(x){add(x.id,'movie')});r[2].forEach(function(x){add(x.id,'tv')})}catch(e){}}
+ var u={};sd=sd.filter(function(x){var k=x.t+x.id;return u[k]?0:(u[k]=1)});return{ex:ex,sd:sd}}
+async function fill(){if(sw.busy)return;sw.busy=1;try{if(!sw.t)sw.t=await taste();var seen=jget('sinator_swipe_seen',{}),sc={},ex=sw.t.ex,have={};
+ sw.q.forEach(function(x){have[x.t+'_'+x.id]=1});
+ var seeds=shuf(sw.t.sd).slice(0,8);
+ var res=await pmap(seeds,function(x){return tj('/'+x.t+'/'+x.id+'/recommendations')},8);
+ res.forEach(function(r,i){((r&&r.results)||[]).forEach(function(m){var t=seeds[i].t,k=t+'_'+m.id;if(ex[k]||seen[k]||have[k]||!m.poster_path||(m.vote_count||0)<50)return;
+  (sc[k]=sc[k]||{m:m,t:t,s:0}).s+=1+(m.vote_average||0)/10})});
+ var a=Object.keys(sc).map(function(k){return sc[k]});
+ if(a.length<14){for(var t of ['movie','tv']){var d=await tj('/discover/'+t,'&sort_by=popularity.desc&vote_count.gte=400&vote_average.gte=6.6&page='+(1+Math.floor(Math.random()*6))).catch(function(){return{}});
+  (d.results||[]).forEach(function(m){var k=t+'_'+m.id;if(!ex[k]&&!seen[k]&&!have[k]&&m.poster_path&&!sc[k])a.push({m:m,t:t,s:.5})})}}
+ a.sort(function(x,y){return y.s*(.7+Math.random()*.6)-x.s*(.7+Math.random()*.6)});
+ a.forEach(function(x){var m=x.m;sw.q.push({id:m.id,t:x.t,title:m.title||m.name,year:(m.release_date||m.first_air_date||'').slice(0,4),p:m.poster_path,v:m.vote_average,o:m.overview})})}
+ catch(e){}sw.busy=0}
+window.sfSwipeOpen=async function(){if(!K()){T('Nejdřív zadej TMDB klíč');return}
+ ov('sfSw','🔥 Swipe tipy','<div id="sfSwB"><p style="text-align:center;opacity:.7">Skládám tipy podle tvého vkusu…</p></div>');
+ if(sw.q.length<3)await fill();show()};
+function show(){var b=document.getElementById('sfSwB');if(!b)return;
+ if(!sw.q.length){b.innerHTML='<p style="text-align:center">Došly tipy 🎉</p><div style="text-align:center"><button class="sf-btn" onclick="sfSwipeMore()">Načíst další</button></div>';return}
+ var c=function(it,u){return '<div class="sfcard'+(u?' u':'')+'" style="background-image:url('+IM+'w500'+it.p+')"><div class="sflab" style="left:16px;color:#f87171;border-color:#f87171">ZAHODIT</div><div class="sflab" style="right:16px;color:#4ade80;border-color:#4ade80">WATCHLIST</div><div class="sflab" style="left:50%;margin-left:-50px;color:#22d3ee;border-color:#22d3ee">VIDĚL JSEM</div><div class="sfi"><b>'+esc(it.title)+'</b><small>'+(it.t==='tv'?'Seriál':'Film')+' · '+it.year+' · ⭐ '+(it.v?it.v.toFixed(1):'—')+'</small><p>'+esc(it.o||'')+'</p></div></div>'};
+ b.innerHTML='<div class="sfdeck">'+(sw.q[1]?c(sw.q[1],1):'')+c(sw.q[0])+'</div><div class="sfact"><button style="border-color:#f87171" onclick="sfAct(\'no\')" title="Zahodit">✕</button><button style="border-color:#22d3ee" onclick="sfAct(\'seen\')" title="Už jsem viděl">👁</button><button style="border-color:#4ade80" onclick="sfAct(\'wl\')" title="Do watchlistu">🔖</button></div><p style="text-align:center;font-size:.75rem;opacity:.6">← zahodit · → watchlist · ↑ už jsem viděl · klepnutí = detail</p>';
+ var el=b.querySelector('.sfcard:not(.u)'),x0,y0,dx=0,dy=0,on=0,labs=el.querySelectorAll('.sflab');
+ function lab(a,o){labs.forEach(function(l,i){l.style.opacity=(['no','wl','seen'][i]===a)?o:0})}
+ function dir(){return(Math.abs(dy)>Math.abs(dx)*1.1&&dy<-20)?'seen':dx>20?'wl':dx<-20?'no':0}
+ el.onpointerdown=function(e){on=1;x0=e.clientX;y0=e.clientY;dx=dy=0;el.setPointerCapture(e.pointerId);el.style.transition='none'};
+ el.onpointermove=function(e){if(!on)return;dx=e.clientX-x0;dy=e.clientY-y0;el.style.transform='translate('+dx+'px,'+dy+'px) rotate('+dx/18+'deg)';lab(dir(),Math.min(1,Math.hypot(dx,dy)/100))};
+ el.onpointerup=el.onpointercancel=function(){if(!on)return;on=0;el.style.transition='';var a=dir(),d=Math.hypot(dx,dy);
+  if(a&&d>90)sfAct(a);else{el.style.transform='';lab(0,0);if(d<6)open_(sw.q[0].id,sw.q[0].t)}}}
+window.sfSwipeMore=async function(){await fill();show()};
+window.sfAct=async function(a){var it=sw.q.shift();if(!it)return;var el=document.querySelector('#sfSwB .sfcard:not(.u)');
+ if(el){var f={no:[-650,0],wl:[650,0],seen:[0,-750]}[a];el.style.transform='translate('+f[0]+'px,'+f[1]+'px) rotate('+f[0]/20+'deg)';el.style.opacity=0}
+ var seen=jget('sinator_swipe_seen',{});seen[it.t+'_'+it.id]=1;jset('sinator_swipe_seen',seen);
+ setTimeout(show,230);if(sw.q.length<4)fill().then(function(){if(!document.querySelector('#sfSwB .sfcard'))show()});
+ try{if(a==='wl'){T('🔖 Do watchlistu ('+await addWL(it)+')')}else if(a==='seen'){await markSeen(it);T('👁 Označeno jako viděné')}}catch(e){T('⚠️ '+(e.message||'Chyba'))}};
+async function addWL(it){if(BE()){await myWatchlistAdd(it.id,it.t,it.title,it.year,it.p);return 'Sinator + Histra'}
+ if(typeof histraReady==='function'&&histraReady()){await histraPostItem('/api/v1/watchlist',it.id,it.t);return 'Histra'}
+ var l=jget('sinator_swipe_wl',[]);l.push({id:it.id,type:it.t,title:it.title,year:it.year,poster_path:it.p});jset('sinator_swipe_wl',l);return 'jen v tomto zařízení'}
+async function markSeen(it){var s=S();if(s.watched){s.watched[it.t+'_'+it.id]={id:it.id,type:it.t,title:it.title,year:it.year,posterPath:it.p||'',addedAt:Date.now()};st.setItem('sinator_watched',JSON.stringify(s.watched))}
+ if(BE())await myHistoryAdd(it.id,it.t)}
+
+/* ── Up Next: další díly + premiéry ── */
+async function loadUp(){var s=S(),tv={},mv={},hist=[];
+ function add(id,t){id=+id;if(!id)return;(nt(t)==='tv'?tv:mv)[id]=1}
+ (s.favs||[]).forEach(function(f){add(f.id,f.type||'movie')});
+ Object.values(s.watched||{}).forEach(function(w){if(w.type==='episode')add(w.tvId,'tv')});
+ jget('sinator_swipe_wl',[]).forEach(function(f){add(f.id,f.type)});
+ if(BE()){try{var r=await Promise.all([myWatchlistGet(),myHistoryGetAll('episodes')]);r[0].forEach(function(x){add(x.id,x.type)});
+  r[1].sort(function(a,b){return new Date(b.watched_at||0)-new Date(a.watched_at||0)});r[1].slice(0,600).forEach(function(x){add(x.id,'tv')})}catch(e){}}
+ var out={tv:[],mv:[]},t0=td();
+ var a=await pmap(Object.keys(tv).slice(0,45),function(id){return tj('/tv/'+id)},8);
+ a.forEach(function(d){var e=d&&d.next_episode_to_air;if(e&&e.air_date&&e.air_date>=t0)out.tv.push({id:d.id,n:d.name,p:d.poster_path,d:e.air_date,x:'S'+p2(e.season_number)+'E'+p2(e.episode_number)+(e.name?' · '+e.name:'')})});
+ var b=await pmap(Object.keys(mv).slice(0,40),function(id){return Promise.all([tj('/movie/'+id),F(TB+'/movie/'+id+'/release_dates?api_key='+K())])},8);
+ b.forEach(function(r){if(!r)return;var m=r[0],cz=null,us=null;((r[1]&&r[1].results)||[]).forEach(function(c){var iso=c.iso_3166_1;if(iso!=='CZ'&&iso!=='US')return;
+  (c.release_dates||[]).forEach(function(x){var d=(x.release_date||'').slice(0,10);if(d<t0||[2,3,4].indexOf(x.type)<0)return;var o={d:d,k:x.type===4?'💿 VOD':'🎬 kino'};
+   if(iso==='CZ'){if(!cz||d<cz.d)cz=o}else if(!us||d<us.d)us=o})});
+  var o=cz||us;if(o)out.mv.push({id:m.id,n:m.title,p:m.poster_path,d:o.d,x:o.k+(cz?' (ČR)':' (USA)')})});
+ var so=function(x,y){return x.d<y.d?-1:1};out.tv.sort(so);out.mv.sort(so);return out}
+function rows(a,t){return a.length?a.map(function(x){var n=dd(x.d);return '<div class="sfrow" onclick="sfOpen('+x.id+',\''+t+'\')"><img loading="lazy" src="'+(x.p?IM+'w154'+x.p:'')+'"><div><b>'+esc(x.n)+'</b><br><small>'+esc(x.x||'')+' · '+fd(x.d)+'</small></div><span class="sfpill">'+cd(n)+'</span></div>'}).join(''):'<p style="opacity:.6">Nic nenalezeno.</p>'}
+window.sfUpNext=async function(){if(!K()){T('Nejdřív zadej TMDB klíč');return}
+ var b=ov('sfUp','📆 Up Next','<div style="display:flex;gap:8px;margin-bottom:12px"><button class="sf-btn on" id="sfU1" onclick="sfTab(1)">📺 Další díly</button><button class="sf-btn" id="sfU2" onclick="sfTab(2)">🎬 Premiéry</button><button class="sf-btn" onclick="sfNotify()" title="Upozornění">🔔</button></div><div id="sfUb">Načítám…</div>');
+ var o=await loadUp(),to=new Date(Date.now()+60*864e5).toISOString().slice(0,10),q='&region=CZ&release_date.gte='+td()+'&release_date.lte='+to+'&sort_by=primary_release_date.asc&with_release_type=';
+ var ci=await tj('/discover/movie',q+'3|2').catch(function(){return{}}),vo=await tj('/discover/movie',q+'4').catch(function(){return{}});
+ var mp=function(r,k){return((r&&r.results)||[]).filter(function(m){return m.poster_path}).map(function(m){return{id:m.id,n:m.title,p:m.poster_path,d:m.release_date,x:k}})};
+ sw.up={1:'<h4 style="margin:0 0 8px">Seriály, které sleduješ</h4>'+rows(o.tv,'tv')+'<h4 style="margin:14px 0 8px">Filmy z tvého watchlistu</h4>'+rows(o.mv,'movie'),
+  2:'<h4 style="margin:0 0 8px">🎬 Do kin v ČR (60 dní)</h4>'+rows(mp(ci,'kino'),'movie')+'<h4 style="margin:14px 0 8px">💿 Na VOD v ČR (60 dní)</h4>'+rows(mp(vo,'VOD / digitálně'),'movie')};
+ sfTab(1)};
+window.sfTab=function(n){var e=document.getElementById('sfUb');if(!e||!sw.up)return;e.innerHTML=sw.up[n];['1','2'].forEach(function(i){document.getElementById('sfU'+i).classList.toggle('on',i==n)})};
+window.sfNotify=async function(){if(!('Notification' in window)){T('Notifikace tu nejsou podporované');return}
+ if(await Notification.requestPermission()==='granted'){st.setItem('sf_notify','1');T('🔔 Zapnuto — kontrola nových dílů při otevření appky');daily(1)}else T('Notifikace nepovoleny')};
+async function daily(f){if(st.getItem('sf_notify')!=='1'||!('Notification' in window)||Notification.permission!=='granted')return;
+ if(!f&&st.getItem('sf_nchk')===td())return;st.setItem('sf_nchk',td());var o=await loadUp(),h=o.tv.filter(function(x){return dd(x.d)<=1}).map(function(x){return x.n+' '+x.x.split(' ')[0]+' ('+cd(dd(x.d))+')'})
+  .concat(o.mv.filter(function(x){return dd(x.d)<=1}).map(function(x){return x.n+' ('+cd(dd(x.d))+')'}));
+ if(!h.length)return;var t='Sinator — dnes a zítra',bd=h.slice(0,5).join('\n');T('🔔 '+h[0]+(h.length>1?' +'+(h.length-1):''));
+ try{new Notification(t,{body:bd})}catch(e){navigator.serviceWorker&&navigator.serviceWorker.getRegistration().then(function(r){r&&r.showNotification(t,{body:bd})})}}
+setTimeout(function(){daily().catch(function(){})},7000);
+
+/* ── Wrapped ── */
+window.sfWrapped=function(){var y=new Date().getFullYear();
+ ov('sfWr','🎞️ Můj filmový rok','<div style="display:flex;gap:8px;margin-bottom:12px"><select id="sfWy" class="sf-btn">'+[y,y-1,y-2].map(function(v){return '<option>'+v+'</option>'}).join('')+'</select><button class="sf-btn on" onclick="sfWrGo()">Vytvořit</button></div><div id="sfWrB"></div>');sfWrGo()};
+function limg(src){return new Promise(function(r){var i=new Image();i.crossOrigin='anonymous';i.onload=function(){r(i)};i.onerror=function(){r(null)};i.src=src})}
+window.sfWrGo=async function(){var y=+document.getElementById('sfWy').value,b=document.getElementById('sfWrB');b.innerHTML='Počítám…';
+ var mv=[],ep=[],inY=function(d){return d&&new Date(d).getFullYear()===y};
+ if(BE()){try{var r=await Promise.all([myHistoryGetAll('movies'),myHistoryGetAll('episodes')]);
+  mv=r[0].filter(function(x){return inY(x.watched_at)}).map(function(x){return+x.id});ep=r[1].filter(function(x){return inY(x.watched_at)}).map(function(x){return+x.id})}catch(e){}}
+ if(!mv.length&&!ep.length)Object.values(S().watched||{}).forEach(function(w){if(!inY(w.addedAt))return;if(w.type==='movie')mv.push(+w.id);else if(w.type==='episode')ep.push(+w.tvId)});
+ if(!mv.length&&!ep.length){b.innerHTML='<p>Pro rok '+y+' nemám žádná zhlédnutí.</p>';return}
+ var um=Object.keys(mv.reduce(function(o,i){o[i]=1;return o},{})).slice(0,60),us=Object.keys(ep.reduce(function(o,i){o[i]=1;return o},{})).slice(0,25),M={},V={};
+ (await pmap(um,function(i){return tj('/movie/'+i)},10)).forEach(function(d){if(d)M[d.id]=d});(await pmap(us,function(i){return tj('/tv/'+i)},10)).forEach(function(d){if(d)V[d.id]=d});
+ var min=0,g={};mv.forEach(function(i){var d=M[i];min+=(d&&d.runtime)||105;if(d)(d.genres||[]).forEach(function(x){g[x.name]=(g[x.name]||0)+1})});
+ ep.forEach(function(i){var d=V[i];min+=(d&&d.episode_run_time&&d.episode_run_time[0])||42});
+ Object.keys(V).forEach(function(i){(V[i].genres||[]).forEach(function(x){g[x.name]=(g[x.name]||0)+1})});
+ var tg=Object.keys(g).sort(function(a,c){return g[c]-g[a]}).slice(0,3),top=Object.keys(M).map(function(i){return M[i]}).filter(function(d){return d.poster_path}).sort(function(a,c){return c.vote_average-a.vote_average}).slice(0,5);
+ var ims=await Promise.all(top.map(function(d){return limg(IM+'w342'+d.poster_path)}));
+ var c=document.createElement('canvas');c.width=1080;c.height=1920;var x=c.getContext('2d'),gr=x.createLinearGradient(0,0,1080,1920);
+ gr.addColorStop(0,'#1b0f3a');gr.addColorStop(.55,'#0b1a33');gr.addColorStop(1,'#07090f');x.fillStyle=gr;x.fillRect(0,0,1080,1920);
+ var tx=function(s,px,py,f,col,al){x.font=f;x.fillStyle=col;x.textAlign=al||'left';x.fillText(s,px,py)};
+ tx('SINATOR · MŮJ FILMOVÝ ROK',70,130,'700 42px sans-serif','#22d3ee');tx(''+y,70,360,'900 240px sans-serif','#fff');
+ [['FILMŮ',mv.length],['EPIZOD',ep.length],['HODIN',Math.round(min/60)]].forEach(function(s,i){var px=70+i*330;tx(''+s[1],px,560,'900 110px sans-serif','#fff');tx(s[0],px,610,'600 34px sans-serif','#9ca3af')});
+ tx('≈ '+(min/1440).toFixed(1).replace('.',',')+' dne u obrazovky',70,690,'500 36px sans-serif','#fb923c');
+ tx('NEJČASTĚJŠÍ ŽÁNRY',70,830,'700 38px sans-serif','#22d3ee');
+ tg.forEach(function(n,i){var py=890+i*100,w=Math.max(120,840*g[n]/g[tg[0]]);x.fillStyle='#22d3ee33';x.fillRect(70,py,w,66);x.fillStyle='#22d3ee';x.fillRect(70,py,10,66);tx(n,100,py+46,'700 38px sans-serif','#fff')});
+ if(top.length){tx('NEJLÉPE HODNOCENÉ FILMY',70,1260,'700 38px sans-serif','#22d3ee');
+  ims.forEach(function(im,i){var px=70+i*192;if(im)x.drawImage(im,px,1300,172,258);else{x.fillStyle='#222';x.fillRect(px,1300,172,258)}})}
+ tx('vytvořeno v Sinatoru',540,1840,'500 32px sans-serif','#6b7280','center');
+ b.innerHTML='<img style="max-width:100%;border-radius:12px;display:block;margin:0 auto 12px" src="'+c.toDataURL('image/png')+'"><div style="display:flex;gap:8px;justify-content:center"><button class="sf-btn on" id="sfWd">⬇️ Stáhnout</button><button class="sf-btn" id="sfWs">📤 Sdílet</button></div>';
+ var fn='sinator-wrapped-'+y+'.png';
+ document.getElementById('sfWd').onclick=function(){c.toBlob(function(bl){var a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download=fn;document.body.appendChild(a);a.click();a.remove()})};
+ document.getElementById('sfWs').onclick=function(){c.toBlob(function(bl){var f=new File([bl],fn,{type:'image/png'});
+  if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:'Můj filmový rok '+y}).catch(function(){});else document.getElementById('sfWd').click()})}};
+})();
+</script>
+<!-- ═══ /SINATOR FEATURES PACK ═══ -->
+
 </body>
 </html>
