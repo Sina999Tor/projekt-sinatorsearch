@@ -1669,6 +1669,26 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             <div class="settings-divider"></div>
             <button class="settings-full-btn" onclick="toggleFullscreen()" id="settingsFullscreenBtn">📺 Fullscreen (vypnuto)</button>
             <div class="settings-divider"></div>
+            <div class="settings-section" id="notifySection" style="background:rgba(96,144,255,0.07);border:1px solid rgba(96,144,255,0.3);border-radius:12px;padding:14px 16px;">
+                <span class="settings-label" style="color:#6090ff;">🔔 Upozornění</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">
+                    Dá ti vědět, když vyjde <b>nová epizoda</b> seriálu, který sleduješ, nebo když se film či seriál <b>z tvého watchlistu objeví na streamovací službě</b> (Netflix, Max, Disney+…). Funguje nejlépe v nainstalované appce na Androidu (Chrome): kontrola proběhne sama na pozadí zhruba 1–2× denně. V ostatních prohlížečích a na iPhonu se kontroluje při otevření appky.
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;margin-top:10px;">
+                    <div onclick="notifyToggle()" id="notifyToggle" style="width:44px;height:24px;border-radius:12px;background:#333;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
+                        <div id="notifyToggleKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;pointer-events:none;"></div>
+                    </div>
+                    <div style="font-size:0.88rem;color:#eee;font-weight:600;">Upozornění na nové epizody a streamy</div>
+                </div>
+                <div id="notifyOptions" style="display:none;margin-top:10px;">
+                    <input type="text" id="notifyProviders" placeholder="Jen tyto služby (prázdné = všechny), např. Netflix, Max" onchange="notifySaveProviders()" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-dark);color:#fff;font-size:0.8rem;">
+                    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                        <button class="settings-btn-small" onclick="notifyCheckNow()">🔍 Zkontrolovat teď</button>
+                        <button class="settings-btn-small" onclick="notifyTest()">🔔 Zkušební upozornění</button>
+                    </div>
+                </div>
+                <div id="notifyStatus" style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;line-height:1.4;"></div>
+            </div>
             <div class="settings-section" id="installAppSection">
                 <span class="settings-label">📲 Instalace aplikace</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">
@@ -5494,6 +5514,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     const CHANGELOG_HISTORY = [
         { version: '2026-10-07a', date: '7. 10. 2026', items: [
             'Tematické seznamy 2 — nová položka 🏎️ Auta: filmy, kde auta hrají významnou roli (závody, honičky, muscle cary, street racing…)',
+            'Upozornění (Nastavení → Ostatní): nové epizody sledovaných seriálů a tituly z watchlistu, které se objevily na streamovací službě (CZ). Samostatný worker notify-sw.js; kontrola na pozadí v nainstalované appce na Androidu (Chrome), jinde při otevření appky. První kontrola jen zapíše výchozí stav',
             'Schválení „Stejný uživatel“ přenese i TMDB klíč: schválené zařízení si klíč uloží k záznamu přístupu a nové zařízení ho po schválení samo převezme (když nemá vlastní). Nemá-li původní uživatel klíč uložený, admin se zeptá, zda mu dát svůj. Pozn.: klíč je tak uložený v databázi Firebase u záznamu uživatele',
             'Žádost o přístup: když přezdívka už existuje (nová instalace appky / nové zařízení), žádost se už neodmítne jako „obsazená“, ale odešle se adminovi. V Adminu je u ní upozornění „Přezdívka už existuje — stejný uživatel, nebo nový?“ a tlačítka ✅ Stejný uživatel / ❌ Jiný — zamítnutím se původní uživatel obnoví beze změny',
             'Instalace appky: do nainstalované verze se přenese TMDB klíč, přezdívka i schválení přístupu (nemusí se znovu zadávat ani schvalovat) — v Nastavení → Instalace aplikace je tlačítko 🔑 „Přenést klíč, jméno a přístup do instalace“ (přidá je na 10 min do adresy za #, takže je zástupce/Přidat na plochu/iOS vezme s sebou a první spuštění je uloží); u tlačítka Instalovat aplikaci se to dělá samo. Pozvánky nesou jen TMDB klíč. Manifest zůstává statický',
@@ -6029,6 +6050,118 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             }
         });
     });
+
+    // ── 🔔 Upozornění na nové epizody a dostupnost titulů na streamech ──────────────
+    // Samostatný service worker /notify-sw.js (neovlivňuje /sw.js) čte "snímek" z IndexedDB, který sem ukládá appka.
+    (function() {
+        var IDB = 'sinator-notify', ST = 'kv', FLAG = 'sinator_notify_enabled', PROV = 'sinator_notify_providers', LAST = 'sinator_notify_last_check';
+        function idb() { return new Promise(function(res, rej) { var r = indexedDB.open(IDB, 1); r.onupgradeneeded = function() { r.result.createObjectStore(ST); }; r.onsuccess = function() { res(r.result); }; r.onerror = function() { rej(r.error); }; }); }
+        function idbSet(k, v) { return idb().then(function(d) { return new Promise(function(res, rej) { var t = d.transaction(ST, 'readwrite'); t.objectStore(ST).put(v, k); t.oncomplete = res; t.onerror = function() { rej(t.error); }; }); }); }
+        function toast(m) { try { if (typeof showToast === 'function') { showToast(m); return; } } catch (e) {} try { alert(m); } catch (e) {} }
+        function supported() { return 'Notification' in window && 'serviceWorker' in navigator && 'indexedDB' in window; }
+        function standalone() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true; }
+        function enabled() { return localStorage.getItem(FLAG) === '1'; }
+        function providers() { return (localStorage.getItem(PROV) || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean); }
+        function setStatus(t) { var el = document.getElementById('notifyStatus'); if (el) el.textContent = t || ''; }
+        function paint() {
+            var on = enabled();
+            var t = document.getElementById('notifyToggle'), k = document.getElementById('notifyToggleKnob'), o = document.getElementById('notifyOptions'), p = document.getElementById('notifyProviders');
+            if (t) t.style.background = on ? '#6090ff' : '#333';
+            if (k) k.style.left = on ? '22px' : '2px';
+            if (o) o.style.display = on ? 'block' : 'none';
+            if (p && document.activeElement !== p) p.value = providers().join(', ');
+            if (!supported()) setStatus('⚠️ Tenhle prohlížeč upozornění nepodporuje.');
+            else if (on) {
+                var last = +localStorage.getItem(LAST) || 0;
+                var perm = Notification.permission === 'granted' ? '' : ' ⚠️ Upozornění jsou v prohlížeči zakázaná.';
+                setStatus('✅ Zapnuto' + (last ? ' · poslední kontrola ' + new Date(last).toLocaleString('cs-CZ') : '') + (('periodicSync' in ServiceWorkerRegistration.prototype) && standalone() ? ' · kontrola na pozadí je aktivní' : ' · kontrola probíhá při otevření appky') + '.' + perm);
+            } else setStatus('');
+        }
+        // Snímek dat pro worker: TMDB klíč, sledované seriály (poslední shlédnutá epizoda) a watchlist
+        async function buildSnapshot() {
+            var snap = { tmdb: (localStorage.getItem('sinator_tmdb_api_key') || '').trim(), region: 'CZ', providers: providers(), shows: [], titles: [], at: Date.now() };
+            try {
+                var idx = JSON.parse(localStorage.getItem('sinator_histra_watched_idx_v1') || 'null');
+                if (idx && idx.shows) Object.keys(idx.shows).forEach(function(id) { var e = idx.shows[id]; snap.shows.push({ id: +id, s: e.s || 0, e: e.n || 0 }); });
+            } catch (e) {}
+            try {
+                if (typeof window.ntGetWatchlistPool === 'function') {
+                    var pool = await window.ntGetWatchlistPool();
+                    ((pool && pool.items) || []).forEach(function(it) { if (it && it.id) snap.titles.push({ id: it.id, type: it.type === 'tv' ? 'tv' : 'movie', title: it.title || '' }); });
+                }
+            } catch (e) {}
+            await idbSet('snap', snap);
+            return snap;
+        }
+        async function register() {
+            var reg = await navigator.serviceWorker.register('/notify-sw.js', { scope: '/notify-scope/' });
+            if (!reg.active) {
+                var sw = reg.installing || reg.waiting;
+                if (sw) await Promise.race([new Promise(function(res) { sw.addEventListener('statechange', function() { if (sw.state === 'activated') res(); }); }), new Promise(function(r) { setTimeout(r, 8000); })]);
+            }
+            try { if (reg.periodicSync) await reg.periodicSync.register('sinator-notify', { minInterval: 12 * 3600 * 1000 }); } catch (e) {}
+            return reg;
+        }
+        function ask(reg, msg) {
+            return new Promise(function(res) {
+                var w = reg.active; if (!w) return res(null);
+                var ch = new MessageChannel(); var done = false;
+                ch.port1.onmessage = function(ev) { done = true; res(ev.data); };
+                w.postMessage(msg, [ch.port2]);
+                setTimeout(function() { if (!done) res(null); }, 25000);
+            });
+        }
+        window.notifyToggle = async function() {
+            if (!supported()) { toast('Tenhle prohlížeč upozornění nepodporuje'); return; }
+            if (enabled()) {
+                localStorage.removeItem(FLAG);
+                try { var r = await navigator.serviceWorker.getRegistration('/notify-scope/'); if (r) { try { if (r.periodicSync) await r.periodicSync.unregister('sinator-notify'); } catch (e) {} await r.unregister(); } } catch (e) {}
+                paint(); toast('🔕 Upozornění vypnuta'); return;
+            }
+            var perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+            if (perm !== 'granted') { toast('⚠️ Upozornění nejsou povolená v prohlížeči'); paint(); return; }
+            if (!(localStorage.getItem('sinator_tmdb_api_key') || '').trim()) { toast('⚠️ Nejdřív nastav TMDB klíč'); return; }
+            localStorage.setItem(FLAG, '1');
+            setStatus('⏳ Nastavuji…');
+            try { await buildSnapshot(); await register(); } catch (e) { setStatus('⚠️ Nepodařilo se zapnout: ' + (e && e.message || e)); localStorage.removeItem(FLAG); paint(); return; }
+            paint(); toast('🔔 Upozornění zapnuta');
+            window.notifyCheckNow(true);
+        };
+        window.notifySaveProviders = function() {
+            var v = (document.getElementById('notifyProviders') || {}).value || '';
+            localStorage.setItem(PROV, v);
+            if (enabled()) buildSnapshot().catch(function() {});
+        };
+        window.notifyCheckNow = async function(silent) {
+            if (!enabled()) return;
+            try {
+                await buildSnapshot();
+                var reg = await register();
+                var r = await ask(reg, { type: 'check' });
+                localStorage.setItem(LAST, String(Date.now()));
+                paint();
+                if (!silent || (r && r.notified)) {
+                    if (!r) toast('⚠️ Kontrola se nepodařila');
+                    else if (r.skipped) toast('⚠️ Chybí TMDB klíč');
+                    else toast(r.notified ? '🔔 Nové: ' + r.notified : '✅ Zkontrolováno (' + r.shows + ' seriálů, ' + r.titles + ' titulů v watchlistu) — zatím nic nového');
+                }
+            } catch (e) { if (!silent) toast('⚠️ Kontrola selhala'); }
+        };
+        window.notifyTest = async function() {
+            try { var reg = await register(); if (reg.active) reg.active.postMessage({ type: 'test' }); else toast('⚠️ Worker ještě není připravený, zkus to za chvíli'); } catch (e) { toast('⚠️ Nepodařilo se'); }
+        };
+        // Po startu: znovu zaregistrovat worker (po „vynucené aktualizaci“ se odregistruje) a občas zkontrolovat
+        setTimeout(function() {
+            try {
+                paint();
+                if (!enabled() || !supported() || Notification.permission !== 'granted') return;
+                var last = +localStorage.getItem(LAST) || 0;
+                if (Date.now() - last > 6 * 3600 * 1000) window.notifyCheckNow(true);
+                else buildSnapshot().then(register).catch(function() {});
+            } catch (e) {}
+        }, 6000);
+        document.addEventListener('visibilitychange', function() { if (!document.hidden) paint(); });
+    })();
 
     // ✅ OPRAVENÁ PWA INSTALACE
     function setupPWA() {
