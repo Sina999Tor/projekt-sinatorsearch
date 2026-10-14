@@ -1668,7 +1668,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             </div>
             <div class="settings-divider"></div>
             <button class="settings-full-btn" onclick="toggleFullscreen()" id="settingsFullscreenBtn">📺 Fullscreen (vypnuto)</button>
-            <div class="settings-divider"></div>
+            <div class="sw-page" id="swPageExperimental">
             <div class="settings-section" id="notifySection" style="background:rgba(96,144,255,0.07);border:1px solid rgba(96,144,255,0.3);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:#6090ff;">🔔 Upozornění</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">
@@ -1689,6 +1689,18 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 </div>
                 <div id="notifyStatus" style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;line-height:1.4;"></div>
             </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section" id="homeBtnsSection">
+                <span class="settings-label">🏠 Přizpůsobit tlačítka domovské obrazovky</span>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">Zapni / vypni zobrazení jednotlivých tlačítek v horní liště. Nastavení nejde vypnout, aby se k němu šlo vždy vrátit. Ukládá se jen v tomto zařízení.</div>
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-top:10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;">
+                    <span style="flex:1;font-size:0.85rem;color:var(--text);">🖼️ Šipka ▲ schová i logo<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">Po sbalení lišty se místo malého loga zobrazí jen tlačítka</div></span>
+                    <div id="hbLogoSw" onclick="homeBtnsToggleLogo()" style="width:44px;height:24px;border-radius:12px;position:relative;flex-shrink:0;transition:background .2s;background:#333;cursor:pointer;"><div id="hbLogoKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;pointer-events:none;"></div></div>
+                </div>
+                <div id="homeBtnsList" style="display:flex;flex-direction:column;gap:6px;margin-top:10px;"></div>
+                <button class="settings-btn-small" style="width:100%;margin-top:10px;" onclick="homeBtnsReset()">↺ Zobrazit všechna tlačítka</button>
+            </div>
+            </div><!-- /swPageExperimental -->
             <div class="settings-section" id="installAppSection">
                 <span class="settings-label">📲 Instalace aplikace</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">
@@ -5560,6 +5572,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             'Přehrát v externí aplikaci — přidána aplikace 🔶 VLC (Nastavení → 📱 Aplikace): přehraje přímý odkaz na video. Na Hellspy podrž video → Otevřít v prohlížeči → zkopíruj adresu (.mp4), pak v Sinatoru klepni na VLC — odkaz se vezme ze schránky (nebo ho vložíš do okna) a otevře se rovnou ve VLC. Je tam i tlačítko Otevřít Hellspy a Jen otevřít VLC'
         ] },
         { version: '2026-10-14a', date: '14. 10. 2026', items: [
+            '🏠 Experimentální funkce — zapnutí/vypnutí jednotlivých tlačítek horní lišty (Hudba, Živá TV, Swipe, Up Next, Wrapped, Zábava…); Nastavení vypnout nejde. Přepínač „Šipka ▲ schová i logo“ — po sbalení lišty zmizí i malé logo',
+            '🧪 Nastavení — nová sekce Experimentální funkce; přesunuto sem 🔔 Upozornění na nové epizody a streamy (dřív ve Vzhledu)',
             '🔥 Swipe tipy (tlačítko v horní liště): tipy na filmy a seriály podle tvého vkusu (zhlédnuté, oblíbené, watchlist). Táhni doleva = zahodit, doprava = do watchlistu (Sinator + Histra), nahoru = už jsem viděl; klepnutí otevře detail. Funguje i tlačítky pod kartou',
             '📝 Soukromé poznámky: v detailu filmu/seriálu je textové pole pro vlastní recenzi nebo důvod, proč je titul ve watchlistu. Ukládá se automaticky, jen v tomto zařízení',
             '▶️ Trailer přímo v appce: tlačítko v detailu otevře YouTube trailer (z TMDB) v plovoucím okně, které jde přetahovat; víc videí přepneš ⏭, ↗ otevře YouTube',
@@ -5568,7 +5582,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         ] },
         { version: '2026-10-07a', date: '7. 10. 2026', items: [
             'Tematické seznamy 2 — nová položka 🏎️ Auta: filmy, kde auta hrají významnou roli (závody, honičky, muscle cary, street racing…)',
-            'Upozornění (Nastavení → Ostatní): nové epizody sledovaných seriálů a tituly z watchlistu, které se objevily na streamovací službě (CZ). Samostatný worker notify-sw.js; kontrola na pozadí v nainstalované appce na Androidu (Chrome), jinde při otevření appky. První kontrola jen zapíše výchozí stav',
+            'Upozornění (Nastavení → 🧪 Experimentální funkce): nové epizody sledovaných seriálů a tituly z watchlistu, které se objevily na streamovací službě (CZ). Samostatný worker notify-sw.js; kontrola na pozadí v nainstalované appce na Androidu (Chrome), jinde při otevření appky. První kontrola jen zapíše výchozí stav',
             'Schválení „Stejný uživatel“ přenese i TMDB klíč: schválené zařízení si klíč uloží k záznamu přístupu a nové zařízení ho po schválení samo převezme (když nemá vlastní). Nemá-li původní uživatel klíč uložený, admin se zeptá, zda mu dát svůj. Pozn.: klíč je tak uložený v databázi Firebase u záznamu uživatele',
             'Žádost o přístup: když přezdívka už existuje (nová instalace appky / nové zařízení), žádost se už neodmítne jako „obsazená“, ale odešle se adminovi. V Adminu je u ní upozornění „Přezdívka už existuje — stejný uživatel, nebo nový?“ a tlačítka ✅ Stejný uživatel / ❌ Jiný — zamítnutím se původní uživatel obnoví beze změny',
             'Instalace appky: do nainstalované verze se přenese TMDB klíč, přezdívka i schválení přístupu (nemusí se znovu zadávat ani schvalovat) — v Nastavení → Instalace aplikace je tlačítko 🔑 „Přenést klíč, jméno a přístup do instalace“ (přidá je na 10 min do adresy za #, takže je zástupce/Přidat na plochu/iOS vezme s sebou a první spuštění je uloží); u tlačítka Instalovat aplikaci se to dělá samo. Pozvánky nesou jen TMDB klíč. Manifest zůstává statický',
@@ -46869,7 +46883,7 @@ window.addEventListener('load', function() {
 (function(){
   var $ = function(id){ return document.getElementById(id); };
   var GROUPS = [
-    ['', ['profile','tmdb','ai','connect','look','apps','security','update','backup','admin']]
+    ['', ['profile','tmdb','ai','connect','look','apps','security','update','backup','experimental','admin']]
   ];
   var PAGES = {
     ai:      {icon:'🤖', name:'AI klíče',          sub:'Gemini, Groq, OpenRouter',                 c:'#a78bfa', node:'settingsTabContentKeys', pre:function(){ window.switchKeysSubTab('ai'); }},
@@ -46881,6 +46895,7 @@ window.addEventListener('load', function() {
     security:{icon:'🔐', name:'Heslo a obsah',     sub:'Přístupové heslo, explicitní obsah',       c:'#ff6b6b', node:'swPageSecurity'},
     update:  {icon:'🔄', name:'Aktualizace',       sub:'Kontrola verze a historie změn',           c:'#1db954', node:'swPageUpdate'},
     backup:  {icon:'💾', name:'Záloha dat',        sub:'Export a import',                          c:'#8bc34a', node:'swPageBackup'},
+    experimental:{icon:'🧪', name:'Experimentální funkce', sub:'Upozornění na nové epizody a streamy', c:'#38bdf8', node:'swPageExperimental', pre:function(){ if(window.homeBtnsRender) window.homeBtnsRender(); }},
     admin:   {icon:'🛡️', name:'Admin',             sub:function(){ var l=$('adminModeLabel'); return 'Admin: ' + (l ? l.textContent : 'Neaktivní'); }, c:'#ffaa00', node:'settingsTabContentAdmin'}
   };
 
@@ -47024,6 +47039,33 @@ window.sfOpen=open_;
 (function(){var z=document.getElementById('btnZabavaToggle');if(!z)return;
  [['🔥','Swipe','sfSwipeOpen','Swipe tipy podle tvého vkusu'],['📆','Up Next','sfUpNext','Další díly a premiéry'],['🎞️','Wrapped','sfWrapped','Můj filmový rok']].forEach(function(b){
   z.insertAdjacentHTML('beforebegin','<button class="action-btn icon" onclick="'+b[2]+'()" title="'+b[3]+'"><span class="btn-icon">'+b[0]+'</span><span class="btn-label">'+b[1]+'</span></button>')})})();
+
+/* ── Zapnutí/vypnutí tlačítek domovské obrazovky (Nastavení → Experimentální funkce) ── */
+(function(){
+ var KEY='sinator_hidden_home_btns',LKEY='sinator_hide_logo_on_collapse',LOCK={'Nastavení':1};
+ var st=document.createElement('style');st.textContent='.header-actions .hb-off{display:none!important}';st.textContent+='body.hb-logo-hide header .logo-container.logo-mini{display:none!important}body.hb-logo-hide header .logo-container.logo-mini ~ .header-actions{flex:1 1 100%!important;width:100%!important;padding-left:12px!important}';document.head.appendChild(st);
+ function logoOn(){try{return localStorage.getItem(LKEY)==='1'}catch(e){return false}}
+ function applyLogo(){document.body.classList.toggle('hb-logo-hide',logoOn());if(typeof updateHeaderSpacer==='function')setTimeout(updateHeaderSpacer,50)}
+ function btns(){var ha=document.querySelector('.header-actions'),r=[];if(!ha)return r;
+  [].forEach.call(ha.children,function(b){var l=b.querySelector&&b.querySelector('.btn-label');if(!l)return;
+   var ic=b.querySelector('.btn-icon');r.push({el:b,key:l.textContent.trim(),icon:ic?ic.textContent.trim():'',title:b.getAttribute('title')||''})});return r}
+ function hidden(){try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){return[]}}
+ function save(a){try{localStorage.setItem(KEY,JSON.stringify(a))}catch(e){}}
+ function apply(){var h=hidden();btns().forEach(function(b){b.el.classList.toggle('hb-off',!LOCK[b.key]&&h.indexOf(b.key)>-1)});
+  if(typeof updateHeaderSpacer==='function')setTimeout(updateHeaderSpacer,50)}
+ window.homeBtnsToggleLogo=function(){try{localStorage.setItem(LKEY,logoOn()?'0':'1')}catch(e){}applyLogo();window.homeBtnsRender()};
+ window.homeBtnsRender=function(){var box=document.getElementById('homeBtnsList');if(!box)return;var h=hidden();box.innerHTML='';
+  var ls=document.getElementById('hbLogoSw'),lk=document.getElementById('hbLogoKnob');if(ls&&lk){ls.style.background=logoOn()?'#22c55e':'#333';lk.style.left=logoOn()?'22px':'2px'}
+  btns().forEach(function(b){var locked=!!LOCK[b.key],on=locked||h.indexOf(b.key)<0;
+   var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;'+(locked?'opacity:.6;':'');
+   var t=document.createElement('span');t.style.cssText='flex:1;font-size:0.85rem;color:var(--text);';t.textContent=b.icon+' '+b.key+(locked?' (nelze vypnout)':'');
+   var sw=document.createElement('div');sw.style.cssText='width:44px;height:24px;border-radius:12px;position:relative;flex-shrink:0;transition:background .2s;background:'+(on?'#22c55e':'#333')+';cursor:'+(locked?'not-allowed':'pointer')+';';
+   var k=document.createElement('div');k.style.cssText='width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:left .2s;left:'+(on?'22px':'2px')+';pointer-events:none;';sw.appendChild(k);
+   if(!locked)sw.onclick=function(){var a=hidden(),i=a.indexOf(b.key);if(i>-1)a.splice(i,1);else a.push(b.key);save(a);apply();window.homeBtnsRender()};
+   row.appendChild(t);row.appendChild(sw);box.appendChild(row)})};
+ window.homeBtnsReset=function(){save([]);apply();window.homeBtnsRender()};
+ apply();applyLogo();
+})();
 
 /* ── Detail titulu: trailer + soukromá poznámka ── */
 (function(){var sb=document.getElementById('modalScrollBody');if(!sb)return;
