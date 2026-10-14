@@ -1701,6 +1701,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     <span style="flex:1;font-size:0.85rem;color:var(--text);">🔽 Schovat šipku pro sbalení lišty<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">Když máš málo tlačítek, lištu sbalovat nemusíš. Lišta zůstane vždy rozbalená</div></span>
                     <div id="hbArrowSw" onclick="homeBtnsToggleArrow()" style="width:44px;height:24px;border-radius:12px;position:relative;flex-shrink:0;transition:background .2s;background:#333;cursor:pointer;"><div id="hbArrowKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;pointer-events:none;"></div></div>
                 </div>
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-top:6px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;">
+                    <span style="flex:1;font-size:0.85rem;color:var(--text);">ℹ️ Schovat informace na domovské obrazovce<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">Skryje pruh s textem a tlačítkem „i“ pod horní lištou</div></span>
+                    <div id="hbNoticeSw" onclick="homeBtnsToggleNotice()" style="width:44px;height:24px;border-radius:12px;position:relative;flex-shrink:0;transition:background .2s;background:#333;cursor:pointer;"><div id="hbNoticeKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;pointer-events:none;"></div></div>
+                </div>
                 <div id="homeBtnsList" style="display:flex;flex-direction:column;gap:6px;margin-top:10px;"></div>
                 <button class="settings-btn-small" style="width:100%;margin-top:10px;" onclick="homeBtnsReset()">↺ Zobrazit všechna tlačítka</button>
             </div>
@@ -5577,7 +5581,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             '🔔 Upozornění na nové epizody a streamy se přesunulo ze Vzhledu do Nastavení → 🧪 Experimentální funkce (funkce beze změny)',
             '🏠 Přizpůsobit tlačítka domovské obrazovky (Nastavení → 🧪 Experimentální funkce): každé tlačítko horní lišty — Hledat, Filtry, Hudba, Živá TV, Oblíbené, Složky, Seznamy, Top tipy, Co dnes?, Swipe, Up Next, Wrapped, Zábava — jde zapnout/vypnout. Nastavení vypnout nejde, aby se k němu šlo vždy vrátit. Tlačítko „Zobrazit všechna“ vrátí vše zpět; ukládá se jen v tomto zařízení',
             '🖼️ Přepínač „Šipka ▲ schová i logo“: po sbalení horní lišty zmizí i malé logo a zůstanou jen tlačítka (výchozí je vypnuto)',
-            '🔽 Přepínač „Schovat šipku pro sbalení lišty“: když máš málo tlačítek, šipka ▲/▼ zmizí a lišta zůstane stále rozbalená (výchozí je vypnuto)'
+            '🔽 Přepínač „Schovat šipku pro sbalení lišty“: když máš málo tlačítek, šipka ▲/▼ zmizí a lišta zůstane stále rozbalená (výchozí je vypnuto)',
+            'ℹ️ Přepínač „Schovat informace na domovské obrazovce“: skryje pruh s informačním textem a tlačítkem „i“ pod horní lištou (výchozí je vypnuto)'
         ] },
         { version: '2026-10-14b', date: '14. 10. 2026', items: [
             'Přehrát v externí aplikaci — přidána aplikace 🔶 VLC (Nastavení → 📱 Aplikace): přehraje přímý odkaz na video. Na Hellspy podrž video → Otevřít v prohlížeči → zkopíruj adresu (.mp4), pak v Sinatoru klepni na VLC — odkaz se vezme ze schránky (nebo ho vložíš do okna) a otevře se rovnou ve VLC. Je tam i tlačítko Otevřít Hellspy a Jen otevřít VLC'
@@ -47051,13 +47056,15 @@ window.sfOpen=open_;
 
 /* ── Zapnutí/vypnutí tlačítek domovské obrazovky (Nastavení → Experimentální funkce) ── */
 (function(){
- var KEY='sinator_hidden_home_btns',LKEY='sinator_hide_logo_on_collapse',AKEY='sinator_hide_toolbar_arrow',LOCK={'Nastavení':1};
- var st=document.createElement('style');st.textContent='.header-actions .hb-off{display:none!important}';st.textContent+='body.hb-noarrow #btnToggleToolbar{display:none!important}body.hb-logo-hide header .logo-container.logo-mini{display:none!important}body.hb-logo-hide header .logo-container.logo-mini ~ .header-actions{flex:1 1 100%!important;width:100%!important;padding-left:12px!important}';document.head.appendChild(st);
+ var KEY='sinator_hidden_home_btns',LKEY='sinator_hide_logo_on_collapse',AKEY='sinator_hide_toolbar_arrow',NKEY='sinator_hide_notice_bar',LOCK={'Nastavení':1};
+ var st=document.createElement('style');st.textContent='.header-actions .hb-off{display:none!important}';st.textContent+='body.hb-nonotice #noticeBar{display:none!important}body.hb-noarrow #btnToggleToolbar{display:none!important}body.hb-logo-hide header .logo-container.logo-mini{display:none!important}body.hb-logo-hide header .logo-container.logo-mini ~ .header-actions{flex:1 1 100%!important;width:100%!important;padding-left:12px!important}';document.head.appendChild(st);
  function logoOn(){try{return localStorage.getItem(LKEY)==='1'}catch(e){return false}}
  function arrowOff(){try{return localStorage.getItem(AKEY)==='1'}catch(e){return false}}
  function applyArrow(){document.body.classList.toggle('hb-noarrow',arrowOff());
   if(arrowOff()){try{if(typeof _applyToolbarState==='function'&&parseInt(localStorage.getItem('sinator_toolbar_state')||'0')!==0)_applyToolbarState(0)}catch(e){}}
   if(typeof updateHeaderSpacer==='function')setTimeout(updateHeaderSpacer,50)}
+ function noticeOff(){try{return localStorage.getItem(NKEY)==='1'}catch(e){return false}}
+ function applyNotice(){document.body.classList.toggle('hb-nonotice',noticeOff());if(typeof updateHeaderSpacer==='function')setTimeout(updateHeaderSpacer,50)}
  function applyLogo(){document.body.classList.toggle('hb-logo-hide',logoOn());if(typeof updateHeaderSpacer==='function')setTimeout(updateHeaderSpacer,50)}
  function btns(){var ha=document.querySelector('.header-actions'),r=[];if(!ha)return r;
   [].forEach.call(ha.children,function(b){var l=b.querySelector&&b.querySelector('.btn-label');if(!l)return;
@@ -47067,10 +47074,12 @@ window.sfOpen=open_;
  function apply(){var h=hidden();btns().forEach(function(b){b.el.classList.toggle('hb-off',!LOCK[b.key]&&h.indexOf(b.key)>-1)});
   if(typeof updateHeaderSpacer==='function')setTimeout(updateHeaderSpacer,50)}
  window.homeBtnsToggleArrow=function(){try{localStorage.setItem(AKEY,arrowOff()?'0':'1')}catch(e){}applyArrow();window.homeBtnsRender()};
+ window.homeBtnsToggleNotice=function(){try{localStorage.setItem(NKEY,noticeOff()?'0':'1')}catch(e){}applyNotice();window.homeBtnsRender()};
  window.homeBtnsToggleLogo=function(){try{localStorage.setItem(LKEY,logoOn()?'0':'1')}catch(e){}applyLogo();window.homeBtnsRender()};
  window.homeBtnsRender=function(){var box=document.getElementById('homeBtnsList');if(!box)return;var h=hidden();box.innerHTML='';
   var ls=document.getElementById('hbLogoSw'),lk=document.getElementById('hbLogoKnob');if(ls&&lk){ls.style.background=logoOn()?'#22c55e':'#333';lk.style.left=logoOn()?'22px':'2px'}
   var as=document.getElementById('hbArrowSw'),ak=document.getElementById('hbArrowKnob');if(as&&ak){as.style.background=arrowOff()?'#22c55e':'#333';ak.style.left=arrowOff()?'22px':'2px'}
+  var ns=document.getElementById('hbNoticeSw'),nk=document.getElementById('hbNoticeKnob');if(ns&&nk){ns.style.background=noticeOff()?'#22c55e':'#333';nk.style.left=noticeOff()?'22px':'2px'}
   btns().forEach(function(b){var locked=!!LOCK[b.key],on=locked||h.indexOf(b.key)<0;
    var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;'+(locked?'opacity:.6;':'');
    var t=document.createElement('span');t.style.cssText='flex:1;font-size:0.85rem;color:var(--text);';t.textContent=b.icon+' '+b.key+(locked?' (nelze vypnout)':'');
@@ -47079,7 +47088,7 @@ window.sfOpen=open_;
    if(!locked)sw.onclick=function(){var a=hidden(),i=a.indexOf(b.key);if(i>-1)a.splice(i,1);else a.push(b.key);save(a);apply();window.homeBtnsRender()};
    row.appendChild(t);row.appendChild(sw);box.appendChild(row)})};
  window.homeBtnsReset=function(){save([]);apply();window.homeBtnsRender()};
- apply();applyLogo();applyArrow();
+ apply();applyLogo();applyArrow();applyNotice();
  window.addEventListener('load',function(){setTimeout(applyArrow,500)});
 })();
 
