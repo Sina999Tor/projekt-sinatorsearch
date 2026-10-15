@@ -5576,6 +5576,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-15c', date: '15. 10. 2026', items: [
+            '⭐ Top tipy: když někdo přidá nové doporučení, všem ostatním vyskočí okno ve stylu „Aplikace byla aktualizována“ — s titulem, přezdívkou a komentářem a tlačítky ⭐ Zobrazit Top tipy / Rozumím. Každé přidání se ukáže jen jednou. Vlastní přidání na tomto zařízení se nehlásí, po prvním spuštění se dřívější tipy nezobrazují a okno nevyskočí na zamčené appce ani při otevřených Top tipech'
+        ] },
         { version: '2026-10-15b', date: '15. 10. 2026', items: [
             '⭐ Franchise — Vlastní série: pod připravenými sériemi je nový seznam vlastních. Ve výsledcích hledání i v detailu kolekce/seriálu je tlačítko ➕ Přidat / ➖ Odebrat. Film se uloží jako celá jeho kolekce (bez duplicit), seriál jako přehled řad; seznam se ukládá v zařízení',
             '🎤 Franchise — hlasové hledání: mikrofon vedle políčka, po nadiktování se hledá samo. Po návratu z detailu se obnoví poslední hledání',
@@ -43341,7 +43344,7 @@ if (location.search.indexOf('debug=1') !== -1) {
 <!-- Firebase SDK + Doporučuji logika -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, query, where, orderBy, limit, onSnapshot, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getDatabase, ref, onValue, get, set, remove, onDisconnect as rtdbOnDisconnect, serverTimestamp as rtdbServerTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -43357,6 +43360,116 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const rtdb = getDatabase(fbApp);
+
+// ---- UPOZORNĚNÍ NA NOVÉ TOP TIPY (Doporučuji) ----
+// Každý nový záznam v kolekci „doporuceni“ se u ostatních uživatelů ukáže jednou ve stylu
+// okna „Aplikace byla aktualizována“. Základ (poslední viděný čas) se posune při zobrazení,
+// takže se stejné přidání už nikdy neopakuje. Vlastní zápisy z tohoto zařízení se nehlásí.
+(function initDopNotify() {
+  try {
+    const TS_KEY = 'sinator_dop_seen_ts', MINE_KEY = 'sinator_dop_mine';
+    const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const mineList = () => { try { return JSON.parse(lsGet(MINE_KEY) || '[]'); } catch (e) { return []; } };
+    const addMine = id => { const m = mineList(); if (m.indexOf(id) < 0) { m.push(id); lsSet(MINE_KEY, JSON.stringify(m.slice(-50))); } };
+    const baseTs = () => parseInt(lsGet(TS_KEY) || '', 10) || 0;
+    const queue = new Map();
+    let shown = [], timer = null;
+
+    // Stejná pravidla jako u okna „Co je nového“: zamčená appka / chybějící přezdívka = nezobrazovat
+    function canShow() {
+      try {
+        if (document.visibilityState !== 'visible') return false;
+        if (document.body.classList.contains('app-locked')) return false;
+        const ls = document.getElementById('lockScreen');
+        if (ls && !ls.classList.contains('hidden')) return false;
+        const nk = document.getElementById('nickSetupOverlay');
+        if (nk && nk.style.display && nk.style.display !== 'none') return false;
+        const ar = document.getElementById('accessReqOverlay');
+        if (ar && ar.style.display && ar.style.display !== 'none') return false;
+        if (!(lsGet('sinator_user_nick') || lsGet('sinator_d_nick'))) return false;
+        if (document.getElementById('whatsNewOverlay') || document.getElementById('changelogModalOverlay')) return false;
+      } catch (e) {}
+      return true;
+    }
+
+    function render() {
+      const old = document.getElementById('dopNewOverlay');
+      if (old) old.remove();
+      if (!shown.length) return;
+      const MAX = 4, many = shown.length > 1;
+      const rows = shown.slice(0, MAX).map(it => {
+        const img = it.poster
+          ? `<img src="https://image.tmdb.org/t/p/w92${esc(it.poster)}" style="width:40px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0;background:#222;">`
+          : `<div style="width:40px;height:60px;border-radius:6px;background:#222;flex-shrink:0;"></div>`;
+        const cm = it.comment ? `<div style="font-size:0.8rem;color:var(--text);margin-top:3px;word-break:break-word;">„${esc(it.comment.length > 120 ? it.comment.slice(0, 117) + '…' : it.comment)}“</div>` : '';
+        return `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--border);">${img}<div style="min-width:0;flex:1;">
+          <div style="font-weight:700;font-size:0.92rem;color:var(--text);">${esc(it.title)}${it.year ? ' (' + esc(it.year) + ')' : ''}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">${it.type === 'tv' ? '📺 Seriál' : '🎬 Film'} · 👤 ${esc(it.nickname || 'Anonym')}</div>${cm}</div></div>`;
+      }).join('');
+      const more = shown.length > MAX ? `<div style="font-size:0.8rem;color:var(--text-muted);padding-top:6px;">…a další (${shown.length - MAX})</div>` : '';
+      const overlay = document.createElement('div');
+      overlay.id = 'dopNewOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
+      overlay.innerHTML = `
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 20px 24px;max-width:520px;width:100%;box-shadow:0 -8px 30px rgba(0,0,0,0.4);max-height:85vh;overflow-y:auto;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-weight:700;font-size:1.05rem;color:var(--gold);">⭐ ${many ? 'Nové tipy v Top tipech' : 'Nový tip v Top tipech'}</span>
+            <button onclick="window._dopNewClose()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;line-height:1;">✕</button>
+          </div>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:8px;">${many ? 'Někdo přidal nová doporučení.' : 'Někdo přidal nové doporučení.'}</div>
+          ${rows}${more}
+          <div style="display:flex;gap:10px;margin-top:16px;">
+            <button onclick="window._dopNewOpen()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--gold);background:none;color:var(--gold);font-weight:700;cursor:pointer;">⭐ Zobrazit Top tipy</button>
+            <button onclick="window._dopNewClose()" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--gold);color:#1a1a1a;font-weight:700;cursor:pointer;">Rozumím</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+    }
+    window._dopNewClose = function () { shown = []; const el = document.getElementById('dopNewOverlay'); if (el) el.remove(); };
+    window._dopNewOpen = function () { window._dopNewClose(); if (typeof window.openDoporucujiModal === 'function') window.openDoporucujiModal(); };
+
+    function tryShow() {
+      if (!queue.size) { clearInterval(timer); timer = null; return; }
+      const dop = document.getElementById('doporucujiOverlay');
+      const items = [...queue.values()].sort((a, b) => b.ts - a.ts);
+      // Uživatel zrovna prohlíží Top tipy — nic nevyskakuje, jen se obnoví seznam
+      if (dop && dop.style.display === 'flex') {
+        queue.clear(); lsSet(TS_KEY, String(Math.max(baseTs(), items[0].ts)));
+        try { loadDoporuceni(); } catch (e) {}
+        return;
+      }
+      if (!canShow()) return;
+      queue.clear();
+      lsSet(TS_KEY, String(Math.max(baseTs(), items[0].ts))); // zobrazí se jen jednou
+      const have = new Set(shown.map(x => x.id));
+      shown = items.filter(x => !have.has(x.id)).concat(shown);
+      render();
+    }
+    function kick() { if (queue.size && !timer) timer = setInterval(tryShow, 2500); tryShow(); }
+    document.addEventListener('visibilitychange', () => { if (queue.size) tryShow(); });
+
+    onSnapshot(query(collection(db, 'doporuceni'), orderBy('createdAt', 'desc'), limit(10)), snap => {
+      // záznamy, které právě vznikly na tomto zařízení (čekají na server), si zapamatuj jako vlastní
+      snap.docChanges().forEach(ch => { if (ch.type === 'added' && ch.doc.metadata.hasPendingWrites) addMine(ch.doc.id); });
+      const docs = snap.docs.filter(d => { const c = d.data().createdAt; return c && typeof c.toMillis === 'function'; });
+      if (!baseTs()) { // první spuštění — stávající tipy se nehlásí
+        lsSet(TS_KEY, String(docs.length ? docs[0].data().createdAt.toMillis() : Date.now()));
+        return;
+      }
+      const mine = new Set(mineList()), base = baseTs();
+      docs.forEach(d => {
+        const x = d.data(), ts = x.createdAt.toMillis();
+        if (ts > base && !mine.has(d.id) && !queue.has(d.id)) {
+          queue.set(d.id, { id: d.id, ts, title: x.title || '?', year: x.year || '', type: x.type, poster: x.poster || '', nickname: x.nickname || '', comment: x.comment || '' });
+        }
+      });
+      if (queue.size) kick();
+    }, err => { console.warn('dop notify listener failed', err); });
+  } catch (e) { console.warn('dop notify init failed', e); }
+})();
+// ---- /UPOZORNĚNÍ NA NOVÉ TOP TIPY ----
 
 // ---- PRESENCE (online počítadlo) ----
 (function initPresence() {
