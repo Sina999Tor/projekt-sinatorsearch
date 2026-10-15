@@ -47079,6 +47079,7 @@ window.KinoList = (function() {
       listEl.innerHTML = arr.length ? arr.map(v === 'grid' ? card : row).join('') : '<div style="grid-column:1/-1;text-align:center;color:#888;padding:24px;">Nic nenalezeno.</div>';
     }
     if (tb) tb.addEventListener('click', e => {
+      e._kinoIn = true; // klik uvnitř panelu (po překreslení už target není v DOM, ať ho „klik mimo“ nezavře)
       const b = e.target.closest('[data-k]'); if (!b) return;
       const k = b.getAttribute('data-k');
       if (k === 'gbtn') { open = !open; toolbar(); }
@@ -47088,7 +47089,7 @@ window.KinoList = (function() {
         if (o.mode === 'server') { if (o.onGenre) o.onGenre(genre); } else render();
       }
     });
-    document.addEventListener('click', e => { if (open && tb && !tb.contains(e.target)) { open = false; toolbar(); } });
+    document.addEventListener('click', e => { if (open && !e._kinoIn && tb && !tb.contains(e.target)) { open = false; toolbar(); } });
     const ctl = {
       setItems(arr) {
         items = arr || [];
