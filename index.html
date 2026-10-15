@@ -5576,6 +5576,15 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-15e', date: '15. 10. 2026', items: [
+            '🔔 Jedno upozornění místo dvou: zvoneček v 📆 Up Next je teď stejný přepínač jako Nastavení → 🧪 Experimentální funkce → Upozornění (🔔 zapnuto / 🔕 vypnuto). Starý samostatný systém upozornění v Up Next je pryč, takže nic nechodí dvakrát',
+            '🔍 Kontrola už bere VŠE: celý watchlist z Histry (ne jen pár desítek titulů) + watchlist Sinatoru + Traktu, a rozkoukané/sledované seriály z Histry, Sinator backendu, Traktu i lokálních epizod. Stejné zdroje používá i 📆 Up Next (až 400 seriálů a 400 filmů, už bez dřívějších limitů 150/40)',
+            '🚀 Při spuštění appky se (nejvýš 1× za 30 minut, ať se nezahlcuje TMDB) zkontrolují nové epizody a streamy; blížící se premiéry dílů a filmů se kontrolují jen jednou denně při prvním otevření appky. Film dnes/zítra a díl zítra se oznámí jednou; díl, který vychází dnes, hlásí kontrola nových epizod',
+            '🎬 Up Next → Premiéry → Do kin v ČR teď ukazuje stejný seznam jako Zábava → Co se chystá → Filmy v kinech (stejné filmy, hodnocení ★ a datum)',
+            '🐛 Opraveno skutečné omezení kontroly: worker notify-sw.js bral jen prvních 80 seriálů a 120 titulů z watchlistu (proto „119 titulů“). Limity jsou pryč (až 2000 seriálů / 3000 titulů). Nově přidané tituly se při první kontrole jen zapíšou jako výchozí stav, takže nepřijde záplava upozornění',
+            '🛡️ Šetření TMDB: dotazy při 429 (příliš rychle) se po krátké pauze zopakují, data o premiérách filmů z watchlistu se drží 24 h v paměti a Up Next se při startu nenačítá dvakrát',
+            '⏱️ Delší kontrola velkého watchlistu už nekončí hláškou „Kontrola se nepodařila“ (limit čekání 25 s → 3 min), stav ukazuje „Kontroluji…“'
+        ] },
         { version: '2026-10-15d', date: '15. 10. 2026', items: [
             '🛠️ Oprava: seriál s oznámeným dalším dílem (např. Šlub) se teď ukáže v 🎭 Rozkoukané i v 📆 Up Next — stejně jako dostane upozornění. Rozkoukané teď kromě Traktu berou i Histru a Sinator backend (Trakt už není povinný) a Up Next už neořezává novější seriály (limit zvýšen na 150, řazeno podle posledního sledování)'
         ] },
@@ -6180,19 +6189,102 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 var perm = Notification.permission === 'granted' ? '' : ' ⚠️ Upozornění jsou v prohlížeči zakázaná.';
                 setStatus('✅ Zapnuto' + (last ? ' · poslední kontrola ' + new Date(last).toLocaleString('cs-CZ') : '') + (('periodicSync' in ServiceWorkerRegistration.prototype) && standalone() ? ' · kontrola na pozadí je aktivní' : ' · kontrola probíhá při otevření appky') + '.' + perm);
             } else setStatus('');
+            try { if (window._sfPaintBell) window._sfPaintBell(); } catch (e) {}
         }
-        // Snímek dat pro worker: TMDB klíč, sledované seriály (poslední shlédnutá epizoda) a watchlist
+        // ── Společný sběr zdrojů (používá ho i 📆 Up Next): watchlist Histry + Sinatoru (+ Trakt),
+        // rozkoukané/sledované seriály z Histry, Sinator backendu, Traktu a lokálních epizod.
+        var _srcCache = null;
+        function _withTimeout(p, ms) { return Promise.race([p, new Promise(function(r) { setTimeout(function() { r(null); }, ms); })]); }
+        async function collectSources(force) {
+            if (!force && _srcCache && Date.now() - _srcCache.at < 5 * 60 * 1000) return _srcCache.v;
+            var showMap = {}, titleMap = {};
+            function noteShow(id, s, e, at) {
+                id = +id; if (!id) return; s = +s || 0; e = +e || 0; at = +at || 0;
+                var c = showMap[id];
+                if (!c) { showMap[id] = { id: id, s: s, e: e, at: at }; return; }
+                if (s > c.s || (s === c.s && e > c.e)) { c.s = s; c.e = e; }
+                if (at > c.at) c.at = at;
+            }
+            function noteTitle(id, type, title) {
+                id = +id; if (!id) return;
+                type = (type === 'tv' || type === 'show' || type === 'shows') ? 'tv' : 'movie';
+                var k = type + '_' + id;
+                if (!titleMap[k]) titleMap[k] = { id: id, type: type, title: title || '' };
+            }
+            var hasHistra = typeof histraReady === 'function' && histraReady();
+            var hasSin = typeof myBackendReady === 'function' && myBackendReady();
+            var tr = null; try { tr = (typeof state !== 'undefined' && state.trakt && state.trakt.accessToken) ? state.trakt : null; } catch (e) {}
+            var jobs = [];
+            // Histra: index sledovaných seriálů + celý watchlist
+            if (hasHistra) {
+                jobs.push((async function() {
+                    try { if (typeof histraRefreshWatchedIndex === 'function') await _withTimeout(histraRefreshWatchedIndex(false), 10000); } catch (e) {}
+                    try {
+                        var hw = (typeof _hwLoad === 'function') ? _hwLoad() : JSON.parse(localStorage.getItem('sinator_histra_watched_idx_v1') || 'null');
+                        if (hw && hw.shows) Object.keys(hw.shows).forEach(function(id) { var x = hw.shows[id]; noteShow(id, x.s, x.n, x.at); });
+                    } catch (e) {}
+                })());
+                jobs.push((async function() {
+                    try {
+                        var raw = await histraFetchAllPaged('/api/v1/watchlist?extended=full&lang=cs-CZ', 100, 30);
+                        (raw || []).forEach(function(e) { var p = histraParseMediaEntry(e); if (p) noteTitle(p.tmdb, p.type, p.title); });
+                    } catch (e) {}
+                })());
+            } else {
+                try { var hw0 = JSON.parse(localStorage.getItem('sinator_histra_watched_idx_v1') || 'null'); if (hw0 && hw0.shows) Object.keys(hw0.shows).forEach(function(id) { var x = hw0.shows[id]; noteShow(id, x.s, x.n, x.at); }); } catch (e) {}
+            }
+            // Sinator backend: watchlist + historie epizod
+            if (hasSin) {
+                jobs.push((async function() {
+                    try { ((await myWatchlistGet()) || []).forEach(function(x) { if (x) noteTitle(x.id, x.type, x.title); }); } catch (e) {}
+                })());
+                jobs.push((async function() {
+                    try {
+                        ((await myHistoryGetAll('episodes')) || []).forEach(function(x) {
+                            var w = typeof x.watched_at === 'number' ? x.watched_at : (Date.parse(x.watched_at) || 0);
+                            noteShow(x.id, x.season, x.episode, w);
+                        });
+                    } catch (e) {}
+                })());
+            }
+            // Trakt: rozkoukané seriály + watchlist
+            if (tr) {
+                jobs.push((async function() {
+                    try {
+                        if (typeof ensureTraktToken === 'function') await ensureTraktToken();
+                        var r1 = await fetchWithRetry(TRAKT_BASE + '/sync/watched/shows', { headers: getTraktHeaders() });
+                        if (r1.ok) (await r1.json() || []).forEach(function(it) {
+                            var id = it && it.show && it.show.ids && it.show.ids.tmdb; if (!id) return;
+                            var ms = 0, me = 0;
+                            (it.seasons || []).forEach(function(se) { (se.episodes || []).forEach(function(ep) { if (se.number > ms || (se.number === ms && ep.number > me)) { ms = se.number; me = ep.number; } }); });
+                            noteShow(id, ms, me, Date.parse(it.last_watched_at) || 0);
+                        });
+                    } catch (e) {}
+                    try {
+                        var r2 = await fetchWithRetry(TRAKT_BASE + '/users/' + (tr.username || 'me') + '/watchlist?extended=full&limit=1000', { headers: getTraktHeaders() });
+                        if (r2.ok) (await r2.json() || []).forEach(function(it) { var m = it.movie || it.show; if (m && m.ids && m.ids.tmdb) noteTitle(m.ids.tmdb, it.type === 'movie' ? 'movie' : 'tv', m.title); });
+                    } catch (e) {}
+                })());
+            }
+            await Promise.all(jobs);
+            // Lokální: zaškrtnuté epizody + oblíbené
+            try { Object.values(state.watched || {}).forEach(function(w) { if (w && w.type === 'episode' && w.tvId) noteShow(w.tvId, w.season, w.episode, w.addedAt); }); } catch (e) {}
+            try { (state.favs || []).forEach(function(f) { if (f) noteTitle(f.id, f.type, f.title); }); } catch (e) {}
+            var v = {
+                shows: Object.keys(showMap).map(function(k) { return showMap[k]; }).sort(function(a, b) { return b.at - a.at; }),
+                titles: Object.keys(titleMap).map(function(k) { return titleMap[k]; })
+            };
+            _srcCache = { at: Date.now(), v: v };
+            return v;
+        }
+        window.sinatorCollectSources = collectSources;
+        // Snímek dat pro worker: TMDB klíč + všechny sledované seriály a celý watchlist (Histra + Sinator + Trakt)
         async function buildSnapshot() {
             var snap = { tmdb: (localStorage.getItem('sinator_tmdb_api_key') || '').trim(), region: 'CZ', providers: providers(), shows: [], titles: [], at: Date.now() };
             try {
-                var idx = JSON.parse(localStorage.getItem('sinator_histra_watched_idx_v1') || 'null');
-                if (idx && idx.shows) Object.keys(idx.shows).forEach(function(id) { var e = idx.shows[id]; snap.shows.push({ id: +id, s: e.s || 0, e: e.n || 0 }); });
-            } catch (e) {}
-            try {
-                if (typeof window.ntGetWatchlistPool === 'function') {
-                    var pool = await window.ntGetWatchlistPool();
-                    ((pool && pool.items) || []).forEach(function(it) { if (it && it.id) snap.titles.push({ id: it.id, type: it.type === 'tv' ? 'tv' : 'movie', title: it.title || '' }); });
-                }
+                var src = await collectSources(true);
+                snap.shows = src.shows.map(function(x) { return { id: x.id, s: x.s, e: x.e }; });
+                snap.titles = src.titles;
             } catch (e) {}
             await idbSet('snap', snap);
             return snap;
@@ -6212,7 +6304,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 var ch = new MessageChannel(); var done = false;
                 ch.port1.onmessage = function(ev) { done = true; res(ev.data); };
                 w.postMessage(msg, [ch.port2]);
-                setTimeout(function() { if (!done) res(null); }, 25000);
+                setTimeout(function() { if (!done) res(null); }, 180000);
             });
         }
         window.notifyToggle = async function() {
@@ -6229,7 +6321,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             setStatus('⏳ Nastavuji…');
             try { await buildSnapshot(); await register(); } catch (e) { setStatus('⚠️ Nepodařilo se zapnout: ' + (e && e.message || e)); localStorage.removeItem(FLAG); paint(); return; }
             paint(); toast('🔔 Upozornění zapnuta');
-            window.notifyCheckNow(true);
+            window.notifyCheckNow(true).then(function() { try { if (window.sfUpcomingCheck) window.sfUpcomingCheck(true); } catch (e) {} });
         };
         window.notifySaveProviders = function() {
             var v = (document.getElementById('notifyProviders') || {}).value || '';
@@ -6239,6 +6331,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         window.notifyCheckNow = async function(silent) {
             if (!enabled()) return;
             try {
+                setStatus('⏳ Kontroluji watchlist a sledované seriály…');
                 await buildSnapshot();
                 var reg = await register();
                 var r = await ask(reg, { type: 'check' });
@@ -6254,17 +6347,22 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         window.notifyTest = async function() {
             try { var reg = await register(); if (reg.active) reg.active.postMessage({ type: 'test' }); else toast('⚠️ Worker ještě není připravený, zkus to za chvíli'); } catch (e) { toast('⚠️ Nepodařilo se'); }
         };
-        // Po startu: znovu zaregistrovat worker (po „vynucené aktualizaci“ se odregistruje) a občas zkontrolovat
-        setTimeout(function() {
+        // Po startu: znovu zaregistrovat worker a VŽDY zkontrolovat nové epizody/streamy + blížící se premiéry
+        function bootCheck() {
             try {
                 paint();
                 if (!enabled() || !supported() || Notification.permission !== 'granted') return;
-                var last = +localStorage.getItem(LAST) || 0;
-                if (Date.now() - last > 6 * 3600 * 1000) window.notifyCheckNow(true);
-                else buildSnapshot().then(register).catch(function() {});
+                if (Date.now() - (+localStorage.getItem(LAST) || 0) < 30 * 60 * 1000) { if (window.sfUpcomingCheck) window.sfUpcomingCheck(); return; } // worker max. 1× za 30 min; premiéry 1× denně
+                window.notifyCheckNow(true).then(function() { try { if (window.sfUpcomingCheck) window.sfUpcomingCheck(); } catch (e) {} });
             } catch (e) {}
-        }, 6000);
-        document.addEventListener('visibilitychange', function() { if (!document.hidden) paint(); });
+        }
+        setTimeout(bootCheck, 6000);
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) return;
+            paint();
+            // návrat do appky po delší době = jako nové otevření
+            if (enabled() && Date.now() - (+localStorage.getItem(LAST) || 0) > 30 * 60 * 1000) bootCheck();
+        });
     })();
 
     // ✅ OPRAVENÁ PWA INSTALACE
@@ -47367,7 +47465,9 @@ async function markSeen(it){var s=S();if(s.watched){s.watched[it.t+'_'+it.id]={i
  if(BE())await myHistoryAdd(it.id,it.t)}
 
 /* ── Up Next: další díly + premiéry ── */
-async function loadUp(){var s=S(),tv={},mv={},hist=[],tvO=[];
+var _upC=null;
+async function loadUp(force){if(!force&&_upC&&Date.now()-_upC.t<6e5)return _upC.v;var v=await loadUp0();_upC={t:Date.now(),v:v};return v}
+async function loadUp0(){var s=S(),tv={},mv={},hist=[],tvO=[];
  function addTv(id){id=+id;if(!id||tv[id])return;tv[id]=1;tvO.push(id)}
  function add(id,t){id=+id;if(!id)return;if(nt(t)==='tv')addTv(id);else mv[id]=1}
  try{var hw=window._hwIdx||JSON.parse(st.getItem('sinator_histra_watched_idx_v1')||'null');
@@ -47379,33 +47479,45 @@ async function loadUp(){var s=S(),tv={},mv={},hist=[],tvO=[];
  (s.favs||[]).forEach(function(f){add(f.id,f.type||'movie')});
  jget('sinator_swipe_wl',[]).forEach(function(f){add(f.id,f.type)});
  wl.forEach(function(x){add(x.id,x.type)});
+ if(window.sinatorCollectSources){try{var cs=await window.sinatorCollectSources();cs.shows.forEach(function(x){addTv(x.id)});cs.titles.forEach(function(x){add(x.id,x.type)})}catch(e){}}
+ Object.keys(mv).forEach(function(id){if(s.watched&&s.watched['movie_'+id])delete mv[id]});
  var out={tv:[],mv:[]},t0=td();
- var a=await pmap(tvO.slice(0,150),function(id){return tj('/tv/'+id)},8);
+ var a=await pmap(tvO.slice(0,400),function(id){return tj('/tv/'+id)},10);
  a.forEach(function(d){var e=d&&d.next_episode_to_air;if(e&&e.air_date&&e.air_date>=t0)out.tv.push({id:d.id,n:d.name,p:d.poster_path,d:e.air_date,x:'S'+p2(e.season_number)+'E'+p2(e.episode_number)+(e.name?' · '+e.name:'')})});
- var b=await pmap(Object.keys(mv).slice(0,40),function(id){return Promise.all([tj('/movie/'+id),F(TB+'/movie/'+id+'/release_dates?api_key='+K())])},8);
- b.forEach(function(r){if(!r)return;var m=r[0],cz=null,us=null;((r[1]&&r[1].results)||[]).forEach(function(c){var iso=c.iso_3166_1;if(iso!=='CZ'&&iso!=='US')return;
-  (c.release_dates||[]).forEach(function(x){var d=(x.release_date||'').slice(0,10);if(d<t0||[2,3,4].indexOf(x.type)<0)return;var o={d:d,k:x.type===4?'💿 VOD':'🎬 kino'};
-   if(iso==='CZ'){if(!cz||d<cz.d)cz=o}else if(!us||d<us.d)us=o})});
-  var o=cz||us;if(o)out.mv.push({id:m.id,n:m.title,p:m.poster_path,d:o.d,x:o.k+(cz?' (ČR)':' (USA)')})});
+ var mc={};try{mc=JSON.parse(localStorage.getItem('sf_mv_cache')||'{}')}catch(e){}
+ var now=Date.now(),ids=Object.keys(mv).slice(0,400),need=ids.filter(function(id){return !mc[id]||now-mc[id].t>864e5});
+ await pmap(need,function(id){return tj('/movie/'+id,'&append_to_response=release_dates').then(function(m){if(!m||!m.id)return null;var rd=[];((m.release_dates&&m.release_dates.results)||[]).forEach(function(c){if(c.iso_3166_1!=='CZ'&&c.iso_3166_1!=='US')return;(c.release_dates||[]).forEach(function(x){if([2,3,4].indexOf(x.type)>=0)rd.push([c.iso_3166_1,(x.release_date||'').slice(0,10),x.type])})});mc[id]={t:now,id:m.id,n:m.title,p:m.poster_path,rd:rd};return 1})},10);
+ try{var keep={};ids.forEach(function(id){if(mc[id])keep[id]=mc[id]});localStorage.setItem('sf_mv_cache',JSON.stringify(keep))}catch(e){}
+ ids.forEach(function(id){var c=mc[id];if(!c)return;var cz=null,us=null;c.rd.forEach(function(x){var d=x[1];if(d<t0)return;var o={d:d,k:x[2]===4?'💿 VOD':'🎬 kino'};if(x[0]==='CZ'){if(!cz||d<cz.d)cz=o}else if(!us||d<us.d)us=o});var o=cz||us;if(o)out.mv.push({id:c.id,n:c.n,p:c.p,d:o.d,x:o.k+(cz?' (ČR)':' (USA)')})});
  var so=function(x,y){return x.d<y.d?-1:1};out.tv.sort(so);out.mv.sort(so);return out}
 function rows(a,t){return a.length?a.map(function(x){var n=dd(x.d);return '<div class="sfrow" onclick="sfOpen('+x.id+',\''+t+'\')"><img loading="lazy" src="'+(x.p?IM+'w154'+x.p:'')+'"><div><b>'+esc(x.n)+'</b><br><small>'+esc(x.x||'')+' · '+fd(x.d)+'</small></div><span class="sfpill">'+cd(n)+'</span></div>'}).join(''):'<p style="opacity:.6">Nic nenalezeno.</p>'}
 window.sfUpNext=async function(){if(!K()){T('Nejdřív zadej TMDB klíč');return}
- var b=ov('sfUp','📆 Up Next','<div style="display:flex;gap:8px;margin-bottom:12px"><button class="sf-btn on" id="sfU1" onclick="sfTab(1)">📺 Další díly</button><button class="sf-btn" id="sfU2" onclick="sfTab(2)">🎬 Premiéry</button><button class="sf-btn" onclick="sfNotify()" title="Upozornění">🔔</button></div><div id="sfUb">Načítám…</div>');
+ var b=ov('sfUp','📆 Up Next','<div style="display:flex;gap:8px;margin-bottom:12px"><button class="sf-btn on" id="sfU1" onclick="sfTab(1)">📺 Další díly</button><button class="sf-btn" id="sfU2" onclick="sfTab(2)">🎬 Premiéry</button><button class="sf-btn" id="sfBell" onclick="sfNotify()" title="Upozornění zap/vyp">'+(localStorage.getItem('sinator_notify_enabled')==='1'?'🔔':'🔕')+'</button></div><div id="sfUb">Načítám…</div>');
  var o=await loadUp(),to=new Date(Date.now()+60*864e5).toISOString().slice(0,10),q='&region=CZ&release_date.gte='+td()+'&release_date.lte='+to+'&sort_by=primary_release_date.asc&with_release_type=';
- var ci=await tj('/discover/movie',q+'3|2').catch(function(){return{}}),vo=await tj('/discover/movie',q+'4').catch(function(){return{}});
+ var ci=await tj('/movie/upcoming','&region=CZ&page=1').catch(function(){return{}}),vo=await tj('/discover/movie',q+'4').catch(function(){return{}});
  var mp=function(r,k){return((r&&r.results)||[]).filter(function(m){return m.poster_path}).map(function(m){return{id:m.id,n:m.title,p:m.poster_path,d:m.release_date,x:k}})};
  sw.up={1:'<h4 style="margin:0 0 8px">Seriály, které sleduješ</h4>'+rows(o.tv,'tv')+'<h4 style="margin:14px 0 8px">Filmy z tvého watchlistu</h4>'+rows(o.mv,'movie'),
-  2:'<h4 style="margin:0 0 8px">🎬 Do kin v ČR (60 dní)</h4>'+rows(mp(ci,'kino'),'movie')+'<h4 style="margin:14px 0 8px">💿 Na VOD v ČR (60 dní)</h4>'+rows(mp(vo,'VOD / digitálně'),'movie')};
+  2:'<h4 style="margin:0 0 8px">🎬 Do kin v ČR</h4>'+rows(((ci&&ci.results)||[]).filter(function(m){return m.release_date}).map(function(m){return{id:m.id,n:m.title,p:m.poster_path,d:m.release_date,x:m.vote_average>0?'★ '+m.vote_average.toFixed(1):'kino'}}),'movie')+'<h4 style="margin:14px 0 8px">💿 Na VOD v ČR (60 dní)</h4>'+rows(mp(vo,'VOD / digitálně'),'movie')};
  sfTab(1)};
 window.sfTab=function(n){var e=document.getElementById('sfUb');if(!e||!sw.up)return;e.innerHTML=sw.up[n];['1','2'].forEach(function(i){document.getElementById('sfU'+i).classList.toggle('on',i==n)})};
-window.sfNotify=async function(){if(!('Notification' in window)){T('Notifikace tu nejsou podporované');return}
- if(await Notification.requestPermission()==='granted'){st.setItem('sf_notify','1');T('🔔 Zapnuto — kontrola nových dílů při otevření appky');daily(1)}else T('Notifikace nepovoleny')};
-async function daily(f){if(st.getItem('sf_notify')!=='1'||!('Notification' in window)||Notification.permission!=='granted')return;
- if(!f&&st.getItem('sf_nchk')===td())return;st.setItem('sf_nchk',td());var o=await loadUp(),h=o.tv.filter(function(x){return dd(x.d)<=1}).map(function(x){return x.n+' '+x.x.split(' ')[0]+' ('+cd(dd(x.d))+')'})
-  .concat(o.mv.filter(function(x){return dd(x.d)<=1}).map(function(x){return x.n+' ('+cd(dd(x.d))+')'}));
- if(!h.length)return;var t='Sinator — dnes a zítra',bd=h.slice(0,5).join('\n');T('🔔 '+h[0]+(h.length>1?' +'+(h.length-1):''));
- try{new Notification(t,{body:bd})}catch(e){navigator.serviceWorker&&navigator.serviceWorker.getRegistration().then(function(r){r&&r.showNotification(t,{body:bd})})}}
-setTimeout(function(){daily().catch(function(){})},7000);
+window._sfPaintBell=function(){var b=document.getElementById('sfBell');if(b)b.textContent=localStorage.getItem('sinator_notify_enabled')==='1'?'🔔':'🔕'};
+/* 🔔 = stejný přepínač jako Nastavení → 🧪 Experimentální funkce → Upozornění (jedna sada upozornění, žádné dvojité) */
+window.sfNotify=async function(){if(typeof window.notifyToggle!=='function'){T('Upozornění tu nejsou dostupná');return}
+ await window.notifyToggle();window._sfPaintBell()};
+/* Blížící se premiéry: film dnes/zítra a díl zítra (díl, který vychází dnes, hlásí worker jako „nová epizoda“ — jinak by přišlo 2×).
+   Každá položka se oznámí jen jednou (sf_up_ledger). Spouští se při každém startu appky z notify modulu. */
+window.sfUpcomingCheck=async function(force){try{
+ if(localStorage.getItem('sinator_notify_enabled')!=='1'||!('Notification' in window)||Notification.permission!=='granted'||!K())return;
+ if(!force&&localStorage.getItem('sf_up_day')===td())return; /* jednou denně, při prvním otevření appky */
+ var o=await loadUp(),led=[];localStorage.setItem('sf_up_day',td());try{led=JSON.parse(localStorage.getItem('sf_up_ledger')||'[]')}catch(e){}
+ var it=[];
+ o.tv.forEach(function(x){if(dd(x.d)===1)it.push({k:'tv'+x.id+'|'+x.d,t:x.n+' '+x.x.split(' ')[0]+' (zítra)'})});
+ o.mv.forEach(function(x){var n=dd(x.d);if(n<=1)it.push({k:'mv'+x.id+'|'+x.d,t:x.n+' ('+cd(n)+')'})});
+ it=it.filter(function(i){return led.indexOf(i.k)<0});if(!it.length)return;
+ it.forEach(function(i){led.push(i.k)});localStorage.setItem('sf_up_ledger',JSON.stringify(led.slice(-300)));
+ var t='Sinator — blížící se premiéry',bd=it.slice(0,6).map(function(i){return i.t}).join('\n');T('🔔 '+it[0].t+(it.length>1?' +'+(it.length-1):''));
+ var r=null;try{r=await navigator.serviceWorker.getRegistration()}catch(e){}
+ if(r&&r.showNotification)r.showNotification(t,{body:bd,tag:'sinator-upnext'});else new Notification(t,{body:bd,tag:'sinator-upnext'})}catch(e){}};
 
 /* ── Wrapped ── */
 window.sfWrapped=function(){var y=new Date().getFullYear();

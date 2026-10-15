@@ -40,9 +40,17 @@ async function pool(items, n, fn) {
 }
 
 async function tmdb(path, key, extra) {
-  const r = await fetch(`${TMDB}${path}?api_key=${encodeURIComponent(key)}${extra || ''}`);
-  if (!r.ok) throw new Error('TMDB ' + r.status);
-  return r.json();
+  // při 429 (limit TMDB) chvíli počkat a zkusit znovu — max. 3 pokusy
+  for (let i = 0; ; i++) {
+    const r = await fetch(`${TMDB}${path}?api_key=${encodeURIComponent(key)}${extra || ''}`);
+    if (r.status === 429 && i < 3) {
+      const ra = parseFloat(r.headers.get('Retry-After')) || 0;
+      await new Promise(res => setTimeout(res, Math.min(10000, Math.max(1000, ra * 1000) * (i + 1))));
+      continue;
+    }
+    if (!r.ok) throw new Error('TMDB ' + r.status);
+    return r.json();
+  }
 }
 
 async function check(opts) {
@@ -56,7 +64,7 @@ async function check(opts) {
   const want = (snap.providers || []).map(s => String(s).toLowerCase().trim()).filter(Boolean);
 
   // 1) Nové epizody sledovaných seriálů
-  await pool((snap.shows || []).slice(0, 80), 5, async sh => {
+  await pool((snap.shows || []).slice(0, 2000), 8, async sh => {
     try {
       const d = await tmdb('/tv/' + sh.id, snap.tmdb, '&language=cs-CZ');
       const le = d.last_episode_to_air;
@@ -77,7 +85,7 @@ async function check(opts) {
   });
 
   // 2) Tituly z watchlistu, které se objevily na streamovací službě
-  await pool((snap.titles || []).slice(0, 120), 5, async t => {
+  await pool((snap.titles || []).slice(0, 3000), 8, async t => {
     try {
       const type = t.type === 'tv' ? 'tv' : 'movie';
       const d = await tmdb('/' + type + '/' + t.id + '/watch/providers', snap.tmdb);
