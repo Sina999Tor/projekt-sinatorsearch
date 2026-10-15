@@ -5576,6 +5576,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-15d', date: '15. 10. 2026', items: [
+            '🛠️ Oprava: seriál s oznámeným dalším dílem (např. Šlub) se teď ukáže v 🎭 Rozkoukané i v 📆 Up Next — stejně jako dostane upozornění. Rozkoukané teď kromě Traktu berou i Histru a Sinator backend (Trakt už není povinný) a Up Next už neořezává novější seriály (limit zvýšen na 150, řazeno podle posledního sledování)'
+        ] },
         { version: '2026-10-15c', date: '15. 10. 2026', items: [
             '⭐ Top tipy: když někdo přidá nové doporučení, všem ostatním vyskočí okno ve stylu „Aplikace byla aktualizována“ — s titulem, přezdívkou a komentářem a tlačítky ⭐ Zobrazit Top tipy / Rozumím. Každé přidání se ukáže jen jednou. Vlastní přidání na tomto zařízení se nehlásí, po prvním spuštění se dřívější tipy nezobrazují a okno nevyskočí na zamčené appce ani při otevřených Top tipech'
         ] },
@@ -17743,7 +17746,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         $('modalContent').classList.remove('watched-full');
         $('modalContent').classList.add('watched-full');
 
-        if (!state.trakt.accessToken) {
+        const _rozkExtraSrc = (typeof histraReady === 'function' && histraReady()) || (typeof myBackendReady === 'function' && myBackendReady()) || Object.keys(state.watched || {}).some(k => k.startsWith('ep_'));
+        if (!state.trakt.accessToken && !_rozkExtraSrc) {
             $('modalScrollBody').innerHTML = `<div style="padding:40px;text-align:center;">
                 <div style="font-size:3rem;margin-bottom:16px;">📺</div>
                 <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">Vyžaduje Trakt přihlášení</div>
@@ -17754,10 +17758,18 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         }
 
         try {
-            await ensureTraktToken();
-            const res = await fetchWithRetry(`${TRAKT_BASE}/sync/watched/shows`, { headers: getTraktHeaders() });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const watchedShowsRaw = await res.json();
+            let watchedShowsRaw = [];
+            if (state.trakt.accessToken) {
+                try {
+                    await ensureTraktToken();
+                    const res = await fetchWithRetry(`${TRAKT_BASE}/sync/watched/shows`, { headers: getTraktHeaders() });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    watchedShowsRaw = await res.json();
+                } catch (te) {
+                    if (!_rozkExtraSrc) throw te; // bez Traktu to jde přes Sinator/Histru
+                    console.warn('Trakt watched/shows selhalo, pokračuji bez něj:', te);
+                }
+            }
             const watchedShows = Array.isArray(watchedShowsRaw) ? watchedShowsRaw : [];
 
             // Pro každý seriál zjistíme počet shlédnutých vs celkový počet epizod
@@ -17937,6 +17949,57 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 }
             } catch (e) { console.warn('Local watching merge error:', e); }
 
+            // ── Doplnění: seriály z Histry a ze Sinator backendu ─────────────────────
+            // Stejné zdroje, ze kterých berou data upozornění a Up Next. Dřív se Rozkoukané
+            // četly jen z Traktu (+ lokální zaškrtnuté epizody), takže seriál sledovaný přes
+            // Sinator/Histru (např. Šlub) tu chyběl, i když mu přišlo upozornění na nový díl.
+            try {
+                const haveIds = new Set(results.map(r => String(r.id)));
+                const traktIds = new Set(watchedShows.map(x => String(x.show?.ids?.tmdb)));
+                const extra = new Map();
+                const note = (id, se, ep, at) => {
+                    id = String(id);
+                    if (!id || id === 'undefined' || id === 'null' || id === '0' || id === 'NaN') return;
+                    let e = extra.get(id);
+                    if (!e) { e = { eps: new Set(), s: 0, n: 0, at: 0 }; extra.set(id, e); }
+                    if (se > 0 || ep > 0) e.eps.add(se + ':' + ep);
+                    if (se > e.s || (se === e.s && ep > e.n)) { e.s = se; e.n = ep; }
+                    at = Number(at) || 0;
+                    if (at > e.at) e.at = at;
+                };
+                try { const hw = (typeof _hwLoad === 'function') ? _hwLoad() : null; if (hw && hw.shows) Object.keys(hw.shows).forEach(id => { const e = hw.shows[id]; note(id, Number(e.s) || 0, Number(e.n) || 0, e.at); }); } catch (e) {}
+                try { if (typeof histraReady === 'function' && histraReady()) { (await histraHistoryAll(false)).forEach(x => { if (x.kind === 'episode') note(x.tmdb, Number(x.season) || 0, Number(x.number) || 0, x.watchedAt); }); } } catch (e) {}
+                try { if (typeof myBackendReady === 'function' && myBackendReady()) { (await myHistoryGetAll('episodes') || []).forEach(x => { const w = typeof x.watched_at === 'number' ? x.watched_at : (Date.parse(x.watched_at) || 0); note(x.id, x.season != null ? Number(x.season) || 0 : 0, x.episode != null ? Number(x.episode) || 0 : 0, w); }); } } catch (e) {}
+                const extraIds = [...extra.keys()].filter(id => !haveIds.has(id) && !traktIds.has(id)).sort((a, b) => extra.get(b).at - extra.get(a).at);
+                if (extraIds.length && tmdbApiKey) {
+                    for (let i = 0; i < extraIds.length; i += 8) {
+                        if (progressEl) progressEl.textContent = `Doplňuji Sinator/Histra… ${Math.min(i + 8, extraIds.length)}/${extraIds.length}`;
+                        await Promise.all(extraIds.slice(i, i + 8).map(async tvId => {
+                            const ex = extra.get(tvId);
+                            try {
+                                const d = await (await fetch(`${BASE}/tv/${tvId}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
+                                if (!d || !d.id) return;
+                                const totalEps = d.number_of_episodes || 0;
+                                const totalSeasons = d.number_of_seasons || 0;
+                                const nextEpisode = d.next_episode_to_air || null;
+                                const watchedEps = ex.eps.size;
+                                if (state.watched[`tv_${tvId}`] && !nextEpisode) return; // opravdu dokoukané
+                                if (!nextEpisode) {
+                                    // bez známého dalšího dílu jen aktivně sledované (nedávno, nedokončené)
+                                    if (!(watchedEps > 0 && watchedEps < totalEps && ex.at && Date.now() - ex.at < 180 * 864e5)) return;
+                                }
+                                results.push({
+                                    id: Number(tvId), title: d.name || 'Seriál', year: (d.first_air_date || '').slice(0, 4), posterPath: d.poster_path || '',
+                                    watchedEps, totalEps, maxWatchedSeason: ex.s, totalSeasons,
+                                    airStatus: d.status || '', nextEpisode, slug: null, plays: watchedEps ? 0 : 1, lastWatchedAt: ex.at
+                                });
+                            } catch (e) { /* TMDB nedostupné - přeskočit */ }
+                        }));
+                        if (gridEl && results.length) _renderWatchingGrid(gridEl, results);
+                    }
+                }
+            } catch (e) { console.warn('Sinator/Histra watching merge error:', e); }
+
             if (autoMarkedComplete) { saveWatched(); }
             if (progressEl) progressEl.textContent = '';
             if (!results.length) {
@@ -17965,7 +18028,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             const noEpisodeDetail = it.watchedEps === 0 && (it.plays||0) > 0;
             const pct = it.totalEps > 0 ? Math.round((it.watchedEps / it.totalEps) * 100) : 0;
             const progressBar = noEpisodeDetail
-                ? `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">✅ Trakt: sledováno (bez detailu odkoukaných epizod)</div>`
+                ? `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">✅ Sledováno (bez detailu odkoukaných epizod)</div>`
                 : (it.totalEps > 0 ? `<div style="background:rgba(255,255,255,0.1);border-radius:4px;height:5px;margin-top:6px;overflow:hidden;"><div style="background:#00b4d8;height:100%;border-radius:4px;width:${pct}%;transition:width 0.3s;"></div></div><div style="font-size:0.68rem;color:var(--text-muted);margin-top:3px;">${it.watchedEps}/${it.totalEps} epizod (${pct}%)</div>` : '');
             const newEpBadge = it.nextEpisode ? `<div style="display:inline-block;background:rgba(229,9,20,0.2);border:1px solid #e50914;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#e50914;font-weight:700;margin-top:4px;">🆕 S${it.nextEpisode.season_number}E${it.nextEpisode.episode_number} dostupné</div>` : '';
             const seasonBadge = (!noEpisodeDetail && it.totalSeasons > it.maxWatchedSeason) ? `<div style="display:inline-block;background:rgba(0,180,216,0.15);border:1px solid #00b4d8;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#00b4d8;font-weight:700;margin-top:4px;">📺 Sezóna ${it.maxWatchedSeason+1} nevykoukána</div>` : '';
@@ -47304,15 +47367,20 @@ async function markSeen(it){var s=S();if(s.watched){s.watched[it.t+'_'+it.id]={i
  if(BE())await myHistoryAdd(it.id,it.t)}
 
 /* ── Up Next: další díly + premiéry ── */
-async function loadUp(){var s=S(),tv={},mv={},hist=[];
- function add(id,t){id=+id;if(!id)return;(nt(t)==='tv'?tv:mv)[id]=1}
- (s.favs||[]).forEach(function(f){add(f.id,f.type||'movie')});
- Object.values(s.watched||{}).forEach(function(w){if(w.type==='episode')add(w.tvId,'tv')});
- jget('sinator_swipe_wl',[]).forEach(function(f){add(f.id,f.type)});
- if(BE()){try{var r=await Promise.all([myWatchlistGet(),myHistoryGetAll('episodes')]);r[0].forEach(function(x){add(x.id,x.type)});
+async function loadUp(){var s=S(),tv={},mv={},hist=[],tvO=[];
+ function addTv(id){id=+id;if(!id||tv[id])return;tv[id]=1;tvO.push(id)}
+ function add(id,t){id=+id;if(!id)return;if(nt(t)==='tv')addTv(id);else mv[id]=1}
+ try{var hw=window._hwIdx||JSON.parse(st.getItem('sinator_histra_watched_idx_v1')||'null');
+  if(hw&&hw.shows)Object.keys(hw.shows).map(function(k){return[k,hw.shows[k].at||0]}).sort(function(a,b){return b[1]-a[1]}).forEach(function(x){addTv(x[0])})}catch(e){}
+ var wl=[];
+ if(BE()){try{var r=await Promise.all([myWatchlistGet(),myHistoryGetAll('episodes')]);wl=r[0]||[];
   r[1].sort(function(a,b){return new Date(b.watched_at||0)-new Date(a.watched_at||0)});r[1].slice(0,600).forEach(function(x){add(x.id,'tv')})}catch(e){}}
+ Object.values(s.watched||{}).forEach(function(w){if(w.type==='episode')add(w.tvId,'tv')});
+ (s.favs||[]).forEach(function(f){add(f.id,f.type||'movie')});
+ jget('sinator_swipe_wl',[]).forEach(function(f){add(f.id,f.type)});
+ wl.forEach(function(x){add(x.id,x.type)});
  var out={tv:[],mv:[]},t0=td();
- var a=await pmap(Object.keys(tv).slice(0,45),function(id){return tj('/tv/'+id)},8);
+ var a=await pmap(tvO.slice(0,150),function(id){return tj('/tv/'+id)},8);
  a.forEach(function(d){var e=d&&d.next_episode_to_air;if(e&&e.air_date&&e.air_date>=t0)out.tv.push({id:d.id,n:d.name,p:d.poster_path,d:e.air_date,x:'S'+p2(e.season_number)+'E'+p2(e.episode_number)+(e.name?' · '+e.name:'')})});
  var b=await pmap(Object.keys(mv).slice(0,40),function(id){return Promise.all([tj('/movie/'+id),F(TB+'/movie/'+id+'/release_dates?api_key='+K())])},8);
  b.forEach(function(r){if(!r)return;var m=r[0],cz=null,us=null;((r[1]&&r[1].results)||[]).forEach(function(c){var iso=c.iso_3166_1;if(iso!=='CZ'&&iso!=='US')return;
