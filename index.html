@@ -5577,6 +5577,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-15e', date: '15. 10. 2026', items: [
+            '🍿 Zábava → Kino: nová položka „Právě hraje v kinech“ (filmy, co teď běží v českých kinech, se žánrovými filtry). Kino je teď řazené chronologicky: 🎟️ Již bylo v kině → 🍿 Právě hraje → 📅 Co se chystá; „Již bylo“ už neukazuje filmy, které právě hrají',
             '🔔 Jedno upozornění místo dvou: zvoneček v 📆 Up Next je teď stejný přepínač jako Nastavení → 🧪 Experimentální funkce → Upozornění (🔔 zapnuto / 🔕 vypnuto). Starý samostatný systém upozornění v Up Next je pryč, takže nic nechodí dvakrát',
             '🔍 Kontrola už bere VŠE: celý watchlist z Histry (ne jen pár desítek titulů) + watchlist Sinatoru + Traktu, a rozkoukané/sledované seriály z Histry, Sinator backendu, Traktu i lokálních epizod. Stejné zdroje používá i 📆 Up Next (až 400 seriálů a 400 filmů, už bez dřívějších limitů 150/40)',
             '🚀 Při spuštění appky se (nejvýš 1× za 30 minut, ať se nezahlcuje TMDB) zkontrolují nové epizody a streamy; blížící se premiéry dílů a filmů se kontrolují jen jednou denně při prvním otevření appky. Film dnes/zítra a díl zítra se oznámí jednou; díl, který vychází dnes, hlásí kontrola nových epizod',
@@ -14633,8 +14634,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 switchTvTab('epg');
                 if (window._epgPendingReturn) { openEpgDetail(window._epgPendingReturn); window._epgPendingReturn = null; }
             }
-            else if (['zebricky','upcoming','porovnani','mood','tentoden','koukats','nahodnytip','uzbylo','asksinator'].includes(backTo)) {
-                const modalIds = { zebricky:'zebrickyModal', upcoming:'upcomingModal', porovnani:'porovnaniModal', mood:'moodModal', tentoden:'tentodenModal', koukats:'koukatSModal', nahodnytip:'nahodnyTipModal', uzbylo:'uzByloVKineModal', asksinator:'askSinatorModal' };
+            else if (['zebricky','upcoming','porovnani','mood','tentoden','koukats','nahodnytip','uzbylo','hraje','asksinator'].includes(backTo)) {
+                const modalIds = { zebricky:'zebrickyModal', upcoming:'upcomingModal', porovnani:'porovnaniModal', mood:'moodModal', tentoden:'tentodenModal', koukats:'koukatSModal', nahodnytip:'nahodnyTipModal', uzbylo:'uzByloVKineModal', hraje:'hrajeVKineModal', asksinator:'askSinatorModal' };
                 if (window._reopenZabavaSub) window._reopenZabavaSub(modalIds[backTo]);
             }
         }
@@ -14670,7 +14671,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     // Helper: generates sticky modal nav bar HTML
     function modalNav(title, hasBack, extraBtns = '') {
         const backTo = state._backTo;
-        const backLabel = backTo === 'histra' ? '← Histra' : backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'thematic' ? '← Tematické seznamy' : backTo === 'thematic2' ? '← Tematické seznamy 2' : backTo === 'thematic2results' ? `← ${(state._thematicFull2 && state._thematicFull2.theme && state._thematicFull2.theme.name) || 'Tematické seznamy 2'}` : backTo === 'streaming' ? '← Streamy' : backTo === 'streamingResults' ? `← ${(state._streamFull && state._streamFull.name) || 'Streamy'}` : backTo === 'smartlist' ? '← Smart seznamy' : backTo === 'smartlist-sources' ? '← Smart seznamy' : '← Zpět';
+        const backLabel = backTo === 'histra' ? '← Histra' : backTo === 'favs' ? '← Oblíbené' : backTo === 'watched' ? '← Shlédnuté' : backTo === 'trakt' ? '← Zpět' : backTo === 'simkl' ? '← Zpět' : backTo === 'mdblist' ? '← MDBList' : backTo === 'watching' ? '← Rozkoukané seriály' : backTo === 'moviesprogress' ? '← Rozkoukanné filmy' : backTo === 'zebricky' ? '← Žebříčky' : backTo === 'upcoming' ? '← Co se chystá' : backTo === 'porovnani' ? '← Porovnání' : backTo === 'mood' ? '← Nálada' : backTo === 'tentoden' ? '← Tento den' : backTo === 'koukats' ? '← Koukat s...' : backTo === 'nahodnytip' ? '← Tip' : backTo === 'uzbylo' ? '← Už bylo v kině' : backTo === 'hraje' ? '← Právě hraje' : backTo === 'thematic' ? '← Tematické seznamy' : backTo === 'thematic2' ? '← Tematické seznamy 2' : backTo === 'thematic2results' ? `← ${(state._thematicFull2 && state._thematicFull2.theme && state._thematicFull2.theme.name) || 'Tematické seznamy 2'}` : backTo === 'streaming' ? '← Streamy' : backTo === 'streamingResults' ? `← ${(state._streamFull && state._streamFull.name) || 'Streamy'}` : backTo === 'smartlist' ? '← Smart seznamy' : backTo === 'smartlist-sources' ? '← Smart seznamy' : '← Zpět';
         const back = hasBack ? `<button class="modal-back-btn" onclick="navigateBack()">${backLabel}</button>` : '';
         const nav = $('modalNavBar'); const left = $('modalNavLeft'); const right = $('modalNavRight');
         if(nav && left && right) {
@@ -21239,7 +21240,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
         <button onclick="pushModalAndOpen('zabavaModal', openZabavaModal, openZabavaKinoModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎬</span>
-            <div><div style="font-weight:700;color:#38bdf8;">Kino</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co se chystá a co už bylo v kině</div></div>
+            <div><div style="font-weight:700;color:#38bdf8;">Kino</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co bylo, co hraje a co se chystá</div></div>
         </button>
         <button onclick="pushModalAndOpen('zabavaModal', openZabavaModal, openZabavaAiModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🤖</span>
@@ -21268,13 +21269,17 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <button onclick="closeZabavaKinoModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
-        <button onclick="closeZabavaKinoModal();openUpcomingModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:1.6rem;">📅</span>
-            <div><div style="font-weight:700;color:#38bdf8;">Co se chystá</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Brzy v kinech a nové seriály</div></div>
-        </button>
         <button onclick="closeZabavaKinoModal();openUzByloVKineModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎟️</span>
             <div><div style="font-weight:700;color:#c084fc;">Již bylo v kině</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Filmy z kin za posledních 6 měsíců</div></div>
+        </button>
+        <button onclick="closeZabavaKinoModal();openHrajeVKineModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🍿</span>
+            <div><div style="font-weight:700;color:#22c55e;">Právě hraje v kinech</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co běží v českých kinech teď</div></div>
+        </button>
+        <button onclick="closeZabavaKinoModal();openUpcomingModal()" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📅</span>
+            <div><div style="font-weight:700;color:#38bdf8;">Co se chystá</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Brzy v kinech a nové seriály</div></div>
         </button>
     </div>
 </div>
@@ -21491,7 +21496,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <button onclick="closeUzByloVKineModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:16px;">
-        <p style="color:#888;font-size:0.85rem;margin-bottom:14px;text-align:center;">Filmy uvedené v českých kinech za posledních 6 měsíců</p>
+        <p style="color:#888;font-size:0.85rem;margin-bottom:14px;text-align:center;">Filmy uvedené v českých kinech za posledních 6 měsíců (bez těch, co právě hrají)</p>
         <!-- Filtry žánrů -->
         <div id="uzByloGenreFilters" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;justify-content:center;"></div>
         <!-- Výsledky -->
@@ -21503,6 +21508,21 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <div id="uzByloVKineLoadMore" style="display:none;text-align:center;margin-top:16px;">
             <button onclick="uzByloLoadMore()" style="background:#1e293b;border:1px solid #334155;color:#c084fc;padding:10px 28px;border-radius:20px;cursor:pointer;font-size:0.9rem;font-weight:600;">Načíst další</button>
         </div>
+    </div>
+</div>
+
+<!-- PRÁVĚ HRAJE V KINECH MODAL -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" id="hrajeVKineModal" onclick="if(event.target===this)closeHrajeVKineModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">🍿 Právě hraje v kinech</h3>
+        <button onclick="closeHrajeVKineModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;">
+        <p style="color:#888;font-size:0.85rem;margin-bottom:14px;text-align:center;">Filmy, které teď běží v českých kinech</p>
+        <div id="hrajeGenreFilters" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;justify-content:center;"></div>
+        <div id="hrajeVKineResult" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;"></div>
+        <div id="hrajeVKineLoader" style="display:none;text-align:center;padding:30px;color:#888;"><div style="font-size:1.5rem;margin-bottom:8px;">⏳</div>Načítám…</div>
+        <div id="hrajeVKineError" style="display:none;color:#f87171;text-align:center;padding:20px;font-size:0.9rem;"></div>
     </div>
 </div>
 
@@ -43002,7 +43022,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Hide when any fullscreen modal with its own close button is visible
         var fullscreenModalIds = [
             'nahodnyTipModal','kvizModal','zebrickyModal','upcomingModal',
-            'porovnaniModal','moodModal','myStatsModal','tentodenModal','koukatSModal','uzByloVKineModal',
+            'porovnaniModal','moodModal','myStatsModal','tentodenModal','koukatSModal','uzByloVKineModal','hrajeVKineModal',
             'tvRadioModal','zabavaModal','zabavaAiModal','listsModal','histraListsModal','musicModal',
             'slozkyModal','slozkyPickerModal','doporucujiOverlay','addDoporuceniOverlay',
             'settingsModal','externalInstallModal','askSinatorModal'
@@ -45011,7 +45031,7 @@ window._restoreLastZabavaList = function() {
             zebrickyModal: 'openZebricky', upcomingModal: 'openUpcomingModal',
             porovnaniModal: 'openPorovnaniModal', moodModal: 'openMoodModal',
             tentodenModal: 'openTentodenModal', koukatSModal: 'openKoukatSModal',
-            nahodnyTipModal: 'openNahodnyTipModal', uzByloVKineModal: 'openUzByloVKineModal',
+            nahodnyTipModal: 'openNahodnyTipModal', uzByloVKineModal: 'openUzByloVKineModal', hrajeVKineModal: 'openHrajeVKineModal',
             askSinatorModal: 'openAskSinatorModal'
         };
         const fnName = data && openers[data.modalId];
@@ -47097,7 +47117,8 @@ window._askSinatorGoPrev = function() {
         (data.results || []).forEach(m => (m.genre_ids || []).forEach(g => allGids.push(g)));
         renderGenreFilters(allGids);
       }
-      const html = (data.results || []).map(renderCard).join('');
+      let nowIds = new Set(); try { nowIds = await window._hrajeNowIds(); } catch (e) {}
+      const html = (data.results || []).filter(m => !nowIds.has(m.id)).map(renderCard).join('');
       if (append) res.innerHTML += html;
       else res.innerHTML = html;
       if (_page < _totalPages) loadMoreBtn.style.display = 'block';
@@ -47156,6 +47177,69 @@ window._askSinatorGoPrev = function() {
   };
 })();
 
+// ===== PRÁVĚ HRAJE V KINECH =====
+(function() {
+  let _items = [], _active = null, _genres = {};
+  const KEY = () => window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+  async function fetchNow() {
+    const key = KEY(); if (!key) throw new Error('Chybí TMDB API klíč.');
+    const pages = await Promise.all([1, 2, 3].map(p => fetch(`https://api.themoviedb.org/3/movie/now_playing?api_key=${key}&language=cs-CZ&region=CZ&page=${p}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] }))));
+    const seen = new Set(), out = [];
+    pages.forEach(d => (d.results || []).forEach(m => { if (m && !seen.has(m.id)) { seen.add(m.id); out.push(m); } }));
+    return out;
+  }
+  // Sdílená sada ID filmů, které právě hrají (používá i „Již bylo v kině“, aby se nepřekrývaly)
+  let _idsCache = null;
+  window._hrajeNowIds = async function() {
+    if (_idsCache && Date.now() - _idsCache.at < 3600000) return _idsCache.ids;
+    try { const a = await fetchNow(); _idsCache = { at: Date.now(), ids: new Set(a.map(m => m.id)) }; return _idsCache.ids; } catch (e) { return new Set(); }
+  };
+  function card(m) {
+    const img = m.poster_path ? `<img src="https://image.tmdb.org/t/p/w300${m.poster_path}" style="width:100%;height:195px;object-fit:cover;border-radius:10px 10px 0 0;" loading="lazy">` : `<div style="width:100%;height:195px;background:#1e293b;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem;">🎬</div>`;
+    const year = m.release_date ? m.release_date.slice(0, 4) : '';
+    const rating = m.vote_average ? `⭐ ${m.vote_average.toFixed(1)}` : '';
+    return `<div onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('hraje','hrajeVKineModal',${m.id},'movie')" style="background:#111827;border-radius:10px;border:1px solid #1e293b;cursor:pointer;overflow:hidden;">${img}<div style="padding:8px;"><div style="font-size:0.8rem;font-weight:700;color:#e2e8f0;line-height:1.3;margin-bottom:4px;">${m.title}</div><div style="font-size:0.72rem;color:#94a3b8;">${year}${rating ? ' · ' + rating : ''}</div></div></div>`;
+  }
+  function paintFilters() {
+    const el = document.getElementById('hrajeGenreFilters'); if (!el) return;
+    const ids = []; _items.forEach(m => (m.genre_ids || []).forEach(g => ids.push(g)));
+    const uniq = [...new Set(ids)].slice(0, 14);
+    const btn = (id, label) => { const a = _active === id; return `<button onclick="hrajeFilterGenre(${id === null ? 'null' : id})" style="padding:5px 14px;border-radius:20px;border:1px solid ${a ? '#22c55e' : '#334155'};background:${a ? 'rgba(34,197,94,0.15)' : '#111827'};color:${a ? '#22c55e' : '#94a3b8'};font-size:0.78rem;cursor:pointer;">${label}</button>`; };
+    el.innerHTML = btn(null, 'Vše') + uniq.map(id => btn(id, _genres[id] || id)).join('');
+  }
+  function paintList() {
+    const res = document.getElementById('hrajeVKineResult'); if (!res) return;
+    const list = _active === null ? _items : _items.filter(m => (m.genre_ids || []).includes(_active));
+    res.innerHTML = list.length ? list.map(card).join('') : '<div style="grid-column:1/-1;text-align:center;color:#888;padding:20px;">Nic nenalezeno.</div>';
+  }
+  window.hrajeFilterGenre = function(id) { _active = id; paintFilters(); paintList(); };
+  window.openHrajeVKineModal = async function() {
+    const m = document.getElementById('hrajeVKineModal'); if (!m) return;
+    m.style.display = 'flex'; _active = null;
+    if (window._saveLastZabavaList) window._saveLastZabavaList('hraje', 'hrajeVKineModal');
+    if (window.updatePwaBtn) updatePwaBtn();
+    const loader = document.getElementById('hrajeVKineLoader'), err = document.getElementById('hrajeVKineError');
+    err.style.display = 'none';
+    if (!_items.length) {
+      loader.style.display = 'block';
+      try {
+        _items = await fetchNow();
+        if (!Object.keys(_genres).length) {
+          const r = await fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${KEY()}&language=cs-CZ`).then(x => x.json()).catch(() => ({}));
+          (r.genres || []).forEach(g => { _genres[g.id] = g.name; });
+        }
+      } catch (e) { err.textContent = e.message || 'Chyba načítání.'; err.style.display = 'block'; }
+      loader.style.display = 'none';
+    }
+    paintFilters(); paintList();
+  };
+  window.closeHrajeVKineModal = function() {
+    const m = document.getElementById('hrajeVKineModal'); if (m) m.style.display = 'none';
+    if (window._clearLastZabavaList) window._clearLastZabavaList();
+    if (window._returnToZabava) _returnToZabava();
+  };
+})();
+
 // Register modal close keys
 (function() {
   const orig = window._modalCloseMap || {};
@@ -47170,6 +47254,7 @@ window._askSinatorGoPrev = function() {
   orig['calendarModal'] = function() { if(typeof closeCalendarModal==='function') closeCalendarModal(); };
   orig['tentodenModal'] = function() { if(typeof closeTentodenModal==='function') closeTentodenModal(); };
   orig['uzByloVKineModal'] = function() { if(typeof closeUzByloVKineModal==='function') closeUzByloVKineModal(); };
+  orig['hrajeVKineModal'] = function() { if(typeof closeHrajeVKineModal==='function') closeHrajeVKineModal(); };
   orig['askSinatorModal'] = function() { if(typeof closeAskSinatorModal==='function') closeAskSinatorModal(); };
   window._modalCloseMap = orig;
 })();
