@@ -5576,6 +5576,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-15b', date: '15. 10. 2026', items: [
+            '⭐ Franchise — Vlastní série: pod připravenými sériemi je nový seznam vlastních. Ve výsledcích hledání i v detailu kolekce/seriálu je tlačítko ➕ Přidat / ➖ Odebrat. Film se uloží jako celá jeho kolekce (bez duplicit), seriál jako přehled řad; seznam se ukládá v zařízení',
+            '🎤 Franchise — hlasové hledání: mikrofon vedle políčka, po nadiktování se hledá samo. Po návratu z detailu se obnoví poslední hledání',
+            '📈 Kolekce v Franchise teď ukazují Zhlédnuto X / Y a ▶️ Další na řadě; z názvů zmizelo „(kolekce)“',
+            '🛠️ Oprava: při návratu z detailu filmu už nebliká domovská obrazovka (Franchise, Swipe, Up Next i Wrapped)'
+        ] },
         { version: '2026-10-15a', date: '15. 10. 2026', items: [
             '🧹 Nastavení → Vzhled: sekce 🔔 Upozornění a 🏠 Přizpůsobit tlačítka domovské obrazovky (včetně přepínačů šipky, loga a informačního pruhu) se už nezobrazují ve Vzhledu — zůstaly jen v Nastavení → 🧪 Experimentální funkce, kde fungují beze změny'
         ] },
@@ -47053,10 +47059,15 @@ async function pmap(a,fn,n){var o=[];for(var c of chunk(a,n||8)){o=o.concat(awai
 function shuf(a){return a.map(function(x){return[Math.random(),x]}).sort(function(a,b){return a[0]-b[0]}).map(function(x){return x[1]})}
 function ov(id,title,html){var o=document.getElementById(id);if(o)o.remove();o=document.createElement('div');o.id=id;o.className='sfo';
  o.innerHTML='<div class="sfh"><span>'+title+'</span><button onclick="document.getElementById(\''+id+'\').remove()">✕</button></div><div class="sfb">'+html+'</div>';document.body.appendChild(o);return o.querySelector('.sfb')}
-function open_(id,t){var os=[].slice.call(document.querySelectorAll('.sfo'));os.forEach(function(o){o.style.display='none'});
- var back=function(){var mm=document.getElementById('modal');if(mm&&!mm.classList.contains('open'))mm.style.zIndex='';os.forEach(function(o){if(o.isConnected)o.style.display='flex'})};
+function open_(id,t){var os=[].slice.call(document.querySelectorAll('.sfo')),hid=false,done=false,iv=null,obs=null,n=0;
+ var hide=function(){if(hid)return;hid=true;os.forEach(function(o){o.style.display='none'})};
+ var back=function(){if(done)return;done=true;clearInterval(iv);try{obs&&obs.disconnect()}catch(e){}var mm=document.getElementById('modal');if(mm&&!mm.classList.contains('open'))mm.style.zIndex='';os.forEach(function(o){if(o.isConnected)o.style.display='flex'})};
+ var chk=function(){var m=document.getElementById('modal');if(!m)return;if(m.classList.contains('open'))hide();else if(hid)back()};
+ var m0=document.getElementById('modal');
+ try{if(m0&&window.MutationObserver){obs=new MutationObserver(chk);obs.observe(m0,{attributes:true,attributeFilter:['class']})}}catch(e){}
  try{window._siOpenDetail?window._siOpenDetail(id,t):openDetail(id,t)}catch(e){back();T('⚠️ Detail se nepodařilo otevřít');return}
- var n=0,iv=setInterval(function(){var m=document.getElementById('modal');n++;if(!m||(n>2&&!m.classList.contains('open'))||n>7200){clearInterval(iv);back()}},400)}
+ chk();
+ iv=setInterval(function(){n++;chk();if(!hid&&n>40)back();if(n>7200)back()},400)}
 window.sfOpen=open_;
 
 /* ── Hlavička: tlačítka ── */
@@ -47264,6 +47275,7 @@ window.sfWrGo=async function(){var y=+document.getElementById('sfWy').value,b=do
 .sfnext{border:1px solid #22d3ee66;background:#22d3ee14;border-radius:12px;padding:10px 12px;margin-bottom:12px;cursor:pointer}
 .sfrow.sfdone{opacity:.55}
 .sfokp{background:#22c55e22!important;color:#22c55e!important}
+.sffav{padding:6px 10px!important;font-size:.78rem!important;flex-shrink:0;white-space:nowrap;min-height:0!important}
 </style>
 <script>
 (function(){
@@ -47552,7 +47564,30 @@ var FR=[
 ];
 
 /* ── Stav + pomocné ── */
-var IDC=jget('sf_fr_ids',{}),fr=null,curItems=null;
+var IDC=jget('sf_fr_ids',{}),fr=null,curItems=null,CU=jget('sf_fr_custom',[]),lastQ='';
+var BLANK='data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+function cleanCol(n){return String(n||'').replace(/\s*[\(\-–]?\s*(kolekce|collection)\)?\s*$/i,'').trim()||String(n||'')}
+function cuSave(){jset('sf_fr_custom',CU)}
+function cuFind(id,t){id=+id;return CU.filter(function(x){return(x.t===t&&x.id===id)||(t==='movie'&&x.t==='col'&&(x.src||[]).indexOf(id)>-1)})[0]}
+function favHtml(id,t){var on=!!cuFind(id,t);return '<button class="sf-btn sffav'+(on?' on':'')+'" data-fk="'+t+'|'+id+'" onclick="event.stopPropagation();sfFrFav('+id+',\''+t+'\')">'+(on?'➖ Odebrat':'➕ Přidat')+'</button>'}
+function favRefresh(){var o=$('sfFr');if(!o)return;[].slice.call(o.querySelectorAll('[data-fk]')).forEach(function(b){var p=b.getAttribute('data-fk').split('|'),on=!!cuFind(p[1],p[0]);b.classList.toggle('on',on);b.textContent=on?'➖ Odebrat':'➕ Přidat'});if($('sfFrC'))renderCustom()}
+function renderCustom(){var c=$('sfFrC');if(!c)return;
+ if(!CU.length){c.innerHTML='<p style="opacity:.6;font-size:.82rem;margin:0 0 8px">Zatím nic. Vyhledej titul a klepni na „➕ Přidat“ — kolekce nebo seriál se pak objeví tady.</p>';return}
+ c.innerHTML=CU.map(function(x){var kind=x.t==='col'?'📚 Kolekce':x.t==='tv'?'📺 Seriál':'🎬 Film';
+  return '<div class="sfrow" onclick="sfFrAuto('+x.id+',\''+x.t+'\')"><img loading="lazy" src="'+(x.p?IM+'w154'+x.p:BLANK)+'"><div><b>'+esc(x.n)+'</b><br><small>'+kind+'</small></div>'+favHtml(x.id,x.t)+'</div>'}).join('')}
+window.sfFrFav=async function(id,t){
+ id=+id;var ex=cuFind(id,t);
+ if(ex){CU=CU.filter(function(x){return x!==ex});cuSave();favRefresh();T('➖ Odebráno z vlastních');return}
+ if(!K()){T('Nejdřív zadej TMDB klíč');return}
+ try{
+  if(t==='movie'){var m=await tj('/movie/'+id),c=m.belongs_to_collection;
+   if(c){var e2=CU.filter(function(x){return x.t==='col'&&x.id===c.id})[0];
+    if(e2){e2.src=(e2.src||[]).concat([id])}else CU.push({t:'col',id:c.id,n:cleanCol(c.name||m.title),p:c.poster_path||m.poster_path||null,src:[id]})}
+   else CU.push({t:'movie',id:id,n:m.title,p:m.poster_path||null,src:[id]})}
+  else if(t==='col'){var cc=await tj('/collection/'+id);CU.push({t:'col',id:id,n:cleanCol(cc.name),p:cc.poster_path||null,src:[]})}
+  else{var d=await tj('/tv/'+id);CU.push({t:'tv',id:id,n:d.name,p:d.poster_path||null})}
+  cuSave();favRefresh();T('➕ Přidáno do vlastních')}catch(e){T('⚠️ Nepodařilo se přidat')}};
+window.sfFrVoice=function(){if(typeof window.startVoiceSearch==='function')window.startVoiceSearch('sfFrQ','sfFrMic');else T('Hlasové hledání není dostupné')};
 function flatOf(f){var o=[];f.gs.forEach(function(g){g[1].forEach(function(e){o.push(e)})});return o}
 function released(e){return !e.r||e.r<=today().slice(0,7)}
 
@@ -47597,18 +47632,20 @@ function rowHtml(it,i,w){
   +(it.pc?'<span class="sfpc">🎞️ '+esc(it.pc)+'</span>':'')+(it.nt?'<span class="sfnt">💡 '+esc(it.nt)+'</span>':'')+'</div>'+pill+'</div>'}
 
 /* ── Domů ── */
-window.sfFrOpen=function(){shell();window.sfFrHome()};
+window.sfFrOpen=function(){lastQ='';shell();window.sfFrHome()};
 window.sfFrHome=function(){
  fr=null;head('🧭 Franchise',false);
- var h='<p style="margin:0 0 12px;font-size:.85rem;opacity:.75">Chronologické pořadí dílů, spin-offů a prequelů — plus tip na potitulkové scény, ať ti nic neunikne. Vyber sérii, nebo hledej libovolný titul.</p>'
-  +'<div style="display:flex;gap:8px;margin-bottom:12px"><input id="sfFrQ" class="sf-note" style="min-height:0;margin:0;flex:1" placeholder="Hledej sérii nebo titul…" onkeydown="if(event.key===\'Enter\')sfFrSearch()"><button class="sf-btn on" onclick="sfFrSearch()">🔍</button></div><div id="sfFrR"></div><h4 style="margin:6px 0 8px">Připravené série</h4>';
+ var h='<p style="margin:0 0 12px;font-size:.85rem;opacity:.75">Chronologické pořadí dílů, spin-offů a prequelů — plus tip na potitulkové scény, ať ti nic neunikne. Vyber sérii, nebo hledej libovolný titul (i hlasem).</p>'
+  +'<div style="display:flex;gap:8px;margin-bottom:12px"><input id="sfFrQ" class="sf-note" style="min-height:0;margin:0;flex:1;min-width:0" placeholder="Hledej sérii nebo titul…" onkeydown="if(event.key===\'Enter\')sfFrSearch()"><button id="sfFrMic" class="sf-btn" title="Hlasové hledání" onclick="sfFrVoice()">🎤</button><button class="sf-btn on" onclick="sfFrSearch()">🔍</button></div><div id="sfFrR"></div><h4 style="margin:6px 0 8px">Připravené série</h4>';
  FR.forEach(function(f){var n=flatOf(f).length;
   h+='<div class="sfrow" onclick="sfFrGo(\''+f.k+'\')"><span style="font-size:1.8rem;width:46px;text-align:center">'+f.ic+'</span><div><b>'+esc(f.n)+'</b><br><small>'+n+' titulů'+(f.gs.length>1?' · '+f.gs.length+' větve':'')+'</small></div><span class="sfpill">→</span></div>'});
- body(h)};
+ h+='<h4 style="margin:18px 0 8px">⭐ Vlastní série</h4><div id="sfFrC"></div>';
+ body(h);renderCustom();
+ var inp=$('sfFrQ');if(inp){inp.addEventListener('input',function(e){if(e.isTrusted===false)window.sfFrSearch()});if(lastQ){inp.value=lastQ;window.sfFrSearch()}}};
 
 /* ── Hledání ── */
 window.sfFrSearch=async function(){
- var inp=$('sfFrQ'),r=$('sfFrR');if(!inp||!r)return;var q=inp.value.trim();if(!q)return;var nq=nz(q);
+ var inp=$('sfFrQ'),r=$('sfFrR');if(!inp||!r)return;var q=inp.value.trim();if(!q)return;lastQ=q;var nq=nz(q);
  var cur=FR.filter(function(f){return nz(f.n+' '+f.al).indexOf(nq)>-1||flatOf(f).some(function(e){return nz(e.n+' '+e.q).indexOf(nq)>-1})});
  var h='';
  if(cur.length){h+='<h4 style="margin:0 0 8px">Připravené série</h4>';cur.forEach(function(f){
@@ -47617,10 +47654,11 @@ window.sfFrSearch=async function(){
  if(!K())return;
  try{var d=await tj('/search/multi','&query='+encodeURIComponent(q)),
   rs=((d&&d.results)||[]).filter(function(x){return(x.media_type==='movie'||x.media_type==='tv')&&x.poster_path}).slice(0,12);
+  if($('sfFrR')!==r)return;
   h+='<h4 style="margin:10px 0 8px">Další tituly (TMDB) — klepnutím zobrazíš kolekci / řady</h4>';
   if(!rs.length)h+='<p style="opacity:.6">Nic nenalezeno.</p>';
   rs.forEach(function(x){var yr=((x.release_date||x.first_air_date)||'').slice(0,4);
-   h+='<div class="sfrow" onclick="sfFrAuto('+x.id+',\''+x.media_type+'\')"><img loading="lazy" src="'+IM+'w154'+x.poster_path+'"><div><b>'+esc(x.title||x.name)+'</b><br><small>'+(x.media_type==='tv'?'📺 Seriál':'🎬 Film')+(yr?' · '+yr:'')+'</small></div><span class="sfpill">→</span></div>'});
+   h+='<div class="sfrow" onclick="sfFrAuto('+x.id+',\''+x.media_type+'\')"><img loading="lazy" src="'+IM+'w154'+x.poster_path+'"><div><b>'+esc(x.title||x.name)+'</b><br><small>'+(x.media_type==='tv'?'📺 Seriál':'🎬 Film')+(yr?' · '+yr:'')+'</small></div>'+favHtml(x.id,x.media_type)+'</div>'});
   r.innerHTML=h}catch(e){r.innerHTML=h+'<p style="opacity:.6">Hledání se nepovedlo.</p>'}};
 
 /* ── Kurátorovaná série ── */
@@ -47654,23 +47692,31 @@ function renderFr(){
 
 /* ── Libovolný titul z TMDB: kolekce / řady ── */
 window.sfFrAuto=async function(id,t){
- head('🧭 Kolekce / řady',true);body('<p>Načítám…</p>');
+ id=+id;head('🧭 Kolekce / řady',true);body('<p>Načítám…</p>');
  try{
-  var w=await loadW(),items=[],intro='';
-  if(t==='movie'){
-   var m=await tj('/movie/'+id),c=m.belongs_to_collection;
-   if(!c){body('<p style="opacity:.8">Film <b>'+esc(m.title)+'</b> není v TMDB součástí žádné kolekce (nemá nalezené sequely ani prequely).</p><div class="sfrow" onclick="sfOpen('+id+',\'movie\')"><div><b>Otevřít detail filmu</b></div><span class="sfpill">→</span></div>');return}
-   var col=await tj('/collection/'+c.id),today_=today();
+  var w=await loadW(),items=[],intro='',td_=today(),favId=id,favT=t;
+  if(t==='movie'||t==='col'){
+   var cid=null,m=null;
+   if(t==='col')cid=id;
+   else{m=await tj('/movie/'+id);if(m.belongs_to_collection)cid=m.belongs_to_collection.id}
+   if(!cid){body('<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px"><div style="flex:1;font-size:.85rem;opacity:.85">Film <b>'+esc(m.title)+'</b> není v TMDB součástí žádné kolekce (nemá nalezené sequely ani prequely).</div>'+favHtml(id,'movie')+'</div><div class="sfrow" onclick="sfOpen('+id+',\'movie\')"><div><b>Otevřít detail filmu</b></div><span class="sfpill">→</span></div>');return}
+   var col=await tj('/collection/'+cid);
    items=(col.parts||[]).slice().sort(function(a,b){return(a.release_date||'9999')<(b.release_date||'9999')?-1:1}).map(function(x){
-    var d=x.release_date||'';return{id:x.id,t:'movie',n:x.title,y:d.slice(0,4),p:x.poster_path,future:!d||d>today_}});
-   intro='Kolekce <b>'+esc(col.name||c.name)+'</b> — řazeno podle data vydání (TMDB nezná vnitřní chronologii děje).'}
+    var d=x.release_date||'';return{id:x.id,t:'movie',n:x.title,y:d.slice(0,4),p:x.poster_path,future:!d||d>td_}});
+   intro='Kolekce <b>'+esc(cleanCol(col.name))+'</b> — řazeno podle data vydání (TMDB nezná vnitřní chronologii děje).';
+   if(t==='col'){favId=cid;favT='col'}}
   else{
    var d=await tj('/tv/'+id);
    items=(d.seasons||[]).filter(function(s){return s.season_number>0}).map(function(s){
-    return{id:id,t:'tv',n:d.name+' — '+(s.name||('Řada '+s.season_number)),y:(s.air_date||'').slice(0,4),p:s.poster_path||d.poster_path,era:s.episode_count?s.episode_count+' ep.':'',noW:true,future:s.air_date&&s.air_date>today()}});
+    return{id:id,t:'tv',n:d.name+' — '+(s.name||('Řada '+s.season_number)),y:(s.air_date||'').slice(0,4),p:s.poster_path||d.poster_path,era:s.episode_count?s.episode_count+' ep.':'',noW:true,future:s.air_date&&s.air_date>td_}});
    intro='Seriál <b>'+esc(d.name)+'</b> — přehled řad. Spin-offy a prequely seriálů TMDB nepropojuje; zkus je vyhledat zvlášť, nebo se podívej do připravených sérií.'}
   if(!items.length){body('<p style="opacity:.8">Nic k zobrazení.</p>');return}
-  var h='<p style="margin:0 0 12px;font-size:.85rem;opacity:.8">'+intro+'</p>';
+  var h='<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px"><div style="flex:1;font-size:.85rem;opacity:.85">'+intro+'</div>'+favHtml(favId,favT)+'</div>';
+  if(!items[0].noW){
+   var rel=items.filter(function(x){return !x.future}),done=rel.filter(function(x){return isW(x,w)}).length,tot=rel.length,nxt=rel.filter(function(x){return !isW(x,w)})[0];
+   h+='<div style="font-size:.85rem;opacity:.85">Zhlédnuto <b>'+done+' / '+tot+'</b></div><div class="sfbar"><i style="width:'+(tot?Math.round(100*done/tot):0)+'%"></i></div>';
+   if(nxt)h+='<div class="sfnext" onclick="sfOpen('+nxt.id+',\'movie\')"><small style="opacity:.7">▶️ Další na řadě</small><br><b>'+esc(nxt.n)+'</b></div>';
+   else if(tot&&done===tot)h+='<div class="sfnext" style="cursor:default"><b>🏁 Hotovo — všechno vydané máš zhlédnuté!</b></div>'}
   items.forEach(function(it,i){h+=rowHtml(it,i,w)});
   body(h)}catch(e){body('<p>⚠️ Nepodařilo se načíst data z TMDB.</p>')}};
 })();
