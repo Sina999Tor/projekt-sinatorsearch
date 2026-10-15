@@ -1668,6 +1668,45 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             </div>
             <div class="settings-divider"></div>
             <button class="settings-full-btn" onclick="toggleFullscreen()" id="settingsFullscreenBtn">📺 Fullscreen (vypnuto)</button>
+            <div class="settings-section" id="installAppSection">
+                <span class="settings-label">📲 Instalace aplikace</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">
+                    Nainstaluj Sinator Search jako plnohodnotnou appku na plochu — spouští se samostatně, bez adresního řádku prohlížeče.
+                </div>
+
+                <!-- Stav: již nainstalováno -->
+                <div id="pwaAlreadyInstalledInfo" style="display:none;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.35);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:0.8rem;color:#4ade80;">
+                    ✅ Aplikace je nainstalovaná a běží samostatně.
+                </div>
+
+                <!-- Android / desktop Chrome: nativní instalace -->
+                <button class="settings-full-btn" id="pwaInstallBtn" onclick="installPWA()" style="display:none;margin-top:10px;">📲 Instalovat aplikaci (Android)</button>
+                <div id="pwaInstallInfo" style="font-size:0.7rem; color:var(--text-muted); text-align:center; margin-top:4px; display:none;">Dostupné v Chrome/Edge na Androidu přes HTTPS</div>
+
+                <!-- Přenos TMDB klíče do instalace -->
+                <button class="settings-btn-small" id="pwaCarryKeyBtn" onclick="prepareKeyForInstall()" style="display:none;width:100%;margin-top:10px;">🔑 Přenést klíč, jméno a přístup do instalace</button>
+                <div id="pwaCarryKeyInfo" style="display:none;font-size:0.7rem;color:var(--text-muted);line-height:1.4;margin-top:4px;">TMDB klíč, přezdívka a schválení přístupu se na 10 minut přidají do adresy (za #). Když appku přidáš na plochu, vezme si je s sebou a po prvním spuštění je nebudeš zadávat ani schvalovat znovu. U instalace přes tlačítko výš se to dělá samo.</div>
+
+                <!-- Android, ale prohlížeč ještě nenabídl instalaci automaticky -->
+                <div id="androidManualInstallInfo" style="display:none;background:rgba(0,180,216,0.08);border:1px solid rgba(0,180,216,0.25);border-radius:10px;padding:12px;margin-top:10px;font-size:0.8rem;line-height:1.7;color:var(--text-main);">
+                    <b>🤖 Instalace na Androidu (ručně):</b><br>
+                    1️⃣ Klepni na menu prohlížeče (⋮ vpravo nahoře)<br>
+                    2️⃣ Vyber <b>„Instalovat aplikaci"</b> nebo <b>„Přidat na plochu"</b><br>
+                    3️⃣ Potvrď instalaci
+                </div>
+
+                <!-- iOS: instrukce pro sdílení na plochu -->
+                <div id="iosInstallInfo" style="display:none;background:rgba(0,180,216,0.08);border:1px solid rgba(0,180,216,0.25);border-radius:10px;padding:12px;margin-top:10px;font-size:0.8rem;line-height:1.7;color:var(--text-main);">
+                    <b>🍎 Instalace na iPhone/iPad (Safari):</b><br>
+                    1️⃣ Klepni na ikonu <b>Sdílet</b> ⬆️ dole na obrazovce<br>
+                    2️⃣ V nabídce vyber <b>„Přidat na plochu"</b><br>
+                    3️⃣ Potvrď tlačítkem <b>„Přidat"</b> vpravo nahoře<br>
+                    <span style="color:var(--text-muted);">⚠️ Instalace funguje pouze v prohlížeči Safari (v Chrome/jiných na iOS není podporovaná).</span>
+                </div>
+            </div>
+            </div>
+            <!-- ============ TAB: OSTATNÍ ============ -->
+            <div class="settings-tab-content" id="settingsTabContentOther">
             <div class="sw-page" id="swPageExperimental">
             <div class="settings-section" id="notifySection" style="background:rgba(96,144,255,0.07);border:1px solid rgba(96,144,255,0.3);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:#6090ff;">🔔 Upozornění</span>
@@ -1709,45 +1748,6 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <button class="settings-btn-small" style="width:100%;margin-top:10px;" onclick="homeBtnsReset()">↺ Zobrazit všechna tlačítka</button>
             </div>
             </div><!-- /swPageExperimental -->
-            <div class="settings-section" id="installAppSection">
-                <span class="settings-label">📲 Instalace aplikace</span>
-                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">
-                    Nainstaluj Sinator Search jako plnohodnotnou appku na plochu — spouští se samostatně, bez adresního řádku prohlížeče.
-                </div>
-
-                <!-- Stav: již nainstalováno -->
-                <div id="pwaAlreadyInstalledInfo" style="display:none;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.35);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:0.8rem;color:#4ade80;">
-                    ✅ Aplikace je nainstalovaná a běží samostatně.
-                </div>
-
-                <!-- Android / desktop Chrome: nativní instalace -->
-                <button class="settings-full-btn" id="pwaInstallBtn" onclick="installPWA()" style="display:none;margin-top:10px;">📲 Instalovat aplikaci (Android)</button>
-                <div id="pwaInstallInfo" style="font-size:0.7rem; color:var(--text-muted); text-align:center; margin-top:4px; display:none;">Dostupné v Chrome/Edge na Androidu přes HTTPS</div>
-
-                <!-- Přenos TMDB klíče do instalace -->
-                <button class="settings-btn-small" id="pwaCarryKeyBtn" onclick="prepareKeyForInstall()" style="display:none;width:100%;margin-top:10px;">🔑 Přenést klíč, jméno a přístup do instalace</button>
-                <div id="pwaCarryKeyInfo" style="display:none;font-size:0.7rem;color:var(--text-muted);line-height:1.4;margin-top:4px;">TMDB klíč, přezdívka a schválení přístupu se na 10 minut přidají do adresy (za #). Když appku přidáš na plochu, vezme si je s sebou a po prvním spuštění je nebudeš zadávat ani schvalovat znovu. U instalace přes tlačítko výš se to dělá samo.</div>
-
-                <!-- Android, ale prohlížeč ještě nenabídl instalaci automaticky -->
-                <div id="androidManualInstallInfo" style="display:none;background:rgba(0,180,216,0.08);border:1px solid rgba(0,180,216,0.25);border-radius:10px;padding:12px;margin-top:10px;font-size:0.8rem;line-height:1.7;color:var(--text-main);">
-                    <b>🤖 Instalace na Androidu (ručně):</b><br>
-                    1️⃣ Klepni na menu prohlížeče (⋮ vpravo nahoře)<br>
-                    2️⃣ Vyber <b>„Instalovat aplikaci"</b> nebo <b>„Přidat na plochu"</b><br>
-                    3️⃣ Potvrď instalaci
-                </div>
-
-                <!-- iOS: instrukce pro sdílení na plochu -->
-                <div id="iosInstallInfo" style="display:none;background:rgba(0,180,216,0.08);border:1px solid rgba(0,180,216,0.25);border-radius:10px;padding:12px;margin-top:10px;font-size:0.8rem;line-height:1.7;color:var(--text-main);">
-                    <b>🍎 Instalace na iPhone/iPad (Safari):</b><br>
-                    1️⃣ Klepni na ikonu <b>Sdílet</b> ⬆️ dole na obrazovce<br>
-                    2️⃣ V nabídce vyber <b>„Přidat na plochu"</b><br>
-                    3️⃣ Potvrď tlačítkem <b>„Přidat"</b> vpravo nahoře<br>
-                    <span style="color:var(--text-muted);">⚠️ Instalace funguje pouze v prohlížeči Safari (v Chrome/jiných na iOS není podporovaná).</span>
-                </div>
-            </div>
-            </div>
-            <!-- ============ TAB: OSTATNÍ ============ -->
-            <div class="settings-tab-content" id="settingsTabContentOther">
             <div class="sw-page" id="swPageProfile">
             <div class="settings-section" style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.2);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:var(--gold,#ffd700);">👤 Tvoje jméno / přezdívka</span>
@@ -5576,6 +5576,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-15a', date: '15. 10. 2026', items: [
+            '🧹 Nastavení → Vzhled: sekce 🔔 Upozornění a 🏠 Přizpůsobit tlačítka domovské obrazovky (včetně přepínačů šipky, loga a informačního pruhu) se už nezobrazují ve Vzhledu — zůstaly jen v Nastavení → 🧪 Experimentální funkce, kde fungují beze změny'
+        ] },
+        { version: '2026-10-14d', date: '14. 10. 2026', items: [
+            '🧭 Franchise — Chronologický průvodce sériemi (nové tlačítko v horní liště): u rozsáhlých sérií a provázaných světů ukáže všechny filmy, seriály, spin-offy a prequely v pořadí. Přepínač 🧭 Podle děje / 🗓️ Podle vydání, ukazatel „Zhlédnuto X / Y“, tlačítko ▶️ Další na řadě a filtr 👁 Jen nezhlédnuté (zhlédnuté se berou z tvé historie a oblíbených)',
+            '🎞️ U klíčových dílů tipy na potitulkové scény a propojení (hlavně MCU), 💡 poznámky k pořadí (např. kam zařadit Tokyo Drift, Rogue One nebo Animatrix) a štítky éry v příběhu',
+            '📚 Připravené série: Marvel (MCU), Star Wars, Star Trek, DC, Vetřelec, Predator, Harry Potter + Fantastic Beasts, Středozem, Rychle a zběsile, Terminator, Matrix, Planeta opic, MonsterVerse, Conjuring, Jurský park/svět a Duna',
+            '🔍 Hledání libovolného titulu: připravené série se najdou i podle názvu dílu, ostatní filmy ukážou celou TMDB kolekci podle data vydání a seriály přehled řad',
+            'Tlačítko Franchise jde zapnout/vypnout v Nastavení → 🧪 Experimentální funkce (přizpůsobení tlačítek domovské obrazovky). Postery a ID se po prvním načtení ukládají do zařízení, další otevření je rychlé'
+        ] },
         { version: '2026-10-14c', date: '14. 10. 2026', items: [
             '🧪 Nastavení — nová sekce Experimentální funkce (menu karta před Adminem)',
             '🔔 Upozornění na nové epizody a streamy se přesunulo ze Vzhledu do Nastavení → 🧪 Experimentální funkce (funkce beze změny)',
@@ -47051,7 +47061,7 @@ window.sfOpen=open_;
 
 /* ── Hlavička: tlačítka ── */
 (function(){var z=document.getElementById('btnZabavaToggle');if(!z)return;
- [['🔥','Swipe','sfSwipeOpen','Swipe tipy podle tvého vkusu'],['📆','Up Next','sfUpNext','Další díly a premiéry'],['🎞️','Wrapped','sfWrapped','Můj filmový rok']].forEach(function(b){
+ [['🔥','Swipe','sfSwipeOpen','Swipe tipy podle tvého vkusu'],['📆','Up Next','sfUpNext','Další díly a premiéry'],['🧭','Franchise','sfFrOpen','Chronologický průvodce sériemi'],['🎞️','Wrapped','sfWrapped','Můj filmový rok']].forEach(function(b){
   z.insertAdjacentHTML('beforebegin','<button class="action-btn icon" onclick="'+b[2]+'()" title="'+b[3]+'"><span class="btn-icon">'+b[0]+'</span><span class="btn-label">'+b[1]+'</span></button>')})})();
 
 /* ── Zapnutí/vypnutí tlačítek domovské obrazovky (Nastavení → Experimentální funkce) ── */
@@ -47242,6 +47252,430 @@ window.sfWrGo=async function(){var y=+document.getElementById('sfWy').value,b=do
   if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:'Můj filmový rok '+y}).catch(function(){});else document.getElementById('sfWd').click()})}};
 })();
 </script>
+<!-- ═══ FRANCHISE TRACKER: Chronologický průvodce sériemi ═══ -->
+<style>
+.sfnum{width:22px;text-align:center;font-weight:800;opacity:.55;font-size:.8rem;flex-shrink:0}
+.sfgh{margin:16px 0 8px;font-weight:800;color:#22d3ee;font-size:.85rem;letter-spacing:.03em}
+.sfpc{display:block;font-size:.74rem;color:#fbbf24;margin-top:3px}
+.sfnt{display:block;font-size:.74rem;opacity:.75;margin-top:2px}
+.sfera{display:inline-block;background:#a78bfa22;color:#a78bfa;border-radius:20px;padding:1px 8px;font-size:.7rem;font-weight:700;margin-left:4px}
+.sfbar{height:8px;border-radius:6px;background:#ffffff14;overflow:hidden;margin:6px 0 12px}
+.sfbar i{display:block;height:100%;background:linear-gradient(90deg,#22d3ee,#22c55e)}
+.sfnext{border:1px solid #22d3ee66;background:#22d3ee14;border-radius:12px;padding:10px 12px;margin-bottom:12px;cursor:pointer}
+.sfrow.sfdone{opacity:.55}
+.sfokp{background:#22c55e22!important;color:#22c55e!important}
+</style>
+<script>
+(function(){
+'use strict';
+var TB='https://api.themoviedb.org/3',IM='https://image.tmdb.org/t/p/',st=window._store||localStorage;
+var K=function(){return (window._siGetKey&&window._siGetKey())||''};
+var S=function(){return (window._siState&&window._siState())||{}};
+var BE=function(){return typeof myBackendReady==='function'&&myBackendReady()};
+function jget(k,d){try{var v=JSON.parse(st.getItem(k));return v==null?d:v}catch(e){return d}}
+function jset(k,v){try{st.setItem(k,JSON.stringify(v))}catch(e){}}
+function T(m){try{showToast(m)}catch(e){alert(m)}}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function F(u){return (typeof _fetchWithTimeout==='function'?_fetchWithTimeout(u,10000):fetch(u)).then(function(r){return r.json()})}
+function tj(p,q){return F(TB+p+'?api_key='+K()+'&language=cs-CZ'+(q||''))}
+function nz(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+function p2(n){return n<10?'0'+n:''+n}
+function today(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
+function chunk(a,n){var o=[];for(var i=0;i<a.length;i+=n)o.push(a.slice(i,i+n));return o}
+async function pmap(a,fn,n){var o=[];for(var c of chunk(a,n||8)){o=o.concat(await Promise.all(c.map(function(x){return fn(x).catch(function(){return null})})))}return o}
+function $(id){return document.getElementById(id)}
+
+/* ── Data: kurátorované franchise. E(typ, název, rok, vydání 'RRRR-MM', éra v příběhu, potitulková scéna, poznámka, hledaný název, štítek) ── */
+function E(t,n,y,r,era,pc,nt,q,lab){return{t:t==='m'?'movie':'tv',n:n,y:y,r:r,era:era||'',pc:pc||'',nt:nt||'',q:q||n,lab:lab||''}}
+var FR=[
+{k:'mcu',ic:'🦸',n:'Marvel Cinematic Universe',al:'marvel mcu avengers iron man thor hulk spider-man doctor strange kapitan amerika',gs:[
+ ['Infinity Saga — pořadí děje',[
+  E('m','Captain America: The First Avenger',2011,'2011-07','1942–1945','Po titulcích: upoutávka na Avengers','Steve se probouzí v roce 2012 — navazuje Avengers'),
+  E('m','Captain Marvel',2019,'2019-03','1995','Uprostřed titulků: Carol se objeví u Avengers po Infinity War • Po titulcích: kocour Goose vyvrhne Tesserakt'),
+  E('m','Iron Man',2008,'2008-05','2010','Po titulcích: Nick Fury nabízí Tonymu Avengers Initiative'),
+  E('m','Iron Man 2',2010,'2010-05','2011','Po titulcích: Coulson nachází v Novém Mexiku Mjölnir'),
+  E('m','The Incredible Hulk',2008,'2008-06','2011','Závěrečná scéna: Tony Stark navštíví gen. Rosse — narážka na tým'),
+  E('m','Thor',2011,'2011-05','2011','Po titulcích: Dr. Selvig s Furym u Tesseraktu — Loki ho ovládá'),
+  E('m','The Avengers',2012,'2012-05','2012','Uprostřed titulků: Thanos se usmívá • Po titulcích: parta jí šawarmu'),
+  E('m','Thor: The Dark World',2013,'2013-11','2013','Uprostřed titulků: Sif a Volstagg předávají Aether Sběrateli (→ Strážci galaxie) • Po titulcích: Thor a Jane'),
+  E('m','Iron Man 3',2013,'2013-05','2013','Po titulcích: Tony vypráví příběh spícímu Brucu Bannerovi'),
+  E('m','Captain America: The Winter Soldier',2014,'2014-04','2014','Uprostřed titulků: Strucker s Lokiho žezlem a dvojčata Maximoffovi • Po titulcích: Bucky u výstavy o Captain Americovi'),
+  E('m','Guardians of the Galaxy',2014,'2014-08','2014','Po titulcích: Howard the Duck'),
+  E('m','Guardians of the Galaxy Vol. 2',2017,'2017-05','2014','5 scén: Kraglin, Ravageři, Ayesha tvoří Adama Warlocka, teenage Groot, Watcheři'),
+  E('m','Avengers: Age of Ultron',2015,'2015-05','2015','Uprostřed titulků: Thanos si nasazuje Rukavici nekonečna'),
+  E('m','Ant-Man',2015,'2015-07','2015','Uprostřed titulků: Hope dostává oblek Wasp • Po titulcích: Cap, Falcon a Bucky (→ Civil War)'),
+  E('m','Captain America: Civil War',2016,'2016-05','2016','Uprostřed titulků: Bucky v kryospánku ve Wakandě • Po titulcích: Peter Parker a webshootery'),
+  E('m','Black Widow',2021,'2021-07','2016','Po titulcích: Yelena u hrobu Natashy; Valentina ji posílá za Clintem (→ Hawkeye)','Vyšlo až 2021, děj mezi Civil War a Infinity War'),
+  E('m','Black Panther',2018,'2018-02','2016','Uprostřed titulků: T\'Challa v OSN • Po titulcích: Bucky se probouzí ve Wakandě'),
+  E('m','Spider-Man: Homecoming',2017,'2017-07','2016–2017','Uprostřed titulků: Toomes ve vězení • Po titulcích: Captain America a výchovné video (vtip)'),
+  E('m','Doctor Strange',2016,'2016-11','2016–2017','Uprostřed titulků: Strange a Thor • Po titulcích: Mordo bere sílu čaroději'),
+  E('m','Thor: Ragnarok',2017,'2017-11','2017','Uprostřed titulků: Thorova loď potkává Thanosovu • Po titulcích: Grandmaster'),
+  E('m','Avengers: Infinity War',2018,'2018-04','2018','Po titulcích: Fury posílá signál (→ Captain Marvel)'),
+  E('m','Ant-Man and the Wasp',2018,'2018-07','2018','Uprostřed titulků: Hank, Hope a Janet mizí (Snap)','Děj souběžně s Infinity War'),
+  E('m','Avengers: Endgame',2019,'2019-04','2018 → 2023','Na konci titulků: zvuk kování brnění'),
+  E('m','Spider-Man: Far From Home',2019,'2019-07','2024','Uprostřed titulků: J. Jonah Jameson odhaluje Spider-Mana • Po titulcích: Talos a Soren = Fury a Hill jsou ve skutečnosti Skrulové')
+ ]],
+ ['Multiverse Saga — pořadí vydání (děje se překrývají)',[
+  E('t','WandaVision',2021,'2021-01'),
+  E('t','The Falcon and the Winter Soldier',2021,'2021-03'),
+  E('t','Loki',2021,'2021-06','','','Děj začíná po Endgame (zmizelý Tesserakt 2012)'),
+  E('m','Black Widow',2021,'2021-07','','','Zařazeno v Infinity Saga (děj před Infinity War)','Black Widow','dup'),
+  E('t','What If...?',2021,'2021-08','','','Animovaná alternativní linie'),
+  E('m','Shang-Chi and the Legend of the Ten Rings',2021,'2021-09'),
+  E('m','Eternals',2021,'2021-11'),
+  E('t','Hawkeye',2021,'2021-11'),
+  E('m','Spider-Man: No Way Home',2021,'2021-12'),
+  E('t','Moon Knight',2022,'2022-03'),
+  E('m','Doctor Strange in the Multiverse of Madness',2022,'2022-05'),
+  E('t','Ms. Marvel',2022,'2022-06'),
+  E('m','Thor: Love and Thunder',2022,'2022-07'),
+  E('t','She-Hulk: Attorney at Law',2022,'2022-08'),
+  E('m','Black Panther: Wakanda Forever',2022,'2022-11'),
+  E('m','Ant-Man and the Wasp: Quantumania',2023,'2023-02'),
+  E('m','Guardians of the Galaxy Vol. 3',2023,'2023-05'),
+  E('t','Secret Invasion',2023,'2023-06'),
+  E('m','The Marvels',2023,'2023-11'),
+  E('t','Echo',2024,'2024-01'),
+  E('m','Deadpool & Wolverine',2024,'2024-07'),
+  E('t','Agatha All Along',2024,'2024-09'),
+  E('t','Daredevil: Born Again',2025,'2025-03'),
+  E('m','Captain America: Brave New World',2025,'2025-02'),
+  E('m','Thunderbolts',2025,'2025-05'),
+  E('t','Ironheart',2025,'2025-06'),
+  E('m','The Fantastic Four: First Steps',2025,'2025-07')
+ ]]
+]},
+{k:'sw',ic:'⚔️',n:'Star Wars',al:'star wars hvezdne valky mandalorian jedi andor ahsoka',gs:[['',[
+  E('m','Star Wars: Epizoda I – Skrytá hrozba',1999,'1999-05','32 př. B.','','','Star Wars: The Phantom Menace'),
+  E('m','Star Wars: The Clone Wars (film)',2008,'2008-08','22 př. B.','','Úvod k seriálu Klonové války'),
+  E('m','Star Wars: Epizoda II – Klonové války',2002,'2002-05','22 př. B.','','','Star Wars: Attack of the Clones'),
+  E('t','Star Wars: The Clone Wars',2008,'2008-10','22–19 př. B.','','Doporučeno po Epizodě II; finále 7. řady se kryje s Epizodou III'),
+  E('m','Star Wars: Epizoda III – Pomsta Sithů',2005,'2005-05','19 př. B.','','','Star Wars: Revenge of the Sith'),
+  E('t','Star Wars: The Bad Batch',2021,'2021-05','19–18 př. B.','','Navazuje na Clone Wars, překrývá se s Epizodou III'),
+  E('m','Solo: A Star Wars Story',2018,'2018-05','13 př. B.'),
+  E('t','Obi-Wan Kenobi',2022,'2022-05','9 př. B.','','Mezi Epizodou III a IV'),
+  E('t','Andor',2022,'2022-09','5–0 př. B.','','Děj před Rogue One; hotové 2 řady'),
+  E('t','Star Wars Rebels',2014,'2014-10','5–0 př. B.','','Důležité pro Ahsoku'),
+  E('m','Rogue One: A Star Wars Story',2016,'2016-12','0 př. B.','','Navazuje přímo na Epizodu IV','Rogue One'),
+  E('m','Star Wars: Epizoda IV – Nová naděje',1977,'1977-05','0 př. B.','','','Star Wars'),
+  E('m','Star Wars: Epizoda V – Impérium vrací úder',1980,'1980-05','3 po B.','','','The Empire Strikes Back'),
+  E('m','Star Wars: Epizoda VI – Návrat Jediů',1983,'1983-05','4 po B.','','','Return of the Jedi'),
+  E('t','The Mandalorian',2019,'2019-11','9 po B.','','Děj po Návratu Jediů'),
+  E('t','The Book of Boba Fett',2021,'2021-12','9 po B.','','Překrývá se s 2.–3. řadou Mandaloriana'),
+  E('t','Ahsoka',2023,'2023-08','9 po B.','','Doporučeno znát Rebels a Mandaloriana'),
+  E('m','Star Wars: Epizoda VII – Síla se probouzí',2015,'2015-12','34 po B.','','','Star Wars: The Force Awakens'),
+  E('m','Star Wars: Epizoda VIII – Poslední z Jediů',2017,'2017-12','34 po B.','','','Star Wars: The Last Jedi'),
+  E('m','Star Wars: Epizoda IX – Vzestup Skywalkera',2019,'2019-12','35 po B.','','','Star Wars: The Rise of Skywalker')
+]]]},
+{k:'st',ic:'🖖',n:'Star Trek',al:'star trek enterprise picard voyager discovery',gs:[
+ ['Hlavní časová osa (Prime)',[
+  E('t','Star Trek: Enterprise',2001,'2001-09','2151–2155'),
+  E('t','Star Trek: Discovery',2017,'2017-09','2255–2258','','Řady 1–2','','S1–2'),
+  E('t','Star Trek: Strange New Worlds',2022,'2022-05','2259–'),
+  E('t','Star Trek: The Original Series',1966,'1966-09','2265–2269','','','Star Trek'),
+  E('m','Star Trek: The Motion Picture',1979,'1979-12','2273'),
+  E('m','Star Trek II: The Wrath of Khan',1982,'1982-06','2285'),
+  E('m','Star Trek III: The Search for Spock',1984,'1984-06','2285'),
+  E('m','Star Trek IV: The Voyage Home',1986,'1986-11','2286'),
+  E('m','Star Trek V: The Final Frontier',1989,'1989-06','2287'),
+  E('m','Star Trek VI: The Undiscovered Country',1991,'1991-12','2293'),
+  E('t','Star Trek: The Next Generation',1987,'1987-09','2364–2370'),
+  E('t','Star Trek: Deep Space Nine',1993,'1993-01','2369–2375','','Překrývá se s TNG a Voyagerem'),
+  E('t','Star Trek: Voyager',1995,'1995-01','2371–2378'),
+  E('m','Star Trek Generations',1994,'1994-11','2293 / 2371','','Přechod z TOS na TNG','Star Trek Generations'),
+  E('m','Star Trek: First Contact',1996,'1996-11','2373'),
+  E('m','Star Trek: Insurrection',1998,'1998-12','2375'),
+  E('m','Star Trek: Nemesis',2002,'2002-12','2379'),
+  E('t','Star Trek: Lower Decks',2020,'2020-08','2380–2383'),
+  E('t','Star Trek: Prodigy',2021,'2021-10','2383'),
+  E('t','Star Trek: Picard',2020,'2020-01','2399–2401'),
+  E('t','Star Trek: Discovery',2017,'2017-09','3188–3191','','Řady 3–5 (daleká budoucnost)','','S3–5')
+ ]],
+ ['Kelvin timeline (alternativní)',[
+  E('m','Star Trek',2009,'2009-05','2233 / 2258'),
+  E('m','Star Trek Into Darkness',2013,'2013-05','2259'),
+  E('m','Star Trek Beyond',2016,'2016-07','2263')
+ ]]
+]},
+{k:'dc',ic:'🦇',n:'DC Extended Universe',al:'dc dceu batman superman justice league wonder woman aquaman shazam',gs:[['',[
+  E('m','Wonder Woman',2017,'2017-06','1918'),
+  E('m','Wonder Woman 1984',2020,'2020-12','1984'),
+  E('m','Man of Steel',2013,'2013-06','2013'),
+  E('m','Batman v Superman: Dawn of Justice',2016,'2016-03','2015–2016'),
+  E('m','Suicide Squad',2016,'2016-08','2016','Uprostřed titulků: Waller a Bruce Wayne'),
+  E('m','Justice League',2017,'2017-11','2017','Uprostřed titulků: Lex Luthor a Deathstroke'),
+  E('m','Zack Snyder\'s Justice League',2021,'2021-03','2017','','Alternativní verze Justice League'),
+  E('m','Aquaman',2018,'2018-12','2018'),
+  E('m','Shazam!',2019,'2019-04','2019'),
+  E('m','Birds of Prey (and the Fantabulous Emancipation of One Harley Quinn)',2020,'2020-02','2020'),
+  E('m','The Suicide Squad',2021,'2021-08','2021'),
+  E('t','Peacemaker',2022,'2022-01','2022','','Navazuje na The Suicide Squad'),
+  E('m','Black Adam',2022,'2022-10','2022'),
+  E('m','Shazam! Fury of the Gods',2023,'2023-03','2023'),
+  E('m','The Flash',2023,'2023-06','2023'),
+  E('m','Blue Beetle',2023,'2023-08','2023'),
+  E('m','Aquaman and the Lost Kingdom',2023,'2023-12','2023')
+]]]},
+{k:'alien',ic:'👽',n:'Vetřelec (Alien)',al:'alien vetrelec prometheus romulus covenant',gs:[['',[
+  E('m','Prometheus',2012,'2012-06','2093'),
+  E('m','Alien: Covenant',2017,'2017-05','2104'),
+  E('t','Alien: Earth',2025,'2025-08','2120','','Dva roky před prvním filmem'),
+  E('m','Alien',1979,'1979-05','2122'),
+  E('m','Alien: Romulus',2024,'2024-08','2142','','Mezi Vetřelcem a Vetřelci'),
+  E('m','Aliens',1986,'1986-07','2179'),
+  E('m','Alien 3',1992,'1992-05','2179'),
+  E('m','Alien Resurrection',1997,'1997-11','2381')
+]]]},
+{k:'pred',ic:'🎯',n:'Predator',al:'predator prey badlands aliens vs predator',gs:[['',[
+  E('m','Predator: Killer of Killers',2025,'2025-06','841 / 1609 / 1941','','Animovaná antologie ze tří epoch'),
+  E('m','Prey',2022,'2022-08','1719'),
+  E('m','Predator',1987,'1987-06','1987'),
+  E('m','Predator 2',1990,'1990-11','1997'),
+  E('m','Alien vs. Predator',2004,'2004-08','2004','','Crossover s Vetřelcem'),
+  E('m','Aliens vs. Predator: Requiem',2007,'2007-12','2004','','Crossover s Vetřelcem'),
+  E('m','Predators',2010,'2010-07','2010'),
+  E('m','The Predator',2018,'2018-09','2018'),
+  E('m','Predator: Badlands',2025,'2025-11','Daleká budoucnost')
+]]]},
+{k:'hp',ic:'🪄',n:'Wizarding World (Harry Potter)',al:'harry potter fantasticke zvirata fantastic beasts wizarding',gs:[
+ ['Harry Potter — pořadí děje (zároveň vydání)',[
+  E('m','Harry Potter and the Philosopher\'s Stone',2001,'2001-11','1991–1992'),
+  E('m','Harry Potter and the Chamber of Secrets',2002,'2002-11','1992–1993'),
+  E('m','Harry Potter and the Prisoner of Azkaban',2004,'2004-06','1993–1994'),
+  E('m','Harry Potter and the Goblet of Fire',2005,'2005-11','1994–1995'),
+  E('m','Harry Potter and the Order of the Phoenix',2007,'2007-07','1995–1996'),
+  E('m','Harry Potter and the Half-Blood Prince',2009,'2009-07','1996–1997'),
+  E('m','Harry Potter and the Deathly Hallows: Part 1',2010,'2010-11','1997–1998'),
+  E('m','Harry Potter and the Deathly Hallows: Part 2',2011,'2011-07','1998')
+ ]],
+ ['Fantastic Beasts — prequely (děj před Harrym)',[
+  E('m','Fantastic Beasts and Where to Find Them',2016,'2016-11','1926'),
+  E('m','Fantastic Beasts: The Crimes of Grindelwald',2018,'2018-11','1927'),
+  E('m','Fantastic Beasts: The Secrets of Dumbledore',2022,'2022-04','1932')
+ ]]
+]},
+{k:'lotr',ic:'💍',n:'Středozem (Pán prstenů)',al:'pan prstenu lord of the rings hobit hobbit middle earth tolkien rings of power',gs:[['',[
+  E('t','The Lord of the Rings: The Rings of Power',2022,'2022-09','Druhý věk','','Řady 1–2'),
+  E('m','The Lord of the Rings: The War of the Rohirrim',2024,'2024-12','Třetí věk (před Hobitem)','','Animovaný film'),
+  E('m','The Hobbit: An Unexpected Journey',2012,'2012-12','Třetí věk'),
+  E('m','The Hobbit: The Desolation of Smaug',2013,'2013-12','Třetí věk'),
+  E('m','The Hobbit: The Battle of the Five Armies',2014,'2014-12','Třetí věk'),
+  E('m','The Lord of the Rings: The Fellowship of the Ring',2001,'2001-12','Třetí věk (3018)'),
+  E('m','The Lord of the Rings: The Two Towers',2002,'2002-12','Třetí věk'),
+  E('m','The Lord of the Rings: The Return of the King',2003,'2003-12','Třetí věk')
+]]]},
+{k:'ff',ic:'🏎️',n:'Rychle a zběsile (Fast & Furious)',al:'fast furious rychle zbesile hobbs shaw tokyo drift',gs:[['',[
+  E('m','The Fast and the Furious',2001,'2001-06','2001'),
+  E('m','2 Fast 2 Furious',2003,'2003-06','2003'),
+  E('m','Fast & Furious',2009,'2009-04','2009'),
+  E('m','Fast Five',2011,'2011-04','2011','Uprostřed titulků: Hobbs dostává složku o Letty (žije)'),
+  E('m','Fast & Furious 6',2013,'2013-05','2013','Závěrečná scéna: propojení na Tokyo Drift a Furious 7'),
+  E('m','The Fast and the Furious: Tokyo Drift',2006,'2006-06','po Fast & Furious 6','','Chronologicky až tady; vyšlo jako 3. díl'),
+  E('m','Furious 7',2015,'2015-04','2015'),
+  E('m','The Fate of the Furious',2017,'2017-04','2017'),
+  E('m','Fast & Furious Presents: Hobbs & Shaw',2019,'2019-08','2019','','Spin-off','Hobbs & Shaw'),
+  E('m','F9',2021,'2021-06','2021'),
+  E('m','Fast X',2023,'2023-05','2023')
+]]]},
+{k:'term',ic:'🤖',n:'Terminator',al:'terminator skynet sarah connor',gs:[
+ ['Doporučené jádro (T1 → T2 → Dark Fate)',[
+  E('m','The Terminator',1984,'1984-10','1984'),
+  E('m','Terminator 2: Judgment Day',1991,'1991-07','1995'),
+  E('m','Terminator: Dark Fate',2019,'2019-10','2020','','Přímé pokračování T2, ignoruje díly 3–5')
+ ]],
+ ['Alternativní časové linie',[
+  E('m','Terminator 3: Rise of the Machines',2003,'2003-07','2004'),
+  E('m','Terminator Salvation',2009,'2009-05','2018'),
+  E('t','Terminator: The Sarah Connor Chronicles',2008,'2008-01','1999–2009','','Navazuje na T2, ignoruje T3'),
+  E('m','Terminator Genisys',2015,'2015-07','1984 / 2017','','Restart časové osy'),
+  E('t','Terminator Zero',2024,'2024-08','2022','','Anime seriál')
+ ]]
+]},
+{k:'matrix',ic:'💊',n:'Matrix',al:'matrix animatrix neo',gs:[['',[
+  E('m','The Matrix',1999,'1999-03','Blízká budoucnost'),
+  E('m','The Animatrix',2003,'2003-06','Různé éry','','Pusť jako první Second Renaissance (původ strojů); Final Flight of Osiris těsně před Reloaded'),
+  E('m','The Matrix Reloaded',2003,'2003-05','Navazuje na Matrix'),
+  E('m','The Matrix Revolutions',2003,'2003-11','Navazuje na Reloaded'),
+  E('m','The Matrix Resurrections',2021,'2021-12','Po Revolutions')
+]]]},
+{k:'apes',ic:'🦍',n:'Planeta opic (Planet of the Apes)',al:'planeta opic planet of the apes caesar',gs:[
+ ['Původní série (1968–1973)',[
+  E('m','Planet of the Apes',1968,'1968-02','3978'),
+  E('m','Beneath the Planet of the Apes',1970,'1970-05','3955'),
+  E('m','Escape from the Planet of the Apes',1971,'1971-05','1973'),
+  E('m','Conquest of the Planet of the Apes',1972,'1972-06','1991'),
+  E('m','Battle for the Planet of the Apes',1973,'1973-06','2003')
+ ]],
+ ['Reboot série (2011–)',[
+  E('m','Rise of the Planet of the Apes',2011,'2011-08'),
+  E('m','Dawn of the Planet of the Apes',2014,'2014-07'),
+  E('m','War for the Planet of the Apes',2017,'2017-07'),
+  E('m','Kingdom of the Planet of the Apes',2024,'2024-05','Generace po Caesarovi')
+ ]]
+]},
+{k:'monster',ic:'🦖',n:'MonsterVerse (Godzilla & Kong)',al:'godzilla kong monsterverse monarch skull island',gs:[['',[
+  E('m','Kong: Skull Island',2017,'2017-03','1973','Po titulcích: Monarch odhaluje Godzillu, Mothru, Rodana a King Ghidorah'),
+  E('m','Godzilla',2014,'2014-05','2014'),
+  E('t','Monarch: Legacy of Monsters',2023,'2023-11','1962 / 2015','','Navazuje na Godzillu (2014)'),
+  E('m','Godzilla: King of the Monsters',2019,'2019-05','2019'),
+  E('m','Godzilla vs. Kong',2021,'2021-03','Po King of the Monsters'),
+  E('m','Godzilla x Kong: The New Empire',2024,'2024-03','Po Godzilla vs. Kong')
+]]]},
+{k:'conj',ic:'👻',n:'Conjuring Universe',al:'conjuring zaklinac annabelle nun jeptiska la llorona',gs:[['',[
+  E('m','The Nun',2018,'2018-09','1952'),
+  E('m','Annabelle: Creation',2017,'2017-08','1955'),
+  E('m','The Nun II',2023,'2023-09','1956'),
+  E('m','Annabelle',2014,'2014-10','1968'),
+  E('m','The Conjuring',2013,'2013-07','1971'),
+  E('m','Annabelle Comes Home',2019,'2019-06','1972'),
+  E('m','The Curse of La Llorona',2019,'2019-04','1973'),
+  E('m','The Conjuring 2',2016,'2016-06','1976–1977'),
+  E('m','The Conjuring: The Devil Made Me Do It',2021,'2021-06','1981'),
+  E('m','The Conjuring: Last Rites',2025,'2025-09','1986')
+]]]},
+{k:'jp',ic:'🦕',n:'Jurský park / Jurský svět',al:'jurassic park jurassic world jursky park dinosaur',gs:[['',[
+  E('m','Jurassic Park',1993,'1993-06','1993'),
+  E('m','The Lost World: Jurassic Park',1997,'1997-05','1997'),
+  E('m','Jurassic Park III',2001,'2001-07','2001'),
+  E('m','Jurassic World',2015,'2015-06','2015'),
+  E('t','Jurassic World: Camp Cretaceous',2020,'2020-09','2015–2018','','Děj souběžně s Jurassic World a Fallen Kingdom'),
+  E('m','Jurassic World: Fallen Kingdom',2018,'2018-06','2018'),
+  E('t','Jurassic World: Chaos Theory',2024,'2024-05','2018–2022','','Navazuje na Camp Cretaceous'),
+  E('m','Jurassic World: Dominion',2022,'2022-06','2022'),
+  E('m','Jurassic World Rebirth',2025,'2025-07','Po Dominion')
+]]]},
+{k:'dune',ic:'🏜️',n:'Duna (Dune)',al:'duna dune prophecy atreides',gs:[['',[
+  E('t','Dune: Prophecy',2024,'2024-11','10 000 let před Dunou','','Seriálový prequel o vzniku Bene Gesserit'),
+  E('m','Dune',2021,'2021-09','10191'),
+  E('m','Dune: Part Two',2024,'2024-03','Navazuje na Dunu')
+]]]}
+];
+
+/* ── Stav + pomocné ── */
+var IDC=jget('sf_fr_ids',{}),fr=null,curItems=null;
+function flatOf(f){var o=[];f.gs.forEach(function(g){g[1].forEach(function(e){o.push(e)})});return o}
+function released(e){return !e.r||e.r<=today().slice(0,7)}
+
+async function resolveOne(e){
+ var key=e.t+'|'+e.q+'|'+e.y,c=IDC[key];
+ if(c){e.id=c.id;e.p=c.p;e.cs=c.cs;return}
+ var path=e.t==='movie'?'/search/movie':'/search/tv';
+ var yq=(e.t==='movie'?'&year=':'&first_air_date_year=')+e.y;
+ var d=await tj(path,'&query='+encodeURIComponent(e.q)+yq),rs=(d&&d.results)||[];
+ if(!rs.length){d=await tj(path,'&query='+encodeURIComponent(e.q));rs=(d&&d.results)||[]}
+ if(!rs.length)return;
+ var q=nz(e.q),m=rs.filter(function(x){return nz(x.title||x.name)===q||nz(x.original_title||x.original_name)===q})[0]||rs[0];
+ e.id=m.id;e.p=m.poster_path;e.cs=m.title||m.name;
+ IDC[key]={id:m.id,p:m.poster_path||null,cs:e.cs}}
+
+async function loadW(){
+ var w=S().watched||{},mv={},tv={};
+ Object.keys(w).forEach(function(k){var x=w[k];if(!x)return;
+  if(x.type==='movie')mv[+x.id]=1;else if(x.type==='tv')tv[+x.id]=1;else if(x.type==='episode'&&x.tvId)tv[+x.tvId]=1});
+ if(BE()){try{var r=await Promise.all([myHistoryGetAll('movies'),myHistoryGetAll('episodes')]);
+  r[0].forEach(function(x){mv[+x.id]=1});r[1].forEach(function(x){tv[+x.id]=1})}catch(e){}}
+ return{mv:mv,tv:tv}}
+function isW(it,w){if(!it.id||!w||it.noW)return false;return !!(it.t==='movie'?w.mv[it.id]:w.tv[it.id])}
+
+/* ── Shell ── */
+function shell(){
+ var o=$('sfFr');if(o)o.remove();
+ o=document.createElement('div');o.id='sfFr';o.className='sfo';
+ o.innerHTML='<div class="sfh"><div style="display:flex;gap:10px;align-items:center;min-width:0"><button id="sfFrBack" style="display:none" onclick="sfFrHome()">←</button><span id="sfFrT">🧭 Franchise</span></div><button onclick="document.getElementById(\'sfFr\').remove()">✕</button></div><div class="sfb" id="sfFrB"></div>';
+ document.body.appendChild(o);return $('sfFrB')}
+function head(t,back){var e=$('sfFrT');if(e)e.textContent=t;var b=$('sfFrBack');if(b)b.style.display=back?'':'none'}
+function body(h){var b=$('sfFrB');if(b){b.innerHTML=h;b.scrollTop=0}}
+
+/* ── Řádek ── */
+function rowHtml(it,i,w){
+ var done=isW(it,w),un=it.r&&!released(it)||it.future;
+ var pill=un?'<span class="sfpill">🔜 připravuje se</span>':done?'<span class="sfpill sfokp">✓ '+(it.t==='tv'?'sledováno':'viděno')+'</span>':'';
+ var cs=it.cs&&nz(it.cs)!==nz(it.n)?'<small style="opacity:.6"> · '+esc(it.cs)+'</small>':'';
+ var meta=(it.t==='tv'?'📺 Seriál':'🎬 Film')+(it.y?' · '+esc(it.y):'')+(it.lab?' · '+esc(it.lab):'')+(it.era?'<span class="sfera">'+esc(it.era)+'</span>':'');
+ var click=it.id?' onclick="sfOpen('+it.id+',\''+it.t+'\')"':' style="cursor:default"';
+ return '<div class="sfrow'+(done?' sfdone':'')+'"'+click+'><span class="sfnum">'+(i+1)+'</span><img loading="lazy" src="'+(it.p?(it.p.indexOf('http')===0?it.p:IM+'w154'+it.p):'data:image/gif;base64,R0lGODlhAQABAAAAACw=')+'"><div><b>'+esc(it.n)+'</b>'+cs+'<br><small>'+meta+'</small>'
+  +(it.pc?'<span class="sfpc">🎞️ '+esc(it.pc)+'</span>':'')+(it.nt?'<span class="sfnt">💡 '+esc(it.nt)+'</span>':'')+'</div>'+pill+'</div>'}
+
+/* ── Domů ── */
+window.sfFrOpen=function(){shell();window.sfFrHome()};
+window.sfFrHome=function(){
+ fr=null;head('🧭 Franchise',false);
+ var h='<p style="margin:0 0 12px;font-size:.85rem;opacity:.75">Chronologické pořadí dílů, spin-offů a prequelů — plus tip na potitulkové scény, ať ti nic neunikne. Vyber sérii, nebo hledej libovolný titul.</p>'
+  +'<div style="display:flex;gap:8px;margin-bottom:12px"><input id="sfFrQ" class="sf-note" style="min-height:0;margin:0;flex:1" placeholder="Hledej sérii nebo titul…" onkeydown="if(event.key===\'Enter\')sfFrSearch()"><button class="sf-btn on" onclick="sfFrSearch()">🔍</button></div><div id="sfFrR"></div><h4 style="margin:6px 0 8px">Připravené série</h4>';
+ FR.forEach(function(f){var n=flatOf(f).length;
+  h+='<div class="sfrow" onclick="sfFrGo(\''+f.k+'\')"><span style="font-size:1.8rem;width:46px;text-align:center">'+f.ic+'</span><div><b>'+esc(f.n)+'</b><br><small>'+n+' titulů'+(f.gs.length>1?' · '+f.gs.length+' větve':'')+'</small></div><span class="sfpill">→</span></div>'});
+ body(h)};
+
+/* ── Hledání ── */
+window.sfFrSearch=async function(){
+ var inp=$('sfFrQ'),r=$('sfFrR');if(!inp||!r)return;var q=inp.value.trim();if(!q)return;var nq=nz(q);
+ var cur=FR.filter(function(f){return nz(f.n+' '+f.al).indexOf(nq)>-1||flatOf(f).some(function(e){return nz(e.n+' '+e.q).indexOf(nq)>-1})});
+ var h='';
+ if(cur.length){h+='<h4 style="margin:0 0 8px">Připravené série</h4>';cur.forEach(function(f){
+  h+='<div class="sfrow" onclick="sfFrGo(\''+f.k+'\')"><span style="font-size:1.8rem;width:46px;text-align:center">'+f.ic+'</span><div><b>'+esc(f.n)+'</b><br><small>'+flatOf(f).length+' titulů</small></div><span class="sfpill">→</span></div>'})}
+ r.innerHTML=h+'<p style="opacity:.6">'+(K()?'Hledám na TMDB…':'Pro hledání dalších titulů zadej TMDB klíč.')+'</p>';
+ if(!K())return;
+ try{var d=await tj('/search/multi','&query='+encodeURIComponent(q)),
+  rs=((d&&d.results)||[]).filter(function(x){return(x.media_type==='movie'||x.media_type==='tv')&&x.poster_path}).slice(0,12);
+  h+='<h4 style="margin:10px 0 8px">Další tituly (TMDB) — klepnutím zobrazíš kolekci / řady</h4>';
+  if(!rs.length)h+='<p style="opacity:.6">Nic nenalezeno.</p>';
+  rs.forEach(function(x){var yr=((x.release_date||x.first_air_date)||'').slice(0,4);
+   h+='<div class="sfrow" onclick="sfFrAuto('+x.id+',\''+x.media_type+'\')"><img loading="lazy" src="'+IM+'w154'+x.poster_path+'"><div><b>'+esc(x.title||x.name)+'</b><br><small>'+(x.media_type==='tv'?'📺 Seriál':'🎬 Film')+(yr?' · '+yr:'')+'</small></div><span class="sfpill">→</span></div>'});
+  r.innerHTML=h}catch(e){r.innerHTML=h+'<p style="opacity:.6">Hledání se nepovedlo.</p>'}};
+
+/* ── Kurátorovaná série ── */
+window.sfFrGo=async function(k){
+ var f=FR.filter(function(x){return x.k===k})[0];if(!f)return;
+ fr={f:f,mode:'c',only:false,w:null};head(f.ic+' '+f.n,true);body('<p>Načítám…</p>');
+ if(K()){try{await pmap(flatOf(f),resolveOne,8);jset('sf_fr_ids',IDC)}catch(e){}}
+ fr.w=await loadW();renderFr()};
+window.sfFrMode=function(m){if(fr){fr.mode=m;renderFr()}};
+window.sfFrOnly=function(){if(fr){fr.only=!fr.only;renderFr()}};
+function renderFr(){
+ if(!fr)return;var f=fr.f,w=fr.w,mode=fr.mode,order=[],i;
+ if(mode==='c'){f.gs.forEach(function(g){g[1].forEach(function(e){order.push({e:e,g:g[0]})})})}
+ else{flatOf(f).map(function(e,ix){return{e:e,ix:ix}}).sort(function(a,b){return a.e.r<b.e.r?-1:a.e.r>b.e.r?1:a.ix-b.ix}).forEach(function(x){order.push({e:x.e,g:''})})}
+ // duplicitní záznam (jen odkaz na jiný titul) vynecháváme
+ order=order.filter(function(x){return !x.e.lab||x.e.lab!=='dup'});
+ var rel=order.filter(function(x){return released(x.e)}),done=rel.filter(function(x){return isW(x.e,w)}).length,tot=rel.length;
+ var nxt=null;for(i=0;i<order.length;i++){var e=order[i].e;if(released(e)&&e.id&&!isW(e,w)){nxt=e;break}}
+ var h='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button class="sf-btn'+(mode==='c'?' on':'')+'" onclick="sfFrMode(\'c\')">🧭 Podle děje</button><button class="sf-btn'+(mode==='r'?' on':'')+'" onclick="sfFrMode(\'r\')">🗓️ Podle vydání</button><button class="sf-btn'+(fr.only?' on':'')+'" onclick="sfFrOnly()">👁 Jen nezhlédnuté</button></div>';
+ h+='<div style="font-size:.85rem;opacity:.85">Zhlédnuto <b>'+done+' / '+tot+'</b>'+(K()?'':' (bez TMDB klíče se neověřuje)')+'</div><div class="sfbar"><i style="width:'+(tot?Math.round(100*done/tot):0)+'%"></i></div>';
+ if(nxt)h+='<div class="sfnext" onclick="sfOpen('+nxt.id+',\''+nxt.t+'\')"><small style="opacity:.7">▶️ Další na řadě</small><br><b>'+esc(nxt.n)+'</b>'+(nxt.lab?' <small>· '+esc(nxt.lab)+'</small>':'')+'</div>';
+ else if(tot&&done===tot)h+='<div class="sfnext" style="cursor:default"><b>🏁 Hotovo — všechno vydané máš zhlédnuté!</b></div>';
+ var lastG=null,n=0;
+ order.forEach(function(x){
+  if(fr.only&&isW(x.e,w))return;
+  if(mode==='c'&&x.g&&x.g!==lastG){h+='<div class="sfgh">'+esc(x.g)+'</div>';lastG=x.g}
+  h+=rowHtml(x.e,n++,w)});
+ if(fr.only&&!n)h+='<p style="opacity:.6">Všechno zhlédnuto 🎉</p>';
+ h+='<p style="font-size:.75rem;opacity:.55;margin-top:16px">🎞️ Potitulkové scény jsou orientační tipy (uvedené u klíčových propojení) — u novějších titulů doporučujeme dívat se do úplného konce titulků. Poznámky k pořadí se mohou lišit podle zdroje.</p>';
+ body(h)}
+
+/* ── Libovolný titul z TMDB: kolekce / řady ── */
+window.sfFrAuto=async function(id,t){
+ head('🧭 Kolekce / řady',true);body('<p>Načítám…</p>');
+ try{
+  var w=await loadW(),items=[],intro='';
+  if(t==='movie'){
+   var m=await tj('/movie/'+id),c=m.belongs_to_collection;
+   if(!c){body('<p style="opacity:.8">Film <b>'+esc(m.title)+'</b> není v TMDB součástí žádné kolekce (nemá nalezené sequely ani prequely).</p><div class="sfrow" onclick="sfOpen('+id+',\'movie\')"><div><b>Otevřít detail filmu</b></div><span class="sfpill">→</span></div>');return}
+   var col=await tj('/collection/'+c.id),today_=today();
+   items=(col.parts||[]).slice().sort(function(a,b){return(a.release_date||'9999')<(b.release_date||'9999')?-1:1}).map(function(x){
+    var d=x.release_date||'';return{id:x.id,t:'movie',n:x.title,y:d.slice(0,4),p:x.poster_path,future:!d||d>today_}});
+   intro='Kolekce <b>'+esc(col.name||c.name)+'</b> — řazeno podle data vydání (TMDB nezná vnitřní chronologii děje).'}
+  else{
+   var d=await tj('/tv/'+id);
+   items=(d.seasons||[]).filter(function(s){return s.season_number>0}).map(function(s){
+    return{id:id,t:'tv',n:d.name+' — '+(s.name||('Řada '+s.season_number)),y:(s.air_date||'').slice(0,4),p:s.poster_path||d.poster_path,era:s.episode_count?s.episode_count+' ep.':'',noW:true,future:s.air_date&&s.air_date>today()}});
+   intro='Seriál <b>'+esc(d.name)+'</b> — přehled řad. Spin-offy a prequely seriálů TMDB nepropojuje; zkus je vyhledat zvlášť, nebo se podívej do připravených sérií.'}
+  if(!items.length){body('<p style="opacity:.8">Nic k zobrazení.</p>');return}
+  var h='<p style="margin:0 0 12px;font-size:.85rem;opacity:.8">'+intro+'</p>';
+  items.forEach(function(it,i){h+=rowHtml(it,i,w)});
+  body(h)}catch(e){body('<p>⚠️ Nepodařilo se načíst data z TMDB.</p>')}};
+})();
+</script>
+<!-- ═══ /FRANCHISE TRACKER ═══ -->
 <!-- ═══ /SINATOR FEATURES PACK ═══ -->
 
 </body>
