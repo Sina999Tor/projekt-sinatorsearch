@@ -5577,6 +5577,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-15e', date: '15. 10. 2026', items: [
+            '🎬 Kino (Již bylo v kině / Právě hraje / Co se chystá): sjednocený vzhled a ovládání — všude tlačítko ← Zpět (do menu Kino), žánry schované pod tlačítkem 🎭 Žánr (po kliknutí vyjede nabídka) a přepínač vzhledu ▦ dlaždice / ☰ seznam, který platí pro všechny tři obrazovky a pamatuje se',
             '🍿 Zábava → Kino: nová položka „Právě hraje v kinech“ (filmy, co teď běží v českých kinech, se žánrovými filtry). Kino je teď řazené chronologicky: 🎟️ Již bylo v kině → 🍿 Právě hraje → 📅 Co se chystá; „Již bylo“ už neukazuje filmy, které právě hrají',
             '🔔 Jedno upozornění místo dvou: zvoneček v 📆 Up Next je teď stejný přepínač jako Nastavení → 🧪 Experimentální funkce → Upozornění (🔔 zapnuto / 🔕 vypnuto). Starý samostatný systém upozornění v Up Next je pryč, takže nic nechodí dvakrát',
             '🔍 Kontrola už bere VŠE: celý watchlist z Histry (ne jen pár desítek titulů) + watchlist Sinatoru + Traktu, a rozkoukané/sledované seriály z Histry, Sinator backendu, Traktu i lokálních epizod. Stejné zdroje používá i 📆 Up Next (až 400 seriálů a 400 filmů, už bez dřívějších limitů 150/40)',
@@ -21491,19 +21492,15 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
 <!-- JIŽ BYLO V KINĚ MODAL -->
 <div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" id="uzByloVKineModal" onclick="if(event.target===this)closeUzByloVKineModal()">
-    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
-        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">🎟️ Již bylo v kině</h3>
-        <button onclick="closeUzByloVKineModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <button onclick="kinoBackToMenu('uzByloVKineModal')" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">← Zpět</button>
+        <h3 style="flex:1;min-width:0;font-family:'Playfair Display',serif;font-size:1rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🎟️ Již bylo v kině</h3>
+        <button onclick="closeUzByloVKineModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;flex-shrink:0;">✕</button>
     </div>
-    <div style="flex:1;overflow-y:auto;padding:16px;">
-        <p style="color:#888;font-size:0.85rem;margin-bottom:14px;text-align:center;">Filmy uvedené v českých kinech za posledních 6 měsíců (bez těch, co právě hrají)</p>
-        <!-- Filtry žánrů -->
-        <div id="uzByloGenreFilters" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;justify-content:center;"></div>
-        <!-- Výsledky -->
-        <div id="uzByloVKineResult" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;"></div>
-        <div id="uzByloVKineLoader" style="display:none;text-align:center;padding:30px;color:#888;">
-            <div style="font-size:1.5rem;margin-bottom:8px;">⏳</div>Načítám…
-        </div>
+    <div id="uzByloToolbar" style="flex-shrink:0;padding:12px 16px 0;position:relative;"></div>
+    <div style="flex:1;overflow-y:auto;padding:12px 16px 16px;">
+        <div id="uzByloVKineResult"></div>
+        <div id="uzByloVKineLoader" style="display:none;text-align:center;padding:30px;color:#888;"><div style="font-size:1.5rem;margin-bottom:8px;">⏳</div>Načítám…</div>
         <div id="uzByloVKineError" style="display:none;color:#f87171;text-align:center;padding:20px;font-size:0.9rem;"></div>
         <div id="uzByloVKineLoadMore" style="display:none;text-align:center;margin-top:16px;">
             <button onclick="uzByloLoadMore()" style="background:#1e293b;border:1px solid #334155;color:#c084fc;padding:10px 28px;border-radius:20px;cursor:pointer;font-size:0.9rem;font-weight:600;">Načíst další</button>
@@ -21513,14 +21510,14 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
 <!-- PRÁVĚ HRAJE V KINECH MODAL -->
 <div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" id="hrajeVKineModal" onclick="if(event.target===this)closeHrajeVKineModal()">
-    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
-        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">🍿 Právě hraje v kinech</h3>
-        <button onclick="closeHrajeVKineModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <button onclick="kinoBackToMenu('hrajeVKineModal')" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">← Zpět</button>
+        <h3 style="flex:1;min-width:0;font-family:'Playfair Display',serif;font-size:1rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🍿 Právě hraje</h3>
+        <button onclick="closeHrajeVKineModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;flex-shrink:0;">✕</button>
     </div>
-    <div style="flex:1;overflow-y:auto;padding:16px;">
-        <p style="color:#888;font-size:0.85rem;margin-bottom:14px;text-align:center;">Filmy, které teď běží v českých kinech</p>
-        <div id="hrajeGenreFilters" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;justify-content:center;"></div>
-        <div id="hrajeVKineResult" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;"></div>
+    <div id="hrajeToolbar" style="flex-shrink:0;padding:12px 16px 0;position:relative;"></div>
+    <div style="flex:1;overflow-y:auto;padding:12px 16px 16px;">
+        <div id="hrajeVKineResult"></div>
         <div id="hrajeVKineLoader" style="display:none;text-align:center;padding:30px;color:#888;"><div style="font-size:1.5rem;margin-bottom:8px;">⏳</div>Načítám…</div>
         <div id="hrajeVKineError" style="display:none;color:#f87171;text-align:center;padding:20px;font-size:0.9rem;"></div>
     </div>
@@ -44832,15 +44829,17 @@ window.deactivateAdminMode = function(...a) {
      📅 CO SE CHYSTÁ MODAL
 ===================================================== -->
 <div id="upcomingModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" onclick="if(event.target===this)closeUpcomingModal()">
-  <div style="background:#141414;width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #2a2a2a;">
-    <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;">📅 Co se chystá</h3>
-    <button onclick="closeUpcomingModal()" style="background:none;border:1px solid #333;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
-  </div>
-  <div style="flex-shrink:0;display:flex;gap:0;border-bottom:1px solid #2a2a2a;">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <button onclick="kinoBackToMenu('upcomingModal')" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">← Zpět</button>
+        <h3 style="flex:1;min-width:0;font-family:'Playfair Display',serif;font-size:1rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📅 Co se chystá</h3>
+        <button onclick="closeUpcomingModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;flex-shrink:0;">✕</button>
+    </div>
+  <div style="flex-shrink:0;display:flex;gap:0;border-bottom:1px solid var(--border);">
     <button onclick="upcomingSetTab('movies')" id="upTabMovies" style="flex:1;padding:10px;background:rgba(56,189,248,0.15);border:none;border-bottom:2px solid #38bdf8;color:#fff;font-size:0.85rem;font-weight:700;cursor:pointer;">🎬 Filmy v kinech</button>
     <button onclick="upcomingSetTab('tv')" id="upTabTv" style="flex:1;padding:10px;background:transparent;border:none;border-bottom:2px solid transparent;color:#888;font-size:0.85rem;font-weight:600;cursor:pointer;">📺 Nové seriály</button>
   </div>
-  <div id="upcomingBody" style="flex:1;overflow-y:auto;padding:12px;"></div>
+  <div id="upcomingToolbar" style="flex-shrink:0;padding:12px 16px 0;position:relative;"></div>
+  <div id="upcomingBody" style="flex:1;overflow-y:auto;padding:12px 16px 16px;"><div id="upcomingList"></div></div>
 </div>
 
 <!-- =====================================================
@@ -45469,7 +45468,7 @@ async function loadZebricky(tab) {
 // =====================================================
 // 📅 CO SE CHYSTÁ
 // =====================================================
-let _upcomingTab = 'movies', _upcomingCache = {};
+let _upcomingTab = 'movies', _upCtl = null, _upItems = {}, _upTok = 0;
 function openUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m){m.style.display='flex';} upcomingSetTab('movies'); if(window._saveLastZabavaList) window._saveLastZabavaList('upcoming','upcomingModal'); if(window.updatePwaBtn)updatePwaBtn(); }
 function closeUpcomingModal() { const m=document.getElementById('upcomingModal'); if(m)m.style.display='none'; if(window._clearLastZabavaList) window._clearLastZabavaList(); if(window._returnToZabava)_returnToZabava(); }
 function upcomingSetTab(tab) {
@@ -45484,39 +45483,27 @@ function upcomingSetTab(tab) {
   loadUpcoming(tab);
 }
 async function loadUpcoming(tab) {
-  const body = document.getElementById('upcomingBody');
-  if (!body) return;
-  if (_upcomingCache[tab]) { body.innerHTML = _upcomingCache[tab]; return; }
-  body.innerHTML='<div style="text-align:center;padding:40px;font-size:2rem;">⏳</div>';
+  const list = document.getElementById('upcomingList');
+  if (!list) return;
+  if (!_upCtl) _upCtl = KinoList.mount({ tb:'upcomingToolbar', list:'upcomingList', origin:'upcoming', modalId:'upcomingModal', accent:'#38bdf8', mode:'client' });
+  const tok = ++_upTok;
+  _upCtl.setSubtitle(tab==='movies' ? 'Filmy, které brzy vyjdou v českých kinech' : 'Seriály, které se teď vysílají');
   const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
-  if (!tmdbKey) { body.innerHTML='<p style="color:#e50914;text-align:center;padding:20px;">Chybí TMDB API klíč.</p>'; return; }
-  const url = tab==='movies'
-    ? `https://api.themoviedb.org/3/movie/upcoming?api_key=${tmdbKey}&language=cs-CZ&page=1&region=CZ`
-    : `https://api.themoviedb.org/3/tv/on_the_air?api_key=${tmdbKey}&language=cs-CZ&page=1`;
+  if (!tmdbKey) { list.style.cssText=''; list.innerHTML='<p style="color:#e50914;text-align:center;padding:20px;">Chybí TMDB API klíč.</p>'; return; }
   try {
-    const data = await fetch(url).then(r=>r.json());
-    const items = (data.results||[]).slice(0,30);
-    if (!items.length) { body.innerHTML='<p style="color:#888;text-align:center;padding:20px;">Žádné výsledky.</p>'; return; }
-    const html = items.map(it=>{
-      const title=it.title||it.name||'?';
-      const date=it.release_date||it.first_air_date||'';
-      const year=date.substring(0,4);
-      const poster=it.poster_path?`https://image.tmdb.org/t/p/w92${it.poster_path}`:'';
-      const type=tab==='movies'?'movie':'tv';
-      const rating=it.vote_average>0?`★ ${it.vote_average.toFixed(1)}`:'Nové';
-      const dateLabel=date?new Date(date).toLocaleDateString('cs-CZ',{day:'numeric',month:'long',year:'numeric'}):'';
-      return `<div onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('upcoming','upcomingModal',${it.id},'${type}')" style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid #1a1a1a;cursor:pointer;border-radius:8px;transition:background 0.15s;" onmouseover="this.style.background='#1a1a1a'" onmouseout="this.style.background='transparent'">
-        ${poster?`<img src="${poster}" style="width:44px;height:64px;object-fit:cover;border-radius:6px;flex-shrink:0;" loading="lazy">`:'<div style="width:44px;height:64px;background:#1a1a1a;border-radius:6px;flex-shrink:0;"></div>'}
-        <div style="flex:1;min-width:0;">
-          <div style="font-weight:600;color:#fff;font-size:0.88rem;margin-bottom:3px;">${title}</div>
-          ${dateLabel?`<div style="color:#38bdf8;font-size:0.72rem;margin-bottom:2px;">📅 ${dateLabel}</div>`:''}
-          <div style="color:#fbbf24;font-size:0.75rem;">${rating}</div>
-        </div>
-      </div>`;
-    }).join('');
-    _upcomingCache[tab] = '<div style="padding:4px 0;">'+html+'</div>';
-    body.innerHTML = _upcomingCache[tab];
-  } catch(e) { body.innerHTML='<p style="color:#e50914;text-align:center;padding:20px;">Chyba načítání.</p>'; }
+    if (!_upItems[tab]) {
+      list.style.cssText=''; list.innerHTML='<div style="text-align:center;padding:40px;font-size:2rem;">⏳</div>';
+      const url = tab==='movies'
+        ? `https://api.themoviedb.org/3/movie/upcoming?api_key=${tmdbKey}&language=cs-CZ&page=1&region=CZ`
+        : `https://api.themoviedb.org/3/tv/on_the_air?api_key=${tmdbKey}&language=cs-CZ&page=1`;
+      const data = await fetch(url).then(r=>r.json());
+      _upItems[tab] = (data.results||[]).slice(0,30).map(m=>KinoList.norm(m, tab==='movies'?'movie':'tv'));
+    }
+    await KinoList.ready();
+    if (tok !== _upTok) return;
+    _upCtl.setGenre(null);
+    _upCtl.setItems(_upItems[tab]);
+  } catch(e) { list.style.cssText=''; list.innerHTML='<p style="color:#e50914;text-align:center;padding:20px;">Chyba načítání.</p>'; }
 }
 
 // =====================================================
@@ -47025,161 +47012,165 @@ window._askSinatorGoPrev = function() {
 };
 
 
+// ===== SDÍLENÝ SEZNAM FILMŮ PRO KINO (Již bylo / Právě hraje / Co se chystá) =====
+window.kinoBackToMenu = function(modalId) {
+  const m = document.getElementById(modalId); if (m) m.style.display = 'none';
+  if (window._clearLastZabavaList) window._clearLastZabavaList();
+  if (window.openZabavaKinoModal) window.openZabavaKinoModal();
+  if (window.updatePwaBtn) updatePwaBtn();
+};
+window.KinoList = (function() {
+  const VK = 'sinator_kino_view';
+  const KEY = () => window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
+  let gmap = {}, movieIds = [], gp = null;
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function view() { try { return localStorage.getItem(VK) === 'list' ? 'list' : 'grid'; } catch (e) { return 'grid'; } }
+  function ready() {
+    if (gp) return gp;
+    gp = (async () => {
+      const k = KEY(); if (!k) { gp = null; return; }
+      for (const t of ['movie', 'tv']) {
+        try {
+          const r = await fetch(`https://api.themoviedb.org/3/genre/${t}/list?api_key=${k}&language=cs-CZ`).then(x => x.json());
+          (r.genres || []).forEach(g => { if (t === 'movie') { gmap[g.id] = g.name; movieIds.push(g.id); } else if (!gmap[g.id]) gmap[g.id] = g.name; });
+        } catch (e) {}
+      }
+      if (!Object.keys(gmap).length) gp = null;
+    })();
+    return gp;
+  }
+  function norm(m, type) {
+    return { id: m.id, type: type || 'movie', title: m.title || m.name || '?', poster: m.poster_path || '', date: m.release_date || m.first_air_date || '', rating: m.vote_average || 0, genre_ids: m.genre_ids || [] };
+  }
+  function mount(o) {
+    const tb = document.getElementById(o.tb), listEl = document.getElementById(o.list);
+    const acc = o.accent || '#38bdf8';
+    let items = [], genre = null, ids = [], open = false;
+    const click = it => `typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('${o.origin}','${o.modalId}',${it.id},'${it.type}')`;
+    function dShort(d) { try { return d ? new Date(d).toLocaleDateString('cs-CZ') : ''; } catch (e) { return ''; } }
+    function dLong(d) { try { return d ? new Date(d).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' }) : ''; } catch (e) { return ''; } }
+    function card(it) {
+      const img = it.poster ? `<img src="https://image.tmdb.org/t/p/w300${it.poster}" style="width:100%;height:195px;object-fit:cover;border-radius:10px 10px 0 0;" loading="lazy">` : `<div style="width:100%;height:195px;background:#1e293b;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem;">🎬</div>`;
+      const meta = [it.date ? dShort(it.date) : '', it.rating ? '⭐ ' + it.rating.toFixed(1) : ''].filter(Boolean).join(' · ');
+      return `<div onclick="${click(it)}" style="background:#111827;border-radius:10px;border:1px solid #1e293b;cursor:pointer;overflow:hidden;">${img}<div style="padding:8px;"><div style="font-size:0.8rem;font-weight:700;color:#e2e8f0;line-height:1.3;margin-bottom:4px;">${esc(it.title)}</div><div style="font-size:0.72rem;color:#94a3b8;">${meta}</div></div></div>`;
+    }
+    function row(it) {
+      const img = it.poster ? `<img src="https://image.tmdb.org/t/p/w92${it.poster}" style="width:44px;height:64px;object-fit:cover;border-radius:6px;flex-shrink:0;" loading="lazy">` : '<div style="width:44px;height:64px;background:#1a1a1a;border-radius:6px;flex-shrink:0;"></div>';
+      return `<div onclick="${click(it)}" style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid #1a1a1a;cursor:pointer;">${img}<div style="flex:1;min-width:0;"><div style="font-weight:600;color:#fff;font-size:0.88rem;margin-bottom:3px;">${esc(it.title)}</div>${it.date ? `<div style="color:#38bdf8;font-size:0.72rem;margin-bottom:2px;">📅 ${dLong(it.date)}</div>` : ''}${it.rating ? `<div style="color:#fbbf24;font-size:0.75rem;">★ ${it.rating.toFixed(1)}</div>` : ''}</div></div>`;
+    }
+    function toolbar() {
+      if (!tb) return;
+      const v = view();
+      const gname = genre === null ? 'Vše' : (gmap[genre] || genre);
+      const vb = (k, ic) => `<button data-k="v" data-v="${k}" style="padding:0 14px;border:none;background:${v === k ? 'rgba(255,255,255,0.14)' : 'transparent'};color:${v === k ? acc : '#94a3b8'};font-size:1.05rem;cursor:pointer;">${ic}</button>`;
+      const opt = (id, name) => `<button data-k="g" data-g="${id === null ? '' : id}" style="display:block;width:100%;text-align:left;padding:10px 12px;border:none;border-radius:8px;background:${id === genre ? 'rgba(255,255,255,0.1)' : 'transparent'};color:${id === genre ? acc : '#e2e8f0'};font-size:0.88rem;cursor:pointer;">${esc(name)}</button>`;
+      tb.innerHTML = (o.subtitle ? `<div style="color:#888;font-size:0.8rem;margin-bottom:10px;text-align:center;">${esc(o.subtitle)}</div>` : '') +
+        `<div style="display:flex;gap:8px;align-items:stretch;position:relative;">
+          <button data-k="gbtn" style="flex:1;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:10px;border:1px solid #334155;background:#111827;color:#e2e8f0;font-size:0.88rem;cursor:pointer;"><span>🎭 Žánr: <b style="color:${acc}">${esc(gname)}</b></span><span>${open ? '▴' : '▾'}</span></button>
+          <div style="display:flex;border:1px solid #334155;border-radius:10px;overflow:hidden;background:#111827;">${vb('grid', '▦')}${vb('list', '☰')}</div>
+          <div style="display:${open ? 'block' : 'none'};position:absolute;top:100%;left:0;right:0;margin-top:6px;z-index:30;max-height:50vh;overflow-y:auto;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,0.7);">${opt(null, 'Vše')}${ids.map(id => opt(id, gmap[id] || id)).join('')}</div>
+        </div>`;
+    }
+    function render() {
+      if (!listEl) return;
+      const v = view();
+      const arr = genre === null || o.mode === 'server' ? items : items.filter(m => (m.genre_ids || []).includes(genre));
+      listEl.style.cssText = v === 'grid' ? 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;' : 'display:flex;flex-direction:column;gap:2px;';
+      listEl.innerHTML = arr.length ? arr.map(v === 'grid' ? card : row).join('') : '<div style="grid-column:1/-1;text-align:center;color:#888;padding:24px;">Nic nenalezeno.</div>';
+    }
+    if (tb) tb.addEventListener('click', e => {
+      const b = e.target.closest('[data-k]'); if (!b) return;
+      const k = b.getAttribute('data-k');
+      if (k === 'gbtn') { open = !open; toolbar(); }
+      else if (k === 'v') { try { localStorage.setItem(VK, b.getAttribute('data-v')); } catch (x) {} toolbar(); render(); }
+      else if (k === 'g') {
+        const g = b.getAttribute('data-g'); genre = g === '' ? null : +g; open = false; toolbar();
+        if (o.mode === 'server') { if (o.onGenre) o.onGenre(genre); } else render();
+      }
+    });
+    document.addEventListener('click', e => { if (open && tb && !tb.contains(e.target)) { open = false; toolbar(); } });
+    const ctl = {
+      setItems(arr) {
+        items = arr || [];
+        if (o.mode !== 'server') {
+          const cnt = {}; items.forEach(m => (m.genre_ids || []).forEach(g => { cnt[g] = (cnt[g] || 0) + 1; }));
+          ids = Object.keys(cnt).map(Number).sort((a, b) => cnt[b] - cnt[a]);
+          if (genre !== null && !ids.includes(genre)) genre = null;
+        }
+        toolbar(); render();
+      },
+      append(arr) { items = items.concat(arr || []); render(); },
+      setGenreIds(a) { ids = a || []; toolbar(); },
+      setGenre(g) { genre = g; open = false; },
+      setSubtitle(t) { o.subtitle = t; toolbar(); },
+      paint() { toolbar(); render(); }
+    };
+    toolbar();
+    return ctl;
+  }
+  return { ready, norm, mount, view, movieGenreIds: () => movieIds };
+})();
+
 // ===== JIŽ BYLO V KINĚ =====
 (function() {
-  let _page = 1;
-  let _totalPages = 1;
-  let _activeGenre = null;
-  let _allGenres = {};
-
+  let _page = 1, _totalPages = 1, _genre = null, _ctl = null;
   const TMDB_KEY = () => window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
-
   function getDateRange() {
-    const to = new Date();
-    const from = new Date();
+    const to = new Date(), from = new Date();
     from.setMonth(from.getMonth() - 6);
     const fmt = d => d.toISOString().split('T')[0];
     return { from: fmt(from), to: fmt(to) };
   }
-
-  async function fetchPage(page, genreId) {
+  async function fetchPage(page) {
     const key = TMDB_KEY();
     if (!key) throw new Error('Chybí TMDB API klíč.');
     const { from, to } = getDateRange();
-    const genreParam = genreId ? `&with_genres=${genreId}` : '';
-    const url = `https://api.themoviedb.org/3/discover/movie?api_key=${key}&language=cs-CZ&region=CZ&release_date.gte=${from}&release_date.lte=${to}&with_release_type=3|2&sort_by=release_date.desc&page=${page}${genreParam}`;
-    const res = await fetch(url);
+    const g = _genre ? `&with_genres=${_genre}` : '';
+    const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${key}&language=cs-CZ&region=CZ&release_date.gte=${from}&release_date.lte=${to}&with_release_type=3|2&sort_by=release_date.desc&page=${page}${g}`);
     if (!res.ok) throw new Error('Chyba TMDB API.');
     return res.json();
   }
-
-  async function fetchGenres() {
-    const key = TMDB_KEY();
-    if (!key) return {};
-    const res = await fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${key}&language=cs-CZ`);
-    if (!res.ok) return {};
-    const d = await res.json();
-    const map = {};
-    (d.genres || []).forEach(g => { map[g.id] = g.name; });
-    return map;
+  function ctl() {
+    if (!_ctl) _ctl = KinoList.mount({ tb: 'uzByloToolbar', list: 'uzByloVKineResult', origin: 'uzbylo', modalId: 'uzByloVKineModal', accent: '#c084fc', mode: 'server',
+      subtitle: 'Filmy uvedené v českých kinech za posledních 6 měsíců (bez těch, co právě hrají)',
+      onGenre: g => { _genre = g; _page = 1; load(1, false); } });
+    return _ctl;
   }
-
-  function renderCard(m) {
-    const img = m.poster_path
-      ? `<img src="https://image.tmdb.org/t/p/w300${m.poster_path}" style="width:100%;height:195px;object-fit:cover;border-radius:10px 10px 0 0;" loading="lazy">`
-      : `<div style="width:100%;height:195px;background:#1e293b;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem;">🎬</div>`;
-    const year = m.release_date ? m.release_date.slice(0,4) : '';
-    const rating = m.vote_average ? `⭐ ${m.vote_average.toFixed(1)}` : '';
-    return `<div onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('uzbylo','uzByloVKineModal',${m.id},'movie')" style="background:#111827;border-radius:10px;border:1px solid #1e293b;cursor:pointer;overflow:hidden;transition:transform 0.15s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
-      ${img}
-      <div style="padding:8px;">
-        <div style="font-size:0.8rem;font-weight:700;color:#e2e8f0;line-height:1.3;margin-bottom:4px;">${m.title}</div>
-        <div style="font-size:0.72rem;color:#94a3b8;">${year}${rating ? ' · ' + rating : ''}</div>
-      </div>
-    </div>`;
-  }
-
-  function renderGenreFilters(genreIds) {
-    const el = document.getElementById('uzByloGenreFilters');
-    if (!el) return;
-    const unique = [...new Set(genreIds)].slice(0, 12);
-    let html = `<button onclick="uzByloFilterGenre(null)" style="padding:5px 14px;border-radius:20px;border:1px solid ${_activeGenre===null?'#c084fc':'#334155'};background:${_activeGenre===null?'rgba(192,132,252,0.15)':'#111827'};color:${_activeGenre===null?'#c084fc':'#94a3b8'};font-size:0.78rem;cursor:pointer;">Vše</button>`;
-    unique.forEach(id => {
-      const name = _allGenres[id] || id;
-      const active = _activeGenre === id;
-      html += `<button onclick="uzByloFilterGenre(${id})" style="padding:5px 14px;border-radius:20px;border:1px solid ${active?'#c084fc':'#334155'};background:${active?'rgba(192,132,252,0.15)':'#111827'};color:${active?'#c084fc':'#94a3b8'};font-size:0.78rem;cursor:pointer;">${name}</button>`;
-    });
-    el.innerHTML = html;
-  }
-
-  async function loadMovies(page, append) {
-    const res = document.getElementById('uzByloVKineResult');
-    const loader = document.getElementById('uzByloVKineLoader');
-    const errEl = document.getElementById('uzByloVKineError');
-    const loadMoreBtn = document.getElementById('uzByloVKineLoadMore');
-    if (!res) return;
-    errEl.style.display = 'none';
-    loader.style.display = 'block';
-    loadMoreBtn.style.display = 'none';
+  async function load(page, append) {
+    const loader = document.getElementById('uzByloVKineLoader'), errEl = document.getElementById('uzByloVKineError'), more = document.getElementById('uzByloVKineLoadMore');
+    errEl.style.display = 'none'; loader.style.display = 'block'; more.style.display = 'none';
     try {
-      const data = await fetchPage(page, _activeGenre);
+      const data = await fetchPage(page);
       _totalPages = data.total_pages || 1;
-      if (!append) {
-        res.innerHTML = '';
-        // Collect genre IDs for filters
-        const genreIds = [];
-        (data.results || []).forEach(m => (m.genre_ids || []).forEach(g => genreIds.push(g)));
-        if (Object.keys(_allGenres).length === 0) {
-          _allGenres = await fetchGenres();
-        }
-        // get unique genre ids from all results for filters
-        const allGids = [];
-        (data.results || []).forEach(m => (m.genre_ids || []).forEach(g => allGids.push(g)));
-        renderGenreFilters(allGids);
-      }
       let nowIds = new Set(); try { nowIds = await window._hrajeNowIds(); } catch (e) {}
-      const html = (data.results || []).filter(m => !nowIds.has(m.id)).map(renderCard).join('');
-      if (append) res.innerHTML += html;
-      else res.innerHTML = html;
-      if (_page < _totalPages) loadMoreBtn.style.display = 'block';
-    } catch(e) {
-      errEl.textContent = e.message || 'Chyba načítání.';
-      errEl.style.display = 'block';
-    } finally {
-      loader.style.display = 'none';
-    }
+      const arr = (data.results || []).filter(m => !nowIds.has(m.id)).map(m => KinoList.norm(m, 'movie'));
+      if (append) ctl().append(arr); else ctl().setItems(arr);
+      if (_page < _totalPages) more.style.display = 'block';
+    } catch (e) { errEl.textContent = e.message || 'Chyba načítání.'; errEl.style.display = 'block'; }
+    finally { loader.style.display = 'none'; }
   }
-
-  window.openUzByloVKineModal = function() {
-    const m = document.getElementById('uzByloVKineModal');
-    if (!m) return;
-    m.style.display = 'flex';
-    _page = 1; _activeGenre = null;
-    document.getElementById('uzByloVKineResult').innerHTML = '';
-    document.getElementById('uzByloGenreFilters').innerHTML = '';
-    loadMovies(1, false);
+  window.openUzByloVKineModal = async function() {
+    const m = document.getElementById('uzByloVKineModal'); if (!m) return;
+    m.style.display = 'flex'; _page = 1; _genre = null;
+    const c = ctl(); c.setGenre(null);
+    try { await KinoList.ready(); } catch (e) {}
+    c.setGenreIds(KinoList.movieGenreIds()); c.setItems([]);
+    load(1, false);
     if (window._saveLastZabavaList) window._saveLastZabavaList('uzbylo', 'uzByloVKineModal');
     if (window.updatePwaBtn) updatePwaBtn();
   };
-
   window.closeUzByloVKineModal = function() {
-    const m = document.getElementById('uzByloVKineModal');
-    if (m) m.style.display = 'none';
+    const m = document.getElementById('uzByloVKineModal'); if (m) m.style.display = 'none';
     if (window._clearLastZabavaList) window._clearLastZabavaList();
     if (window._returnToZabava) _returnToZabava();
   };
-
-  window.closeUzByloVKineModalFull = function() {
-    const m = document.getElementById('uzByloVKineModal');
-    if (m) m.style.display = 'none';
-  };
-
-  window.uzByloFilterGenre = function(genreId) {
-    _activeGenre = genreId;
-    _page = 1;
-    // re-render filter buttons
-    const el = document.getElementById('uzByloGenreFilters');
-    if (el) {
-      el.querySelectorAll('button').forEach(btn => {
-        const btnGenre = btn.getAttribute('onclick').includes('null') ? null : parseInt(btn.getAttribute('onclick').match(/\d+/)?.[0]);
-        const active = btnGenre === _activeGenre;
-        btn.style.borderColor = active ? '#c084fc' : '#334155';
-        btn.style.background = active ? 'rgba(192,132,252,0.15)' : '#111827';
-        btn.style.color = active ? '#c084fc' : '#94a3b8';
-      });
-    }
-    loadMovies(1, false);
-  };
-
-  window.uzByloLoadMore = function() {
-    _page++;
-    loadMovies(_page, true);
-  };
+  window.closeUzByloVKineModalFull = function() { const m = document.getElementById('uzByloVKineModal'); if (m) m.style.display = 'none'; };
+  window.uzByloLoadMore = function() { _page++; load(_page, true); };
 })();
 
 // ===== PRÁVĚ HRAJE V KINECH =====
 (function() {
-  let _items = [], _active = null, _genres = {};
+  let _items = [], _ctl = null, _idsCache = null;
   const KEY = () => window._store?.getItem('sinator_tmdb_api_key') || window.state?.tmdbApiKey || '';
   async function fetchNow() {
     const key = KEY(); if (!key) throw new Error('Chybí TMDB API klíč.');
@@ -47189,49 +47180,25 @@ window._askSinatorGoPrev = function() {
     return out;
   }
   // Sdílená sada ID filmů, které právě hrají (používá i „Již bylo v kině“, aby se nepřekrývaly)
-  let _idsCache = null;
   window._hrajeNowIds = async function() {
     if (_idsCache && Date.now() - _idsCache.at < 3600000) return _idsCache.ids;
     try { const a = await fetchNow(); _idsCache = { at: Date.now(), ids: new Set(a.map(m => m.id)) }; return _idsCache.ids; } catch (e) { return new Set(); }
   };
-  function card(m) {
-    const img = m.poster_path ? `<img src="https://image.tmdb.org/t/p/w300${m.poster_path}" style="width:100%;height:195px;object-fit:cover;border-radius:10px 10px 0 0;" loading="lazy">` : `<div style="width:100%;height:195px;background:#1e293b;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem;">🎬</div>`;
-    const year = m.release_date ? m.release_date.slice(0, 4) : '';
-    const rating = m.vote_average ? `⭐ ${m.vote_average.toFixed(1)}` : '';
-    return `<div onclick="typeof openDetailFromZabavaList==='function'&&openDetailFromZabavaList('hraje','hrajeVKineModal',${m.id},'movie')" style="background:#111827;border-radius:10px;border:1px solid #1e293b;cursor:pointer;overflow:hidden;">${img}<div style="padding:8px;"><div style="font-size:0.8rem;font-weight:700;color:#e2e8f0;line-height:1.3;margin-bottom:4px;">${m.title}</div><div style="font-size:0.72rem;color:#94a3b8;">${year}${rating ? ' · ' + rating : ''}</div></div></div>`;
-  }
-  function paintFilters() {
-    const el = document.getElementById('hrajeGenreFilters'); if (!el) return;
-    const ids = []; _items.forEach(m => (m.genre_ids || []).forEach(g => ids.push(g)));
-    const uniq = [...new Set(ids)].slice(0, 14);
-    const btn = (id, label) => { const a = _active === id; return `<button onclick="hrajeFilterGenre(${id === null ? 'null' : id})" style="padding:5px 14px;border-radius:20px;border:1px solid ${a ? '#22c55e' : '#334155'};background:${a ? 'rgba(34,197,94,0.15)' : '#111827'};color:${a ? '#22c55e' : '#94a3b8'};font-size:0.78rem;cursor:pointer;">${label}</button>`; };
-    el.innerHTML = btn(null, 'Vše') + uniq.map(id => btn(id, _genres[id] || id)).join('');
-  }
-  function paintList() {
-    const res = document.getElementById('hrajeVKineResult'); if (!res) return;
-    const list = _active === null ? _items : _items.filter(m => (m.genre_ids || []).includes(_active));
-    res.innerHTML = list.length ? list.map(card).join('') : '<div style="grid-column:1/-1;text-align:center;color:#888;padding:20px;">Nic nenalezeno.</div>';
-  }
-  window.hrajeFilterGenre = function(id) { _active = id; paintFilters(); paintList(); };
   window.openHrajeVKineModal = async function() {
     const m = document.getElementById('hrajeVKineModal'); if (!m) return;
-    m.style.display = 'flex'; _active = null;
+    m.style.display = 'flex';
+    if (!_ctl) _ctl = KinoList.mount({ tb: 'hrajeToolbar', list: 'hrajeVKineResult', origin: 'hraje', modalId: 'hrajeVKineModal', accent: '#22c55e', mode: 'client', subtitle: 'Filmy, které teď běží v českých kinech' });
     if (window._saveLastZabavaList) window._saveLastZabavaList('hraje', 'hrajeVKineModal');
     if (window.updatePwaBtn) updatePwaBtn();
     const loader = document.getElementById('hrajeVKineLoader'), err = document.getElementById('hrajeVKineError');
-    err.style.display = 'none';
+    err.style.display = 'none'; _ctl.setGenre(null);
     if (!_items.length) {
       loader.style.display = 'block';
-      try {
-        _items = await fetchNow();
-        if (!Object.keys(_genres).length) {
-          const r = await fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${KEY()}&language=cs-CZ`).then(x => x.json()).catch(() => ({}));
-          (r.genres || []).forEach(g => { _genres[g.id] = g.name; });
-        }
-      } catch (e) { err.textContent = e.message || 'Chyba načítání.'; err.style.display = 'block'; }
+      try { _items = (await fetchNow()).map(x => KinoList.norm(x, 'movie')); } catch (e) { err.textContent = e.message || 'Chyba načítání.'; err.style.display = 'block'; }
       loader.style.display = 'none';
     }
-    paintFilters(); paintList();
+    try { await KinoList.ready(); } catch (e) {}
+    _ctl.setItems(_items);
   };
   window.closeHrajeVKineModal = function() {
     const m = document.getElementById('hrajeVKineModal'); if (m) m.style.display = 'none';
