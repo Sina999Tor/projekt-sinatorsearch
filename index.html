@@ -5602,6 +5602,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-15e', date: '15. 10. 2026', items: [
+            '📺 TV Program → ▶ Přehrát živě: opraveno spouštění kanálů, které z programu nešly, ale v Kanálech ano. Dohledání kanálu je přesnější (bez diakritiky a značek HD/CZ/SK, nebere první náhodný částečný nález) a když existuje víc stejnojmenných zdrojů (HD/SD, Kanály 1–6), appka nabídne výběr a zapamatuje si ten funkční, takže příště naskočí rovnou. „🔀 Jiný zdroj“ ukazuje všechny shody',
             '🔁 Chytrý seznam se zrcadlí do Histry: seznam stejného názvu se v Histře vytvoří a při každém obnovení se doplní o nové shody (a odeberou ty, co appka poslala a už nesedí; ručně přidané položky se nemažou). V průvodci jde vypnout (krok 5)',
             '🧠 Sinator → Seznamy → ➕: při vytvoření na výběr „📁 Nový seznam“ (jako dřív) nebo „🧠 Chytrý seznam“ — průvodce o 5 krocích (název + filmy/seriály → žánry [kterýkoli / všechny] → roky [od–do nebo jednotlivé] → hodnocení a minimum hlasů TMDB / Trakt / IMDb → řazení + shrnutí). Chytrý seznam se plní sám (až 100 shod), jde upravit ✏️, obnovit 🔄 a smazat; filtry se ukládají v zařízení',
             '🎬 Kino (Již bylo v kině / Právě hraje / Co se chystá): sjednocený vzhled a ovládání — všude tlačítko ← Zpět (do menu Kino), žánry schované pod tlačítkem 🎭 Žánr (po kliknutí vyjede nabídka) a přepínač vzhledu ▦ dlaždice / ☰ seznam, který platí pro všechny tři obrazovky a pamatuje se',
@@ -39733,29 +39734,99 @@ function showTvError(name, url) {
         </div>`;
 }
 
-function findTvChannelByEpgName(chName) {
-    if(!chName || !tvState.channels || !tvState.channels.length) return null;
-    const norm = s => (s||'').toLowerCase()
-        .replace(/^.*\|\s*/,'')              // odstranit prefix "CZ| " apod.
-        .replace(/\s*\b(hd|fhd|4k|hevc)\b/gi,'')
-        .replace(/[^a-z0-9čćšžýáíéúůňďťěř]+/gi,'')
-        .trim();
-    const target = norm(chName);
-    if(!target) return null;
-    let exact = null, partial = null;
-    for(const ch of tvState.channels) {
-        const n = norm(ch.name);
-        if(n === target) { exact = ch; break; }
-        if(!partial && (n.includes(target) || target.includes(n)) && target.length > 2) partial = ch;
-    }
-    return exact || partial;
+// ── Dohledání kanálu podle jména z EPG ───────────────────────────────────
+// Normalizace: bez diakritiky (EPG „ARENA ŠPORT1“ = „Arena Sport 1“), bez značek kvality
+// a zemí (HD, 4K, CZ, SK…), bez prefixu „CZ| “. Dřív se bral PRVNÍ částečný nález, takže
+// z programu mohl naskočit jiný (třeba nefunkční) kanál než ten, co jde spustit v Kanálech.
+function _epgNorm(s) {
+    return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/^.*\|\s*/, '')
+        .replace(/\[[^\]]*\]/g, '')
+        .replace(/\(?\d{3,4}p\)?/g, '')
+        .replace(/\b(hd|fhd|uhd|4k|hevc|sd|cz|sk|czech|slovak|slovakia|czechia)\b/g, '')
+        .replace(/[^a-z0-9]+/g, '');
 }
+const _epgNormCache = new WeakMap();
+function _epgChNorm(ch) { let n = _epgNormCache.get(ch); if (n === undefined) { n = _epgNorm(ch.name); _epgNormCache.set(ch, n); } return n; }
+function _epgPrefGet(t) { try { return (JSON.parse(localStorage.getItem('sinator_epg_ch_pref') || '{}'))[t] || null; } catch (e) { return null; } }
+function _epgPrefSet(t, u) { try { const m = JSON.parse(localStorage.getItem('sinator_epg_ch_pref') || '{}'); m[t] = u; localStorage.setItem('sinator_epg_ch_pref', JSON.stringify(m)); } catch (e) {} }
+function _epgPickFrom(lists, target) {
+    const exact = [], partial = [], seen = new Set();
+    for (const src of lists) {
+        for (const ch of (src.list || [])) {
+            if (!ch || !ch.url || seen.has(ch.url)) continue;
+            const n = _epgChNorm(ch); if (!n) continue;
+            if (n === target) { seen.add(ch.url); exact.push({ ch, source: src.label }); }
+            else if (target.length > 2 && n.length > 2 && (n.includes(target) || target.includes(n))) { seen.add(ch.url); partial.push({ ch, source: src.label, d: Math.abs(n.length - target.length) }); }
+        }
+    }
+    partial.sort((a, b) => a.d - b.d);
+    return { exact, partial };
+}
+// Rychlé dohledání jen v hlavním seznamu (logo v programu) — respektuje zapamatovanou volbu
+function findTvChannelByEpgName(chName) {
+    if (!chName || !tvState.channels || !tvState.channels.length) return null;
+    const t = _epgNorm(chName); if (!t) return null;
+    const r = _epgPickFrom([{ label: '', list: tvState.channels }], t);
+    const pref = _epgPrefGet(t);
+    if (pref) { const h = r.exact.concat(r.partial).find(x => x.ch.url === pref); if (h) return h.ch; }
+    return (r.exact[0] || r.partial[0] || {}).ch || null;
+}
+// Všechny kandidáty napříč zdroji (Kanály, Kanály 3–6; země z Kanálů 2 jen když nic jiného nesedí)
+function _epgCandidates(chName) {
+    const t = _epgNorm(chName);
+    const base = [{ label: '📺 Kanály', list: tvState.channels }];
+    if (typeof alt2State !== 'undefined') base.push({ label: '📺 Kanály 3', list: alt2State.channels });
+    if (typeof alt3State !== 'undefined') base.push({ label: '📺 Kanály 4', list: alt3State.channels });
+    if (typeof alt4State !== 'undefined') base.push({ label: '📺 Kanály 5', list: alt4State.channels });
+    if (typeof alt5State !== 'undefined') base.push({ label: '📺 Kanály 6', list: alt5State.channels });
+    let r = t ? _epgPickFrom(base, t) : { exact: [], partial: [] };
+    if (t && !r.exact.length && !r.partial.length && typeof ALT_PLAYLISTS === 'object') {
+        const cs = [];
+        Object.keys(ALT_PLAYLISTS).forEach(code => {
+            if (code === 'alt2' || code === 'alt3' || code === 'alt4' || code === 'alt5') return;
+            try { if (!altState.parsedCache[code]) altState.parsedCache[code] = parseM3U(ALT_PLAYLISTS[code].m3u); cs.push({ label: '📺 K2 · ' + (ALT_PLAYLISTS[code].label || code), list: altState.parsedCache[code] }); } catch (e) {}
+        });
+        const r2 = _epgPickFrom(cs, t); r = { exact: r2.exact, partial: [] };
+    }
+    return { t, exact: r.exact, partial: r.partial };
+}
+function _epgChooser(chName, list) {
+    const old = document.getElementById('epgAltChooserModal'); if (old) old.remove();
+    const t = _epgNorm(chName), pref = _epgPrefGet(t), seen = new Set();
+    const rows = list.filter(x => x && x.ch && x.ch.url && !seen.has(x.ch.url) && seen.add(x.ch.url)).slice(0, 14);
+    window._epgChooserRows = rows; window._epgChooserTarget = t;
+    const listHtml = rows.map((x, i) => `<button onclick="_epgChoosePick(${i})" style="display:block;width:100%;padding:11px 14px;margin-bottom:8px;background:var(--bg-elevated);border:1px solid ${x.ch.url === pref ? '#ff9800' : 'var(--border)'};border-radius:8px;color:var(--text);font-size:0.85rem;font-weight:600;text-align:left;cursor:pointer;">${x.ch.url === pref ? '⭐ ' : ''}${_epgEscapeHtml(x.ch.name || chName)}<div style="font-size:0.7rem;font-weight:400;color:var(--text-muted);margin-top:2px;">${_epgEscapeHtml(x.source || '')}${x.ch.group ? ' · ' + _epgEscapeHtml(x.ch.group) : ''}</div></button>`).join('');
+    const el = document.createElement('div');
+    el.id = 'epgAltChooserModal';
+    el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
+    el.onclick = () => el.remove();
+    el.innerHTML = `<div style="background:var(--bg,#111);width:100%;max-width:480px;max-height:80vh;overflow-y:auto;border-radius:16px 16px 0 0;padding:20px 16px 28px;" onclick="event.stopPropagation()">
+        <div style="font-weight:700;margin-bottom:4px;">📺 ${_epgEscapeHtml(chName)} — vyber zdroj</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px;">Vybraný zdroj si appka zapamatuje a příště ho pustí rovnou.</div>
+        ${listHtml}
+        <button onclick="document.getElementById('epgAltChooserModal').remove()" style="width:100%;padding:10px;margin-top:4px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);cursor:pointer;">Zavřít</button>
+    </div>`;
+    document.body.appendChild(el);
+}
+function _epgChoosePick(i) {
+    const row = (window._epgChooserRows || [])[i]; if (!row) return;
+    _epgPrefSet(window._epgChooserTarget, row.ch.url);
+    const m = document.getElementById('epgAltChooserModal'); if (m) m.remove();
+    openInVlcUrl(row.ch.url);
+}
+window._epgChoosePick = _epgChoosePick;
 
 function playEpgChannelLive(chName) {
-    const ch = findTvChannelByEpgName(chName);
-    if(!ch) { alert('Kanál "' + chName + '" se nepodařilo dohledat v seznamu.'); return; }
-    document.getElementById('epgDetailModal').style.display='none';
-    openInVlcUrl(ch.url);
+    const c = _epgCandidates(chName);
+    const list = c.exact.length ? c.exact : c.partial;
+    if (!list.length) { alert('Kanál "' + chName + '" se nepodařilo dohledat v seznamu.'); return; }
+    const m = document.getElementById('epgDetailModal'); if (m) m.style.display = 'none';
+    const pref = _epgPrefGet(c.t);
+    const hit = pref && list.find(x => x.ch.url === pref);
+    if (hit) { openInVlcUrl(hit.ch.url); return; }
+    if (list.length === 1) { openInVlcUrl(list[0].ch.url); return; }
+    _epgChooser(chName, list); // víc stejnojmenných kanálů (HD/SD, různé zdroje) → vyber, který funguje
 }
 
 // Wrappery pro tlačítka v EPG detailu — čtou pořad/kanál z window._lastEpgDetail
@@ -39792,25 +39863,14 @@ function tvSearchProgramFromDetail() {
 // pro případ, že se hlavní zdroj sekává. Využívá stejné findTvAltSources jako
 // živý přehrávač.
 function playEpgChannelAlt(chName) {
-    const ch = findTvChannelByEpgName(chName);
-    if (!ch) { alert('Kanál "' + chName + '" se nepodařilo dohledat v seznamu.'); return; }
-    const alts = findTvAltSources(ch.name, ch.url);
-    if (!alts.length) { alert('Pro "' + ch.name + '" nemám žádný jiný zdroj.'); return; }
-    const old = document.getElementById('epgAltChooserModal');
-    if (old) old.remove();
-    const listHtml = alts.map(a =>
-        `<button onclick="document.getElementById('epgAltChooserModal').remove();openInVlcUrl(decodeURIComponent('${encodeURIComponent(a.url)}'))" style="display:block;width:100%;padding:11px 14px;margin-bottom:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.85rem;font-weight:600;text-align:left;cursor:pointer;">${a.source}</button>`
-    ).join('');
-    const el = document.createElement('div');
-    el.id = 'epgAltChooserModal';
-    el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end;justify-content:center;';
-    el.onclick = () => el.remove();
-    el.innerHTML = `<div style="background:var(--bg,#111);width:100%;max-width:480px;border-radius:16px 16px 0 0;padding:20px 16px 28px;" onclick="event.stopPropagation()">
-        <div style="font-weight:700;margin-bottom:12px;">🔀 Jiný zdroj — ${ch.name}</div>
-        ${listHtml}
-        <button onclick="document.getElementById('epgAltChooserModal').remove()" style="width:100%;padding:10px;margin-top:4px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);cursor:pointer;">Zavřít</button>
-    </div>`;
-    document.body.appendChild(el);
+    const c = _epgCandidates(chName);
+    const list = c.exact.concat(c.partial);
+    let alts = [];
+    try { alts = findTvAltSources(list.length ? list[0].ch.name : chName, null); } catch (e) {}
+    alts.forEach(a => { if (!list.some(x => x.ch.url === a.url)) list.push({ ch: { name: a.name, url: a.url }, source: a.source }); });
+    if (!list.length) { alert('Kanál "' + chName + '" se nepodařilo dohledat v seznamu.'); return; }
+    const m = document.getElementById('epgDetailModal'); if (m) m.style.display = 'none';
+    _epgChooser(chName, list);
 }
 
 function _epgCatchupSource(channel) {
