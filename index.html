@@ -5577,6 +5577,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-15e', date: '15. 10. 2026', items: [
+            '🧠 Sinator → Seznamy → ➕: při vytvoření na výběr „📁 Nový seznam“ (jako dřív) nebo „🧠 Chytrý seznam“ — průvodce o 5 krocích (název + filmy/seriály → žánry [kterýkoli / všechny] → roky [od–do nebo jednotlivé] → hodnocení a minimum hlasů TMDB / Trakt / IMDb → řazení + shrnutí). Chytrý seznam se plní sám (až 100 shod), jde upravit ✏️, obnovit 🔄 a smazat; filtry se ukládají v zařízení',
             '🎬 Kino (Již bylo v kině / Právě hraje / Co se chystá): sjednocený vzhled a ovládání — všude tlačítko ← Zpět (do menu Kino), žánry schované pod tlačítkem 🎭 Žánr (po kliknutí vyjede nabídka) a přepínač vzhledu ▦ dlaždice / ☰ seznam, který platí pro všechny tři obrazovky a pamatuje se',
             '🍿 Zábava → Kino: nová položka „Právě hraje v kinech“ (filmy, co teď běží v českých kinech, se žánrovými filtry). Kino je teď řazené chronologicky: 🎟️ Již bylo v kině → 🍿 Právě hraje → 📅 Co se chystá; „Již bylo“ už neukazuje filmy, které právě hrají',
             '🔔 Jedno upozornění místo dvou: zvoneček v 📆 Up Next je teď stejný přepínač jako Nastavení → 🧪 Experimentální funkce → Upozornění (🔔 zapnuto / 🔕 vypnuto). Starý samostatný systém upozornění v Up Next je pryč, takže nic nechodí dvakrát',
@@ -13886,6 +13887,10 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     }
 
     function renderMyBackendGrid(items, emptyMsg, tab) {
+        _renderMyBackendGridBase(items, emptyMsg, tab);
+        if (tab && String(tab).startsWith('smart:')) smartDecorate(tab);
+    }
+    function _renderMyBackendGridBase(items, emptyMsg, tab) {
         const c = $('myBackendResultsContainer');
         const canRemove = tab === 'watchlist' || tab === 'ratings-movies' || tab === 'ratings-shows' || tab === 'history-movies' || tab === 'history-episodes' || tab === 'history-shows' || tab.startsWith('list:');
         // Jen když není aktivní filtr podle písmene — jinak by "items" byl jen
@@ -13993,6 +13998,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     emptyMsg = 'Historie seriálů je prázdná.';
                 }
                 else if (tab.startsWith('list:')) { items = await myListItemsGet(tab.slice(5)); emptyMsg = 'Seznam je prázdný.'; }
+                else if (tab.startsWith('smart:')) { items = await smartLoad(tab.slice(6)); emptyMsg = 'Tomuhle chytrému seznamu zatím nic neodpovídá — uprav filtry (✏️).'; }
                 // Postery/názvy se teď aplikují jen z lokální cache (okamžité, bez
                 // network fetche) — chybějící se donačtou na pozadí PO vykreslení,
                 // viz o pár řádků níže. Dřív appka čekala na doběhnutí VŠECH TMDB
@@ -14112,10 +14118,11 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             { key: 'history-shows', label: '🕓 Hist. seriály' },
         ];
         const listTabs = lists.map(l => ({ key: `list:${l.id}`, label: `📁 ${l.name} (${l.item_count || 0})`, id: l.id }));
-        const allTabs = [...staticTabs, ...listTabs];
+        const smartTabs = smartAll().map(d => ({ key: `smart:${d.id}`, label: `🧠 ${String(d.name).replace(/</g, '&lt;')}`, smartId: d.id }));
+        const allTabs = [...staticTabs, ...listTabs, ...smartTabs];
         $('myBackendListTabs').innerHTML = allTabs.map(t => `<span style="position:relative;display:inline-flex;">
-            <button class="ts-list-tab-btn" data-tab="${t.key}" onclick="renderMyBackendTab('${t.key}')" style="white-space:nowrap;padding:8px ${t.id ? '26px' : '14px'} 8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.82rem;">${t.label}</button>
-            ${t.id ? `<button onclick="event.stopPropagation();myBackendDeleteList('${t.id}')" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:rgba(224,122,111,0.25);border:none;color:#e07a6f;font-size:0.7rem;line-height:1;cursor:pointer;">✕</button>` : ''}
+            <button class="ts-list-tab-btn" data-tab="${t.key}" onclick="renderMyBackendTab('${t.key}')" style="white-space:nowrap;padding:8px ${(t.id || t.smartId) ? '26px' : '14px'} 8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.82rem;">${t.label}</button>
+            ${(t.id || t.smartId) ? `<button onclick="event.stopPropagation();${t.smartId ? `mySmartDelete('${t.smartId}')` : `myBackendDeleteList('${t.id}')`}" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:rgba(224,122,111,0.25);border:none;color:#e07a6f;font-size:0.7rem;line-height:1;cursor:pointer;">✕</button>` : ''}
         </span>`).join('') + `<button onclick="myBackendCreateList()" style="white-space:nowrap;padding:8px 14px;border-radius:20px;border:1px dashed #6090ff;background:transparent;color:#6090ff;cursor:pointer;font-size:0.82rem;">➕ Nový seznam</button>`;
         $('myBackendListTabsWrap').style.display = 'block';
 
@@ -14146,7 +14153,248 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     }
     window.loadMyBackendOverview = loadMyBackendOverview;
 
-    window.myBackendCreateList = async function() {
+// ===== 🧠 CHYTRÉ SEZNAMY (Sinator) =====
+    // Definice filtrů se ukládají lokálně (sinator_smart_lists_v1); obsah se při otevření dotáhne z TMDB
+    // (žánry, roky, hodnocení TMDB, počet hlasů) nebo z Trakt filtrů (Trakt/IMDb hodnocení a hlasy).
+    const SMART_KEY = 'sinator_smart_lists_v1';
+    const SMART_GENRES = [
+        { k: 'action', cs: 'Akční', m: 28, t: [10759], slug: ['action'] }, { k: 'adventure', cs: 'Dobrodružný', m: 12, t: [10759], slug: ['adventure'] },
+        { k: 'animation', cs: 'Animovaný', m: 16, t: [16], slug: ['animation'] }, { k: 'comedy', cs: 'Komedie', m: 35, t: [35], slug: ['comedy'] },
+        { k: 'crime', cs: 'Krimi', m: 80, t: [80], slug: ['crime'] }, { k: 'documentary', cs: 'Dokumentární', m: 99, t: [99], slug: ['documentary'] },
+        { k: 'drama', cs: 'Drama', m: 18, t: [18], slug: ['drama'] }, { k: 'family', cs: 'Rodinný', m: 10751, t: [10751], slug: ['family'] },
+        { k: 'fantasy', cs: 'Fantasy', m: 14, t: [10765], slug: ['fantasy'] }, { k: 'history', cs: 'Historický', m: 36, t: null, slug: ['history'] },
+        { k: 'horror', cs: 'Horor', m: 27, t: null, slug: ['horror'] }, { k: 'music', cs: 'Hudební', m: 10402, t: null, slug: ['music'] },
+        { k: 'mystery', cs: 'Mysteriózní', m: 9648, t: [9648], slug: ['mystery'] }, { k: 'romance', cs: 'Romantický', m: 10749, t: null, slug: ['romance'] },
+        { k: 'scifi', cs: 'Sci-Fi', m: 878, t: [10765], slug: ['science-fiction'] }, { k: 'thriller', cs: 'Thriller', m: 53, t: null, slug: ['thriller'] },
+        { k: 'war', cs: 'Válečný', m: 10752, t: [10768], slug: ['war'] }, { k: 'western', cs: 'Western', m: 37, t: [37], slug: ['western'] },
+        { k: 'kids', cs: 'Dětský', m: null, t: [10762], slug: ['kids'] }, { k: 'reality', cs: 'Reality', m: null, t: [10764], slug: ['reality'] }
+    ];
+    const SMART_SORTS = { popular: 'Popularita', rating: 'Nejlépe hodnocené', newest: 'Nejnovější', votes: 'Nejvíc hlasů' };
+    function smartAll() { try { const a = JSON.parse(localStorage.getItem(SMART_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+    function smartSaveAll(a) { try { localStorage.setItem(SMART_KEY, JSON.stringify(a)); } catch (e) {} }
+    function smartGet(id) { return smartAll().find(x => x.id === id) || null; }
+    function smartDefault() { return { id: '', name: '', type: 'movie', genres: [], genreMode: 'any', years: { mode: 'none', from: '', to: '', text: '' }, tmdb: {}, trakt: {}, imdb: {}, sort: 'popular', hideWatched: true }; }
+    const _smartNum = n => (n == null || n === '' || isNaN(+n)) ? null : +n;
+    const _smartFmt = n => Number(n).toLocaleString('cs-CZ');
+    function smartParseYears(text) {
+        const out = new Set();
+        String(text || '').split(/[,;\s]+/).filter(Boolean).forEach(tok => {
+            const m = tok.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
+            if (m) { let a = +m[1], b = +m[2]; if (a > b) [a, b] = [b, a]; for (let y = a; y <= b && out.size < 120; y++) out.add(y); }
+            else if (/^\d{4}$/.test(tok)) out.add(+tok);
+        });
+        return [...out].sort((a, b) => a - b);
+    }
+    function smartNeedTrakt(d) { return ['trakt', 'imdb'].some(k => d[k] && (_smartNum(d[k].min) != null || _smartNum(d[k].max) != null || _smartNum(d[k].votes) != null)); }
+    function smartChips(d) {
+        const c = [d.type === 'movie' ? '🎬 Filmy' : '📺 Seriály'];
+        if (d.genres.length) c.push(d.genres.map(k => (SMART_GENRES.find(g => g.k === k) || {}).cs || k).join(d.genreMode === 'all' ? ' + ' : ' / '));
+        const y = d.years || {};
+        if (y.mode === 'range' && (y.from || y.to)) c.push(`Vydáno ${y.from || '…'}–${y.to || '…'}`);
+        else if (y.mode === 'list' && y.text) c.push('Roky: ' + y.text);
+        [['tmdb', 'TMDB'], ['trakt', 'Trakt'], ['imdb', 'IMDb']].forEach(([k, lab]) => {
+            const r = d[k] || {}, mn = _smartNum(r.min), mx = _smartNum(r.max), v = _smartNum(r.votes);
+            if (mn != null || mx != null) c.push(`${lab} ${mn != null ? mn : 0}–${mx != null ? mx : 100} %`);
+            if (v != null) c.push(`${_smartFmt(v)}+ hlasů ${lab}`);
+        });
+        c.push('↕ ' + (SMART_SORTS[d.sort] || 'Popularita'));
+        if (d.hideWatched) c.push('bez shlédnutých');
+        return c;
+    }
+    // ---- engine: TMDB discover ----
+    async function smartTmdb(d) {
+        const key = tmdbApiKey; if (!key) throw new Error('Chybí TMDB API klíč.');
+        const isM = d.type === 'movie';
+        const sortMap = { popular: 'popularity.desc', rating: 'vote_average.desc', newest: isM ? 'primary_release_date.desc' : 'first_air_date.desc', votes: 'vote_count.desc' };
+        const gids = [];
+        d.genres.forEach(k => { const g = SMART_GENRES.find(x => x.k === k); if (!g) return; (isM ? (g.m ? [g.m] : []) : (g.t || [])).forEach(i => { if (!gids.includes(i)) gids.push(i); }); });
+        const yrs = (d.years && d.years.mode === 'list') ? smartParseYears(d.years.text) : [];
+        const perYear = yrs.length > 0 && yrs.length <= 12;
+        function url(page, yr) {
+            const p = new URLSearchParams({ api_key: key, language: 'cs-CZ', include_adult: 'false', page: String(page), sort_by: sortMap[d.sort] || sortMap.popular });
+            if (gids.length) p.set('with_genres', gids.join(d.genreMode === 'all' ? ',' : '|'));
+            const t = d.tmdb || {}, mn = _smartNum(t.min), mx = _smartNum(t.max); let vc = _smartNum(t.votes);
+            if (mn != null) p.set('vote_average.gte', (mn / 10).toFixed(1));
+            if (mx != null) p.set('vote_average.lte', (mx / 10).toFixed(1));
+            if (d.sort === 'rating' && (vc == null || vc < 100)) vc = 100; // jinak vyhrají tituly s pár hlasy
+            if (vc != null) p.set('vote_count.gte', String(vc));
+            const df = isM ? 'primary_release_date' : 'first_air_date';
+            if (yr) p.set(isM ? 'primary_release_year' : 'first_air_date_year', String(yr));
+            else if (d.years && d.years.mode === 'range') { if (d.years.from) p.set(df + '.gte', d.years.from + '-01-01'); if (d.years.to) p.set(df + '.lte', d.years.to + '-12-31'); }
+            else if (yrs.length) { p.set(df + '.gte', yrs[0] + '-01-01'); p.set(df + '.lte', yrs[yrs.length - 1] + '-12-31'); }
+            return `https://api.themoviedb.org/3/discover/${isM ? 'movie' : 'tv'}?${p}`;
+        }
+        const jobs = [];
+        if (perYear) yrs.forEach(yr => [1, 2].forEach(pg => jobs.push(url(pg, yr)))); else [1, 2, 3, 4, 5].forEach(pg => jobs.push(url(pg)));
+        const res = await Promise.all(jobs.map(u => fetch(u).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] }))));
+        const seen = new Set(), out = [];
+        res.forEach(r => (r.results || []).forEach(m => {
+            if (!m || seen.has(m.id)) return; seen.add(m.id);
+            const date = m.release_date || m.first_air_date || '';
+            out.push({ id: m.id, type: d.type, title: m.title || m.name || '', year: date.slice(0, 4), rating: m.vote_average || 0, votes: m.vote_count || 0, pop: m.popularity || 0, date, poster_path: m.poster_path || '' });
+        }));
+        return out;
+    }
+    // ---- engine: Trakt filtry (Trakt/IMDb/TMDB hodnocení a hlasy přes /popular) ----
+    async function smartTrakt(d) {
+        const path = d.type === 'movie' ? 'movies' : 'shows';
+        const yrs = (d.years && d.years.mode === 'list') ? smartParseYears(d.years.text) : [];
+        const base = new URLSearchParams({ extended: 'full', limit: '100', page: '1' });
+        if (d.years && d.years.mode === 'range' && (d.years.from || d.years.to)) {
+            const a = d.years.from || 1900, b = d.years.to || new Date().getFullYear() + 1;
+            base.set('years', a === b ? String(a) : `${a}-${b}`);
+        } else if (yrs.length) base.set('years', yrs[0] === yrs[yrs.length - 1] ? String(yrs[0]) : `${yrs[0]}-${yrs[yrs.length - 1]}`);
+        const rng = (k, scale, qk, vk) => {
+            const r = d[k] || {}, mn = _smartNum(r.min), mx = _smartNum(r.max), v = _smartNum(r.votes);
+            if (mn != null || mx != null) { const f = x => scale === 1 ? String(Math.round(x)) : (x / 10).toFixed(1); base.set(qk, `${f(mn != null ? mn : 0)}-${f(mx != null ? mx : 100)}`); }
+            if (v != null) base.set(vk, `${v}-`);
+        };
+        rng('trakt', 1, 'ratings', 'votes'); rng('imdb', 10, 'imdb_ratings', 'imdb_votes'); rng('tmdb', 10, 'tmdb_ratings', 'tmdb_votes');
+        // Žánry: „kterýkoli“ = samostatný dotaz na každý žánr + sloučení; „všechny“ = dotaz na první žánr a zbytek se dofiltruje zde
+        const slugsOf = k => (SMART_GENRES.find(g => g.k === k) || { slug: [] }).slug;
+        const queries = [];
+        if (!d.genres.length) queries.push(new URLSearchParams(base));
+        else if (d.genreMode === 'all') { const q = new URLSearchParams(base); q.set('genres', slugsOf(d.genres[0])[0]); queries.push(q); }
+        else d.genres.forEach(k => slugsOf(k).forEach(sl => { const q = new URLSearchParams(base); q.set('genres', sl); queries.push(q); }));
+        const results = await Promise.all(queries.slice(0, 8).map(async q => {
+            const r = await fetchWithRetry(`${TRAKT_BASE}/${path}/popular?${q}`, { headers: getTraktHeaders() });
+            if (!r.ok) throw new Error(`Trakt odmítl dotaz (HTTP ${r.status}). Filtry hodnocení Trakt/IMDb mohou vyžadovat Trakt VIP — zkus je v seznamu vypnout.`);
+            return r.json();
+        }));
+        const seen = new Set(), out = [];
+        results.forEach(list => (Array.isArray(list) ? list : []).forEach((m, i) => {
+            const id = m && m.ids && m.ids.tmdb; if (!id || seen.has(id)) return; seen.add(id);
+            out.push({ id, type: d.type, title: m.title || '', year: String(m.year || ''), rating: m.rating || 0, votes: m.votes || 0, pop: 1000 - i, date: m.released || (m.first_aired || '').slice(0, 10) || '', genres: m.genres || [], poster_path: '' });
+        }));
+        return out;
+    }
+    function smartPost(d, items) {
+        let a = items;
+        if (d.years && d.years.mode === 'list') { const ys = new Set(smartParseYears(d.years.text)); if (ys.size) a = a.filter(it => ys.has(+it.year)); }
+        if (d.genreMode === 'all' && d.genres.length > 1 && a.length && a[0].genres) {
+            a = a.filter(it => d.genres.every(k => { const sl = (SMART_GENRES.find(g => g.k === k) || { slug: [] }).slug; return sl.some(x => (it.genres || []).includes(x)); }));
+        }
+        if (d.hideWatched) a = a.filter(it => { try { return !isWatched(it.id, it.type); } catch (e) { return true; } });
+        const by = { popular: (x, y) => (y.pop || 0) - (x.pop || 0), rating: (x, y) => (y.rating || 0) - (x.rating || 0), newest: (x, y) => String(y.date).localeCompare(String(x.date)), votes: (x, y) => (y.votes || 0) - (x.votes || 0) };
+        return a.slice().sort(by[d.sort] || by.popular).slice(0, 100);
+    }
+    const _smartCache = {};
+    async function smartLoad(id, force) {
+        const d = smartGet(id); if (!d) throw new Error('Chytrý seznam už neexistuje.');
+        const c = _smartCache[id];
+        if (!force && c && Date.now() - c.t < 30 * 60 * 1000) return c.items;
+        const raw = smartNeedTrakt(d) ? await smartTrakt(d) : await smartTmdb(d);
+        const items = smartPost(d, raw);
+        _smartCache[id] = { t: Date.now(), items };
+        return items;
+    }
+    window.mySmartRefresh = function(id) { delete _smartCache[id]; window._myBackendCurrentItemsTab = null; renderMyBackendTab('smart:' + id); };
+    window.mySmartDelete = function(id) {
+        const d = smartGet(id); if (!d || !confirm(`Smazat chytrý seznam „${d.name}“? (Položky se nemažou, je to jen sada filtrů.)`)) return;
+        smartSaveAll(smartAll().filter(x => x.id !== id)); delete _smartCache[id];
+        loadMyBackendOverview('watchlist', true);
+        renderMyBackendTab('watchlist');
+    };
+    function smartDecorate(tab) {
+        const c = $('myBackendResultsContainer'); const d = smartGet(tab.slice(6)); if (!c || !d) return;
+        c.insertAdjacentHTML('afterbegin', `<div style="padding:12px 14px;border-bottom:1px solid var(--border);background:rgba(96,144,255,0.06);">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">${smartChips(d).map(x => `<span style="padding:4px 10px;border-radius:14px;background:var(--bg-elevated);border:1px solid var(--border);font-size:0.74rem;color:var(--text);">${String(x).replace(/</g, '&lt;')}</span>`).join('')}</div>
+            <div style="display:flex;gap:8px;"><button onclick="mySmartEdit('${d.id}')" style="padding:7px 14px;border-radius:16px;border:1px solid #6090ff;background:transparent;color:#6090ff;cursor:pointer;font-size:0.8rem;">✏️ Upravit filtry</button>
+            <button onclick="mySmartRefresh('${d.id}')" style="padding:7px 14px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:0.8rem;">🔄 Obnovit</button></div></div>`);
+    }
+    // ---- průvodce ----
+    let W = null;
+    const _wizCss = 'width:100%;box-sizing:border-box;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:0.95rem;';
+    function wizChip(label, on, onclick) { return `<button onclick="${onclick}" style="padding:8px 14px;border-radius:18px;border:1px solid ${on ? '#6090ff' : 'var(--border)'};background:${on ? 'rgba(96,144,255,0.2)' : 'var(--bg-elevated)'};color:${on ? '#6090ff' : 'var(--text)'};cursor:pointer;font-size:0.85rem;">${label}</button>`; }
+    function wizReadStep() {
+        const g = id => document.getElementById(id), d = W.d;
+        if (W.step === 1 && g('swName')) d.name = g('swName').value.trim();
+        if (W.step === 3) {
+            if (g('swYFrom')) d.years.from = g('swYFrom').value.trim();
+            if (g('swYTo')) d.years.to = g('swYTo').value.trim();
+            if (g('swYText')) d.years.text = g('swYText').value.trim();
+        }
+        if (W.step === 4) ['tmdb', 'trakt', 'imdb'].forEach(k => { d[k] = { min: g('sw_' + k + '_min').value.trim(), max: g('sw_' + k + '_max').value.trim(), votes: g('sw_' + k + '_votes').value.trim() }; });
+        if (W.step === 5 && g('swSort')) { d.sort = g('swSort').value; d.hideWatched = g('swHide').checked; }
+    }
+    function wizRender() {
+        const ov = document.getElementById('smartWizOverlay'); if (!ov) return;
+        const d = W.d, titles = ['Základ', 'Žánry', 'Roky', 'Hodnocení a hlasy', 'Řazení a shrnutí'];
+        let body = '';
+        if (W.step === 1) {
+            body = `<label style="font-size:0.8rem;color:var(--text-muted);">Název seznamu</label>
+              <input id="swName" value="${String(d.name).replace(/"/g, '&quot;')}" placeholder="např. Skryté perly 90. let" style="${_wizCss}margin:6px 0 18px;">
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px;">Co hledat</div>
+              <div style="display:flex;gap:8px;">${wizChip('🎬 Filmy', d.type === 'movie', "mySmartWiz.type('movie')")}${wizChip('📺 Seriály', d.type === 'tv', "mySmartWiz.type('tv')")}</div>`;
+        } else if (W.step === 2) {
+            const av = SMART_GENRES.filter(g => d.type === 'movie' ? g.m : g.t);
+            body = `<div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px;">Vyber žánry (nic = všechny žánry)</div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;">${av.map(g => wizChip(g.cs, d.genres.includes(g.k), `mySmartWiz.genre('${g.k}')`)).join('')}</div>
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px;">Více žánrů najednou</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">${wizChip('Kterýkoli z nich', d.genreMode === 'any', "mySmartWiz.gmode('any')")}${wizChip('Všechny zároveň', d.genreMode === 'all', "mySmartWiz.gmode('all')")}</div>`;
+        } else if (W.step === 3) {
+            const y = d.years;
+            body = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">${wizChip('Bez omezení', y.mode === 'none', "mySmartWiz.ymode('none')")}${wizChip('Od – do', y.mode === 'range', "mySmartWiz.ymode('range')")}${wizChip('Jednotlivé roky', y.mode === 'list', "mySmartWiz.ymode('list')")}</div>` +
+              (y.mode === 'range' ? `<div style="display:flex;gap:10px;align-items:center;"><input id="swYFrom" inputmode="numeric" maxlength="4" value="${y.from}" placeholder="od (1994)" style="${_wizCss}"><span>–</span><input id="swYTo" inputmode="numeric" maxlength="4" value="${y.to}" placeholder="do (2020)" style="${_wizCss}"></div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">Stačí vyplnit jen jedno z polí.</div>` : '') +
+              (y.mode === 'list' ? `<input id="swYText" value="${y.text}" placeholder="1994, 2001, 2010-2012" style="${_wizCss}"><div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">Roky oddělené čárkou, můžeš i rozsahy (2010-2012).</div>` : '');
+        } else if (W.step === 4) {
+            const row = (k, lab, hint) => { const r = d[k] || {}; return `<div style="padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:12px;"><div style="font-weight:700;margin-bottom:2px;">${lab}</div><div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:10px;">${hint}</div>
+              <div style="display:flex;gap:8px;"><input id="sw_${k}_min" inputmode="numeric" value="${r.min ?? ''}" placeholder="min %" style="${_wizCss}"><input id="sw_${k}_max" inputmode="numeric" value="${r.max ?? ''}" placeholder="max %" style="${_wizCss}"><input id="sw_${k}_votes" inputmode="numeric" value="${r.votes ?? ''}" placeholder="min hlasů" style="${_wizCss}"></div></div>`; };
+            body = row('tmdb', 'TMDB', 'Hodnocení 0–100 % (např. 55 až 100) a minimální počet hlasů') + row('trakt', 'Trakt', 'Hledá se přes Trakt filtry') + row('imdb', 'IMDb', 'Hodnocení a počet hlasů z IMDb (přes Trakt filtry)') +
+              `<div style="font-size:0.74rem;color:var(--text-muted);">Prázdné pole = bez omezení. Když vyplníš Trakt nebo IMDb, hledá se přes Trakt (ten umí všechna tři hodnocení najednou).</div>`;
+        } else {
+            body = `<div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px;">Řazení</div><select id="swSort" style="${_wizCss}margin-bottom:14px;">${Object.entries(SMART_SORTS).map(([k, v]) => `<option value="${k}" ${d.sort === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+              <label style="display:flex;gap:10px;align-items:center;margin-bottom:18px;font-size:0.9rem;"><input id="swHide" type="checkbox" ${d.hideWatched ? 'checked' : ''} style="width:18px;height:18px;"> Skrýt už shlédnuté</label>
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px;">Shrnutí</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${smartChips(d).map(x => `<span style="padding:5px 11px;border-radius:14px;background:var(--bg-elevated);border:1px solid var(--border);font-size:0.78rem;">${String(x).replace(/</g, '&lt;')}</span>`).join('')}</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);margin-top:14px;">Seznam ukáže až 100 nejlepších shod a při otevření se obnovuje (po 30 minutách z paměti).</div>`;
+        }
+        ov.innerHTML = `<div style="background:var(--bg-card);width:100%;max-width:560px;margin:auto;height:100%;max-height:100%;display:flex;flex-direction:column;">
+          <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);"><div style="flex:1;font-weight:800;">🧠 ${W.editId ? 'Upravit chytrý seznam' : 'Nový chytrý seznam'}</div><div style="font-size:0.8rem;color:var(--text-muted);">${W.step}/5 · ${titles[W.step - 1]}</div><button onclick="mySmartWiz.close()" style="background:none;border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:50%;cursor:pointer;">✕</button></div>
+          <div style="flex:1;overflow-y:auto;padding:18px 16px;">${body}</div>
+          <div style="display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--border);">
+            <button onclick="mySmartWiz.back()" style="flex:1;padding:12px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:0.95rem;">${W.step === 1 ? 'Zrušit' : '← Zpět'}</button>
+            <button onclick="mySmartWiz.next()" style="flex:2;padding:12px;border-radius:12px;border:none;background:#6090ff;color:#fff;font-weight:700;cursor:pointer;font-size:0.95rem;">${W.step === 5 ? (W.editId ? '💾 Uložit' : '✅ Vytvořit') : 'Další →'}</button>
+          </div></div>`;
+    }
+    window.mySmartWiz = {
+        type(t) { wizReadStep(); if (W.d.type !== t) { W.d.type = t; W.d.genres = W.d.genres.filter(k => { const g = SMART_GENRES.find(x => x.k === k); return g && (t === 'movie' ? g.m : g.t); }); } wizRender(); },
+        genre(k) { const a = W.d.genres, i = a.indexOf(k); if (i >= 0) a.splice(i, 1); else a.push(k); wizRender(); },
+        gmode(m) { W.d.genreMode = m; wizRender(); },
+        ymode(m) { wizReadStep(); W.d.years.mode = m; wizRender(); },
+        close() { const ov = document.getElementById('smartWizOverlay'); if (ov) ov.remove(); W = null; },
+        back() { if (W.step === 1) return this.close(); wizReadStep(); W.step--; wizRender(); },
+        next() {
+            wizReadStep(); const d = W.d;
+            if (W.step === 1 && !d.name) { alert('Zadej název seznamu.'); return; }
+            if (W.step === 3 && d.years.mode === 'range') {
+                const f = d.years.from, t = d.years.to;
+                if ((f && !/^\d{4}$/.test(f)) || (t && !/^\d{4}$/.test(t)) || (f && t && +f > +t)) { alert('Roky zadej jako čtyřciferné číslo, „od“ nesmí být větší než „do“.'); return; }
+            }
+            if (W.step === 3 && d.years.mode === 'list' && !smartParseYears(d.years.text).length) { alert('Zadej aspoň jeden rok, např. 1994, 2001, 2010-2012.'); return; }
+            if (W.step === 4) {
+                for (const k of ['tmdb', 'trakt', 'imdb']) for (const f of ['min', 'max', 'votes']) { const v = d[k][f]; if (v !== '' && (isNaN(+v) || +v < 0 || (f !== 'votes' && +v > 100))) { alert('Hodnocení zadej jako číslo 0–100, hlasy jako kladné číslo.'); return; } }
+            }
+            if (W.step < 5) { W.step++; wizRender(); return; }
+            const arr = smartAll(); const id = W.editId || ('sm' + Date.now().toString(36));
+            const rec = Object.assign({}, d, { id });
+            const ix = arr.findIndex(x => x.id === id); if (ix >= 0) arr[ix] = rec; else arr.push(rec);
+            smartSaveAll(arr); delete _smartCache[id]; this.close();
+            window._myBackendCurrentItemsTab = null;
+            loadMyBackendOverview('smart:' + id, true);
+            renderMyBackendTab('smart:' + id);
+        }
+    };
+    function smartOpenWizard(def, editId) {
+        W = { step: 1, d: JSON.parse(JSON.stringify(def)), editId: editId || null };
+        W.d.years = Object.assign({ mode: 'none', from: '', to: '', text: '' }, W.d.years || {});
+        ['tmdb', 'trakt', 'imdb'].forEach(k => { W.d[k] = W.d[k] || {}; });
+        let ov = document.getElementById('smartWizOverlay'); if (ov) ov.remove();
+        ov = document.createElement('div'); ov.id = 'smartWizOverlay';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.94);z-index:7000;display:flex;';
+        document.body.appendChild(ov); wizRender();
+    }
+    window.mySmartEdit = function(id) { const d = smartGet(id); if (d) smartOpenWizard(d, id); };
+    window.myBackendCreateListClassic = async function() {
         const name = prompt('Název nového seznamu:');
         if (!name || !name.trim()) return;
         try {
@@ -14154,6 +14402,20 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             loadMyBackendOverview(null, true);
         } catch (e) { alert('❌ ' + (e && e.message ? e.message : e)); }
     };
+    // Volba při vytvoření: klasický seznam (jako dřív) nebo chytrý seznam (průvodce)
+    window.myBackendCreateList = function() {
+        let ov = document.getElementById('smartPickOverlay'); if (ov) ov.remove();
+        ov = document.createElement('div'); ov.id = 'smartPickOverlay';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:6900;display:flex;align-items:flex-end;justify-content:center;';
+        ov.onclick = e => { if (e.target === ov) ov.remove(); };
+        ov.innerHTML = `<div style="background:var(--bg-card);width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:18px 16px 26px;">
+            <div style="font-weight:800;margin-bottom:14px;">➕ Vytvořit seznam</div>
+            <button onclick="document.getElementById('smartPickOverlay').remove();myBackendCreateListClassic()" style="display:block;width:100%;text-align:left;padding:14px;margin-bottom:10px;border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;"><div style="font-weight:700;">📁 Nový seznam</div><div style="font-size:0.78rem;color:var(--text-muted);margin-top:3px;">Prázdný seznam, položky přidáváš ručně</div></button>
+            <button onclick="document.getElementById('smartPickOverlay').remove();mySmartNew()" style="display:block;width:100%;text-align:left;padding:14px;border-radius:12px;border:1px solid #6090ff;background:rgba(96,144,255,0.1);color:var(--text);cursor:pointer;"><div style="font-weight:700;color:#6090ff;">🧠 Chytrý seznam</div><div style="font-size:0.78rem;color:var(--text-muted);margin-top:3px;">Průvodce: žánry, roky, hodnocení, hlasy — plní se sám</div></button></div>`;
+        document.body.appendChild(ov);
+    };
+    window.mySmartNew = function() { smartOpenWizard(smartDefault(), null); };
+
     window.myBackendDeleteList = async function(listId) {
         if (!confirm('Smazat celý seznam i s obsahem?')) return;
         try {
