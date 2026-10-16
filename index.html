@@ -2816,6 +2816,31 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         if (!name) return;
         return histraMirrorRemove('list', id, type, name);
     }
+    // Zrcadlení chytrého seznamu do Histry: vytvoří/najde seznam podle názvu, přidá chybějící položky
+    // a odebere ty, které tam dřív poslala appka a už nesedí (ručně přidané položky v Histře se nemažou).
+    window.histraSyncSmartList = async function(name, items, prevKeys) {
+        if (!histraReady()) throw new Error('Histra token není nastavený.');
+        const hid = await histraEnsureList(name);
+        const remote = new Set();
+        try {
+            const raw = await histraFetchListItems('/api/v1/lists', { id: hid });
+            (raw || []).forEach(e => { const p = histraParseMediaEntry(e); if (p) remote.add(p.type + '_' + p.tmdb); });
+        } catch (e) {}
+        const want = new Map((items || []).map(it => [((it.type === 'tv' || it.type === 'shows') ? 'tv' : 'movie') + '_' + it.id, it]));
+        const prev = new Set(prevKeys || []);
+        let added = 0, removed = 0, failed = 0, lastErr = '';
+        for (const [k, it] of want) {
+            if (remote.has(k)) continue;
+            try { await histraPostItem(`/api/v1/lists/${hid}/items`, it.id, it.type); added++; }
+            catch (e) { failed++; lastErr = (e && e.message) || String(e); if (failed >= 3) break; }
+        }
+        for (const k of remote) {
+            if (want.has(k) || !prev.has(k)) continue;
+            const idx = k.indexOf('_'), t = k.slice(0, idx), id = k.slice(idx + 1);
+            try { const media = await histraFindListMedia(hid, id, t); if (media) { await histraApi(`/api/v1/lists/${hid}/items`, { method: 'DELETE', body: media }); removed++; } } catch (e) {}
+        }
+        return { listId: hid, added, removed, failed, lastErr, keys: [...want.keys()] };
+    };
     window.histraIsReady = function() { return histraReady(); };
 
     async function histraMirrorAddToList(listId, id, type) {
@@ -5577,6 +5602,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-15e', date: '15. 10. 2026', items: [
+            '🔁 Chytrý seznam se zrcadlí do Histry: seznam stejného názvu se v Histře vytvoří a při každém obnovení se doplní o nové shody (a odeberou ty, co appka poslala a už nesedí; ručně přidané položky se nemažou). V průvodci jde vypnout (krok 5)',
             '🧠 Sinator → Seznamy → ➕: při vytvoření na výběr „📁 Nový seznam“ (jako dřív) nebo „🧠 Chytrý seznam“ — průvodce o 5 krocích (název + filmy/seriály → žánry [kterýkoli / všechny] → roky [od–do nebo jednotlivé] → hodnocení a minimum hlasů TMDB / Trakt / IMDb → řazení + shrnutí). Chytrý seznam se plní sám (až 100 shod), jde upravit ✏️, obnovit 🔄 a smazat; filtry se ukládají v zařízení',
             '🎬 Kino (Již bylo v kině / Právě hraje / Co se chystá): sjednocený vzhled a ovládání — všude tlačítko ← Zpět (do menu Kino), žánry schované pod tlačítkem 🎭 Žánr (po kliknutí vyjede nabídka) a přepínač vzhledu ▦ dlaždice / ☰ seznam, který platí pro všechny tři obrazovky a pamatuje se',
             '🍿 Zábava → Kino: nová položka „Právě hraje v kinech“ (filmy, co teď běží v českých kinech, se žánrovými filtry). Kino je teď řazené chronologicky: 🎟️ Již bylo v kině → 🍿 Právě hraje → 📅 Co se chystá; „Již bylo“ už neukazuje filmy, které právě hrají',
@@ -14173,7 +14199,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     function smartAll() { try { const a = JSON.parse(localStorage.getItem(SMART_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
     function smartSaveAll(a) { try { localStorage.setItem(SMART_KEY, JSON.stringify(a)); } catch (e) {} }
     function smartGet(id) { return smartAll().find(x => x.id === id) || null; }
-    function smartDefault() { return { id: '', name: '', type: 'movie', genres: [], genreMode: 'any', years: { mode: 'none', from: '', to: '', text: '' }, tmdb: {}, trakt: {}, imdb: {}, sort: 'popular', hideWatched: true }; }
+    function smartDefault() { return { id: '', name: '', type: 'movie', genres: [], genreMode: 'any', years: { mode: 'none', from: '', to: '', text: '' }, tmdb: {}, trakt: {}, imdb: {}, sort: 'popular', hideWatched: true, histraMirror: true }; }
     const _smartNum = n => (n == null || n === '' || isNaN(+n)) ? null : +n;
     const _smartFmt = n => Number(n).toLocaleString('cs-CZ');
     function smartParseYears(text) {
@@ -14199,6 +14225,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         });
         c.push('↕ ' + (SMART_SORTS[d.sort] || 'Popularita'));
         if (d.hideWatched) c.push('bez shlédnutých');
+        if (d.histraMirror) c.push('🔁 zrcadleno do Histry');
         return c;
     }
     // ---- engine: TMDB discover ----
@@ -14279,6 +14306,18 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         return a.slice().sort(by[d.sort] || by.popular).slice(0, 100);
     }
     const _smartCache = {};
+    async function smartHistraSync(d, items) {
+        if (!d.histraMirror || !window.histraIsReady || !window.histraIsReady() || !window.histraSyncSmartList) return;
+        const toast = m => { try { (typeof _favToast === 'function' ? _favToast : alert)(m); } catch (e) {} };
+        try {
+            const prev = (d.histra && d.histra.name === d.name) ? (d.histra.keys || []) : [];
+            const r = await window.histraSyncSmartList(d.name, items, prev);
+            const arr = smartAll(), ix = arr.findIndex(x => x.id === d.id);
+            if (ix >= 0) { arr[ix].histra = { name: d.name, keys: r.keys, at: Date.now() }; smartSaveAll(arr); }
+            if (r.added || r.removed) toast(`🔁 Histra „${d.name}“: +${r.added} / −${r.removed}`);
+            else if (r.failed) toast('⚠️ Histra: nepodařilo se přidat položky' + (r.lastErr ? ' (' + r.lastErr.slice(0, 60) + ')' : ''));
+        } catch (e) { toast('⚠️ Histra zrcadlení selhalo: ' + ((e && e.message) || e)); }
+    }
     async function smartLoad(id, force) {
         const d = smartGet(id); if (!d) throw new Error('Chytrý seznam už neexistuje.');
         const c = _smartCache[id];
@@ -14286,11 +14325,12 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const raw = smartNeedTrakt(d) ? await smartTrakt(d) : await smartTmdb(d);
         const items = smartPost(d, raw);
         _smartCache[id] = { t: Date.now(), items };
+        smartHistraSync(d, items); // na pozadí
         return items;
     }
     window.mySmartRefresh = function(id) { delete _smartCache[id]; window._myBackendCurrentItemsTab = null; renderMyBackendTab('smart:' + id); };
     window.mySmartDelete = function(id) {
-        const d = smartGet(id); if (!d || !confirm(`Smazat chytrý seznam „${d.name}“? (Položky se nemažou, je to jen sada filtrů.)`)) return;
+        const d = smartGet(id); if (!d || !confirm(`Smazat chytrý seznam „${d.name}“? (Je to jen sada filtrů — seznam v Histře zůstane, můžeš ho smazat tam.)`)) return;
         smartSaveAll(smartAll().filter(x => x.id !== id)); delete _smartCache[id];
         loadMyBackendOverview('watchlist', true);
         renderMyBackendTab('watchlist');
@@ -14315,7 +14355,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             if (g('swYText')) d.years.text = g('swYText').value.trim();
         }
         if (W.step === 4) ['tmdb', 'trakt', 'imdb'].forEach(k => { d[k] = { min: g('sw_' + k + '_min').value.trim(), max: g('sw_' + k + '_max').value.trim(), votes: g('sw_' + k + '_votes').value.trim() }; });
-        if (W.step === 5 && g('swSort')) { d.sort = g('swSort').value; d.hideWatched = g('swHide').checked; }
+        if (W.step === 5 && g('swSort')) { d.sort = g('swSort').value; d.hideWatched = g('swHide').checked; d.histraMirror = g('swHistra') ? g('swHistra').checked : d.histraMirror; }
     }
     function wizRender() {
         const ov = document.getElementById('smartWizOverlay'); if (!ov) return;
@@ -14345,6 +14385,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         } else {
             body = `<div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px;">Řazení</div><select id="swSort" style="${_wizCss}margin-bottom:14px;">${Object.entries(SMART_SORTS).map(([k, v]) => `<option value="${k}" ${d.sort === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
               <label style="display:flex;gap:10px;align-items:center;margin-bottom:18px;font-size:0.9rem;"><input id="swHide" type="checkbox" ${d.hideWatched ? 'checked' : ''} style="width:18px;height:18px;"> Skrýt už shlédnuté</label>
+              <label style="display:flex;gap:10px;align-items:flex-start;margin-bottom:18px;font-size:0.9rem;${(window.histraIsReady && window.histraIsReady()) ? '' : 'opacity:0.5;'}"><input id="swHistra" type="checkbox" ${(d.histraMirror && window.histraIsReady && window.histraIsReady()) ? 'checked' : ''} ${(window.histraIsReady && window.histraIsReady()) ? '' : 'disabled'} style="width:18px;height:18px;margin-top:2px;flex-shrink:0;"><span>🔁 Zrcadlit do Histry<br><span style="font-size:0.74rem;color:var(--text-muted);">${(window.histraIsReady && window.histraIsReady()) ? 'Vytvoří se seznam stejného názvu a udržuje se podle výsledků' : 'Nejdřív připoj Histru v Nastavení'}</span></span></label>
               <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px;">Shrnutí</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${smartChips(d).map(x => `<span style="padding:5px 11px;border-radius:14px;background:var(--bg-elevated);border:1px solid var(--border);font-size:0.78rem;">${String(x).replace(/</g, '&lt;')}</span>`).join('')}</div>
               <div style="font-size:0.72rem;color:var(--text-muted);margin-top:14px;">Seznam ukáže až 100 nejlepších shod a při otevření se obnovuje (po 30 minutách z paměti).</div>`;
         }
