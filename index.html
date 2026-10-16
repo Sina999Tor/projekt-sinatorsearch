@@ -5602,7 +5602,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-15e', date: '15. 10. 2026', items: [
-            '🔧 Oprava špatně zapamatovaného zdroje kanálu: po spuštění z programu naskočí dole lišta „🔀 Změnit zdroj“ (vybereš jiný a ten se uloží místo původního), ve výběru je i „🗑️ Zapomenout zapamatovanou volbu“; tlačítko v detailu pořadu se jmenuje „Změnit / opravit zdroj“',
+            '🔧 Zdroj kanálu z programu: při prvním spuštění kanálu s víc zdroji naskočí lišta „🔀 Změnit zdroj“ jen jednou (když ji ignoruješ, bere se zdroj jako funkční a příště už se nezobrazí). Dál zůstává tlačítko „Změnit / opravit zdroj“ v detailu pořadu; vybraný zdroj se zapamatuje rovnou, bez hlášek (hláška jen při chybě, např. když jiný zdroj neexistuje). Ve výběru je i „🗑️ Zapomenout zapamatovanou volbu“',
             '📺 TV Program → ▶ Přehrát živě: opraveno spouštění kanálů, které z programu nešly, ale v Kanálech ano. Dohledání kanálu je přesnější (bez diakritiky a značek HD/CZ/SK, nebere první náhodný částečný nález) a když existuje víc stejnojmenných zdrojů (HD/SD, Kanály 1–6), appka nabídne výběr a zapamatuje si ten funkční, takže příště naskočí rovnou. „🔀 Jiný zdroj“ ukazuje všechny shody',
             '🔁 Chytrý seznam se zrcadlí do Histry: seznam stejného názvu se v Histře vytvoří a při každém obnovení se doplní o nové shody (a odeberou ty, co appka poslala a už nesedí; ručně přidané položky se nemažou). V průvodci jde vypnout (krok 5)',
             '🧠 Sinator → Seznamy → ➕: při vytvoření na výběr „📁 Nový seznam“ (jako dřív) nebo „🧠 Chytrý seznam“ — průvodce o 5 krocích (název + filmy/seriály → žánry [kterýkoli / všechny] → roky [od–do nebo jednotlivé] → hodnocení a minimum hlasů TMDB / Trakt / IMDb → řazení + shrnutí). Chytrý seznam se plní sám (až 100 shod), jde upravit ✏️, obnovit 🔄 a smazat; filtry se ukládají v zařízení',
@@ -39816,7 +39816,7 @@ function _epgShowPlayedBar(chName, row) {
     const old = document.getElementById('epgPlayedBar'); if (old) old.remove();
     const el = document.createElement('div'); el.id = 'epgPlayedBar';
     el.style.cssText = 'position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);z-index:99998;background:#1b2437;border:1px solid #ff9800;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 28px rgba(0,0,0,0.6);';
-    el.innerHTML = `<div style="flex:1;min-width:0;"><div style="font-size:0.82rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">▶ ${_epgEscapeHtml(row.ch.name || chName)}</div><div style="font-size:0.68rem;color:var(--text-muted);">${_epgEscapeHtml(row.source || '')} · nejde to? vyber jiný zdroj</div></div>
+    el.innerHTML = `<div style="flex:1;min-width:0;"><div style="font-size:0.82rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">▶ ${_epgEscapeHtml(row.ch.name || chName)}</div><div style="font-size:0.68rem;color:var(--text-muted);">${_epgEscapeHtml(row.source || '')} · nejde to?</div></div>
       <button onclick="document.getElementById('epgPlayedBar').remove();playEpgChannelAlt(window._epgPlayedName)" style="flex-shrink:0;padding:8px 12px;border-radius:8px;border:1px solid #ff9800;background:rgba(255,152,0,0.15);color:#ffcc80;font-weight:700;font-size:0.78rem;cursor:pointer;">🔀 Změnit zdroj</button>
       <button onclick="document.getElementById('epgPlayedBar').remove()" style="flex-shrink:0;width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">✕</button>`;
     window._epgPlayedName = chName;
@@ -39826,14 +39826,12 @@ function _epgShowPlayedBar(chName, row) {
 function _epgForgetPref() {
     _epgPrefSet(window._epgChooserTarget, null);
     const m = document.getElementById('epgAltChooserModal'); if (m) m.remove();
-    try { (typeof _favToast === 'function' ? _favToast : alert)('🗑️ Zapamatovaná volba smazána'); } catch (e) {}
 }
 window._epgForgetPref = _epgForgetPref;
 function _epgChoosePick(i) {
     const row = (window._epgChooserRows || [])[i]; if (!row) return;
     _epgPrefSet(window._epgChooserTarget, row.ch.url);
     const m = document.getElementById('epgAltChooserModal'); if (m) m.remove();
-    _epgShowPlayedBar(window._epgChooserName || row.ch.name, row);
     openInVlcUrl(row.ch.url);
 }
 window._epgChoosePick = _epgChoosePick;
@@ -39845,9 +39843,14 @@ function playEpgChannelLive(chName) {
     const m = document.getElementById('epgDetailModal'); if (m) m.style.display = 'none';
     const pref = _epgPrefGet(c.t);
     const hit = pref && list.find(x => x.ch.url === pref);
-    if (hit) { _epgShowPlayedBar(chName, hit); openInVlcUrl(hit.ch.url); return; }
-    if (list.length === 1) { _epgShowPlayedBar(chName, list[0]); openInVlcUrl(list[0].ch.url); return; }
-    _epgChooser(chName, list); // víc stejnojmenných kanálů (HD/SD, různé zdroje) → vyber, který funguje
+    if (hit) { openInVlcUrl(hit.ch.url); return; }            // zapamatovaný (funkční) zdroj → rovnou, bez lišty
+    if (list.length === 1) { openInVlcUrl(list[0].ch.url); return; }
+    // První spuštění kanálu s víc zdroji: pustí se nejlepší shoda a bere se jako funkční (zapamatuje se).
+    // Lišta s „Změnit zdroj“ se ukáže jen tentokrát; když nic neuděláš, příště už nenaskočí.
+    _epgPrefSet(c.t, list[0].ch.url);
+    window._epgPlayedName = chName;
+    _epgShowPlayedBar(chName, list[0]);
+    openInVlcUrl(list[0].ch.url);
 }
 
 // Wrappery pro tlačítka v EPG detailu — čtou pořad/kanál z window._lastEpgDetail
@@ -39890,6 +39893,7 @@ function playEpgChannelAlt(chName) {
     try { alts = findTvAltSources(list.length ? list[0].ch.name : chName, null); } catch (e) {}
     alts.forEach(a => { if (!list.some(x => x.ch.url === a.url)) list.push({ ch: { name: a.name, url: a.url }, source: a.source }); });
     if (!list.length) { alert('Kanál "' + chName + '" se nepodařilo dohledat v seznamu.'); return; }
+    if (list.length < 2) { alert('Pro kanál "' + chName + '" není k dispozici jiný zdroj.'); return; }
     const m = document.getElementById('epgDetailModal'); if (m) m.style.display = 'none';
     _epgChooser(chName, list);
 }
