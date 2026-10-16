@@ -5602,6 +5602,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-15e', date: '15. 10. 2026', items: [
+            '⏱️ TV Program: po kliknutí na kanál (bublina nahoře nebo „Celý den“) se seznam rovnou posune na právě běžící pořad, nejsi na začátku dne',
             '🔧 Zdroj kanálu z programu: při prvním spuštění kanálu s víc zdroji naskočí lišta „🔀 Změnit zdroj“ jen jednou (když ji ignoruješ, bere se zdroj jako funkční a příště už se nezobrazí). Dál zůstává tlačítko „Změnit / opravit zdroj“ v detailu pořadu; vybraný zdroj se zapamatuje rovnou, bez hlášek (hláška jen při chybě, např. když jiný zdroj neexistuje). Ve výběru je i „🗑️ Zapomenout zapamatovanou volbu“',
             '📺 TV Program → ▶ Přehrát živě: opraveno spouštění kanálů, které z programu nešly, ale v Kanálech ano. Dohledání kanálu je přesnější (bez diakritiky a značek HD/CZ/SK, nebere první náhodný částečný nález) a když existuje víc stejnojmenných zdrojů (HD/SD, Kanály 1–6), appka nabídne výběr a zapamatuje si ten funkční, takže příště naskočí rovnou. „🔀 Jiný zdroj“ ukazuje všechny shody',
             '🔁 Chytrý seznam se zrcadlí do Histry: seznam stejného názvu se v Histře vytvoří a při každém obnovení se doplní o nové shody (a odeberou ty, co appka poslala a už nesedí; ručně přidané položky se nemažou). V průvodci jde vypnout (krok 5)',
@@ -40504,9 +40505,19 @@ function selectEpgChannel(name) {
     const input = document.getElementById('tvEpgChannelSearch');
     filterEpgChannelBubbles(input ? input.value : '');
     renderEpgFiltered(new Date());
-    // Scroll list na začátek
+    // Vybraný kanál → rovnou na aktuálně běžící pořad (dnes); „Vše“ / jiný den → začátek seznamu
     const listEl = document.getElementById('tvProgramList');
     if(listEl) listEl.scrollTop = 0;
+    if(name && tvState._epgIsToday) _epgScrollToNow();
+}
+function _epgScrollToNow() {
+    const go = () => {
+        const listEl = document.getElementById('tvProgramList');
+        const el = listEl && listEl.querySelector('.tv-program-item.now');
+        if(el) el.scrollIntoView({ block: 'center' });
+    };
+    go();
+    requestAnimationFrame(go); // po překreslení/přepočtu layoutu ještě jednou
 }
 
 function renderEpgFiltered(now) {
