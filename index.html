@@ -14390,7 +14390,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         ['tmdb', 'trakt', 'imdb'].forEach(k => { W.d[k] = W.d[k] || {}; });
         let ov = document.getElementById('smartWizOverlay'); if (ov) ov.remove();
         ov = document.createElement('div'); ov.id = 'smartWizOverlay';
-        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.94);z-index:7000;display:flex;';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.94);z-index:2000001;display:flex;';
         document.body.appendChild(ov); wizRender();
     }
     window.mySmartEdit = function(id) { const d = smartGet(id); if (d) smartOpenWizard(d, id); };
@@ -14406,7 +14406,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     window.myBackendCreateList = function() {
         let ov = document.getElementById('smartPickOverlay'); if (ov) ov.remove();
         ov = document.createElement('div'); ov.id = 'smartPickOverlay';
-        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:6900;display:flex;align-items:flex-end;justify-content:center;';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000000;display:flex;align-items:flex-end;justify-content:center;';
         ov.onclick = e => { if (e.target === ov) ov.remove(); };
         ov.innerHTML = `<div style="background:var(--bg-card);width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:18px 16px 26px;">
             <div style="font-weight:800;margin-bottom:14px;">➕ Vytvořit seznam</div>
