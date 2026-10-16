@@ -5602,6 +5602,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-15e', date: '15. 10. 2026', items: [
+            '🔧 Oprava špatně zapamatovaného zdroje kanálu: po spuštění z programu naskočí dole lišta „🔀 Změnit zdroj“ (vybereš jiný a ten se uloží místo původního), ve výběru je i „🗑️ Zapomenout zapamatovanou volbu“; tlačítko v detailu pořadu se jmenuje „Změnit / opravit zdroj“',
             '📺 TV Program → ▶ Přehrát živě: opraveno spouštění kanálů, které z programu nešly, ale v Kanálech ano. Dohledání kanálu je přesnější (bez diakritiky a značek HD/CZ/SK, nebere první náhodný částečný nález) a když existuje víc stejnojmenných zdrojů (HD/SD, Kanály 1–6), appka nabídne výběr a zapamatuje si ten funkční, takže příště naskočí rovnou. „🔀 Jiný zdroj“ ukazuje všechny shody',
             '🔁 Chytrý seznam se zrcadlí do Histry: seznam stejného názvu se v Histře vytvoří a při každém obnovení se doplní o nové shody (a odeberou ty, co appka poslala a už nesedí; ručně přidané položky se nemažou). V průvodci jde vypnout (krok 5)',
             '🧠 Sinator → Seznamy → ➕: při vytvoření na výběr „📁 Nový seznam“ (jako dřív) nebo „🧠 Chytrý seznam“ — průvodce o 5 krocích (název + filmy/seriály → žánry [kterýkoli / všechny] → roky [od–do nebo jednotlivé] → hodnocení a minimum hlasů TMDB / Trakt / IMDb → řazení + shrnutí). Chytrý seznam se plní sám (až 100 shod), jde upravit ✏️, obnovit 🔄 a smazat; filtry se ukládají v zařízení',
@@ -39749,7 +39750,7 @@ function _epgNorm(s) {
 const _epgNormCache = new WeakMap();
 function _epgChNorm(ch) { let n = _epgNormCache.get(ch); if (n === undefined) { n = _epgNorm(ch.name); _epgNormCache.set(ch, n); } return n; }
 function _epgPrefGet(t) { try { return (JSON.parse(localStorage.getItem('sinator_epg_ch_pref') || '{}'))[t] || null; } catch (e) { return null; } }
-function _epgPrefSet(t, u) { try { const m = JSON.parse(localStorage.getItem('sinator_epg_ch_pref') || '{}'); m[t] = u; localStorage.setItem('sinator_epg_ch_pref', JSON.stringify(m)); } catch (e) {} }
+function _epgPrefSet(t, u) { try { const m = JSON.parse(localStorage.getItem('sinator_epg_ch_pref') || '{}'); if (u) m[t] = u; else delete m[t]; localStorage.setItem('sinator_epg_ch_pref', JSON.stringify(m)); } catch (e) {} }
 function _epgPickFrom(lists, target) {
     const exact = [], partial = [], seen = new Set();
     for (const src of lists) {
@@ -39795,7 +39796,7 @@ function _epgChooser(chName, list) {
     const old = document.getElementById('epgAltChooserModal'); if (old) old.remove();
     const t = _epgNorm(chName), pref = _epgPrefGet(t), seen = new Set();
     const rows = list.filter(x => x && x.ch && x.ch.url && !seen.has(x.ch.url) && seen.add(x.ch.url)).slice(0, 14);
-    window._epgChooserRows = rows; window._epgChooserTarget = t;
+    window._epgChooserRows = rows; window._epgChooserTarget = t; window._epgChooserName = chName;
     const listHtml = rows.map((x, i) => `<button onclick="_epgChoosePick(${i})" style="display:block;width:100%;padding:11px 14px;margin-bottom:8px;background:var(--bg-elevated);border:1px solid ${x.ch.url === pref ? '#ff9800' : 'var(--border)'};border-radius:8px;color:var(--text);font-size:0.85rem;font-weight:600;text-align:left;cursor:pointer;">${x.ch.url === pref ? '⭐ ' : ''}${_epgEscapeHtml(x.ch.name || chName)}<div style="font-size:0.7rem;font-weight:400;color:var(--text-muted);margin-top:2px;">${_epgEscapeHtml(x.source || '')}${x.ch.group ? ' · ' + _epgEscapeHtml(x.ch.group) : ''}</div></button>`).join('');
     const el = document.createElement('div');
     el.id = 'epgAltChooserModal';
@@ -39805,14 +39806,34 @@ function _epgChooser(chName, list) {
         <div style="font-weight:700;margin-bottom:4px;">📺 ${_epgEscapeHtml(chName)} — vyber zdroj</div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px;">Vybraný zdroj si appka zapamatuje a příště ho pustí rovnou.</div>
         ${listHtml}
-        <button onclick="document.getElementById('epgAltChooserModal').remove()" style="width:100%;padding:10px;margin-top:4px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);cursor:pointer;">Zavřít</button>
+        ${pref ? `<button onclick="_epgForgetPref()" style="width:100%;padding:10px;margin-top:4px;background:transparent;border:1px solid #e07a6f;border-radius:8px;color:#e07a6f;cursor:pointer;">🗑️ Zapomenout zapamatovanou volbu</button>` : ''}
+        <button onclick="document.getElementById('epgAltChooserModal').remove()" style="width:100%;padding:10px;margin-top:6px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);cursor:pointer;">Zavřít</button>
     </div>`;
     document.body.appendChild(el);
 }
+// Lišta po spuštění kanálu z programu: ukáže, co se pustilo, a umožní to opravit (jiný zdroj / zapomenout volbu)
+function _epgShowPlayedBar(chName, row) {
+    const old = document.getElementById('epgPlayedBar'); if (old) old.remove();
+    const el = document.createElement('div'); el.id = 'epgPlayedBar';
+    el.style.cssText = 'position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);z-index:99998;background:#1b2437;border:1px solid #ff9800;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 28px rgba(0,0,0,0.6);';
+    el.innerHTML = `<div style="flex:1;min-width:0;"><div style="font-size:0.82rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">▶ ${_epgEscapeHtml(row.ch.name || chName)}</div><div style="font-size:0.68rem;color:var(--text-muted);">${_epgEscapeHtml(row.source || '')} · nejde to? vyber jiný zdroj</div></div>
+      <button onclick="document.getElementById('epgPlayedBar').remove();playEpgChannelAlt(window._epgPlayedName)" style="flex-shrink:0;padding:8px 12px;border-radius:8px;border:1px solid #ff9800;background:rgba(255,152,0,0.15);color:#ffcc80;font-weight:700;font-size:0.78rem;cursor:pointer;">🔀 Změnit zdroj</button>
+      <button onclick="document.getElementById('epgPlayedBar').remove()" style="flex-shrink:0;width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">✕</button>`;
+    window._epgPlayedName = chName;
+    document.body.appendChild(el);
+    setTimeout(() => { const b = document.getElementById('epgPlayedBar'); if (b === el) el.remove(); }, 120000);
+}
+function _epgForgetPref() {
+    _epgPrefSet(window._epgChooserTarget, null);
+    const m = document.getElementById('epgAltChooserModal'); if (m) m.remove();
+    try { (typeof _favToast === 'function' ? _favToast : alert)('🗑️ Zapamatovaná volba smazána'); } catch (e) {}
+}
+window._epgForgetPref = _epgForgetPref;
 function _epgChoosePick(i) {
     const row = (window._epgChooserRows || [])[i]; if (!row) return;
     _epgPrefSet(window._epgChooserTarget, row.ch.url);
     const m = document.getElementById('epgAltChooserModal'); if (m) m.remove();
+    _epgShowPlayedBar(window._epgChooserName || row.ch.name, row);
     openInVlcUrl(row.ch.url);
 }
 window._epgChoosePick = _epgChoosePick;
@@ -39824,8 +39845,8 @@ function playEpgChannelLive(chName) {
     const m = document.getElementById('epgDetailModal'); if (m) m.style.display = 'none';
     const pref = _epgPrefGet(c.t);
     const hit = pref && list.find(x => x.ch.url === pref);
-    if (hit) { openInVlcUrl(hit.ch.url); return; }
-    if (list.length === 1) { openInVlcUrl(list[0].ch.url); return; }
+    if (hit) { _epgShowPlayedBar(chName, hit); openInVlcUrl(hit.ch.url); return; }
+    if (list.length === 1) { _epgShowPlayedBar(chName, list[0]); openInVlcUrl(list[0].ch.url); return; }
     _epgChooser(chName, list); // víc stejnojmenných kanálů (HD/SD, různé zdroje) → vyber, který funguje
 }
 
@@ -39930,7 +39951,7 @@ function openEpgDetail(ep) {
             ${desc ? `<div style="font-size:0.85rem;color:var(--text-muted);line-height:1.6;margin-bottom:20px;padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;border-left:3px solid #00b4d8;">${_epgEscapeHtml(desc)}</div>` : ''}
             ${ep.isNow ? `<div style="margin-bottom:16px;display:flex;flex-direction:column;gap:8px;">
                 <button onclick="playEpgChannelLiveFromDetail()" style="width:100%;padding:11px 16px;background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶ Přehrát živě ve VLC</button>
-                <button onclick="playEpgChannelAltFromDetail()" style="width:100%;padding:9px 16px;background:rgba(255,152,0,0.12);border:1px solid #ff9800;color:#ffcc80;border-radius:10px;cursor:pointer;font-size:0.85rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">🔀 Jiný zdroj (když se sekává)</button>
+                <button onclick="playEpgChannelAltFromDetail()" style="width:100%;padding:9px 16px;background:rgba(255,152,0,0.12);border:1px solid #ff9800;color:#ffcc80;border-radius:10px;cursor:pointer;font-size:0.85rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">🔀 Změnit / opravit zdroj</button>
                 <button onclick="openHellspyFromDetail()" style="width:100%;padding:11px 16px;background:rgba(30,60,110,0.35);border:1px solid #3a6ea5;color:#9cc4f0;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶️ Přehrát od začátku (Hellspy)</button>
             </div>` : ''}
             ${(typeof getEnabledExternalPlayApps === 'function' && getEnabledExternalPlayApps().length) ? `<button onclick="playInExternalAppFromDetail()" style="width:100%;padding:11px 16px;background:rgba(139,92,246,0.15);border:1px solid #8b5cf6;color:#c4b5fd;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;">📱 Přehrát v externí aplikaci</button>` : ''}
