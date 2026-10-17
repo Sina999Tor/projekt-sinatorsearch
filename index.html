@@ -5601,7 +5601,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
-        { version: '2026-10-15e', date: '15. 10. 2026', items: [
+        { version: '2026-10-17a', date: '17. 10. 2026', items: [
+            '🗓️ Up Next → nová záložka „Kalendář“ (za zvonečkem): vyšlé i příští díly sledovaných seriálů a premiéry filmů (watchlist + kina v ČR) po dnech. Dá se přepínat vzhled — 🗓️ Mřížka (jako Kalendář sledování, u dne počet a barevné tečky, klepnutím na den se pod kalendářem ukážou položky) nebo 📋 Seznam po datech. Volba se pamatuje',
             '🔔 Klik na upozornění (nová epizoda, film na streamu, blížící se premiéra) otevře appku rovnou na detailu daného titulu — když appka neběží, otevře se s detailem; když běží, přepne se a detail ukáže. U souhrnného upozornění (víc novinek najednou) se jen otevře appka. Vyžaduje nasazení i notify-sw.js',
             '👀 Up Next → nová záložka „Neshlédnuté“: díly sledovaných seriálů, které už vyšly a nemáš je shlédnuté (nejen ten příští za pár dní). Každý seriál je jeden řádek s počtem a šipkou ▸, po rozkliknutí se pod ním ukážou neshlédnuté díly pod sebou (od nejstaršího) i s datem a „včera / před 3 dny“. Počítá se od posledního shlédnutého dílu a z ručně označených dílů; zobrazují se poslední 3–5 řad seriálu',
             '📡 Up Next → nová záložka „📡 Streamy“: tituly z tvého watchlistu (Histra + Sinator + Trakt), které jsou právě teď na streamovací službě v ČR, i se jmény služeb (respektuje filtr služeb z Experimentálních funkcí). Tady najdeš i to, o čem přišlo upozornění „je teď na streamu“ (např. Sherlock Holmes na Oneplay) — upozornění samo se do žádného seznamu neukládalo',
@@ -5612,6 +5613,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             '🧠 Sinator → Seznamy → ➕: při vytvoření na výběr „📁 Nový seznam“ (jako dřív) nebo „🧠 Chytrý seznam“ — průvodce o 5 krocích (název + filmy/seriály → žánry [kterýkoli / všechny] → roky [od–do nebo jednotlivé] → hodnocení a minimum hlasů TMDB / Trakt / IMDb → řazení + shrnutí). Chytrý seznam se plní sám (až 100 shod), jde upravit ✏️, obnovit 🔄 a smazat; filtry se ukládají v zařízení',
             '🎬 Kino (Již bylo v kině / Právě hraje / Co se chystá): sjednocený vzhled a ovládání — všude tlačítko ← Zpět (do menu Kino), žánry schované pod tlačítkem 🎭 Žánr (po kliknutí vyjede nabídka) a přepínač vzhledu ▦ dlaždice / ☰ seznam, který platí pro všechny tři obrazovky a pamatuje se',
             '🍿 Zábava → Kino: nová položka „Právě hraje v kinech“ (filmy, co teď běží v českých kinech, se žánrovými filtry). Kino je teď řazené chronologicky: 🎟️ Již bylo v kině → 🍿 Právě hraje → 📅 Co se chystá; „Již bylo“ už neukazuje filmy, které právě hrají',
+        ] },
+        { version: '2026-10-15e', date: '15. 10. 2026', items: [
             '🔔 Jedno upozornění místo dvou: zvoneček v 📆 Up Next je teď stejný přepínač jako Nastavení → 🧪 Experimentální funkce → Upozornění (🔔 zapnuto / 🔕 vypnuto). Starý samostatný systém upozornění v Up Next je pryč, takže nic nechodí dvakrát',
             '🔍 Kontrola už bere VŠE: celý watchlist z Histry (ne jen pár desítek titulů) + watchlist Sinatoru + Traktu, a rozkoukané/sledované seriály z Histry, Sinator backendu, Traktu i lokálních epizod. Stejné zdroje používá i 📆 Up Next (až 400 seriálů a 400 filmů, už bez dřívějších limitů 150/40)',
             '🚀 Při spuštění appky se (nejvýš 1× za 30 minut, ať se nezahlcuje TMDB) zkontrolují nové epizody a streamy; blížící se premiéry dílů a filmů se kontrolují jen jednou denně při prvním otevření appky. Film dnes/zítra a díl zítra se oznámí jednou; díl, který vychází dnes, hlásí kontrola nových epizod',
@@ -47771,6 +47774,7 @@ body:has(.sfo) #pwaCloseBtn{display:none!important}
 .sf-btn{cursor:pointer;border:1px solid var(--border,#333);background:var(--bg-elevated,#1a1a1a);color:inherit;padding:10px 14px;border-radius:10px;font-weight:700;font-size:.9rem}
 .sf-btn.on{border-color:#22d3ee;color:#22d3ee}
 .sfep{padding:9px 4px;border-bottom:1px solid var(--border,#333);font-size:.86rem;cursor:pointer}.sfep small{display:block;opacity:.65;margin-top:2px}
+.sfcal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:12px}.sfcal-g i{font-style:normal;text-align:center;font-size:.72rem;opacity:.6;padding:2px 0}.sfcal-d{aspect-ratio:1/1.05;border-radius:10px;border:1px solid #2a3350;background:#141a2c;color:#64748b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:.95rem;cursor:pointer;padding:2px}.sfcal-d.on{border-color:#1e6a7a;background:#0f2a33;color:#e5faff}.sfcal-d.today{border-color:#facc15}.sfcal-d.sel{box-shadow:0 0 0 2px #22d3ee inset}.sfcal-d small{font-size:.66rem;color:#7dd3fc}.sfcal-dots{display:flex;gap:2px;height:6px}.sfcal-dots u{width:5px;height:5px;border-radius:50%;display:block}.sfcal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.sfcal-h button{background:#141a2c;border:1px solid #2a3350;color:#fff;border-radius:10px;padding:6px 14px;font-size:1.1rem;cursor:pointer}.sfcal-day{margin:14px 0 6px;font-weight:700}
 .sf-note{width:100%;box-sizing:border-box;min-height:60px;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--border,#333);background:var(--bg-elevated,#1a1a1a);color:inherit;font:inherit;resize:vertical}
 .sfdeck{position:relative;height:60vh;max-height:540px;aspect-ratio:2/3;max-width:100%;margin:6px auto 14px}
 .sfcard{position:absolute;inset:0;border-radius:18px;overflow:hidden;background:#111 center/cover;touch-action:none;cursor:grab;box-shadow:0 8px 28px #0008;transition:transform .2s,opacity .25s;user-select:none}
@@ -47962,12 +47966,13 @@ async function loadUp0(){var s=S(),tv={},mv={},hist=[],tvO=[];
  wl.forEach(function(x){add(x.id,x.type);wlSet[(nt(x.type)==='tv'?'tv':'movie')+'_'+x.id]=1});
  if(window.sinatorCollectSources){try{var cs=await window.sinatorCollectSources();csShows=cs.shows;cs.shows.forEach(function(x){addTv(x.id)});cs.titles.forEach(function(x){add(x.id,x.type);wlSet[(nt(x.type)==='tv'?'tv':'movie')+'_'+x.id]=1})}catch(e){}}
  Object.keys(mv).forEach(function(id){if(s.watched&&s.watched['movie_'+id])delete mv[id]});
- var out={tv:[],mv:[],st:[],unc:[]},t0=td(),lastW={};csShows.forEach(function(x){lastW[x.id]=[x.s,x.e]});
+ var out={tv:[],mv:[],st:[],unc:[],pa:[]},t0=td(),lastW={};csShows.forEach(function(x){lastW[x.id]=[x.s,x.e]});
  var pf=(localStorage.getItem('sinator_notify_providers')||'').split(',').map(function(x){return x.trim().toLowerCase()}).filter(Boolean);
  var pvOf=function(w){var f=((w&&w.results&&w.results.CZ)||{}).flatrate||[];var n=f.map(function(p){return p.provider_name});if(pf.length)n=n.filter(function(x){return pf.some(function(w2){return x.toLowerCase().indexOf(w2)>=0})});return n};
  var a=await pmap(tvO.slice(0,400),function(id){return wlSet['tv_'+id]?tj('/tv/'+id,'&append_to_response=watch/providers'):tj('/tv/'+id)},10);
  a.forEach(function(d){if(d&&wlSet['tv_'+d.id]){var pv=pvOf(d['watch/providers']);if(pv.length)out.st.push({id:d.id,n:d.name,p:d.poster_path,t:'tv',pv:pv})}
  var le=d&&d.last_episode_to_air,lw=d&&lastW[d.id];if(le&&lw&&(lw[0]>0||lw[1]>0)&&le.season_number>0&&(le.season_number*1000+le.episode_number)>(lw[0]*1000+lw[1]))out.unc.push({id:d.id,n:d.name,p:d.poster_path,ws:lw[0],we:lw[1],ls:le.season_number});
+ if(le&&lw&&le.air_date)out.pa.push({id:d.id,n:d.name,p:d.poster_path,d:le.air_date,x:'S'+p2(le.season_number)+'E'+p2(le.episode_number)});
  var e=d&&d.next_episode_to_air;if(e&&e.air_date&&e.air_date>=t0)out.tv.push({id:d.id,n:d.name,p:d.poster_path,d:e.air_date,x:'S'+p2(e.season_number)+'E'+p2(e.episode_number)+(e.name?' · '+e.name:'')})});
  var mc={};try{mc=JSON.parse(localStorage.getItem('sf_mv_cache')||'{}')}catch(e){}
  var now=Date.now(),ids=Object.keys(mv).slice(0,400),need=ids.filter(function(id){return !mc[id]||now-mc[id].t>864e5||mc[id].pv===undefined});
@@ -47998,7 +48003,7 @@ window.sfUnToggle=function(i){var l=document.getElementById('sfUnL'+i),a=documen
 function stRows(a){return a.length?a.map(function(x){return '<div class="sfrow" onclick="sfOpen('+x.id+',\''+x.t+'\')"><img loading="lazy" src="'+(x.p?IM+'w154'+x.p:'')+'"><div><b>'+esc(x.n)+'</b><br><small>📡 '+esc(x.pv.join(', '))+' · '+(x.t==='tv'?'seriál':'film')+'</small></div></div>'}).join(''):'<p style="opacity:.6">Nic z tvého watchlistu teď není na streamu'+((localStorage.getItem('sinator_notify_providers')||'').trim()?' (filtr služeb: '+esc(localStorage.getItem('sinator_notify_providers'))+').':'.')+'</p>'}
 function rows(a,t){return a.length?a.map(function(x){var n=dd(x.d);return '<div class="sfrow" onclick="sfOpen('+x.id+',\''+t+'\')"><img loading="lazy" src="'+(x.p?IM+'w154'+x.p:'')+'"><div><b>'+esc(x.n)+'</b><br><small>'+esc(x.x||'')+' · '+fd(x.d)+'</small></div><span class="sfpill">'+cd(n)+'</span></div>'}).join(''):'<p style="opacity:.6">Nic nenalezeno.</p>'}
 window.sfUpNext=async function(){if(!K()){T('Nejdřív zadej TMDB klíč');return}
- var b=ov('sfUp','📆 Up Next','<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"><button class="sf-btn on" id="sfU1" onclick="sfTab(1)">📺 Další díly</button><button class="sf-btn" id="sfU2" onclick="sfTab(2)">🎬 Premiéry</button><button class="sf-btn" id="sfU3" onclick="sfTab(3)">📡 Streamy</button><button class="sf-btn" id="sfU4" onclick="sfTab(4)">👀 Neshlédnuté</button><button class="sf-btn" id="sfBell" onclick="sfNotify()" title="Upozornění zap/vyp">'+(localStorage.getItem('sinator_notify_enabled')==='1'?'🔔':'🔕')+'</button></div><div id="sfUb">Načítám…</div>');
+ var b=ov('sfUp','📆 Up Next','<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"><button class="sf-btn on" id="sfU1" onclick="sfTab(1)">📺 Další díly</button><button class="sf-btn" id="sfU2" onclick="sfTab(2)">🎬 Premiéry</button><button class="sf-btn" id="sfU3" onclick="sfTab(3)">📡 Streamy</button><button class="sf-btn" id="sfU4" onclick="sfTab(4)">👀 Neshlédnuté</button><button class="sf-btn" id="sfBell" onclick="sfNotify()" title="Upozornění zap/vyp">'+(localStorage.getItem('sinator_notify_enabled')==='1'?'🔔':'🔕')+'</button><button class="sf-btn" id="sfU5" onclick="sfTab(5)">🗓️ Kalendář</button></div><div id="sfUb">Načítám…</div>');
  var o=await loadUp(),to=new Date(Date.now()+60*864e5).toISOString().slice(0,10),q='&region=CZ&release_date.gte='+td()+'&release_date.lte='+to+'&sort_by=primary_release_date.asc&with_release_type=';
  var ci=await tj('/movie/upcoming','&region=CZ&page=1').catch(function(){return{}}),vo=await tj('/discover/movie',q+'4').catch(function(){return{}});
  var mp=function(r,k){return((r&&r.results)||[]).filter(function(m){return m.poster_path}).map(function(m){return{id:m.id,n:m.title,p:m.poster_path,d:m.release_date,x:k}})};
@@ -48007,9 +48012,47 @@ window.sfUpNext=async function(){if(!K()){T('Nejdřív zadej TMDB klíč');retur
   3:'<h4 style="margin:0 0 8px">📡 Tvůj watchlist teď na streamu (ČR)</h4>'+stRows(o.st)};
  sw.o=o;var b4=document.getElementById('sfU4');if(b4&&o.unc.length)b4.textContent='👀 Neshlédnuté ('+o.unc.length+')';
  sfTab(1)};
+/* ── 🗓️ Kalendář: vyšlé/příští díly a premiéry filmů po dnech (mřížka nebo seznam) ── */
+var CAL_M=['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
+var CAL_COL={ep:'#22d3ee',wl:'#fbbf24',cin:'#a78bfa',past:'#64748b'};
+var CAL_LAB={ep:'další díl',wl:'film z watchlistu',cin:'kino ČR',past:'vyšlo'};
+async function calCinema(o){if(o.cin)return o.cin;o.cin=[];
+ try{var r=await Promise.all([1,2].map(function(p){return tj('/movie/upcoming','&region=CZ&page='+p).catch(function(){return{}})}));
+  r.forEach(function(x){((x&&x.results)||[]).forEach(function(m){if(m.release_date)o.cin.push(m)})})}catch(e){}
+ return o.cin}
+function calItems(o,cin){var a=[],seen={};
+ function add(x,k){var key=x.t+x.id+x.d;if(seen[key])return;seen[key]=1;x.k=k;a.push(x)}
+ (o.tv||[]).forEach(function(x){add({id:x.id,t:'tv',n:x.n,p:x.p,d:x.d,x:x.x},'ep')});
+ (o.mv||[]).forEach(function(x){add({id:x.id,t:'movie',n:x.n,p:x.p,d:x.d,x:x.x},'wl')});
+ (o.pa||[]).forEach(function(x){add({id:x.id,t:'tv',n:x.n,p:x.p,d:x.d,x:x.x},'past')});
+ cin.forEach(function(m){add({id:m.id,t:'movie',n:m.title,p:m.poster_path,d:m.release_date,x:'kino ČR'+(m.vote_average>0?' · ★ '+m.vote_average.toFixed(1):'')},'cin')});
+ return a}
+function calPill(d){var n=dd(d);return n<0?ago(d):cd(n)}
+function calRow(x){return '<div class="sfrow" onclick="sfOpen('+x.id+',\''+x.t+'\')"><img loading="lazy" src="'+(x.p?IM+'w154'+x.p:'')+'"><div><b>'+esc(x.n)+'</b><br><small><span style="color:'+CAL_COL[x.k]+'">●</span> '+CAL_LAB[x.k]+(x.x?' · '+esc(x.x):'')+'</small></div><span class="sfpill">'+calPill(x.d)+'</span></div>'}
+function calDayLbl(ds){try{return new Date(ds+'T12:00:00').toLocaleDateString('cs-CZ',{weekday:'long',day:'numeric',month:'long'})}catch(e){return ds}}
+function calGrid(){var c=sw.cal,first=new Date(c.y,c.m,1),dim=new Date(c.y,c.m+1,0).getDate(),off=(first.getDay()+6)%7,tdy=td();
+ var h='<div class="sfcal-h"><button onclick="sfCal(-1)">‹</button><b>'+CAL_M[c.m]+' '+c.y+'</b><button onclick="sfCal(1)">›</button></div><div class="sfcal-g">'+['Po','Út','St','Čt','Pá','So','Ne'].map(function(w){return '<i>'+w+'</i>'}).join('');
+ for(var i=0;i<off;i++)h+='<span></span>';
+ for(var d=1;d<=dim;d++){var ds=c.y+'-'+p2(c.m+1)+'-'+p2(d),it=c.by[ds]||[],kinds={};it.forEach(function(x){kinds[x.k]=1});
+  h+='<button class="sfcal-d'+(it.length?' on':'')+(ds===tdy?' today':'')+(ds===c.sel?' sel':'')+'" onclick="sfCalSel(\''+ds+'\')"><b>'+d+'</b>'+(it.length?'<small>'+it.length+'×</small>':'<small>&nbsp;</small>')+'<span class="sfcal-dots">'+Object.keys(kinds).map(function(k){return '<u style="background:'+CAL_COL[k]+'"></u>'}).join('')+'</span></button>'}
+ h+='</div><div class="sfcal-day">'+calDayLbl(c.sel)+'</div>';
+ var sel=c.by[c.sel]||[];return h+(sel.length?sel.map(calRow).join(''):'<p style="opacity:.6">Tenhle den nic nevychází.</p>')}
+function calList(){var c=sw.cal,from=new Date(Date.now()-7*864e5).toISOString().slice(0,10),ds=Object.keys(c.by).filter(function(d){return d>=from}).sort();
+ return ds.length?ds.map(function(d){var n=dd(d);return '<div class="sfcal-day">'+calDayLbl(d)+' <span style="opacity:.6;font-weight:400;font-size:.8rem">· '+(n<0?ago(d):cd(n))+'</span></div>'+c.by[d].map(calRow).join('')}).join(''):'<p style="opacity:.6">Zatím nic v kalendáři.</p>'}
+function calPaint(){var e=document.getElementById('sfUb');if(!e||sw.tab!==5||!sw.cal)return;var v=localStorage.getItem('sf_cal_view')==='list'?'list':'grid';
+ e.innerHTML='<div style="display:flex;gap:8px;margin-bottom:10px"><button class="sf-btn'+(v==='grid'?' on':'')+'" onclick="sfCalView(\'grid\')">🗓️ Mřížka</button><button class="sf-btn'+(v==='list'?' on':'')+'" onclick="sfCalView(\'list\')">📋 Seznam</button></div>'+
+  '<div style="font-size:.72rem;opacity:.8;margin-bottom:10px">'+Object.keys(CAL_COL).map(function(k){return '<span style="margin-right:10px"><span style="color:'+CAL_COL[k]+'">●</span> '+CAL_LAB[k]+'</span>'}).join('')+'</div>'+(v==='grid'?calGrid():calList())}
+window.sfCalRender=async function(){var e=document.getElementById('sfUb');if(!e||!sw.o)return;
+ e.innerHTML='<p style="opacity:.6">Načítám…</p>';
+ var cin=await calCinema(sw.o);if(sw.tab!==5)return;
+ var c=sw.cal=sw.cal||{},n=new Date();if(c.y==null){c.y=n.getFullYear();c.m=n.getMonth();c.sel=td()}
+ c.by={};calItems(sw.o,cin).forEach(function(x){(c.by[x.d]=c.by[x.d]||[]).push(x)});calPaint()};
+window.sfCal=function(d){var c=sw.cal;c.m+=d;if(c.m<0){c.m=11;c.y--}if(c.m>11){c.m=0;c.y++}calPaint()};
+window.sfCalSel=function(ds){sw.cal.sel=ds;calPaint()};
+window.sfCalView=function(v){try{localStorage.setItem('sf_cal_view',v)}catch(e){}calPaint()};
 window.sfTab=function(n){var e=document.getElementById('sfUb');if(!e||!sw.up)return;sw.tab=n;
- if(n==4){e.innerHTML='<h4 style="margin:0 0 8px">👀 Aktuálně neshlédnuté</h4><p style="opacity:.6">Načítám…</p>';loadUnwatched(sw.o).then(function(r){if(sw.tab===4)e.innerHTML='<h4 style="margin:0 0 4px">👀 Aktuálně neshlédnuté</h4><p style="opacity:.6;margin:0 0 10px;font-size:.8rem">Díly, které už vyšly a nemáš je označené. Klepni na seriál pro rozbalení.</p>'+unRows(r)});}else e.innerHTML=sw.up[n];
- ['1','2','3','4'].forEach(function(i){var b=document.getElementById('sfU'+i);if(b)b.classList.toggle('on',i==n)})};
+ if(n==4){e.innerHTML='<h4 style="margin:0 0 8px">👀 Aktuálně neshlédnuté</h4><p style="opacity:.6">Načítám…</p>';loadUnwatched(sw.o).then(function(r){if(sw.tab===4)e.innerHTML='<h4 style="margin:0 0 4px">👀 Aktuálně neshlédnuté</h4><p style="opacity:.6;margin:0 0 10px;font-size:.8rem">Díly, které už vyšly a nemáš je označené. Klepni na seriál pro rozbalení.</p>'+unRows(r)});}else if(n==5){sfCalRender()}else e.innerHTML=sw.up[n];
+ ['1','2','3','4','5'].forEach(function(i){var b=document.getElementById('sfU'+i);if(b)b.classList.toggle('on',i==n)})};
 window._sfPaintBell=function(){var b=document.getElementById('sfBell');if(b)b.textContent=localStorage.getItem('sinator_notify_enabled')==='1'?'🔔':'🔕'};
 /* 🔔 = stejný přepínač jako Nastavení → 🧪 Experimentální funkce → Upozornění (jedna sada upozornění, žádné dvojité) */
 window.sfNotify=async function(){if(typeof window.notifyToggle!=='function'){T('Upozornění tu nejsou dostupná');return}
