@@ -5602,6 +5602,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-15e', date: '15. 10. 2026', items: [
+            '🔔 Klik na upozornění (nová epizoda, film na streamu, blížící se premiéra) otevře appku rovnou na detailu daného titulu — když appka neběží, otevře se s detailem; když běží, přepne se a detail ukáže. U souhrnného upozornění (víc novinek najednou) se jen otevře appka. Vyžaduje nasazení i notify-sw.js',
             '👀 Up Next → nová záložka „Neshlédnuté“: díly sledovaných seriálů, které už vyšly a nemáš je shlédnuté (nejen ten příští za pár dní). Každý seriál je jeden řádek s počtem a šipkou ▸, po rozkliknutí se pod ním ukážou neshlédnuté díly pod sebou (od nejstaršího) i s datem a „včera / před 3 dny“. Počítá se od posledního shlédnutého dílu a z ručně označených dílů; zobrazují se poslední 3–5 řad seriálu',
             '📡 Up Next → nová záložka „📡 Streamy“: tituly z tvého watchlistu (Histra + Sinator + Trakt), které jsou právě teď na streamovací službě v ČR, i se jmény služeb (respektuje filtr služeb z Experimentálních funkcí). Tady najdeš i to, o čem přišlo upozornění „je teď na streamu“ (např. Sherlock Holmes na Oneplay) — upozornění samo se do žádného seznamu neukládalo',
             '⏱️ TV Program: po kliknutí na kanál (bublina nahoře nebo „Celý den“) se seznam rovnou posune na právě běžící pořad, nejsi na začátku dne',
@@ -6323,6 +6324,31 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             await idbSet('snap', snap);
             return snap;
         }
+        // Klik na upozornění → rovnou detail titulu (?open=typ:id při startu, zpráva od workeru když appka běží)
+        var _openQ = null;
+        function openFromNotif(type, id) {
+            type = type === 'tv' ? 'tv' : 'movie'; id = +id; if (!id) return;
+            var tries = 0;
+            (function go() {
+                tries++;
+                try {
+                    var f = window._siOpenDetail || (typeof openDetail === 'function' ? openDetail : null);
+                    if (f && (typeof tmdbApiKey === 'undefined' || tmdbApiKey)) { f(id, type); return; }
+                } catch (e) {}
+                if (tries < 40) setTimeout(go, 500); // appka se ještě načítá
+            })();
+        }
+        window.sinatorOpenFromNotif = openFromNotif;
+        try {
+            var q = new URLSearchParams(location.search).get('open');
+            if (q && /^(movie|tv):\d+$/.test(q)) { _openQ = q.split(':'); history.replaceState({}, '', location.pathname); }
+        } catch (e) {}
+        if (_openQ) setTimeout(function() { openFromNotif(_openQ[0], _openQ[1]); }, 1200);
+        try {
+            navigator.serviceWorker.addEventListener('message', function(ev) {
+                var d = ev.data; if (d && d.type === 'sinator-open') openFromNotif(d.mediaType, d.id);
+            });
+        } catch (e) {}
         async function register() {
             var reg = await navigator.serviceWorker.register('/notify-sw.js', { scope: '/notify-scope/' });
             if (!reg.active) {
@@ -47995,13 +48021,15 @@ window.sfUpcomingCheck=async function(force){try{
  if(!force&&localStorage.getItem('sf_up_day')===td())return; /* jednou denně, při prvním otevření appky */
  var o=await loadUp(),led=[];localStorage.setItem('sf_up_day',td());try{led=JSON.parse(localStorage.getItem('sf_up_ledger')||'[]')}catch(e){}
  var it=[];
- o.tv.forEach(function(x){if(dd(x.d)===1)it.push({k:'tv'+x.id+'|'+x.d,t:x.n+' '+x.x.split(' ')[0]+' (zítra)'})});
- o.mv.forEach(function(x){var n=dd(x.d);if(n<=1)it.push({k:'mv'+x.id+'|'+x.d,t:x.n+' ('+cd(n)+')'})});
+ o.tv.forEach(function(x){if(dd(x.d)===1)it.push({k:'tv'+x.id+'|'+x.d,t:x.n+' '+x.x.split(' ')[0]+' (zítra)',o:{id:x.id,type:'tv'}})});
+ o.mv.forEach(function(x){var n=dd(x.d);if(n<=1)it.push({k:'mv'+x.id+'|'+x.d,t:x.n+' ('+cd(n)+')',o:{id:x.id,type:'movie'}})});
  it=it.filter(function(i){return led.indexOf(i.k)<0});if(!it.length)return;
  it.forEach(function(i){led.push(i.k)});localStorage.setItem('sf_up_ledger',JSON.stringify(led.slice(-300)));
  var t='Sinator — blížící se premiéry',bd=it.slice(0,6).map(function(i){return i.t}).join('\n');T('🔔 '+it[0].t+(it.length>1?' +'+(it.length-1):''));
- var r=null;try{r=await navigator.serviceWorker.getRegistration()}catch(e){}
- if(r&&r.showNotification)r.showNotification(t,{body:bd,tag:'sinator-upnext'});else new Notification(t,{body:bd,tag:'sinator-upnext'})}catch(e){}};
+ var r=null;try{r=await navigator.serviceWorker.getRegistration('/notify-scope/')}catch(e){}
+ if(!r||!r.showNotification){try{r=await navigator.serviceWorker.getRegistration()}catch(e){}}
+ var op=it.length===1?it[0].o:null,dt={url:op?'/?open='+op.type+':'+op.id:'/',open:op||null};
+ if(r&&r.showNotification)r.showNotification(t,{body:bd,tag:'sinator-upnext',icon:'/apple-touch-icon.png',badge:'/favicon.png',data:dt});else new Notification(t,{body:bd,tag:'sinator-upnext'})}catch(e){}};
 
 /* ── Wrapped ── */
 window.sfWrapped=function(){var y=new Date().getFullYear();

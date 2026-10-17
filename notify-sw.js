@@ -79,7 +79,7 @@ async function check(opts) {
       const seen = (sh.s || 0) * 1000 + (sh.e || 0);
       if (air && Date.now() - air < FRESH_DAYS * 864e5 && key > seen) {
         found.push({ tag: 'ep-' + sh.id + '-' + key, title: '📺 ' + (d.name || sh.name || 'Seriál') + ': nová epizoda',
-          body: 'S' + le.season_number + 'E' + le.episode_number + (le.name ? ' — ' + le.name : '') });
+          body: 'S' + le.season_number + 'E' + le.episode_number + (le.name ? ' — ' + le.name : ''), open: { id: sh.id, type: 'tv' } });
       }
     } catch (e) {}
   });
@@ -99,7 +99,7 @@ async function check(opts) {
       if (prev === undefined) { out.baseline = true; return; }
       const fresh = names.filter(n => !prev.includes(n));
       if (fresh.length) found.push({ tag: 'prov-' + k + '-' + fresh.join(','), title: '🎬 ' + (t.title || 'Titul') + ' je teď na streamu',
-        body: fresh.join(', ') + ' — máš ho ve watchlistu' });
+        body: fresh.join(', ') + ' — máš ho ve watchlistu', open: { id: t.id, type: type } });
     } catch (e) {}
   });
 
@@ -118,7 +118,8 @@ async function check(opts) {
 
 function show(n) {
   return self.registration.showNotification(n.title, {
-    body: n.body, tag: n.tag, icon: '/apple-touch-icon.png', badge: '/favicon.png', data: { url: '/' }
+    body: n.body, tag: n.tag, icon: '/apple-touch-icon.png', badge: '/favicon.png',
+    data: { url: n.open ? '/?open=' + n.open.type + ':' + n.open.id : '/', open: n.open || null }
   });
 }
 
@@ -142,9 +143,16 @@ self.addEventListener('message', e => {
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || '/';
+  const data = e.notification.data || {};
+  const url = data.url || '/';
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-    for (const c of list) { if ('focus' in c) return c.focus(); }
+    // appka už běží → zaostřit a poslat jí, který titul má otevřít (detail)
+    for (const c of list) {
+      if ('focus' in c) {
+        return c.focus().then(() => { if (data.open) c.postMessage({ type: 'sinator-open', id: data.open.id, mediaType: data.open.type }); });
+      }
+    }
+    // appka neběží → otevřít s parametrem ?open=typ:id
     return self.clients.openWindow(url);
   }));
 });
