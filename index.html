@@ -5602,6 +5602,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-15e', date: '15. 10. 2026', items: [
+            '📡 Up Next → nová záložka „📡 Streamy“: tituly z tvého watchlistu (Histra + Sinator + Trakt), které jsou právě teď na streamovací službě v ČR, i se jmény služeb (respektuje filtr služeb z Experimentálních funkcí). Tady najdeš i to, o čem přišlo upozornění „je teď na streamu“ (např. Sherlock Holmes na Oneplay) — upozornění samo se do žádného seznamu neukládalo',
             '⏱️ TV Program: po kliknutí na kanál (bublina nahoře nebo „Celý den“) se seznam rovnou posune na právě běžící pořad, nejsi na začátku dne',
             '🔧 Zdroj kanálu z programu: při prvním spuštění kanálu s víc zdroji naskočí lišta „🔀 Změnit zdroj“ jen jednou (když ji ignoruješ, bere se zdroj jako funkční a příště už se nezobrazí). Dál zůstává tlačítko „Změnit / opravit zdroj“ v detailu pořadu; vybraný zdroj se zapamatuje rovnou, bez hlášek (hláška jen při chybě, např. když jiný zdroj neexistuje). Ve výběru je i „🗑️ Zapomenout zapamatovanou volbu“',
             '📺 TV Program → ▶ Přehrát živě: opraveno spouštění kanálů, které z programu nešly, ale v Kanálech ano. Dohledání kanálu je přesnější (bez diakritiky a značek HD/CZ/SK, nebere první náhodný částečný nález) a když existuje víc stejnojmenných zdrojů (HD/SD, Kanály 1–6), appka nabídne výběr a zapamatuje si ten funkční, takže příště naskočí rovnou. „🔀 Jiný zdroj“ ukazuje všechny shody',
@@ -47924,34 +47925,40 @@ async function loadUp0(){var s=S(),tv={},mv={},hist=[],tvO=[];
  function add(id,t){id=+id;if(!id)return;if(nt(t)==='tv')addTv(id);else mv[id]=1}
  try{var hw=window._hwIdx||JSON.parse(st.getItem('sinator_histra_watched_idx_v1')||'null');
   if(hw&&hw.shows)Object.keys(hw.shows).map(function(k){return[k,hw.shows[k].at||0]}).sort(function(a,b){return b[1]-a[1]}).forEach(function(x){addTv(x[0])})}catch(e){}
- var wl=[];
+ var wl=[],wlSet={};
  if(BE()){try{var r=await Promise.all([myWatchlistGet(),myHistoryGetAll('episodes')]);wl=r[0]||[];
   r[1].sort(function(a,b){return new Date(b.watched_at||0)-new Date(a.watched_at||0)});r[1].slice(0,600).forEach(function(x){add(x.id,'tv')})}catch(e){}}
  Object.values(s.watched||{}).forEach(function(w){if(w.type==='episode')add(w.tvId,'tv')});
  (s.favs||[]).forEach(function(f){add(f.id,f.type||'movie')});
  jget('sinator_swipe_wl',[]).forEach(function(f){add(f.id,f.type)});
- wl.forEach(function(x){add(x.id,x.type)});
- if(window.sinatorCollectSources){try{var cs=await window.sinatorCollectSources();cs.shows.forEach(function(x){addTv(x.id)});cs.titles.forEach(function(x){add(x.id,x.type)})}catch(e){}}
+ wl.forEach(function(x){add(x.id,x.type);wlSet[(nt(x.type)==='tv'?'tv':'movie')+'_'+x.id]=1});
+ if(window.sinatorCollectSources){try{var cs=await window.sinatorCollectSources();cs.shows.forEach(function(x){addTv(x.id)});cs.titles.forEach(function(x){add(x.id,x.type);wlSet[(nt(x.type)==='tv'?'tv':'movie')+'_'+x.id]=1})}catch(e){}}
  Object.keys(mv).forEach(function(id){if(s.watched&&s.watched['movie_'+id])delete mv[id]});
- var out={tv:[],mv:[]},t0=td();
- var a=await pmap(tvO.slice(0,400),function(id){return tj('/tv/'+id)},10);
- a.forEach(function(d){var e=d&&d.next_episode_to_air;if(e&&e.air_date&&e.air_date>=t0)out.tv.push({id:d.id,n:d.name,p:d.poster_path,d:e.air_date,x:'S'+p2(e.season_number)+'E'+p2(e.episode_number)+(e.name?' · '+e.name:'')})});
+ var out={tv:[],mv:[],st:[]},t0=td();
+ var pf=(localStorage.getItem('sinator_notify_providers')||'').split(',').map(function(x){return x.trim().toLowerCase()}).filter(Boolean);
+ var pvOf=function(w){var f=((w&&w.results&&w.results.CZ)||{}).flatrate||[];var n=f.map(function(p){return p.provider_name});if(pf.length)n=n.filter(function(x){return pf.some(function(w2){return x.toLowerCase().indexOf(w2)>=0})});return n};
+ var a=await pmap(tvO.slice(0,400),function(id){return wlSet['tv_'+id]?tj('/tv/'+id,'&append_to_response=watch/providers'):tj('/tv/'+id)},10);
+ a.forEach(function(d){if(d&&wlSet['tv_'+d.id]){var pv=pvOf(d['watch/providers']);if(pv.length)out.st.push({id:d.id,n:d.name,p:d.poster_path,t:'tv',pv:pv})}
+ var e=d&&d.next_episode_to_air;if(e&&e.air_date&&e.air_date>=t0)out.tv.push({id:d.id,n:d.name,p:d.poster_path,d:e.air_date,x:'S'+p2(e.season_number)+'E'+p2(e.episode_number)+(e.name?' · '+e.name:'')})});
  var mc={};try{mc=JSON.parse(localStorage.getItem('sf_mv_cache')||'{}')}catch(e){}
- var now=Date.now(),ids=Object.keys(mv).slice(0,400),need=ids.filter(function(id){return !mc[id]||now-mc[id].t>864e5});
- await pmap(need,function(id){return tj('/movie/'+id,'&append_to_response=release_dates').then(function(m){if(!m||!m.id)return null;var rd=[];((m.release_dates&&m.release_dates.results)||[]).forEach(function(c){if(c.iso_3166_1!=='CZ'&&c.iso_3166_1!=='US')return;(c.release_dates||[]).forEach(function(x){if([2,3,4].indexOf(x.type)>=0)rd.push([c.iso_3166_1,(x.release_date||'').slice(0,10),x.type])})});mc[id]={t:now,id:m.id,n:m.title,p:m.poster_path,rd:rd};return 1})},10);
+ var now=Date.now(),ids=Object.keys(mv).slice(0,400),need=ids.filter(function(id){return !mc[id]||now-mc[id].t>864e5||mc[id].pv===undefined});
+ await pmap(need,function(id){return tj('/movie/'+id,'&append_to_response=release_dates,watch/providers').then(function(m){if(!m||!m.id)return null;var rd=[];((m.release_dates&&m.release_dates.results)||[]).forEach(function(c){if(c.iso_3166_1!=='CZ'&&c.iso_3166_1!=='US')return;(c.release_dates||[]).forEach(function(x){if([2,3,4].indexOf(x.type)>=0)rd.push([c.iso_3166_1,(x.release_date||'').slice(0,10),x.type])})});var pr=((m['watch/providers']&&m['watch/providers'].results&&m['watch/providers'].results.CZ)||{}).flatrate||[];mc[id]={t:now,id:m.id,n:m.title,p:m.poster_path,rd:rd,pv:pr.map(function(p){return p.provider_name})};return 1})},10);
  try{var keep={};ids.forEach(function(id){if(mc[id])keep[id]=mc[id]});localStorage.setItem('sf_mv_cache',JSON.stringify(keep))}catch(e){}
- ids.forEach(function(id){var c=mc[id];if(!c)return;var cz=null,us=null;c.rd.forEach(function(x){var d=x[1];if(d<t0)return;var o={d:d,k:x[2]===4?'💿 VOD':'🎬 kino'};if(x[0]==='CZ'){if(!cz||d<cz.d)cz=o}else if(!us||d<us.d)us=o});var o=cz||us;if(o)out.mv.push({id:c.id,n:c.n,p:c.p,d:o.d,x:o.k+(cz?' (ČR)':' (USA)')})});
- var so=function(x,y){return x.d<y.d?-1:1};out.tv.sort(so);out.mv.sort(so);return out}
+ ids.forEach(function(id){var c=mc[id];if(!c)return;if(wlSet['movie_'+id]&&c.pv&&c.pv.length){var pv=pf.length?c.pv.filter(function(x){return pf.some(function(w2){return x.toLowerCase().indexOf(w2)>=0})}):c.pv;if(pv.length)out.st.push({id:c.id,n:c.n,p:c.p,t:'movie',pv:pv})}
+ var cz=null,us=null;c.rd.forEach(function(x){var d=x[1];if(d<t0)return;var o={d:d,k:x[2]===4?'💿 VOD':'🎬 kino'};if(x[0]==='CZ'){if(!cz||d<cz.d)cz=o}else if(!us||d<us.d)us=o});var o=cz||us;if(o)out.mv.push({id:c.id,n:c.n,p:c.p,d:o.d,x:o.k+(cz?' (ČR)':' (USA)')})});
+ var so=function(x,y){return x.d<y.d?-1:1};out.tv.sort(so);out.mv.sort(so);out.st.sort(function(x,y){return String(x.n).localeCompare(String(y.n),'cs')});return out}
+function stRows(a){return a.length?a.map(function(x){return '<div class="sfrow" onclick="sfOpen('+x.id+',\''+x.t+'\')"><img loading="lazy" src="'+(x.p?IM+'w154'+x.p:'')+'"><div><b>'+esc(x.n)+'</b><br><small>📡 '+esc(x.pv.join(', '))+' · '+(x.t==='tv'?'seriál':'film')+'</small></div></div>'}).join(''):'<p style="opacity:.6">Nic z tvého watchlistu teď není na streamu'+((localStorage.getItem('sinator_notify_providers')||'').trim()?' (filtr služeb: '+esc(localStorage.getItem('sinator_notify_providers'))+').':'.')+'</p>'}
 function rows(a,t){return a.length?a.map(function(x){var n=dd(x.d);return '<div class="sfrow" onclick="sfOpen('+x.id+',\''+t+'\')"><img loading="lazy" src="'+(x.p?IM+'w154'+x.p:'')+'"><div><b>'+esc(x.n)+'</b><br><small>'+esc(x.x||'')+' · '+fd(x.d)+'</small></div><span class="sfpill">'+cd(n)+'</span></div>'}).join(''):'<p style="opacity:.6">Nic nenalezeno.</p>'}
 window.sfUpNext=async function(){if(!K()){T('Nejdřív zadej TMDB klíč');return}
- var b=ov('sfUp','📆 Up Next','<div style="display:flex;gap:8px;margin-bottom:12px"><button class="sf-btn on" id="sfU1" onclick="sfTab(1)">📺 Další díly</button><button class="sf-btn" id="sfU2" onclick="sfTab(2)">🎬 Premiéry</button><button class="sf-btn" id="sfBell" onclick="sfNotify()" title="Upozornění zap/vyp">'+(localStorage.getItem('sinator_notify_enabled')==='1'?'🔔':'🔕')+'</button></div><div id="sfUb">Načítám…</div>');
+ var b=ov('sfUp','📆 Up Next','<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"><button class="sf-btn on" id="sfU1" onclick="sfTab(1)">📺 Další díly</button><button class="sf-btn" id="sfU2" onclick="sfTab(2)">🎬 Premiéry</button><button class="sf-btn" id="sfU3" onclick="sfTab(3)">📡 Streamy</button><button class="sf-btn" id="sfBell" onclick="sfNotify()" title="Upozornění zap/vyp">'+(localStorage.getItem('sinator_notify_enabled')==='1'?'🔔':'🔕')+'</button></div><div id="sfUb">Načítám…</div>');
  var o=await loadUp(),to=new Date(Date.now()+60*864e5).toISOString().slice(0,10),q='&region=CZ&release_date.gte='+td()+'&release_date.lte='+to+'&sort_by=primary_release_date.asc&with_release_type=';
  var ci=await tj('/movie/upcoming','&region=CZ&page=1').catch(function(){return{}}),vo=await tj('/discover/movie',q+'4').catch(function(){return{}});
  var mp=function(r,k){return((r&&r.results)||[]).filter(function(m){return m.poster_path}).map(function(m){return{id:m.id,n:m.title,p:m.poster_path,d:m.release_date,x:k}})};
  sw.up={1:'<h4 style="margin:0 0 8px">Seriály, které sleduješ</h4>'+rows(o.tv,'tv')+'<h4 style="margin:14px 0 8px">Filmy z tvého watchlistu</h4>'+rows(o.mv,'movie'),
-  2:'<h4 style="margin:0 0 8px">🎬 Do kin v ČR</h4>'+rows(((ci&&ci.results)||[]).filter(function(m){return m.release_date}).map(function(m){return{id:m.id,n:m.title,p:m.poster_path,d:m.release_date,x:m.vote_average>0?'★ '+m.vote_average.toFixed(1):'kino'}}),'movie')+'<h4 style="margin:14px 0 8px">💿 Na VOD v ČR (60 dní)</h4>'+rows(mp(vo,'VOD / digitálně'),'movie')};
+  2:'<h4 style="margin:0 0 8px">🎬 Do kin v ČR</h4>'+rows(((ci&&ci.results)||[]).filter(function(m){return m.release_date}).map(function(m){return{id:m.id,n:m.title,p:m.poster_path,d:m.release_date,x:m.vote_average>0?'★ '+m.vote_average.toFixed(1):'kino'}}),'movie')+'<h4 style="margin:14px 0 8px">💿 Na VOD v ČR (60 dní)</h4>'+rows(mp(vo,'VOD / digitálně'),'movie'),
+  3:'<h4 style="margin:0 0 8px">📡 Tvůj watchlist teď na streamu (ČR)</h4>'+stRows(o.st)};
  sfTab(1)};
-window.sfTab=function(n){var e=document.getElementById('sfUb');if(!e||!sw.up)return;e.innerHTML=sw.up[n];['1','2'].forEach(function(i){document.getElementById('sfU'+i).classList.toggle('on',i==n)})};
+window.sfTab=function(n){var e=document.getElementById('sfUb');if(!e||!sw.up)return;e.innerHTML=sw.up[n];['1','2','3'].forEach(function(i){var b=document.getElementById('sfU'+i);if(b)b.classList.toggle('on',i==n)})};
 window._sfPaintBell=function(){var b=document.getElementById('sfBell');if(b)b.textContent=localStorage.getItem('sinator_notify_enabled')==='1'?'🔔':'🔕'};
 /* 🔔 = stejný přepínač jako Nastavení → 🧪 Experimentální funkce → Upozornění (jedna sada upozornění, žádné dvojité) */
 window.sfNotify=async function(){if(typeof window.notifyToggle!=='function'){T('Upozornění tu nejsou dostupná');return}
