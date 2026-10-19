@@ -2801,10 +2801,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const k = histraKeyOf(id, type); if (on) c.keys.add(k); else c.keys.delete(k);
     }
     // Projde celý seznam (všechny stránky), uloží klíče do cache; onHit se zavolá hned při nalezení hledané položky.
-    async function histraListHas(hListId, id, type, onHit) {
+    async function histraListHas(hListId, id, type, onHit, force) {
         const want = histraKeyOf(id, type);
         const cached = window._histraKeyCache[String(hListId)];
-        if (cached && Date.now() - cached.t < 180000) return cached.keys.has(want);
+        if (!force && cached && Date.now() - cached.t < 180000) return cached.keys.has(want);
         const keys = new Set(); let hit = false;
         const limit = 100; let offset = 0, prevSig = null; const seen = new Set();
         for (let page = 0; page < 200; page++) {
@@ -3889,7 +3889,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const _hFinish = sinPickAttachSpinners(_hHead, lists.map((l, i) => document.getElementById(`histraPickBtn_${i}`)));
         const worker = async (l, i) => {
             const b0 = document.getElementById(`histraPickBtn_${i}`);
-            try { const lid = l.id ?? l.list_id; if (await histraListHas(lid, id, type, () => mark(i, true))) mark(i, true); } catch (e) { console.warn('[Histra označení]', e); }
+            try {
+                const lid = l.id ?? l.list_id;
+                const kc = window._histraKeyCache[String(lid)];
+                if (kc) mark(i, kc.keys.has(histraKeyOf(id, type))); // hned z paměti…
+                const res = await histraListHas(lid, id, type, () => mark(i, true), true); // …a vždy znovu ověřit
+                mark(i, !!res);
+            } catch (e) { console.warn('[Histra označení]', e); }
             _hFinish(document.getElementById(`histraPickBtn_${i}`) || b0);
         };
         (async () => { if (typeof _runWithConcurrency === 'function') await _runWithConcurrency(lists.map((l, i) => i), 6, (i) => worker(lists[i], i)); else for (let k = 0; k < lists.length; k += 3) await Promise.all(lists.slice(k, k + 3).map((l, j) => worker(l, k + j))); })();
@@ -5150,21 +5156,26 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const _sHead = overlay.querySelector(':scope > div > div');
         const _sFinish = sinPickAttachSpinners(_sHead, lists.map(l => document.getElementById(`myListPickBtn_${l.id}`)));
         window._sinListCache = window._sinListCache || {};
+        const _sinHas = (items) => Array.isArray(items) && items.some(it => Number(it.id) === Number(id) && (it.type === type || (it.type === 'shows' && type === 'tv') || (it.type === 'movies' && type === 'movie')));
+        const _sinApply = (l, inList) => {
+            const btn = document.getElementById(`myListPickBtn_${l.id}`); if (!btn) return;
+            const was = btn.dataset.inList === '1';
+            if (inList === was) return;
+            btn.dataset.inList = inList ? '1' : '0';
+            btn.style.background = inList ? 'rgba(29,185,84,0.2)' : 'var(--bg-elevated)';
+            btn.style.borderColor = inList ? '#1db954' : 'var(--border)';
+            btn.style.color = inList ? '#1db954' : '#fff';
+            btn.textContent = `${inList ? '✅' : '📁'} ${l.name} (${l.item_count || 0})`;
+            btn.insertAdjacentHTML('beforeend', '<span class="sin-pick-spin sin-btn-spin" style="color:#9aa4c0;"></span>');
+        };
         const checkWorker = async (l) => {
             try {
-                let items; const _c = window._sinListCache[l.id];
-                if (_c && Date.now() - _c.t < 120000) items = _c.items;
-                else { items = await myListItemsGet(l.id); window._sinListCache[l.id] = { t: Date.now(), items }; }
-                const inList = Array.isArray(items) && items.some(it => Number(it.id) === Number(id) && (it.type === type || (it.type === 'shows' && type === 'tv') || (it.type === 'movies' && type === 'movie')));
-                const btn = inList ? document.getElementById(`myListPickBtn_${l.id}`) : null;
-                if (btn) {
-                    btn.dataset.inList = '1';
-                    btn.style.background = 'rgba(29,185,84,0.2)';
-                    btn.style.borderColor = '#1db954';
-                    btn.style.color = '#1db954';
-                    btn.textContent = `✅ ${l.name} (${l.item_count || 0})`;
-                }
-            } catch (e) { /* tichý fail — seznam zůstane neoznačený */ }
+                const _c = window._sinListCache[l.id];
+                if (_c) _sinApply(l, _sinHas(_c.items)); // hned z paměti…
+                const items = await myListItemsGet(l.id); // …a vždy znovu ověřit
+                window._sinListCache[l.id] = { t: Date.now(), items };
+                _sinApply(l, _sinHas(items));
+            } catch (e) { /* tichý fail — seznam zůstane tak, jak je */ }
             _sFinish(document.getElementById(`myListPickBtn_${l.id}`));
         };
         if (typeof _runWithConcurrency === 'function') _runWithConcurrency(lists, 6, checkWorker);
