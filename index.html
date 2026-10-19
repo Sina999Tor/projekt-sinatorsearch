@@ -2583,10 +2583,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // obsah; detekcí toho se vyhneme zbytečnému až 200× opakování stejného
     // požadavku (appka by jinak dlouho vypadala jako zaseklá).
     function histraPageSignature(items) {
-        try { return items.slice(0, 3).map(e => `${e && (e.watched_at || e.id || e.media_id)}`).join('|'); }
+        try { return items.slice(0, 3).map(e => JSON.stringify(e).slice(0, 200)).join('|'); }
         catch (e) { return String(Math.random()); }
     }
-    async function histraFetchAllPaged(basePath, limit, maxPages, onProgress) {
+    async function histraFetchAllPaged(basePath, limit, maxPages, onProgress, noShortStop) {
         limit = limit || 100; maxPages = maxPages || 200;
         let all = [];
         let offset = 0;
@@ -2603,8 +2603,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             if (sig === prevSig) break; // API offset/limit nefunguje — stejná stránka dokola, končíme
             prevSig = sig;
             all = all.concat(items);
-            if (items.length < limit) break;
-            offset += limit;
+            if (items.length < limit && !noShortStop) break;
+            offset += noShortStop ? items.length : limit;
         }
         return all;
     }
@@ -2780,8 +2780,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     async function histraListHas(hListId, id, type) {
         const wantShow = (type === 'tv' || type === 'show' || type === 'shows');
         const want = Number(id);
-        const limit = 100; let offset = 0, prevSig = null;
-        for (let page = 0; page < 40; page++) {
+        const limit = 100; let offset = 0, prevSig = null; const seen = new Set();
+        for (let page = 0; page < 200; page++) {
             let data = null, ok = false;
             for (let attempt = 0; attempt < 3 && !ok; attempt++) {
                 try { data = await histraApi(`/api/v1/lists/${hListId}?extended=full&limit=${limit}&offset=${offset}`); ok = true; }
@@ -2793,6 +2793,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             let sig = ''; try { sig = JSON.stringify(items[0]).slice(0, 300) + '|' + JSON.stringify(items[items.length - 1]).slice(0, 300); } catch (e) {}
             if (sig && sig === prevSig) return false;
             prevSig = sig;
+            let fresh = 0;
+            for (const it of items) { let k = ''; try { k = JSON.stringify(it); } catch (e) {} if (!seen.has(k)) { seen.add(k); fresh++; } }
+            if (!fresh) return false;
             for (const it of items) {
                 if (!it || typeof it !== 'object') continue;
                 const inner = it.movie || it.show || it.media || it.item || {};
@@ -2806,15 +2809,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 }
                 return true;
             }
-            if (items.length < limit) return false;
-            offset += limit;
+            offset += items.length; // server může limit zkrátit (např. na 50) — jedeme dál, dokud nepřijde prázdná stránka
         }
         return false;
     }
     // Najde v Histra seznamu položku podle TMDB id + typu a vrátí její interní media_id
     async function histraFindListMedia(hListId, id, type) {
         const wantShow = (type === 'tv' || type === 'show' || type === 'shows');
-        const items = await histraFetchAllPaged(`/api/v1/lists/${hListId}?extended=full`, 100, 20);
+        const items = await histraFetchAllPaged(`/api/v1/lists/${hListId}?extended=full`, 100, 20, null, true);
         for (const it of items) {
             const inner = it.movie || it.show || it.media || it.item || {};
             const tm = histraExtractTmdb(it) || histraExtractTmdb(inner);
@@ -2859,7 +2861,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const hid = await histraEnsureList(name);
         const remote = new Set();
         try {
-            const raw = await histraFetchAllPaged(`/api/v1/lists/${hid}?extended=full`, 100, 20);
+            const raw = await histraFetchAllPaged(`/api/v1/lists/${hid}?extended=full`, 100, 20, null, true);
             (raw || []).forEach(e => { const p = histraParseMediaEntry(e); if (p) remote.add(p.type + '_' + p.tmdb); });
         } catch (e) {}
         const want = new Map((items || []).map(it => [((it.type === 'tv' || it.type === 'shows') ? 'tv' : 'movie') + '_' + it.id, it]));
@@ -3062,7 +3064,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     window.histraOpenList = function(i) {
         const l = (window._histraLists || [])[i]; if (!l) return;
         const id = l.id ?? l.list_id;
-        histraLoadItems(l.name || l.title || 'Seznam', () => histraFetchAllPaged(`/api/v1/lists/${id}?extended=full&lang=cs-CZ`, 100, 30));
+        histraLoadItems(l.name || l.title || 'Seznam', () => histraFetchAllPaged(`/api/v1/lists/${id}?extended=full&lang=cs-CZ`, 100, 30, null, true));
     };
     window._histraSaveScroll = function() {
         const v = state._histraView, b = $('histraListsBody');
