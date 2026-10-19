@@ -3842,7 +3842,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         if (which === 'sin') {
             if (!(typeof myBackendReady === 'function' && myBackendReady())) return;
             if (target) {
-                let m = {}; try { m = JSON.parse(decodeURIComponent(btn.dataset.wlMeta)); } catch (e) {}
+                let m = {}; try { m = JSON.parse(decodeURIComponent(btn && btn.dataset.wlMeta)); } catch (e) {}
                 await myWatchlistAdd(id, type, m.t || '', m.y || null, m.p || null);
             } else { await myWatchlistRemove(id, type); }
         } else {
@@ -48008,6 +48008,8 @@ window.KinoList = (function() {
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button onclick="trailersPlay('${x.id}')" style="padding:7px 12px;border-radius:10px;border:1px solid #f87171;background:rgba(248,113,113,0.12);color:#f87171;cursor:pointer;font-size:0.78rem;">▶ Přehrát</button>
             <button onclick="trailersFindFilm(this,'${x.id}')" style="padding:7px 12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:0.78rem;">🔍 Detail filmu</button>
+            <button onclick="trailersWatchlist(this,'${x.id}')" style="padding:7px 12px;border-radius:10px;border:1px solid #6090ff;background:rgba(96,144,255,0.12);color:#6090ff;cursor:pointer;font-size:0.78rem;">🔖 Watchlist</button>
+            <button onclick="trailersToList(this,'${x.id}')" style="padding:7px 12px;border-radius:10px;border:1px solid #6090ff;background:rgba(96,144,255,0.12);color:#6090ff;cursor:pointer;font-size:0.78rem;">📁 Do seznamu</button>
             <button onclick="window.open('https://youtu.be/${x.id}','_blank')" style="padding:7px 12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:0.78rem;">↗ YouTube</button>
           </div></div></div>`).join('');
     msg.style.display = arr.length ? 'none' : 'block';
@@ -48069,6 +48071,34 @@ window.KinoList = (function() {
     } catch (e) { alert('Vyhledání selhalo: ' + ((e && e.message) || e)); }
     finally { btn.textContent = orig; btn.disabled = false; }
   };
+  // Najde film/seriál z názvu videa na TMDB (výsledek si pamatuje u položky)
+  async function trailersResolve(x) {
+    if (x._hit) return x._hit;
+    const key = (typeof tmdbApiKey !== 'undefined' && tmdbApiKey) || '';
+    if (!key) throw new Error('Chybí TMDB API klíč.');
+    let q = x.title.replace(/[|–—].*$/, '').replace(/\b(CZ|SK)\b.*$/i, '').replace(/\b(HD|4K|trailer|teaser|upoutávka|oficiální)\b.*$/i, '');
+    const ym = q.match(/\((\d{4})\)/); const year = ym ? ym[1] : '';
+    q = q.replace(/\(\d{4}\)/, '').replace(/[:\-]\s*$/, '').trim();
+    if (!q) throw new Error('Z názvu videa se nepodařilo poznat film.');
+    const r = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${key}&language=cs-CZ&query=${encodeURIComponent(q)}`).then(r => r.json());
+    let list = (r.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv');
+    if (year) { const y = list.filter(m => String(m.release_date || m.first_air_date || '').startsWith(year)); if (y.length) list = y; }
+    if (!list.length) throw new Error(`„${q}“ jsem na TMDB nenašel.`);
+    const h = list[0];
+    x._hit = { id: h.id, type: h.media_type === 'tv' ? 'tv' : 'movie', title: h.title || h.name || q, year: String(h.release_date || h.first_air_date || '').slice(0, 4), poster: h.poster_path || '' };
+    return x._hit;
+  }
+  async function trailersWithHit(btn, id, fn) {
+    const x = _items.find(i => i.id === id); if (!x) return;
+    const orig = btn.textContent; btn.textContent = '⏳'; btn.disabled = true;
+    try { const h = await trailersResolve(x); await fn(h); }
+    catch (e) { alert((e && e.message) || e); }
+    finally { btn.textContent = orig; btn.disabled = false; }
+  }
+  // 🔖 Watchlist (přidá/odebere v Sinatoru, zrcadlí do Histry)
+  window.trailersWatchlist = (btn, id) => trailersWithHit(btn, id, h => window.myBackendAddWatchlist(h.id, h.type, h.title, h.year, h.poster));
+  // 📁 Do seznamu (Sinator picker, zrcadlí do Histry)
+  window.trailersToList = (btn, id) => trailersWithHit(btn, id, h => window.myBackendAddToList(h.id, h.type));
   window.openTrailersModal = function() {
     const m = document.getElementById('trailersModal'); if (!m) return;
     m.style.display = 'flex'; setFilterBtns(); trailersRefresh(false);
