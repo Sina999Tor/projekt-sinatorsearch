@@ -3885,6 +3885,113 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             }
         } catch (e) {}
     };
+    // ── Hromadné přidání celé kolekce (watchlist / seznam), existující tituly se přeskočí ──
+    async function _collRun(items, limit, worker) {
+        let idx = 0;
+        await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+            while (idx < items.length) { const it = items[idx++]; await worker(it); }
+        }));
+    }
+    window.collectionAddWatchlist = async function(btn) {
+        const parts = window._collParts || [];
+        const toast = (typeof _favToast === 'function') ? _favToast : alert;
+        const sinOn = (typeof myBackendReady === 'function' && myBackendReady()), hisOn = histraReady();
+        if (!parts.length) return;
+        if (!sinOn && !hisOn) { alert('⚠️ Nejdřív nastav Sinator backend nebo Histru.'); return; }
+        const orig = btn.textContent; btn.disabled = true; btn.textContent = '⏳ Kontroluji…';
+        let added = 0, skipped = 0, failed = 0;
+        try {
+            if (sinOn) {
+                const wl = await myWatchlistGet();
+                const have = new Set((Array.isArray(wl) ? wl : []).filter(it => it.type === 'movie' || it.type === 'movies').map(it => Number(it.id)));
+                const todo = parts.filter(p => !have.has(Number(p.id)));
+                skipped += parts.length - todo.length;
+                let done = 0;
+                await _collRun(todo, 3, async p => {
+                    try { await myWatchlistAdd(p.id, 'movie', p.title, p.year || null, p.poster || null); added++; wlSetMark('sin', p.id, true); } catch (e) { failed++; }
+                    btn.textContent = `⏳ Sinator ${++done}/${todo.length}`;
+                });
+            }
+            if (hisOn) {
+                // po Sinatoru (zrcadlení už mohlo část přidat) — načíst Histra watchlist a doplnit chybějící
+                const raw = await histraFetchAllPaged('/api/v1/watchlist?extended=full&lang=cs-CZ', 100, 30, null, true);
+                const have = new Set(raw.map(histraMapItem).filter(Boolean).filter(it => it.type === 'movie').map(it => Number(it.id)));
+                const todo = parts.filter(p => !have.has(Number(p.id)));
+                if (!sinOn) skipped += parts.length - todo.length;
+                let done = 0;
+                await _collRun(todo, 3, async p => {
+                    try { await histraPostItem('/api/v1/watchlist', p.id, 'movie'); if (!sinOn) added++; wlSetMark('histra', p.id, true); } catch (e) { if (!sinOn) failed++; }
+                    btn.textContent = `⏳ Histra ${++done}/${todo.length}`;
+                });
+            }
+            toast(`🔖 Watchlist: přidáno ${added}, přeskočeno ${skipped} (už tam byly)` + (failed ? `, chyb ${failed}` : ''));
+        } catch (e) { toast('❌ ' + ((e && e.message) || e)); }
+        finally { btn.disabled = false; btn.textContent = orig; }
+    };
+    window.collectionAddToList = async function(btn) {
+        const parts = window._collParts || [];
+        const sinOn = (typeof myBackendReady === 'function' && myBackendReady());
+        if (!parts.length) return;
+        if (!sinOn) { alert('⚠️ Nejdřív nastav vlastní backend (Sinator) — seznamy se zrcadlí do Histry.'); return; }
+        let lists = [];
+        try { lists = await myListsGet(); } catch (e) { alert('❌ ' + ((e && e.message) || e)); return; }
+        document.getElementById('collListPickerOverlay')?.remove();
+        const ov = document.createElement('div');
+        ov.id = 'collListPickerOverlay';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10700;display:flex;align-items:flex-end;justify-content:center;';
+        ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+        const bs = 'display:block;width:100%;text-align:left;padding:12px 16px;margin-bottom:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;color:#fff;cursor:pointer;font:inherit;';
+        ov.innerHTML = `<div style="background:var(--bg-card);border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:480px;max-height:70vh;overflow-y:auto;">
+            <div id="collPickHead" style="font-weight:700;margin-bottom:14px;color:#6090ff;">📁 Přidat ${parts.length} filmů z kolekce do seznamu (přeskočí se ty, co tam už jsou)</div>
+            ${lists.map((l, i) => `<button data-i="${i}" style="${bs}">📁 ${_hEsc(l.name)} (${l.item_count || 0})</button>`).join('') || '<div style="color:var(--text-muted);margin-bottom:12px;">Zatím nemáš žádné seznamy.</div>'}
+            <button id="collPickNew" style="display:block;width:100%;text-align:center;padding:12px;margin-top:6px;background:transparent;border:1px dashed #6090ff;border-radius:10px;color:#6090ff;cursor:pointer;">➕ Nový seznam</button>
+            <button id="collPickClose" style="display:block;width:100%;text-align:center;padding:10px;margin-top:10px;background:transparent;border:none;color:var(--text-muted);cursor:pointer;">Zavřít</button>
+        </div>`;
+        document.body.appendChild(ov);
+        const toast = (typeof _favToast === 'function') ? _favToast : alert;
+        const head = ov.querySelector('#collPickHead');
+        const run = async (list) => {
+            ov.querySelectorAll('button').forEach(b => b.disabled = true);
+            head.innerHTML = '<span class="sin-pick-spin"></span> Kontroluji seznam…';
+            let added = 0, skipped = 0, failed = 0;
+            try {
+                const items = await myListItemsGet(list.id);
+                const have = new Set((Array.isArray(items) ? items : []).filter(it => it.type === 'movie' || it.type === 'movies').map(it => Number(it.id)));
+                const todo = parts.filter(p => !have.has(Number(p.id)));
+                skipped = parts.length - todo.length;
+                let done = 0;
+                await _collRun(todo, 3, async p => {
+                    try { await myListItemAdd(list.id, p.id, 'movie'); added++; } catch (e) { failed++; }
+                    head.innerHTML = `<span class="sin-pick-spin"></span> Sinator ${++done}/${todo.length}`;
+                });
+                // zrcadlení do Histry (seznam stejného jména)
+                if (histraReady()) {
+                    head.innerHTML = '<span class="sin-pick-spin"></span> Histra…';
+                    try {
+                        const hid = await histraEnsureList(list.name);
+                        await histraListHas(hid, parts[0].id, 'movie', null, true); // naplní cache klíčů seznamu
+                        const keys = (window._histraKeyCache[String(hid)] || { keys: new Set() }).keys;
+                        const hTodo = parts.filter(p => !keys.has('movie_' + Number(p.id)));
+                        let hd = 0;
+                        await _collRun(hTodo, 3, async p => {
+                            try { await histraPostItem(`/api/v1/lists/${hid}/items`, p.id, 'movie'); histraCacheTouch(hid, p.id, 'movie', true); } catch (e) {}
+                            head.innerHTML = `<span class="sin-pick-spin"></span> Histra ${++hd}/${hTodo.length}`;
+                        });
+                    } catch (e) { console.warn('[Kolekce → Histra]', e); toast('⚠️ Histra: ' + _hErr(e)); }
+                }
+                toast(`📁 „${list.name}“: přidáno ${added}, přeskočeno ${skipped} (už tam byly)` + (failed ? `, chyb ${failed}` : ''));
+                ov.remove();
+            } catch (e) { toast('❌ ' + ((e && e.message) || e)); ov.remove(); }
+        };
+        ov.querySelectorAll('button[data-i]').forEach(b => b.onclick = () => run(lists[Number(b.dataset.i)]));
+        ov.querySelector('#collPickClose').onclick = () => ov.remove();
+        ov.querySelector('#collPickNew').onclick = async () => {
+            const name = prompt('Název nového seznamu:');
+            if (!name || !name.trim()) return;
+            try { const l = await myListCreate(name.trim()); await run(l); } catch (e) { toast('❌ ' + ((e && e.message) || e)); }
+        };
+    };
+
     // ── Watchlist – Histra ──
     window.histraWatchlistToggle = async function(id, type) {
         if (!histraReady()) { alert('⚠️ Nejdřív nastav Histra token v Nastavení → Propojení účtů.'); return; }
@@ -15307,8 +15414,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const parts = collection.parts || [];
             if(parts.length === 0) { bodyEl.innerHTML = '<div class="empty">😕 Kolekce je prázdná</div>'; return; }
             parts.sort((a, b) => new Date(a.release_date).getTime() - new Date(b.release_date).getTime());
+            window._collParts = parts.map(p => ({ id: p.id, title: p.title || p.original_title || '', year: String(p.release_date || '').slice(0, 4), poster: p.poster_path || '' }));
             const grid = parts.map(p => { const img = p.poster_path ? `<img class="card-image" src="${IMG}w500${p.poster_path}">` : `<div class="card-placeholder">🎬</div>`; const watched = isWatched(p.id, 'movie'); return `<div class="card${watched?' is-watched':''}" onclick="document.getElementById('collectionOverlay')?.remove();document.body.style.overflow='';openDetail(${p.id}, 'movie')">${img}<div class="card-info"><div class="card-title">${p.title}</div><div class="card-meta"><span>${(p.release_date||'').slice(0,4)||'—'}</span></div></div></div>`; }).join('');
-            bodyEl.innerHTML = `<p style="color:var(--text-muted); margin-bottom:20px;">${parts.length} filmů v kolekci (řazeno od nejstaršího)</p><div class="person-grid">${grid}</div>`;
+            bodyEl.innerHTML = `<p style="color:var(--text-muted); margin-bottom:20px;">${parts.length} filmů v kolekci (řazeno od nejstaršího)</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin:-8px 0 16px;"><button onclick="collectionAddWatchlist(this)" style="padding:9px 14px;border-radius:10px;border:1px solid #6090ff;background:rgba(96,144,255,0.15);color:#6090ff;cursor:pointer;font-size:0.85rem;font-weight:600;">🔖 Vše do watchlistu</button><button onclick="collectionAddToList(this)" style="padding:9px 14px;border-radius:10px;border:1px solid #6090ff;background:rgba(96,144,255,0.15);color:#6090ff;cursor:pointer;font-size:0.85rem;font-weight:600;">📁 Vše do seznamu</button></div><div class="person-grid">${grid}</div>`;
         } catch(e) {
             bodyEl.innerHTML = '<div class="empty">⚠️ Chyba načtení kolekce</div>';
         }
@@ -15329,10 +15437,11 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             const parts = collection.parts || [];
             if(parts.length === 0) { $('modalScrollBody').innerHTML = '<div class="empty">😕 Kolekce je prázdná</div>'; return; }
             parts.sort((a, b) => new Date(a.release_date).getTime() - new Date(b.release_date).getTime());
+            window._collParts = parts.map(p => ({ id: p.id, title: p.title || p.original_title || '', year: String(p.release_date || '').slice(0, 4), poster: p.poster_path || '' }));
             const grid = parts.map(p => { const img = p.poster_path ? `<img class="card-image" src="${IMG}w500${p.poster_path}">` : `<div class="card-placeholder">🎬</div>`; const watched = isWatched(p.id, 'movie'); return `<div class="card${watched?' is-watched':''}" onclick="openDetail(${p.id}, 'movie')">${img}<div class="card-info"><div class="card-title">${p.title}</div><div class="card-meta"><span>${(p.release_date||'').slice(0,4)||'—'}</span></div></div></div>`; }).join('');
             const isFavedColl = isCollFav(collectionId);
             const collFavNavBtn = `<button class="modal-fav-btn ${isFavedColl?'liked':''}" onclick="toggleCollFavInModal(${collectionId},'${collectionName.replace(/'/g,"\'")}')">${isFavedColl?'❤️':'🤍'}</button>`;
-            $('modalScrollBody').innerHTML = `${modalNav(collectionName, hasBack, collFavNavBtn)}<div class="modal-body"><h2 class="modal-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">${collectionName} ↑</h2><p style="color:var(--text-muted); margin-bottom:20px;">${parts.length} filmů v kolekci (řazeno od nejstaršího)</p><div class="person-grid">${grid}</div></div>`;
+            $('modalScrollBody').innerHTML = `${modalNav(collectionName, hasBack, collFavNavBtn)}<div class="modal-body"><h2 class="modal-title" onclick="$('modalScrollBody').scrollTop=0" style="cursor:pointer;" title="Zpět nahoru">${collectionName} ↑</h2><p style="color:var(--text-muted); margin-bottom:20px;">${parts.length} filmů v kolekci (řazeno od nejstaršího)</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin:-8px 0 16px;"><button onclick="collectionAddWatchlist(this)" style="padding:9px 14px;border-radius:10px;border:1px solid #6090ff;background:rgba(96,144,255,0.15);color:#6090ff;cursor:pointer;font-size:0.85rem;font-weight:600;">🔖 Vše do watchlistu</button><button onclick="collectionAddToList(this)" style="padding:9px 14px;border-radius:10px;border:1px solid #6090ff;background:rgba(96,144,255,0.15);color:#6090ff;cursor:pointer;font-size:0.85rem;font-weight:600;">📁 Vše do seznamu</button></div><div class="person-grid">${grid}</div></div>`;
         } catch(e) { 
             $('modalScrollBody').innerHTML = '<div class="empty">⚠️ Chyba načtení kolekce</div>'; 
         }
