@@ -2823,7 +2823,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const hid = await histraEnsureList(name);
         const remote = new Set();
         try {
-            const raw = await histraFetchListItems('/api/v1/lists', { id: hid });
+            const raw = await histraFetchAllPaged(`/api/v1/lists/${hid}?extended=full`, 100, 20);
             (raw || []).forEach(e => { const p = histraParseMediaEntry(e); if (p) remote.add(p.type + '_' + p.tmdb); });
         } catch (e) {}
         const want = new Map((items || []).map(it => [((it.type === 'tv' || it.type === 'shows') ? 'tv' : 'movie') + '_' + it.id, it]));
@@ -3803,14 +3803,29 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         ov.id = 'histraListPickerOverlay';
         ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
         ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
-        const btns = lists.map((l, i) => `<button id="histraPickBtn_${i}" onclick="histraPickList(${i},${id},'${type}')" style="display:block;width:100%;text-align:left;padding:12px 16px;margin-bottom:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;color:#fff;cursor:pointer;">📁 ${_hEsc(l.name || l.title || 'Seznam')}</button>`).join('');
+        const btns = lists.map((l, i) => `<button id="histraPickBtn_${i}" data-in-list="0" onclick="histraPickList(${i},${id},'${type}')" style="display:block;width:100%;text-align:left;padding:12px 16px;margin-bottom:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;color:#fff;cursor:pointer;">📁 ${_hEsc(l.name || l.title || 'Seznam')}</button>`).join('');
         ov.innerHTML = `<div style="background:var(--bg-card);border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:480px;max-height:70vh;overflow-y:auto;">
-            <div style="font-weight:700;margin-bottom:14px;color:#a78bfa;">🟣 Seznamy (Histra)</div>
+            <div style="font-weight:700;margin-bottom:14px;color:#a78bfa;">🟣 Seznamy (Histra) — fialově = už tam je, klikni pro odebrání</div>
             ${btns || '<div style="color:var(--text-muted);margin-bottom:12px;">V Histře zatím nemáš žádné seznamy.</div>'}
             <button onclick="histraPickListNew(${id},'${type}')" style="display:block;width:100%;text-align:center;padding:12px;margin-top:6px;background:transparent;border:1px dashed #8b5cf6;border-radius:10px;color:#a78bfa;cursor:pointer;">➕ Nový seznam</button>
             <button onclick="document.getElementById('histraListPickerOverlay').remove()" style="display:block;width:100%;text-align:center;padding:10px;margin-top:10px;background:transparent;border:none;color:var(--text-muted);cursor:pointer;">Zavřít</button>
         </div>`;
         document.body.appendChild(ov);
+        // Na pozadí zjistit, ve kterých seznamech Histry už položka je, a označit je (jako u seznamů Sinatoru)
+        const mark = (i, on) => {
+            const b = document.getElementById(`histraPickBtn_${i}`); if (!b) return;
+            const l = lists[i], name = _hEsc(l.name || l.title || 'Seznam');
+            b.dataset.inList = on ? '1' : '0';
+            b.style.background = on ? 'rgba(139,92,246,0.2)' : 'var(--bg-elevated)';
+            b.style.borderColor = on ? '#8b5cf6' : 'var(--border)';
+            b.style.color = on ? '#a78bfa' : '#fff';
+            b.innerHTML = (on ? '✅ ' : '📁 ') + name;
+        };
+        window._histraPickMark = mark;
+        const worker = async (l, i) => {
+            try { const lid = l.id ?? l.list_id; if (await histraFindListMedia(lid, id, type)) mark(i, true); } catch (e) { /* tichý fail */ }
+        };
+        (async () => { for (let k = 0; k < lists.length; k += 4) await Promise.all(lists.slice(k, k + 4).map((l, j) => worker(l, k + j))); })();
     };
     window.histraPickList = async function(i, id, type) {
         const l = (window._histraPickLists || [])[i]; if (!l) return;
@@ -3818,10 +3833,18 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const btn = document.getElementById(`histraPickBtn_${i}`);
         if (btn) btn.disabled = true;
         try {
-            await histraPostItem(`/api/v1/lists/${lid}/items`, id, type);
-            if (btn) { btn.style.background = 'rgba(139,92,246,0.2)'; btn.style.borderColor = '#8b5cf6'; btn.style.color = '#a78bfa'; btn.textContent = `✅ ${name}`; }
-            _hToast(`📁 Přidáno do seznamu „${name}“ (Histra)`);
-            setTimeout(() => sinatorAskAlsoList(name, id, type), 50);
+            if (btn && btn.dataset.inList === '1') {
+                // už tam je → odebrat
+                const media = await histraFindListMedia(lid, id, type);
+                if (media) await histraApi(`/api/v1/lists/${lid}/items`, { method: 'DELETE', body: media });
+                if (window._histraPickMark) window._histraPickMark(i, false);
+                _hToast(`🗑️ Odebráno ze seznamu „${name}“ (Histra)`);
+            } else {
+                await histraPostItem(`/api/v1/lists/${lid}/items`, id, type);
+                if (window._histraPickMark) window._histraPickMark(i, true);
+                _hToast(`📁 Přidáno do seznamu „${name}“ (Histra)`);
+                setTimeout(() => sinatorAskAlsoList(name, id, type), 50);
+            }
         } catch (e) { _hToast('❌ ' + _hErr(e)); }
         finally { if (btn) btn.disabled = false; }
     };
@@ -5675,6 +5698,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-17e', date: '17. 10. 2026', items: [
+            '🎞️ Zábava → nová sekce „Trailery“: nová videa z YouTube kanálu Totalfilm.cz (stejně jako je postuje bot Palantír na Discordu) — náhled, název, „dnes / včera v 20:28“, ▶ přehrání přímo v appce, „🔍 Detail filmu“ (z názvu videa najde film na TMDB) a ↗ otevření na YouTube. Filtr „Vše / Jen trailery“. Načítá se přes novou serverovou funkci /api/yt (soubor api/yt.js v ZIPu) a když není nasazená, přes veřejné proxy; ID kanálu se zjistí samo z @TotalfilmCz (jde nastavit i ručně přes ⚙️ kanál)',
+        ] },
+        { version: '2026-10-17d', date: '17. 10. 2026', items: [
+            '🟣 Přidat do seznamu (Histra): seznamy, ve kterých už film/seriál je, jsou teď označené fialově a ✅ (stejně jako u seznamů Sinatoru); klepnutím na označený seznam se položka odebere. Dřív se v Histře neukazovalo nic a klepnutím šlo přidat podruhé',
+        ] },
         { version: '2026-10-17c', date: '17. 10. 2026', items: [
             '🔁 Synchronizace shlédnutí Sinator ↔ Histra bez duplicit: stejné shlédnutí je jen jedno (porovnává se počet shlédnutí, ne přesný čas, takže se dřív shlédnuté filmy už nepřidávají znovu s dnešním datem). Co je shlédnuté jen v jedné aplikaci, doplní se do druhé — z Histry do Sinatoru s datem z Histry, ze Sinatoru do Histry s datem ze Sinatoru (po dávkách). Nové shlédnutí navíc se přidá jen když je opravdu další',
             '🕒 Při označení „Shlédnuto“ (film, seriál, epizoda, Histra i Sinator) naskočí okno: „Shlédnuto teď“ (v historii úplně nahoře) nebo „Již dříve“ (úplně na konci historie); u hromadného označení se ptá jen jednou',
@@ -21675,6 +21704,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             <span style="font-size:1.6rem;">🎬</span>
             <div><div style="font-weight:700;color:#38bdf8;">Kino</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Co bylo, co hraje a co se chystá</div></div>
         </button>
+        <button onclick="pushModalAndOpen('zabavaModal', openZabavaModal, openTrailersModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎞️</span>
+            <div><div style="font-weight:700;color:#f87171;">Trailery</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Nová videa z Totalfilm.cz</div></div>
+        </button>
         <button onclick="pushModalAndOpen('zabavaModal', openZabavaModal, openZabavaAiModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🤖</span>
             <div><div style="font-weight:700;background:linear-gradient(135deg,#a78bfa,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">AI nástroje</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Doporučení, kvízy, nálada, porovnání</div></div>
@@ -21952,6 +21985,26 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <div id="hrajeVKineResult"></div>
         <div id="hrajeVKineLoader" style="display:none;text-align:center;padding:30px;color:#888;"><div style="font-size:1.5rem;margin-bottom:8px;">⏳</div>Načítám…</div>
         <div id="hrajeVKineError" style="display:none;color:#f87171;text-align:center;padding:20px;font-size:0.9rem;"></div>
+    </div>
+</div>
+
+<!-- TRAILERY (Totalfilm.cz) MODAL -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);z-index:4300;flex-direction:column;overflow:hidden;" id="trailersModal" onclick="if(event.target===this)closeTrailersModal()">
+    <div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <button onclick="kinoBackToZabava('trailersModal')" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">← Zpět</button>
+        <h3 style="flex:1;min-width:0;font-family:'Playfair Display',serif;font-size:1rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🎞️ Trailery · Totalfilm.cz</h3>
+        <button onclick="trailersRefresh(true)" title="Obnovit" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;display:grid;place-items:center;">🔄</button>
+        <button onclick="closeTrailersModal()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;place-items:center;">✕</button>
+    </div>
+    <div style="flex-shrink:0;padding:10px 16px 0;display:flex;gap:8px;align-items:center;">
+        <button id="trFilterAll" onclick="trailersFilter('all')" style="padding:7px 14px;border-radius:18px;border:1px solid #f87171;background:rgba(248,113,113,0.15);color:#f87171;cursor:pointer;font-size:0.82rem;">Vše</button>
+        <button id="trFilterTr" onclick="trailersFilter('trailer')" style="padding:7px 14px;border-radius:18px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:0.82rem;">Jen trailery</button>
+        <span style="flex:1"></span>
+        <button onclick="trailersSetChannel()" style="padding:7px 12px;border-radius:18px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:0.78rem;">⚙️ kanál</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:12px 16px 20px;">
+        <div id="trailersList" style="display:flex;flex-direction:column;gap:14px;"></div>
+        <div id="trailersMsg" style="text-align:center;color:#888;padding:24px;display:none;"></div>
     </div>
 </div>
 
@@ -43544,7 +43597,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Hide when any fullscreen modal with its own close button is visible
         var fullscreenModalIds = [
             'nahodnyTipModal','kvizModal','zebrickyModal','upcomingModal',
-            'porovnaniModal','moodModal','myStatsModal','tentodenModal','koukatSModal','uzByloVKineModal','hrajeVKineModal',
+            'porovnaniModal','moodModal','myStatsModal','tentodenModal','koukatSModal','uzByloVKineModal','hrajeVKineModal','trailersModal',
             'tvRadioModal','zabavaModal','zabavaAiModal','listsModal','histraListsModal','musicModal',
             'slozkyModal','slozkyPickerModal','doporucujiOverlay','addDoporuceniOverlay',
             'settingsModal','externalInstallModal','askSinatorModal'
@@ -47733,6 +47786,146 @@ window.KinoList = (function() {
   };
 })();
 
+// ===== TRAILERY (YouTube kanál Totalfilm.cz — stejně jako bot Palantír na Discordu) =====
+(function() {
+  const HANDLE = 'TotalfilmCz', CK = 'sinator_trailers_cache_v1', IK = 'sinator_trailers_channel';
+  let _items = [], _filter = 'all', _loading = false;
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const dec = s => String(s || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  function parseFeed(xml) {
+    const out = [];
+    (String(xml).match(/<entry>[\s\S]*?<\/entry>/g) || []).forEach(e => {
+      const g = re => { const m = e.match(re); return m ? dec(m[1]) : ''; };
+      const id = g(/<yt:videoId>(.*?)<\/yt:videoId>/); if (!id) return;
+      out.push({ id, title: g(/<title>([\s\S]*?)<\/title>/), published: g(/<published>(.*?)<\/published>/), desc: g(/<media:description>([\s\S]*?)<\/media:description>/).slice(0, 400) });
+    });
+    return out;
+  }
+  async function viaProxy(url) {
+    const proxies = [u => 'https://corsproxy.io/?url=' + encodeURIComponent(u), u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u)];
+    let last;
+    for (const p of proxies) {
+      try {
+        const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 12000);
+        const r = await fetch(p(url), { signal: ctl.signal }); clearTimeout(t);
+        if (r.ok) { const txt = await r.text(); if (txt && txt.length > 200) return txt; }
+      } catch (e) { last = e; }
+    }
+    throw last || new Error('Proxy nedostupná');
+  }
+  async function fetchAll() {
+    const manual = (localStorage.getItem(IK) || '').trim();
+    // 1) vlastní serverová funkce /api/yt (nejspolehlivější, když je nasazená)
+    try {
+      const r = await fetch(`/api/yt?handle=${HANDLE}` + (/^UC[\w-]{22}$/.test(manual) ? '&channel=' + manual : ''));
+      if (r.ok) { const d = await r.json(); if (d && Array.isArray(d.items) && d.items.length) return d.items; }
+    } catch (e) {}
+    // 2) přímo z prohlížeče přes veřejné CORS proxy
+    let id = /^UC[\w-]{22}$/.test(manual) ? manual : (localStorage.getItem(IK + '_resolved') || '');
+    if (!id) {
+      const html = await viaProxy(`https://www.youtube.com/@${HANDLE}`);
+      const m = html.match(/"externalId":"(UC[\w-]{22})"/) || html.match(/channel_id=(UC[\w-]{22})/) || html.match(/"channelId":"(UC[\w-]{22})"/);
+      if (!m) throw new Error('ID kanálu se nepodařilo zjistit — nastav ho ručně (⚙️ kanál).');
+      id = m[1]; localStorage.setItem(IK + '_resolved', id);
+    }
+    return parseFeed(await viaProxy(`https://www.youtube.com/feeds/videos.xml?channel_id=${id}`));
+  }
+  function when(iso) {
+    const d = new Date(iso); if (isNaN(d)) return '';
+    const hm = d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+    const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 864e5);
+    return days <= 0 ? `dnes v ${hm}` : days === 1 ? `včera v ${hm}` : days < 7 ? `před ${days} dny` : d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  const isTrailer = t => /trailer|teaser|upoutávk|ukázk|spot/i.test(t || '');
+  function paint() {
+    const list = document.getElementById('trailersList'), msg = document.getElementById('trailersMsg'); if (!list) return;
+    const arr = _filter === 'trailer' ? _items.filter(x => isTrailer(x.title)) : _items;
+    list.innerHTML = arr.map(x => `<div style="background:#111827;border:1px solid #1e293b;border-radius:14px;overflow:hidden;">
+        <div onclick="trailersPlay('${x.id}')" style="position:relative;cursor:pointer;aspect-ratio:16/9;background:#000;">
+          <img loading="lazy" src="https://i.ytimg.com/vi/${x.id}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;display:block;">
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="width:58px;height:58px;border-radius:50%;background:rgba(0,0,0,0.62);display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:#fff;">▶</div></div>
+        </div>
+        <div style="padding:10px 12px 12px;">
+          <div style="font-weight:700;font-size:0.92rem;line-height:1.3;color:#e2e8f0;margin-bottom:4px;">${esc(x.title)}</div>
+          <div style="font-size:0.74rem;color:#94a3b8;margin-bottom:8px;">${esc(when(x.published))}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button onclick="trailersPlay('${x.id}')" style="padding:7px 12px;border-radius:10px;border:1px solid #f87171;background:rgba(248,113,113,0.12);color:#f87171;cursor:pointer;font-size:0.78rem;">▶ Přehrát</button>
+            <button onclick="trailersFindFilm(this,'${x.id}')" style="padding:7px 12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:0.78rem;">🔍 Detail filmu</button>
+            <button onclick="window.open('https://youtu.be/${x.id}','_blank')" style="padding:7px 12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:0.78rem;">↗ YouTube</button>
+          </div></div></div>`).join('');
+    msg.style.display = arr.length ? 'none' : 'block';
+    if (!arr.length) msg.textContent = _loading ? 'Načítám…' : (_filter === 'trailer' ? 'Žádné trailery mezi posledními videi.' : 'Nic k zobrazení.');
+  }
+  function setFilterBtns() {
+    const on = 'padding:7px 14px;border-radius:18px;border:1px solid #f87171;background:rgba(248,113,113,0.15);color:#f87171;cursor:pointer;font-size:0.82rem;';
+    const off = 'padding:7px 14px;border-radius:18px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:0.82rem;';
+    const a = document.getElementById('trFilterAll'), t = document.getElementById('trFilterTr');
+    if (a) a.style.cssText = _filter === 'all' ? on : off; if (t) t.style.cssText = _filter === 'trailer' ? on : off;
+  }
+  window.trailersFilter = f => { _filter = f; setFilterBtns(); paint(); };
+  window.trailersRefresh = async function(force) {
+    if (_loading) return; _loading = true;
+    const msg = document.getElementById('trailersMsg');
+    try {
+      if (!force) { try { const c = JSON.parse(localStorage.getItem(CK) || 'null'); if (c && c.items && c.items.length) { _items = c.items; paint(); if (Date.now() - c.t < 20 * 60 * 1000) { _loading = false; return; } } } catch (e) {} }
+      if (!_items.length) { msg.style.display = 'block'; msg.textContent = 'Načítám…'; }
+      const items = await fetchAll();
+      _items = items; localStorage.setItem(CK, JSON.stringify({ t: Date.now(), items }));
+    } catch (e) {
+      if (!_items.length) { msg.style.display = 'block'; msg.textContent = '⚠️ ' + ((e && e.message) || 'Načtení se nezdařilo') + ' Zkus 🔄, nebo nastav ID kanálu (⚙️ kanál).'; }
+    } finally { _loading = false; paint(); }
+  };
+  window.trailersSetChannel = function() {
+    const cur = localStorage.getItem(IK) || '';
+    const v = prompt('ID YouTube kanálu (UC…) — nech prázdné pro automatické zjištění z @TotalfilmCz:', cur);
+    if (v === null) return;
+    localStorage.setItem(IK, v.trim()); localStorage.removeItem(IK + '_resolved'); localStorage.removeItem(CK);
+    trailersRefresh(true);
+  };
+  window.trailersPlay = function(id) {
+    const old = document.getElementById('trailerPlayer'); if (old) old.remove();
+    const ov = document.createElement('div'); ov.id = 'trailerPlayer';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:2000003;display:flex;flex-direction:column;justify-content:center;';
+    ov.innerHTML = `<div style="display:flex;justify-content:flex-end;padding:10px 14px;"><button onclick="document.getElementById('trailerPlayer').remove()" style="background:none;border:1px solid #444;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button></div>
+      <div style="width:100%;aspect-ratio:16/9;"><iframe src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1" style="width:100%;height:100%;border:0;" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>
+      <div style="text-align:center;padding:14px;"><button onclick="window.open('https://youtu.be/${id}','_blank')" style="padding:9px 18px;border-radius:12px;border:1px solid #555;background:transparent;color:#ddd;cursor:pointer;">↗ Otevřít v YouTube</button></div>`;
+    ov.onclick = e => { if (e.target === ov) ov.remove(); };
+    document.body.appendChild(ov);
+  };
+  // 🔍 Detail filmu: z názvu videa („Manipulation (2026) CZ HD trailer“) vytáhne název a najde ho na TMDB
+  window.trailersFindFilm = async function(btn, id) {
+    const x = _items.find(i => i.id === id); if (!x) return;
+    const key = (typeof tmdbApiKey !== 'undefined' && tmdbApiKey) || '';
+    if (!key) { alert('Chybí TMDB API klíč.'); return; }
+    let q = x.title.replace(/[|–—].*$/, '').replace(/\b(CZ|SK)\b.*$/i, '').replace(/\b(HD|4K|trailer|teaser|upoutávka|oficiální)\b.*$/i, '');
+    const ym = q.match(/\((\d{4})\)/); const year = ym ? ym[1] : '';
+    q = q.replace(/\(\d{4}\)/, '').replace(/[:\-]\s*$/, '').trim();
+    if (!q) { alert('Z názvu videa se nepodařilo poznat film.'); return; }
+    const orig = btn.textContent; btn.textContent = '⏳'; btn.disabled = true;
+    try {
+      let r = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${key}&language=cs-CZ&query=${encodeURIComponent(q)}`).then(r => r.json());
+      let list = (r.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv');
+      if (year) { const y = list.filter(m => String(m.release_date || m.first_air_date || '').startsWith(year)); if (y.length) list = y; }
+      if (!list.length) { alert(`„${q}“ jsem na TMDB nenašel.`); return; }
+      const hit = list[0]; const f = window._siOpenDetail || (typeof openDetail === 'function' ? openDetail : null);
+      if (f) f(hit.id, hit.media_type === 'tv' ? 'tv' : 'movie'); else alert('Detail se nepodařilo otevřít.');
+    } catch (e) { alert('Vyhledání selhalo: ' + ((e && e.message) || e)); }
+    finally { btn.textContent = orig; btn.disabled = false; }
+  };
+  window.openTrailersModal = function() {
+    const m = document.getElementById('trailersModal'); if (!m) return;
+    m.style.display = 'flex'; setFilterBtns(); trailersRefresh(false);
+  };
+  window.closeTrailersModal = function() {
+    const m = document.getElementById('trailersModal'); if (m) m.style.display = 'none';
+    if (window._returnToZabava) _returnToZabava();
+  };
+  window.kinoBackToZabava = function(modalId) {
+    const m = document.getElementById(modalId); if (m) m.style.display = 'none';
+    if (window.openZabavaModal) window.openZabavaModal();
+  };
+})();
+
 // Register modal close keys
 (function() {
   const orig = window._modalCloseMap || {};
@@ -47748,6 +47941,7 @@ window.KinoList = (function() {
   orig['tentodenModal'] = function() { if(typeof closeTentodenModal==='function') closeTentodenModal(); };
   orig['uzByloVKineModal'] = function() { if(typeof closeUzByloVKineModal==='function') closeUzByloVKineModal(); };
   orig['hrajeVKineModal'] = function() { if(typeof closeHrajeVKineModal==='function') closeHrajeVKineModal(); };
+  orig['trailersModal'] = function() { if(typeof closeTrailersModal==='function') closeTrailersModal(); };
   orig['askSinatorModal'] = function() { if(typeof closeAskSinatorModal==='function') closeAskSinatorModal(); };
   window._modalCloseMap = orig;
 })();
