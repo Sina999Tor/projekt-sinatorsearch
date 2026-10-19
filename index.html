@@ -3812,21 +3812,73 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         catch (e) { _hToast('❌ ' + _hErr(e)); }
     };
 
+    // ── Označení tlačítek Watchlist v detailu (je/není ve watchlistu) ──
+    function wlSetMark(which, id, on) {
+        document.querySelectorAll(`[data-wl="${which}"][data-wl-id="${id}"]`).forEach(b => {
+            const sp = b.querySelector('.sin-pick-spin'); if (sp) sp.remove();
+            b.dataset.wlOn = on ? '1' : '0';
+            const sin = which === 'sin';
+            const col = sin ? '#6090ff' : '#a78bfa', bor = sin ? '#6090ff' : '#8b5cf6';
+            const rgb = sin ? '96,144,255' : '139,92,246';
+            b.style.background = on ? `rgba(${rgb},0.35)` : `rgba(${rgb},0.15)`;
+            b.style.borderColor = bor; b.style.color = col;
+            b.style.fontWeight = on ? '700' : '';
+            b.textContent = on ? '✅ Ve watchlistu — klikni pro odebrání' : '🔖 Přidat do watchlistu';
+            // značka i na rozbalovacím tlačítku skupiny (Sinator ▾ / Histra ▾)
+            const head = b.parentElement && b.parentElement.previousElementSibling;
+            if (head) { head.querySelectorAll('.wl-dot').forEach(x => x.remove()); if (on) head.insertAdjacentHTML('beforeend', ' <span class="wl-dot" title="Ve watchlistu">🔖✅</span>'); }
+        });
+    }
+    function wlSpin(which, id) {
+        document.querySelectorAll(`[data-wl="${which}"][data-wl-id="${id}"]`).forEach(b => {
+            if (!b.querySelector('.sin-pick-spin')) { b.style.position = 'relative'; b.insertAdjacentHTML('beforeend', '<span class="sin-pick-spin sin-btn-spin" style="color:#9aa4c0;"></span>'); }
+        });
+    }
+    window.wlSetMark = wlSetMark;
+    window.initWatchlistMarks = async function(id, type) {
+        // Sinator
+        try {
+            if (typeof myBackendReady === 'function' && myBackendReady() && document.querySelector(`[data-wl="sin"][data-wl-id="${id}"]`)) {
+                wlSpin('sin', id);
+                (async () => {
+                    try {
+                        const list = await myWatchlistGet();
+                        const on = Array.isArray(list) && list.some(it => Number(it.id) === Number(id) && (it.type === type || (it.type === 'shows' && type === 'tv') || (it.type === 'movies' && type === 'movie')));
+                        wlSetMark('sin', id, on);
+                    } catch (e) { const sp = document.querySelector(`[data-wl="sin"][data-wl-id="${id}"] .sin-pick-spin`); if (sp) sp.remove(); }
+                })();
+            }
+        } catch (e) {}
+        // Histra
+        try {
+            if (histraReady() && document.querySelector(`[data-wl="histra"][data-wl-id="${id}"]`)) {
+                wlSpin('histra', id);
+                (async () => {
+                    try {
+                        const raw = await histraFetchAllPaged('/api/v1/watchlist?extended=full&lang=cs-CZ', 100, 30, null, true);
+                        const want = _hIsTv(type) ? 'tv' : 'movie';
+                        const on = raw.map(histraMapItem).filter(Boolean).some(it => Number(it.id) === Number(id) && it.type === want);
+                        wlSetMark('histra', id, on);
+                    } catch (e) { const sp = document.querySelector(`[data-wl="histra"][data-wl-id="${id}"] .sin-pick-spin`); if (sp) sp.remove(); }
+                })();
+            }
+        } catch (e) {}
+    };
     // ── Watchlist – Histra ──
     window.histraWatchlistToggle = async function(id, type) {
         if (!histraReady()) { alert('⚠️ Nejdřív nastav Histra token v Nastavení → Propojení účtů.'); return; }
         try {
-            const raw = await histraFetchAllPaged('/api/v1/watchlist?extended=full&lang=cs-CZ', 100, 30);
+            const raw = await histraFetchAllPaged('/api/v1/watchlist?extended=full&lang=cs-CZ', 100, 30, null, true);
             const want = _hIsTv(type) ? 'tv' : 'movie';
             const has = raw.map(histraMapItem).filter(Boolean).some(it => Number(it.id) === Number(id) && it.type === want);
             if (has) {
                 const kind = _hIsTv(type) ? 'show' : 'movie';
                 try { await histraApi('/api/v1/watchlist', { method: 'DELETE', body: { tmdb: String(id), media_type: kind } }); }
                 catch (e) { await histraApi('/api/v1/watchlist', { method: 'DELETE', body: { tmdb: String(id) } }); }
-                _hToast('🗑️ Odebráno z watchlistu (Histra)');
+                _hToast('🗑️ Odebráno z watchlistu (Histra)'); wlSetMark('histra', id, false);
             } else {
                 await histraPostItem('/api/v1/watchlist', id, type);
-                _hToast('🔖 Přidáno do watchlistu (Histra)');
+                _hToast('🔖 Přidáno do watchlistu (Histra)'); wlSetMark('histra', id, true);
             }
         } catch (e) { _hToast('❌ ' + _hErr(e)); }
     };
@@ -5089,10 +5141,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             } catch (e) { /* při chybě zjištění stavu prostě přidáme */ }
             if (already) {
                 await myWatchlistRemove(id, type);
-                toast('🗑️ Odebráno z watchlistu');
+                toast('🗑️ Odebráno z watchlistu'); if (window.wlSetMark) wlSetMark('sin', id, false);
             } else {
                 await myWatchlistAdd(id, type, title, year || null, poster || null);
-                toast('🔖 Přidáno do watchlistu');
+                toast('🔖 Přidáno do watchlistu'); if (window.wlSetMark) wlSetMark('sin', id, true);
             }
         } catch (e) { toast('❌ ' + (e && e.message ? e.message : e)); }
     };
@@ -15932,7 +15984,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
 <button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="openSlozkyPicker({id:${id},type:'${type}',title:'${safeTitle}',year:${year||0},poster:'${d.poster_path||''}',rating:${d.vote_average||0}})">📁 Složky</button>
 ${(typeof myBackendReady==='function'&&myBackendReady()) ? `<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">🧩 Sinator ▾</button>
 <div class="action-buttons" style="${abSubGrid}">
-<button class="action-btn-modal" onclick="myBackendAddWatchlist(${id},'${type}','${jsq(title)}','${year}','${posterPath}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">🔖 Watchlist</button>
+<button class="action-btn-modal" onclick="myBackendAddWatchlist(${id},'${type}','${jsq(title)}','${year}','${posterPath}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;" data-wl="sin" data-wl-id="${id}">🔖 Watchlist</button>
 <button class="action-btn-modal" onclick="myBackendRate(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">⭐ Hodnotit</button>
 ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWatched(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">✅ Shlédnuto</button>` : `<button class="action-btn-modal" onclick="myBackendMarkWatched(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">✅ Shlédnuto (celý seriál)</button>`}
 <button class="action-btn-modal" onclick="myBackendAddToList(${id},'${type}')" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;">📁 Do seznamu</button>
@@ -15940,7 +15992,7 @@ ${type === 'movie' ? `<button class="action-btn-modal" onclick="myBackendMarkWat
 ${(typeof histraReady==='function'&&histraReady()&&state._backTo==='histra'&&state._histraView&&/^Rozkoukan/.test(state._histraView.title||'')) ? `<button class="action-btn-modal" onclick="histraClearProgress(${id},'${type}')" style="background:rgba(139,92,246,0.2);border-color:#8b5cf6;color:#c4b5fd;font-weight:700;">🗑️ Odebrat z rozkoukaných (Histra)</button>` : ''}
 ${(typeof histraReady==='function'&&histraReady()) ? `<button class="action-btn-modal" style="background:var(--bg-elevated);border-color:var(--border);color:var(--text);" onclick="(function(b){const n=b.nextElementSibling;n.style.display=n.style.display==='grid'?'none':'grid';})(this)">🟣 Histra ▾</button>
 <div class="action-buttons" style="${abSubGrid}">
-<button class="action-btn-modal" onclick="histraWatchlistToggle(${id},'${type}')" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#a78bfa;">🔖 Watchlist</button>
+<button class="action-btn-modal" onclick="histraWatchlistToggle(${id},'${type}')" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#a78bfa;" data-wl="histra" data-wl-id="${id}">🔖 Watchlist</button>
 <button class="action-btn-modal" onclick="histraMarkWatchedBoth(${id},'${type}')" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#a78bfa;">✅ Shlédnuto</button>
 <button class="action-btn-modal" onclick="histraAddToListPicker(${id},'${type}')" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#a78bfa;">📁 Do seznamu</button>
 <button class="action-btn-modal" onclick="histraClearProgress(${id},'${type}')" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;color:#a78bfa;">🗑️ Z rozkoukaných</button>
@@ -15984,6 +16036,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             initMySinatorWatchHistory(id, type);
             // Histra: hodnocení, shlédnuto a historie sledování (fialově)
             initHistraRating(id, type);
+            try { if (window.initWatchlistMarks) initWatchlistMarks(id, type); } catch (e) {}
             initHistraWatchedBadge(id, type, d.number_of_episodes || 0);
             initHistraWatchHistory(id, type);
             // Swipe doleva/doprava na plakátu/backdropu = procházení dalších fotek (banerů) titulu
