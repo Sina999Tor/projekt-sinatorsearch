@@ -5156,8 +5156,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 if (_c && Date.now() - _c.t < 120000) items = _c.items;
                 else { items = await myListItemsGet(l.id); window._sinListCache[l.id] = { t: Date.now(), items }; }
                 const inList = Array.isArray(items) && items.some(it => Number(it.id) === Number(id) && (it.type === type || (it.type === 'shows' && type === 'tv') || (it.type === 'movies' && type === 'movie')));
-                if (!inList) return;
-                const btn = document.getElementById(`myListPickBtn_${l.id}`);
+                const btn = inList ? document.getElementById(`myListPickBtn_${l.id}`) : null;
                 if (btn) {
                     btn.dataset.inList = '1';
                     btn.style.background = 'rgba(29,185,84,0.2)';
