@@ -48391,6 +48391,9 @@ function jset(k,v){try{st.setItem(k,JSON.stringify(v))}catch(e){}}
 function T(m){try{showToast(m)}catch(e){alert(m)}}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function F(u){return (typeof _fetchWithTimeout==='function'?_fetchWithTimeout(u,10000):fetch(u)).then(function(r){return r.json()})}
+// Český/slovenský název: TMDB u CZ/SK produkce bez českého překladu vrací anglický (např. „Gods plan“) — použít originál
+function czNm(d){if(!d)return '';var o=(d.original_language==='cs'||d.original_language==='sk')?(d.original_name||d.original_title):'';return o||d.name||d.title||''}
+window.czNm=czNm;
 function tj(p,q){return F(TB+p+'?api_key='+K()+'&language=cs-CZ'+(q||''))}
 function p2(n){return n<10?'0'+n:''+n}
 function td(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
@@ -48555,13 +48558,13 @@ async function loadUp0(){var s=S(),tv={},mv={},hist=[],tvO=[];
  var pf=(localStorage.getItem('sinator_notify_providers')||'').split(',').map(function(x){return x.trim().toLowerCase()}).filter(Boolean);
  var pvOf=function(w){var f=((w&&w.results&&w.results.CZ)||{}).flatrate||[];var n=f.map(function(p){return p.provider_name});if(pf.length)n=n.filter(function(x){return pf.some(function(w2){return x.toLowerCase().indexOf(w2)>=0})});return n};
  var a=await pmap(tvO.slice(0,400),function(id){return wlSet['tv_'+id]?tj('/tv/'+id,'&append_to_response=watch/providers'):tj('/tv/'+id)},10);
- a.forEach(function(d){if(d&&wlSet['tv_'+d.id]){var pv=pvOf(d['watch/providers']);if(pv.length)out.st.push({id:d.id,n:d.name,p:d.poster_path,t:'tv',pv:pv})}
- var le=d&&d.last_episode_to_air,lw=d&&lastW[d.id];if(le&&lw&&(lw[0]>0||lw[1]>0)&&le.season_number>0&&(le.season_number*1000+le.episode_number)>(lw[0]*1000+lw[1]))out.unc.push({id:d.id,n:d.name,p:d.poster_path,ws:lw[0],we:lw[1],ls:le.season_number});
- if(le&&lw&&le.air_date)out.pa.push({id:d.id,n:d.name,p:d.poster_path,d:le.air_date,x:'S'+p2(le.season_number)+'E'+p2(le.episode_number)});
- var e=d&&d.next_episode_to_air;if(e&&e.air_date&&e.air_date>=t0)out.tv.push({id:d.id,n:d.name,p:d.poster_path,d:e.air_date,x:'S'+p2(e.season_number)+'E'+p2(e.episode_number)+(e.name?' · '+e.name:'')})});
+ a.forEach(function(d){if(d&&wlSet['tv_'+d.id]){var pv=pvOf(d['watch/providers']);if(pv.length)out.st.push({id:d.id,n:czNm(d),p:d.poster_path,t:'tv',pv:pv})}
+ var le=d&&d.last_episode_to_air,lw=d&&lastW[d.id];if(le&&lw&&(lw[0]>0||lw[1]>0)&&le.season_number>0&&(le.season_number*1000+le.episode_number)>(lw[0]*1000+lw[1]))out.unc.push({id:d.id,n:czNm(d),p:d.poster_path,ws:lw[0],we:lw[1],ls:le.season_number});
+ if(le&&lw&&le.air_date)out.pa.push({id:d.id,n:czNm(d),p:d.poster_path,d:le.air_date,x:'S'+p2(le.season_number)+'E'+p2(le.episode_number)});
+ var e=d&&d.next_episode_to_air;if(e&&e.air_date&&e.air_date>=t0)out.tv.push({id:d.id,n:czNm(d),p:d.poster_path,d:e.air_date,x:'S'+p2(e.season_number)+'E'+p2(e.episode_number)+(e.name?' · '+e.name:'')})});
  var mc={};try{mc=JSON.parse(localStorage.getItem('sf_mv_cache')||'{}')}catch(e){}
- var now=Date.now(),ids=Object.keys(mv).slice(0,400),need=ids.filter(function(id){return !mc[id]||now-mc[id].t>864e5||mc[id].pv===undefined});
- await pmap(need,function(id){return tj('/movie/'+id,'&append_to_response=release_dates,watch/providers').then(function(m){if(!m||!m.id)return null;var rd=[];((m.release_dates&&m.release_dates.results)||[]).forEach(function(c){if(c.iso_3166_1!=='CZ'&&c.iso_3166_1!=='US')return;(c.release_dates||[]).forEach(function(x){if([2,3,4].indexOf(x.type)>=0)rd.push([c.iso_3166_1,(x.release_date||'').slice(0,10),x.type])})});var pr=((m['watch/providers']&&m['watch/providers'].results&&m['watch/providers'].results.CZ)||{}).flatrate||[];mc[id]={t:now,id:m.id,n:m.title,p:m.poster_path,rd:rd,pv:pr.map(function(p){return p.provider_name})};return 1})},10);
+ var now=Date.now(),ids=Object.keys(mv).slice(0,400),need=ids.filter(function(id){return !mc[id]||now-mc[id].t>864e5||mc[id].pv===undefined||mc[id].cz!==1});
+ await pmap(need,function(id){return tj('/movie/'+id,'&append_to_response=release_dates,watch/providers').then(function(m){if(!m||!m.id)return null;var rd=[];((m.release_dates&&m.release_dates.results)||[]).forEach(function(c){if(c.iso_3166_1!=='CZ'&&c.iso_3166_1!=='US')return;(c.release_dates||[]).forEach(function(x){if([2,3,4].indexOf(x.type)>=0)rd.push([c.iso_3166_1,(x.release_date||'').slice(0,10),x.type])})});var pr=((m['watch/providers']&&m['watch/providers'].results&&m['watch/providers'].results.CZ)||{}).flatrate||[];mc[id]={t:now,cz:1,id:m.id,n:czNm(m),p:m.poster_path,rd:rd,pv:pr.map(function(p){return p.provider_name})};return 1})},10);
  try{var keep={};ids.forEach(function(id){if(mc[id])keep[id]=mc[id]});localStorage.setItem('sf_mv_cache',JSON.stringify(keep))}catch(e){}
  ids.forEach(function(id){var c=mc[id];if(!c)return;if(wlSet['movie_'+id]&&c.pv&&c.pv.length){var pv=pf.length?c.pv.filter(function(x){return pf.some(function(w2){return x.toLowerCase().indexOf(w2)>=0})}):c.pv;if(pv.length)out.st.push({id:c.id,n:c.n,p:c.p,t:'movie',pv:pv})}
  var cz=null,us=null;c.rd.forEach(function(x){var d=x[1];if(d<t0)return;var o={d:d,k:x[2]===4?'💿 VOD':'🎬 kino'};if(x[0]==='CZ'){if(!cz||d<cz.d)cz=o}else if(!us||d<us.d)us=o});var o=cz||us;if(o)out.mv.push({id:c.id,n:c.n,p:c.p,d:o.d,x:o.k+(cz?' (ČR)':' (USA)')})});
@@ -48591,9 +48594,9 @@ window.sfUpNext=async function(){if(!K()){T('Nejdřív zadej TMDB klíč');retur
  var b=ov('sfUp','📆 Up Next','<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"><button class="sf-btn on" id="sfU1" onclick="sfTab(1)">📺 Další díly</button><button class="sf-btn" id="sfU2" onclick="sfTab(2)">🎬 Premiéry</button><button class="sf-btn" id="sfU3" onclick="sfTab(3)">📡 Streamy</button><button class="sf-btn" id="sfU4" onclick="sfTab(4)">👀 Neshlédnuté</button><button class="sf-btn" id="sfBell" onclick="sfNotify()" title="Upozornění zap/vyp">'+(localStorage.getItem('sinator_notify_enabled')==='1'?'🔔':'🔕')+'</button><button class="sf-btn" id="sfU5" onclick="sfTab(5)">🗓️ Kalendář</button></div><div id="sfUb">Načítám…</div>');
  var o=await loadUp(),to=new Date(Date.now()+60*864e5).toISOString().slice(0,10),q='&region=CZ&release_date.gte='+td()+'&release_date.lte='+to+'&sort_by=primary_release_date.asc&with_release_type=';
  var ci=await tj('/movie/upcoming','&region=CZ&page=1').catch(function(){return{}}),vo=await tj('/discover/movie',q+'4').catch(function(){return{}});
- var mp=function(r,k){return((r&&r.results)||[]).filter(function(m){return m.poster_path}).map(function(m){return{id:m.id,n:m.title,p:m.poster_path,d:m.release_date,x:k}})};
+ var mp=function(r,k){return((r&&r.results)||[]).filter(function(m){return m.poster_path}).map(function(m){return{id:m.id,n:czNm(m),p:m.poster_path,d:m.release_date,x:k}})};
  sw.up={1:'<h4 style="margin:0 0 8px">Seriály, které sleduješ</h4>'+rows(o.tv,'tv')+'<h4 style="margin:14px 0 8px">Filmy z tvého watchlistu</h4>'+rows(o.mv,'movie'),
-  2:'<h4 style="margin:0 0 8px">🎬 Do kin v ČR</h4>'+rows(((ci&&ci.results)||[]).filter(function(m){return m.release_date}).map(function(m){return{id:m.id,n:m.title,p:m.poster_path,d:m.release_date,x:m.vote_average>0?'★ '+m.vote_average.toFixed(1):'kino'}}),'movie')+'<h4 style="margin:14px 0 8px">💿 Na VOD v ČR (60 dní)</h4>'+rows(mp(vo,'VOD / digitálně'),'movie'),
+  2:'<h4 style="margin:0 0 8px">🎬 Do kin v ČR</h4>'+rows(((ci&&ci.results)||[]).filter(function(m){return m.release_date}).map(function(m){return{id:m.id,n:czNm(m),p:m.poster_path,d:m.release_date,x:m.vote_average>0?'★ '+m.vote_average.toFixed(1):'kino'}}),'movie')+'<h4 style="margin:14px 0 8px">💿 Na VOD v ČR (60 dní)</h4>'+rows(mp(vo,'VOD / digitálně'),'movie'),
   3:'<h4 style="margin:0 0 8px">📡 Tvůj watchlist teď na streamu (ČR)</h4>'+stRows(o.st)};
  sw.o=o;var b4=document.getElementById('sfU4');if(b4&&o.unc.length)b4.textContent='👀 Neshlédnuté ('+o.unc.length+')';
  sfTab(1)};
@@ -48610,7 +48613,7 @@ function calItems(o,cin){var a=[],seen={};
  (o.tv||[]).forEach(function(x){add({id:x.id,t:'tv',n:x.n,p:x.p,d:x.d,x:x.x},'ep')});
  (o.mv||[]).forEach(function(x){add({id:x.id,t:'movie',n:x.n,p:x.p,d:x.d,x:x.x},'wl')});
  (o.pa||[]).forEach(function(x){add({id:x.id,t:'tv',n:x.n,p:x.p,d:x.d,x:x.x},'past')});
- cin.forEach(function(m){add({id:m.id,t:'movie',n:m.title,p:m.poster_path,d:m.release_date,x:'kino ČR'+(m.vote_average>0?' · ★ '+m.vote_average.toFixed(1):'')},'cin')});
+ cin.forEach(function(m){add({id:m.id,t:'movie',n:czNm(m),p:m.poster_path,d:m.release_date,x:'kino ČR'+(m.vote_average>0?' · ★ '+m.vote_average.toFixed(1):'')},'cin')});
  return a}
 function calPill(d){var n=dd(d);return n<0?ago(d):cd(n)}
 function calRow(x){return '<div class="sfrow" onclick="sfOpen('+x.id+',\''+x.t+'\')"><img loading="lazy" src="'+(x.p?IM+'w154'+x.p:'')+'"><div><b>'+esc(x.n)+'</b><br><small><span style="color:'+CAL_COL[x.k]+'">●</span> '+CAL_LAB[x.k]+(x.x?' · '+esc(x.x):'')+'</small></div><span class="sfpill">'+calPill(x.d)+'</span></div>'}
@@ -49016,9 +49019,9 @@ window.sfFrFav=async function(id,t){
   if(t==='movie'){var m=await tj('/movie/'+id),c=m.belongs_to_collection;
    if(c){var e2=CU.filter(function(x){return x.t==='col'&&x.id===c.id})[0];
     if(e2){e2.src=(e2.src||[]).concat([id])}else CU.push({t:'col',id:c.id,n:cleanCol(c.name||m.title),p:c.poster_path||m.poster_path||null,src:[id]})}
-   else CU.push({t:'movie',id:id,n:m.title,p:m.poster_path||null,src:[id]})}
+   else CU.push({t:'movie',id:id,n:czNm(m),p:m.poster_path||null,src:[id]})}
   else if(t==='col'){var cc=await tj('/collection/'+id);CU.push({t:'col',id:id,n:cleanCol(cc.name),p:cc.poster_path||null,src:[]})}
-  else{var d=await tj('/tv/'+id);CU.push({t:'tv',id:id,n:d.name,p:d.poster_path||null})}
+  else{var d=await tj('/tv/'+id);CU.push({t:'tv',id:id,n:czNm(d),p:d.poster_path||null})}
   cuSave();favRefresh();T('➕ Přidáno do vlastních')}catch(e){T('⚠️ Nepodařilo se přidat')}};
 window.sfFrVoice=function(){if(typeof window.startVoiceSearch==='function')window.startVoiceSearch('sfFrQ','sfFrMic');else T('Hlasové hledání není dostupné')};
 function flatOf(f){var o=[];f.gs.forEach(function(g){g[1].forEach(function(e){o.push(e)})});return o}
@@ -49141,7 +49144,7 @@ window.sfFrAuto=async function(id,t){
   else{
    var d=await tj('/tv/'+id);
    items=(d.seasons||[]).filter(function(s){return s.season_number>0}).map(function(s){
-    return{id:id,t:'tv',n:d.name+' — '+(s.name||('Řada '+s.season_number)),y:(s.air_date||'').slice(0,4),p:s.poster_path||d.poster_path,era:s.episode_count?s.episode_count+' ep.':'',noW:true,future:s.air_date&&s.air_date>td_}});
+    return{id:id,t:'tv',n:czNm(d)+' — '+(s.name||('Řada '+s.season_number)),y:(s.air_date||'').slice(0,4),p:s.poster_path||d.poster_path,era:s.episode_count?s.episode_count+' ep.':'',noW:true,future:s.air_date&&s.air_date>td_}});
    intro='Seriál <b>'+esc(d.name)+'</b> — přehled řad. Spin-offy a prequely seriálů TMDB nepropojuje; zkus je vyhledat zvlášť, nebo se podívej do připravených sérií.'}
   if(!items.length){body('<p style="opacity:.8">Nic k zobrazení.</p>');return}
   var h='<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px"><div style="flex:1;font-size:.85rem;opacity:.85">'+intro+'</div>'+favHtml(favId,favT)+'</div>';
