@@ -2775,6 +2775,42 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         }
         return _histraListIds[key] != null ? _histraListIds[key] : null;
     }
+    // Tolerantní kontrola: je položka (TMDB id + typ) v Histra seznamu? Nevyžaduje media_id,
+    // opakuje při chybě stránky (rate limit) a končí hned při nalezení.
+    async function histraListHas(hListId, id, type) {
+        const wantShow = (type === 'tv' || type === 'show' || type === 'shows');
+        const want = Number(id);
+        const limit = 100; let offset = 0, prevSig = null;
+        for (let page = 0; page < 40; page++) {
+            let data = null, ok = false;
+            for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+                try { data = await histraApi(`/api/v1/lists/${hListId}?extended=full&limit=${limit}&offset=${offset}`); ok = true; }
+                catch (e) { await new Promise(r => setTimeout(r, 400 * (attempt + 1))); }
+            }
+            if (!ok) throw new Error('Histra: seznam se nepodařilo načíst');
+            const items = histraUnwrapList(data);
+            if (!items.length) return false;
+            let sig = ''; try { sig = JSON.stringify(items[0]).slice(0, 300) + '|' + JSON.stringify(items[items.length - 1]).slice(0, 300); } catch (e) {}
+            if (sig && sig === prevSig) return false;
+            prevSig = sig;
+            for (const it of items) {
+                if (!it || typeof it !== 'object') continue;
+                const inner = it.movie || it.show || it.media || it.item || {};
+                const tm = histraExtractTmdb(it) || histraExtractTmdb(inner) || histraExtractTmdb(inner.media) ||
+                           (it.ids && parseInt(it.ids.tmdb_id, 10)) || (inner.ids && parseInt(inner.ids.tmdb_id, 10)) || null;
+                if (Number(tm) !== want) continue;
+                const kindRaw = it.media_type || it.type || it.kind || inner.media_type || inner.type || inner.kind || (it.show ? 'show' : (it.movie ? 'movie' : ''));
+                if (kindRaw) {
+                    const isShow = ['show', 'tv', 'series', 'shows'].includes(String(kindRaw).toLowerCase());
+                    if (isShow !== wantShow) continue;
+                }
+                return true;
+            }
+            if (items.length < limit) return false;
+            offset += limit;
+        }
+        return false;
+    }
     // Najde v Histra seznamu položku podle TMDB id + typu a vrátí její interní media_id
     async function histraFindListMedia(hListId, id, type) {
         const wantShow = (type === 'tv' || type === 'show' || type === 'shows');
@@ -2787,7 +2823,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const isShow = ['show', 'tv', 'series', 'shows'].includes(kind);
             if (isShow !== wantShow) continue;
             const mid = it.media_id ?? it.mediaId ?? inner.id ?? it.id;
-            if (mid == null) continue;
+            if (mid == null) return { media_type: isShow ? 'show' : 'movie', tmdb: String(id) };
             return { media_type: isShow ? 'show' : 'movie', media_id: mid };
         }
         return null;
@@ -3823,9 +3859,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         };
         window._histraPickMark = mark;
         const worker = async (l, i) => {
-            try { const lid = l.id ?? l.list_id; if (await histraFindListMedia(lid, id, type)) mark(i, true); } catch (e) { /* tichý fail */ }
+            try { const lid = l.id ?? l.list_id; if (await histraListHas(lid, id, type)) mark(i, true); } catch (e) { console.warn('[Histra označení]', e); }
         };
-        (async () => { for (let k = 0; k < lists.length; k += 4) await Promise.all(lists.slice(k, k + 4).map((l, j) => worker(l, k + j))); })();
+        (async () => { for (let k = 0; k < lists.length; k += 3) await Promise.all(lists.slice(k, k + 3).map((l, j) => worker(l, k + j))); })();
     };
     window.histraPickList = async function(i, id, type) {
         const l = (window._histraPickLists || [])[i]; if (!l) return;
