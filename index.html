@@ -2445,8 +2445,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     const myListCreate = (name) => myApi('/lists', { method: 'POST', body: JSON.stringify({ name }) }).then(r => { try { if (r && r.id != null) _myListNames[r.id] = name; } catch (e) {} return r; });
     const myListDelete = (listId) => myApi(`/lists/${listId}`, { method: 'DELETE' });
     const myListItemsGet = (listId) => myApi(`/lists/${listId}/items`);
-    const myListItemAdd = async (listId, id, type) => { const r = await myApi(`/lists/${listId}/items`, { method: 'POST', body: JSON.stringify({ id, type }) }); return r; };
-    const myListItemRemove = async (listId, id, type) => { const r = await myApi(`/lists/${listId}/items`, { method: 'DELETE', body: JSON.stringify({ id, type }) }); histraMirrorRemoveFromList(listId, id, type); return r; };
+    const myListItemAdd = async (listId, id, type) => { if (window._sinListCache) delete window._sinListCache[listId]; const r = await myApi(`/lists/${listId}/items`, { method: 'POST', body: JSON.stringify({ id, type }) }); return r; };
+    const myListItemRemove = async (listId, id, type) => { if (window._sinListCache) delete window._sinListCache[listId]; const r = await myApi(`/lists/${listId}/items`, { method: 'DELETE', body: JSON.stringify({ id, type }) }); histraMirrorRemoveFromList(listId, id, type); return r; };
 
     // Hodnocení
     const myRatingsGet = (type) => myApi(`/ratings?type=${(type === 'tv' || type === 'shows') ? 'shows' : 'movies'}`);
@@ -2775,11 +2775,37 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         }
         return _histraListIds[key] != null ? _histraListIds[key] : null;
     }
-    // Tolerantní kontrola: je položka (TMDB id + typ) v Histra seznamu? Nevyžaduje media_id,
-    // opakuje při chybě stránky (rate limit) a končí hned při nalezení.
-    async function histraListHas(hListId, id, type) {
-        const wantShow = (type === 'tv' || type === 'show' || type === 'shows');
-        const want = Number(id);
+    // ── Točící kolečko v pickerech seznamů ──
+    (function(){ if (document.getElementById('sinPickSpinCss')) return; const st = document.createElement('style'); st.id = 'sinPickSpinCss';
+        st.textContent = '@keyframes sinPickSpin{to{transform:rotate(360deg)}}.sin-pick-spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.25);border-top-color:currentColor;border-radius:50%;animation:sinPickSpin .7s linear infinite;vertical-align:middle;flex:0 0 auto}.sin-btn-spin{position:absolute;right:14px;top:50%;margin-top:-7px}';
+        document.head.appendChild(st); })();
+    function sinPickAttachSpinners(headEl, btnEls) {
+        let done = 0; const total = btnEls.length;
+        if (headEl) { headEl.insertAdjacentHTML('beforeend', ' <span class="sin-pick-head-spin" style="white-space:nowrap;font-weight:400;font-size:0.8rem;opacity:.85;"><span class="sin-pick-spin"></span> <span class="sin-pick-cnt">0/' + total + '</span></span>'); }
+        btnEls.forEach(b => { if (!b) return; b.style.position = 'relative'; b.insertAdjacentHTML('beforeend', '<span class="sin-pick-spin sin-btn-spin" style="color:#9aa4c0;"></span>'); });
+        return function finish(btn) {
+            done++;
+            if (btn) { const sp = btn.querySelector('.sin-btn-spin'); if (sp) sp.remove(); }
+            if (headEl) {
+                const c = headEl.querySelector('.sin-pick-cnt'); if (c) c.textContent = done + '/' + total;
+                if (done >= total) { const h = headEl.querySelector('.sin-pick-head-spin'); if (h) h.remove(); }
+            }
+        };
+    }
+    window.sinPickAttachSpinners = sinPickAttachSpinners;
+    // Cache obsahu Histra seznamů (klíče "movie_123"/"tv_456"), platí 3 min; při přidání/odebrání se upraví.
+    window._histraKeyCache = window._histraKeyCache || {};
+    function histraKeyOf(id, type) { return ((type === 'tv' || type === 'show' || type === 'shows') ? 'tv' : 'movie') + '_' + Number(id); }
+    function histraCacheTouch(lid, id, type, on) {
+        const c = window._histraKeyCache[String(lid)]; if (!c) return;
+        const k = histraKeyOf(id, type); if (on) c.keys.add(k); else c.keys.delete(k);
+    }
+    // Projde celý seznam (všechny stránky), uloží klíče do cache; onHit se zavolá hned při nalezení hledané položky.
+    async function histraListHas(hListId, id, type, onHit) {
+        const want = histraKeyOf(id, type);
+        const cached = window._histraKeyCache[String(hListId)];
+        if (cached && Date.now() - cached.t < 180000) return cached.keys.has(want);
+        const keys = new Set(); let hit = false;
         const limit = 100; let offset = 0, prevSig = null; const seen = new Set();
         for (let page = 0; page < 200; page++) {
             let data = null, ok = false;
@@ -2789,29 +2815,28 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             }
             if (!ok) throw new Error('Histra: seznam se nepodařilo načíst');
             const items = histraUnwrapList(data);
-            if (!items.length) return false;
+            if (!items.length) break;
             let sig = ''; try { sig = JSON.stringify(items[0]).slice(0, 300) + '|' + JSON.stringify(items[items.length - 1]).slice(0, 300); } catch (e) {}
-            if (sig && sig === prevSig) return false;
+            if (sig && sig === prevSig) break;
             prevSig = sig;
             let fresh = 0;
             for (const it of items) { let k = ''; try { k = JSON.stringify(it); } catch (e) {} if (!seen.has(k)) { seen.add(k); fresh++; } }
-            if (!fresh) return false;
+            if (!fresh) break;
             for (const it of items) {
                 if (!it || typeof it !== 'object') continue;
                 const inner = it.movie || it.show || it.media || it.item || {};
                 const tm = histraExtractTmdb(it) || histraExtractTmdb(inner) || histraExtractTmdb(inner.media) ||
                            (it.ids && parseInt(it.ids.tmdb_id, 10)) || (inner.ids && parseInt(inner.ids.tmdb_id, 10)) || null;
-                if (Number(tm) !== want) continue;
+                if (!tm) continue;
                 const kindRaw = it.media_type || it.type || it.kind || inner.media_type || inner.type || inner.kind || (it.show ? 'show' : (it.movie ? 'movie' : ''));
-                if (kindRaw) {
-                    const isShow = ['show', 'tv', 'series', 'shows'].includes(String(kindRaw).toLowerCase());
-                    if (isShow !== wantShow) continue;
-                }
-                return true;
+                if (kindRaw) { keys.add(histraKeyOf(tm, kindRaw)); }
+                else { keys.add('movie_' + Number(tm)); keys.add('tv_' + Number(tm)); }
+                if (!hit && keys.has(want)) { hit = true; if (onHit) { try { onHit(); } catch (e) {} } }
             }
-            offset += items.length; // server může limit zkrátit (např. na 50) — jedeme dál, dokud nepřijde prázdná stránka
+            offset += items.length;
         }
-        return false;
+        window._histraKeyCache[String(hListId)] = { t: Date.now(), keys };
+        return keys.has(want);
     }
     // Najde v Histra seznamu položku podle TMDB id + typu a vrátí její interní media_id
     async function histraFindListMedia(hListId, id, type) {
@@ -3860,10 +3885,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             b.innerHTML = (on ? '✅ ' : '📁 ') + name;
         };
         window._histraPickMark = mark;
+        const _hHead = ov.querySelector(':scope > div > div');
+        const _hFinish = sinPickAttachSpinners(_hHead, lists.map((l, i) => document.getElementById(`histraPickBtn_${i}`)));
         const worker = async (l, i) => {
-            try { const lid = l.id ?? l.list_id; if (await histraListHas(lid, id, type)) mark(i, true); } catch (e) { console.warn('[Histra označení]', e); }
+            const b0 = document.getElementById(`histraPickBtn_${i}`);
+            try { const lid = l.id ?? l.list_id; if (await histraListHas(lid, id, type, () => mark(i, true))) mark(i, true); } catch (e) { console.warn('[Histra označení]', e); }
+            _hFinish(document.getElementById(`histraPickBtn_${i}`) || b0);
         };
-        (async () => { for (let k = 0; k < lists.length; k += 3) await Promise.all(lists.slice(k, k + 3).map((l, j) => worker(l, k + j))); })();
+        (async () => { if (typeof _runWithConcurrency === 'function') await _runWithConcurrency(lists.map((l, i) => i), 6, (i) => worker(lists[i], i)); else for (let k = 0; k < lists.length; k += 3) await Promise.all(lists.slice(k, k + 3).map((l, j) => worker(l, k + j))); })();
     };
     window.histraPickList = async function(i, id, type) {
         const l = (window._histraPickLists || [])[i]; if (!l) return;
@@ -3875,11 +3904,11 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 // už tam je → odebrat
                 const media = await histraFindListMedia(lid, id, type);
                 if (media) await histraApi(`/api/v1/lists/${lid}/items`, { method: 'DELETE', body: media });
-                if (window._histraPickMark) window._histraPickMark(i, false);
+                histraCacheTouch(lid, id, type, false); if (window._histraPickMark) window._histraPickMark(i, false);
                 _hToast(`🗑️ Odebráno ze seznamu „${name}“ (Histra)`);
             } else {
                 await histraPostItem(`/api/v1/lists/${lid}/items`, id, type);
-                if (window._histraPickMark) window._histraPickMark(i, true);
+                histraCacheTouch(lid, id, type, true); if (window._histraPickMark) window._histraPickMark(i, true);
                 _hToast(`📁 Přidáno do seznamu „${name}“ (Histra)`);
                 setTimeout(() => sinatorAskAlsoList(name, id, type), 50);
             }
@@ -5118,9 +5147,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         // Na pozadí zjistit, ve kterých seznamech už položka je, a označit je
         // zeleně — nečeká se na to, picker se otevře hned, seznamy se "dobarví"
         // postupně jak přijdou odpovědi.
+        const _sHead = overlay.querySelector(':scope > div > div');
+        const _sFinish = sinPickAttachSpinners(_sHead, lists.map(l => document.getElementById(`myListPickBtn_${l.id}`)));
+        window._sinListCache = window._sinListCache || {};
         const checkWorker = async (l) => {
             try {
-                const items = await myListItemsGet(l.id);
+                let items; const _c = window._sinListCache[l.id];
+                if (_c && Date.now() - _c.t < 120000) items = _c.items;
+                else { items = await myListItemsGet(l.id); window._sinListCache[l.id] = { t: Date.now(), items }; }
                 const inList = Array.isArray(items) && items.some(it => Number(it.id) === Number(id) && (it.type === type || (it.type === 'shows' && type === 'tv') || (it.type === 'movies' && type === 'movie')));
                 if (!inList) return;
                 const btn = document.getElementById(`myListPickBtn_${l.id}`);
@@ -5132,8 +5166,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     btn.textContent = `✅ ${l.name} (${l.item_count || 0})`;
                 }
             } catch (e) { /* tichý fail — seznam zůstane neoznačený */ }
+            _sFinish(document.getElementById(`myListPickBtn_${l.id}`));
         };
-        if (typeof _runWithConcurrency === 'function') _runWithConcurrency(lists, 4, checkWorker);
+        if (typeof _runWithConcurrency === 'function') _runWithConcurrency(lists, 6, checkWorker);
         else lists.forEach(checkWorker);
     };
     window.myBackendToggleListItem = async function(listId, id, type, btnEl, listName) {
