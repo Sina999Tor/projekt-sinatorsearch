@@ -15676,7 +15676,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     }
     function renderSeasons(seasons, tvId) {
         if(!seasons.length) return '<p style="color:var(--text-muted)">Žádné sezóny k zobrazení.</p>';
-        return seasons.map(season => {
+        const _allBar = seasons.filter(x => x.season_number > 0).length > 1 ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;"><button onclick="toggleAllSeasons(${tvId}, true, this)" style="padding:8px 12px;border-radius:12px;border:1px solid #1db954;background:rgba(29,185,84,0.12);color:#1db954;font-size:0.8rem;cursor:pointer;font-weight:600;">☑️ Označit všechny sezóny</button><button onclick="toggleAllSeasons(${tvId}, false, this)" style="padding:8px 12px;border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);font-size:0.8rem;cursor:pointer;font-weight:600;">↩️ Odznačit všechny</button></div>` : '';
+        return _allBar + seasons.map(season => {
             const sKey = `season_${tvId}_${season.season_number}`;
             const watchedEps = Object.keys(state.watched).filter(k=>k.startsWith(`ep_${tvId}_${season.season_number}_`)).length;
             const total = season.episode_count||0;
@@ -15783,61 +15784,66 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     window.refreshSeasonHeader = refreshSeasonHeader;
 
     // ── Hromadně: označit / odznačit celou sezónu ──
-    window.toggleWholeSeason = async function(tvId, seasonNumber, mark, btn) {
+    // Společné jádro: označit/odznačit epizody v jedné nebo ve všech sezónách
+    async function _bulkSeasons(tvId, seasonNumbers, mark, btn, scopeLabel) {
         const orig = btn ? btn.textContent : '';
-        const busyKey = `${tvId}_${seasonNumber}`;
+        const busyKey = `${tvId}`;
         window._seasonBulkBusy = window._seasonBulkBusy || {};
         if (window._seasonBulkBusy[busyKey]) return;
         const toast = (typeof _favToast === 'function') ? _favToast : alert;
         try {
             window._seasonBulkBusy[busyKey] = true;
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Načítám…'; }
-            const episodes = await fetchEpisodes(tvId, seasonNumber);
-            if (!episodes || !episodes.length) { toast('Žádné epizody.'); return; }
             const today = new Date().toISOString().slice(0, 10);
-            const keyOf = ep => `ep_${tvId}_${seasonNumber}_${ep.episode_number}`;
-            let targets;
-            if (mark) targets = episodes.filter(ep => !state.watched[keyOf(ep)] && ep.air_date && ep.air_date <= today); // jen už odvysílané a dosud neoznačené
-            else targets = episodes.filter(ep => state.watched[keyOf(ep)]);
+            const groups = [];
+            for (let i = 0; i < seasonNumbers.length; i += 4) {
+                const part = await Promise.all(seasonNumbers.slice(i, i + 4).map(async n => ({ n, episodes: (await fetchEpisodes(tvId, n)) || [] })));
+                groups.push(...part);
+            }
+            const keyOf = (n, ep) => `ep_${tvId}_${n}_${ep.episode_number}`;
+            const targets = [];
+            groups.forEach(g => g.episodes.forEach(ep => {
+                const w = !!state.watched[keyOf(g.n, ep)];
+                if (mark ? (!w && ep.air_date && ep.air_date <= today) : w) targets.push({ n: g.n, ep });
+            }));
             if (!targets.length) { toast(mark ? '✅ Všechny odvysílané epizody už jsou označené.' : 'Nic k odznačení.'); return; }
-            if (!confirm(mark ? `Označit ${targets.length} epizod sezóny ${seasonNumber} jako shlédnuté?\n(přeskočí se už označené a ještě neodvysílané)` : `Odznačit ${targets.length} shlédnutých epizod sezóny ${seasonNumber}?`)) return;
+            if (!confirm(mark ? `Označit ${targets.length} epizod (${scopeLabel}) jako shlédnuté?\n(přeskočí se už označené a ještě neodvysílané)` : `Odznačit ${targets.length} shlédnutých epizod (${scopeLabel})?`)) return;
             let baseTs = Date.now();
             if (mark) { baseTs = window.sinAskWhen ? await window.sinAskWhen() : Date.now(); if (baseTs == null) return; }
             const hasBE = (typeof myBackendReady === 'function' && myBackendReady());
-            // lokální stav najednou
-            targets.forEach((ep, i) => {
-                const key = keyOf(ep);
+            targets.forEach(({ n, ep }) => {
+                const key = keyOf(n, ep);
                 if (mark) {
-                    state.watched[key] = { id: key, type: 'episode', title: ep.name || '', year: '', posterPath: '', addedAt: Date.now(), tvId, seasonNumber, epNumber: ep.episode_number };
+                    state.watched[key] = { id: key, type: 'episode', title: ep.name || '', year: '', posterPath: '', addedAt: Date.now(), tvId, seasonNumber: n, epNumber: ep.episode_number };
                     state.epWatchCounts[key] = (state.epWatchCounts[key] || 0) + 1;
                 } else { delete state.watched[key]; }
             });
             if (mark) saveEpWatchCounts();
             saveWatched();
-            // synchronizace se službami po 4 paralelně, s průběhem
             let done = 0, failed = 0;
             const POOL = 4;
             for (let i = 0; i < targets.length; i += POOL) {
-                await Promise.all(targets.slice(i, i + POOL).map(async (ep, j) => {
+                await Promise.all(targets.slice(i, i + POOL).map(async ({ n: sn, ep }, j) => {
                     const n = ep.episode_number, ts = baseTs + (i + j) * 1000;
                     try {
-                        try { syncEpisodeToTrakt(tvId, seasonNumber, n, !!mark); } catch (e) {}
+                        try { syncEpisodeToTrakt(tvId, sn, n, !!mark); } catch (e) {}
                         if (hasBE) {
-                            if (mark) await myHistoryAddBoth(tvId, 'tv', seasonNumber, n, ts);
-                            else { await myHistoryRemove(tvId, 'tv', seasonNumber, n); if (window.histraAlsoUnwatched) window.histraAlsoUnwatched(tvId, 'tv', seasonNumber, n); }
+                            if (mark) await myHistoryAddBoth(tvId, 'tv', sn, n, ts);
+                            else { await myHistoryRemove(tvId, 'tv', sn, n); if (window.histraAlsoUnwatched) window.histraAlsoUnwatched(tvId, 'tv', sn, n); }
                         } else if (histraReady()) {
-                            if (mark) histraAlsoWatched(tvId, 'tv', seasonNumber, n, ts || histraTsNow());
-                            else if (window.histraAlsoUnwatched) window.histraAlsoUnwatched(tvId, 'tv', seasonNumber, n);
+                            if (mark) histraAlsoWatched(tvId, 'tv', sn, n, ts || histraTsNow());
+                            else if (window.histraAlsoUnwatched) window.histraAlsoUnwatched(tvId, 'tv', sn, n);
                         }
                     } catch (e) { failed++; }
                     done++;
                     if (btn) btn.textContent = `⏳ ${done}/${targets.length}`;
                 }));
             }
-            // překreslit seznam epizod + hlavičku sezóny
-            const container = document.getElementById(`episodes-${tvId}-${seasonNumber}`);
-            if (container && container.dataset.loaded) container.innerHTML = renderEpisodes(episodes, tvId, seasonNumber);
-            refreshSeasonHeader(tvId, seasonNumber);
+            groups.forEach(g => {
+                const container = document.getElementById(`episodes-${tvId}-${g.n}`);
+                if (container && container.dataset.loaded) container.innerHTML = renderEpisodes(g.episodes, tvId, g.n);
+                refreshSeasonHeader(tvId, g.n);
+            });
             if (typeof updateWatchedCount === 'function') updateWatchedCount();
             if (hasBE) {
                 try {
@@ -15847,9 +15853,16 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     if (typeof loadEpHistoryCounts === 'function') loadEpHistoryCounts(tvId, true);
                 } catch (e) {}
             }
-            toast((mark ? `✅ Sezóna ${seasonNumber}: označeno ${targets.length} epizod` : `↩️ Sezóna ${seasonNumber}: odznačeno ${targets.length} epizod`) + (failed ? ` (chyb: ${failed})` : ''));
+            toast((mark ? `✅ ${scopeLabel}: označeno ${targets.length} epizod` : `↩️ ${scopeLabel}: odznačeno ${targets.length} epizod`) + (failed ? ` (chyb: ${failed})` : ''));
         } catch (e) { toast('❌ ' + ((e && e.message) || e)); }
         finally { delete window._seasonBulkBusy[busyKey]; if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = orig; } }
+    }
+    window.toggleWholeSeason = (tvId, seasonNumber, mark, btn) => _bulkSeasons(tvId, [Number(seasonNumber)], mark, btn, `sezóna ${seasonNumber}`);
+    window.toggleAllSeasons = (tvId, mark, btn) => {
+        let list = [];
+        try { list = JSON.parse(document.getElementById('seasons-container')?.dataset.seasons || '[]').map(x => x.season_number).filter(n => n > 0); } catch (e) {}
+        if (!list.length) { try { (typeof _favToast === 'function' ? _favToast : alert)('Sezóny se ještě nenačetly.'); } catch (e) {} return; }
+        return _bulkSeasons(tvId, list, mark, btn, 'všechny sezóny');
     };
     // Podržení hlavičky sezóny → nabídka označit/odznačit celou sezónu
     (function() {
@@ -15867,10 +15880,12 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10700;display:flex;align-items:flex-end;justify-content:center;';
             ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
             const bs = 'display:block;width:100%;text-align:center;padding:14px;margin-bottom:8px;border-radius:12px;font:inherit;font-weight:600;cursor:pointer;';
-            ov.innerHTML = `<div style="background:var(--bg-card);border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:480px;"><div style="font-weight:700;margin-bottom:12px;">${label}</div><button id="sbMark" style="${bs}background:rgba(29,185,84,0.15);border:1px solid #1db954;color:#1db954;">☑️ Označit celou sezónu</button><button id="sbUnmark" style="${bs}background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);">↩️ Odznačit celou sezónu</button><button id="sbClose" style="${bs}background:transparent;border:none;color:var(--text-muted);">Zavřít</button></div>`;
+            ov.innerHTML = `<div style="background:var(--bg-card);border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:480px;"><div style="font-weight:700;margin-bottom:12px;">${label}</div><button id="sbMark" style="${bs}background:rgba(29,185,84,0.15);border:1px solid #1db954;color:#1db954;">☑️ Označit celou sezónu</button><button id="sbUnmark" style="${bs}background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);">↩️ Odznačit celou sezónu</button><button id="sbMarkAll" style="${bs}background:rgba(29,185,84,0.08);border:1px dashed #1db954;color:#1db954;">☑️ Označit VŠECHNY sezóny</button><button id="sbUnmarkAll" style="${bs}background:transparent;border:1px dashed var(--border);color:var(--text-muted);">↩️ Odznačit VŠECHNY sezóny</button><button id="sbClose" style="${bs}background:transparent;border:none;color:var(--text-muted);">Zavřít</button></div>`;
             document.body.appendChild(ov);
             ov.querySelector('#sbMark').onclick = () => { ov.remove(); toggleWholeSeason(tv, se, true, null); };
             ov.querySelector('#sbUnmark').onclick = () => { ov.remove(); toggleWholeSeason(tv, se, false, null); };
+            ov.querySelector('#sbMarkAll').onclick = () => { ov.remove(); toggleAllSeasons(tv, true, null); };
+            ov.querySelector('#sbUnmarkAll').onclick = () => { ov.remove(); toggleAllSeasons(tv, false, null); };
             ov.querySelector('#sbClose').onclick = () => ov.remove();
         };
         document.addEventListener('touchstart', (e) => {
