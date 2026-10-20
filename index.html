@@ -16259,6 +16259,14 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         // Načti credits znovu (jsou již načteny, ale pro jednoduchost znovu)
         const tmdbKey = window._store?.getItem('sinator_tmdb_api_key') || tmdbApiKey;
         let dirs = [];
+        // Okno se otevře hned (s kolečkem), ne až po stažení seznamu
+        document.getElementById('directorsOverlay')?.remove();
+        const _pre = document.createElement('div');
+        _pre.id = 'directorsOverlay';
+        _pre.style.cssText = 'position:fixed;inset:0;background:var(--bg-card);z-index:10600;display:flex;flex-direction:column;overflow:hidden;';
+        _pre.innerHTML = `<div style="background:var(--bg-card);width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);"><span style="font-weight:700;font-size:1.1rem;">🎥 Režie</span><button onclick="document.getElementById('directorsOverlay').remove();document.body.style.overflow=''" style="width:36px;height:36px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);color:#fff;cursor:pointer;font-size:1.1rem;">✕</button></div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);"><span class="sin-pick-spin" style="width:26px;height:26px;border-width:3px;"></span></div>`;
+        document.body.appendChild(_pre);
+        document.body.style.overflow = 'hidden';
         try {
             if (movieType === 'tv') {
                 const r = await fetch(`${BASE}/tv/${movieId}/aggregate_credits?api_key=${tmdbKey}&language=cs-CZ`);
@@ -16275,13 +16283,16 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 dirs = (data.crew||[]).filter(c => c.job === 'Director');
             }
         } catch(e) {}
-        if(!dirs.length) { alert('Režiséři nenalezeni.'); return; }
+        if(!dirs.length) { document.getElementById('directorsOverlay')?.remove(); document.body.style.overflow = ''; alert('Režiséři nenalezeni.'); return; }
+        // Fotky se začnou stahovat hned, ještě před vykreslením karet
+        dirs.forEach(d => { if (d.profile_path) { const im = new Image(); im.decoding = 'async'; im.src = `${IMG}w185${d.profile_path}`; } });
+        document.getElementById('directorsOverlay')?.remove();
 
         const overlay = document.createElement('div');
         overlay.id = 'directorsOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-card);z-index:10600;display:flex;flex-direction:column;overflow:hidden;';
-        const cards = dirs.map(d => {
-            const img = d.profile_path ? `<img src="${IMG}w185${d.profile_path}" style="width:70px;height:95px;border-radius:8px;object-fit:cover;flex-shrink:0;">` : `<div style="width:70px;height:95px;border-radius:8px;background:var(--bg-elevated);display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0;">👤</div>`;
+        const cards = dirs.map((d, di) => {
+            const img = d.profile_path ? `<img src="${IMG}w185${d.profile_path}" width="70" height="95" decoding="async" ${di < 8 ? 'fetchpriority="high"' : 'loading="lazy"'} style="width:70px;height:95px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg-elevated);opacity:0;transition:opacity .25s;" onload="this.style.opacity=1" onerror="this.style.opacity=1">` : `<div style="width:70px;height:95px;border-radius:8px;background:var(--bg-elevated);display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0;">👤</div>`;
             return `<div onclick="document.getElementById('directorsOverlay').remove();document.body.style.overflow='';openPersonDetail(${d.id})" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:0.2s;" onmouseover="this.style.borderColor='#8a2be2'" onmouseout="this.style.borderColor='var(--border)'">
                 ${img}
                 <div>
