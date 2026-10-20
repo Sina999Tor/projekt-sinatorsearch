@@ -3220,23 +3220,20 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const id = (btn.id || '').split('_')[1];
         const sin = btn.dataset.watched === '1';
         const his = !!(window._uwHis && window._uwHis[id]);
-        const G = 'rgba(29,185,84,0.25)', P = 'rgba(139,92,246,0.28)', T = 'transparent';
+        // Sinator a Histra se zrcadlí → pro uživatele jeden společný stav „Shlédnuto“ (bez uvedení služby).
+        // Shlédnuto aspoň v jedné službě = celé tlačítko zelené (u barevných ikon modré, jako dřív).
+        const _wc = (localStorage.getItem('coloredIcons') === '1') ? ['#6090ff', 'rgba(96,144,255,0.15)'] : ['#1db954', 'rgba(29,185,84,0.15)'];
         btn.style.borderStyle = 'solid'; btn.style.borderWidth = '1px';
-        if (sin && his) {
-            btn.style.background = `linear-gradient(90deg, ${G} 50%, ${P} 50%)`;
-            btn.style.borderColor = '#1db954 #8b5cf6 #8b5cf6 #1db954';
-            btn.style.color = '#e5e7eb';
-            btn.textContent = '✅ Shlédnuto (Sinator + Histra)';
-        } else if (sin || his) {
-            btn.style.background = `linear-gradient(90deg, ${sin ? G : T} 50%, ${his ? P : T} 50%)`;
-            btn.style.borderColor = sin ? '#1db954' : '#8b5cf6';
-            btn.style.color = sin ? '#1db954' : '#a78bfa';
-            btn.textContent = '✅ Shlédnuto (' + (sin ? 'Sinator' : 'Histra') + ')';
+        if (sin || his) {
+            btn.style.background = _wc[1];
+            btn.style.borderColor = _wc[0];
+            btn.style.color = _wc[0];
+            btn.textContent = '✅ Shlédnuto';
         } else {
             btn.style.background = 'transparent';
             btn.style.borderColor = 'var(--border)';
             btn.style.color = 'var(--text-muted)';
-            btn.textContent = '☐ Shlédnuto (Sinator + Histra)';
+            btn.textContent = '☐ Shlédnuto';
         }
     }
     async function initCombinedWatchHistory(id, type) {
@@ -3608,7 +3605,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         btn.style.border = '1px solid ' + (watched ? '#8b5cf6' : 'var(--border)');
         btn.style.background = watched ? 'rgba(139,92,246,0.18)' : 'transparent';
         btn.style.color = watched ? '#a78bfa' : 'var(--text-muted)';
-        btn.textContent = watched ? '✅ Shlédnuto (Histra)' : '☐ Shlédnuto (Histra)';
+        btn.textContent = watched ? '✅ Shlédnuto' : '☐ Shlédnuto';
     }
     async function initHistraWatchedBadge(id, type, total) {
         const btn = document.getElementById(`histraWatchedBadge_${id}`);
@@ -16676,7 +16673,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         btn.style.border = '1px solid ' + (watched ? _wc[0] : 'var(--border)');
         btn.style.background = watched ? _wc[1] : 'transparent';
         btn.style.color = watched ? _wc[0] : 'var(--text-muted)';
-        btn.textContent = watched ? '✅ Shlédnuto (Sinator)' : '☐ Shlédnuto (Sinator)';
+        btn.textContent = watched ? '✅ Shlédnuto' : '☐ Shlédnuto';
         try { if (typeof histraReady === 'function' && histraReady()) uwRestyle(btn); } catch (e) {}
     }
     async function initMySinatorWatchedBadge(id, type) {
