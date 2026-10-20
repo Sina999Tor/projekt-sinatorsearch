@@ -4733,37 +4733,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
         let removedMovies = 0, removedEpisodes = 0, removedWl = 0, removedListItems = 0, removedLists = 0, errors = 0;
         try {
-            for (const m of (log.movies || [])) {
-                // Zpětná kompatibilita: starší log ukládal filmy jako holé tmdb
-                // číslo (bez watchedAt) — u nich smažeme podle id/typu jako dřív.
-                // Nový log má {tmdb, watchedAt} a mažeme přesně JEN ten watch
-                // event, co přidal tenhle sync — jiná zhlédnutí téhož filmu
-                // (rewatch) zůstanou nedotčená.
-                try {
-                    if (m && typeof m === 'object' && m.watchedAt != null) await myHistoryRemoveEntry(m.tmdb, 'movie', m.watchedAt);
-                    else await myHistoryRemove(typeof m === 'object' ? m.tmdb : m, 'movie');
-                    removedMovies++;
-                } catch (e) { errors++; }
-            }
-            setStatus(`Vracím zpět: filmy hotovo (${removedMovies}). Epizody…`);
-            for (const ep of (log.episodes || [])) {
-                try {
-                    if (ep.watchedAt != null) await myHistoryRemoveEntry(ep.tmdb, 'tv', ep.watchedAt, ep.season, ep.number);
-                    else await myHistoryRemove(ep.tmdb, 'tv', ep.season, ep.number);
-                    removedEpisodes++;
-                } catch (e) { errors++; }
-            }
-            setStatus(`Vracím zpět: epizody hotovo (${removedEpisodes}). Watchlist…`);
-            // Zrušit i lokální "Shlédnuto" příznaky (checkboxy/zelené rámečky),
-            // co tenhle sync nastavil — jinak by po smazání z historie appka
-            // pořád ukazovala titul jako shlédnutý.
+            const allMovies = (log.movies || []).slice(), allEps = (log.episodes || []).slice();
+            // 1) Lokální „Shlédnuto“ příznaky (checkboxy/zelené rámečky), co sync nastavil — hned a najednou,
+            //    ať se nemusí čekat na mazání z backendu.
             let unmarkedLocal = 0;
-            for (const m of (log.movies || [])) {
+            for (const m of allMovies) {
                 const tmdbId = typeof m === 'object' ? m.tmdb : m;
                 const wKey = `movie_${tmdbId}`;
                 if (state.watched[wKey]) { delete state.watched[wKey]; unmarkedLocal++; }
             }
-            for (const ep of (log.episodes || [])) {
+            for (const ep of allEps) {
                 const wKey = `ep_${ep.tmdb}_${ep.season}_${ep.number}`;
                 if (state.watched[wKey]) { delete state.watched[wKey]; unmarkedLocal++; }
             }
@@ -4771,8 +4750,37 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 saveWatched();
                 if (typeof updateWatchedCount === 'function') updateWatchedCount();
                 if (typeof applyWatchedBordersToAllCards === 'function') applyWatchedBordersToAllCards();
-                if (typeof reconcileWatchedShows === 'function') await reconcileWatchedShows();
             }
+            // 2) Mazání z historie na backendu — po 8 paralelně, s průběhem; zbytek se průběžně ukládá do logu,
+            //    takže když appku zavřeš uprostřed, tlačítko „Vrátit“ pokračuje tam, kde skončilo.
+            const POOL = 8;
+            const runChunks = async (arr, key, fn, label) => {
+                for (let i = 0; i < arr.length; i += POOL) {
+                    await Promise.all(arr.slice(i, i + POOL).map(fn));
+                    const done = Math.min(arr.length, i + POOL);
+                    if (done % 40 === 0 || done === arr.length) {
+                        setStatus(`Vracím zpět: ${label} ${done}/${arr.length}…`);
+                        log[key] = arr.slice(done);
+                        try { _store.setItem('sinator_histra_sync_log', JSON.stringify(log)); } catch (e) {}
+                    }
+                }
+            };
+            await runChunks(allMovies, 'movies', async (m) => {
+                try {
+                    if (m && typeof m === 'object' && m.watchedAt != null) await myHistoryRemoveEntry(m.tmdb, 'movie', m.watchedAt);
+                    else await myHistoryRemove(typeof m === 'object' ? m.tmdb : m, 'movie');
+                    removedMovies++;
+                } catch (e) { errors++; }
+            }, 'filmy');
+            await runChunks(allEps, 'episodes', async (ep) => {
+                try {
+                    if (ep.watchedAt != null) await myHistoryRemoveEntry(ep.tmdb, 'tv', ep.watchedAt, ep.season, ep.number);
+                    else await myHistoryRemove(ep.tmdb, 'tv', ep.season, ep.number);
+                    removedEpisodes++;
+                } catch (e) { errors++; }
+            }, 'epizody');
+            setStatus(`Vracím zpět: epizody hotovo (${removedEpisodes}). Watchlist…`);
+            if (unmarkedLocal && typeof reconcileWatchedShows === 'function') { try { await reconcileWatchedShows(); } catch (e) {} }
             for (const w of (log.watchlist || [])) {
                 try { await myWatchlistRemove(w.tmdb, w.type); removedWl++; } catch (e) { errors++; }
             }
