@@ -2032,6 +2032,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         </div>
         <div id="tvUpStatus" style="min-height:18px;font-size:0.78rem;margin-top:10px;line-height:1.4;"></div>
         <button id="tvUpAddBtn" onclick="tvUpDoAdd()" style="width:100%;margin-top:8px;background:#1db954;border:none;color:#000;font-weight:700;padding:11px;border-radius:10px;cursor:pointer;font-size:0.92rem;">➕ Přidat playlist</button>
+        <button onclick="tvUpOpenTest((document.getElementById('tvUpUrl')||{}).value||'')" style="width:100%;margin-top:8px;background:transparent;border:1px solid #5dade2;color:#5dade2;font-weight:700;padding:11px;border-radius:10px;cursor:pointer;font-size:0.92rem;">🧪 Otestovat playlist</button>
         <div style="margin-top:18px;font-size:0.7rem;color:var(--text-muted);font-weight:700;letter-spacing:0.05em;">MOJE PLAYLISTY</div>
         <div id="tvUpMgrList"></div>
     </div>
@@ -24490,7 +24491,7 @@ function _tvAdminRenderSourceBar() {
     bar.innerHTML = _TV_ADMIN_SOURCES.map(s => {
         const on = st.source === s.id && (s.id === 'all' || !st.search);
         return `<button onclick="_tvAdminSelectSource('${s.id}')" style="flex-shrink:0;padding:6px 13px;border-radius:16px;border:1px solid ${on ? '#5dade2' : 'var(--border)'};background:${on ? 'rgba(93,173,226,0.18)' : 'transparent'};color:${on ? '#5dade2' : '#ccc'};font-size:0.82rem;font-weight:${on ? '700' : '500'};cursor:pointer;white-space:nowrap;">${s.icon || '📺'} ${s.label}</button>`;
-    }).join('') + `<button onclick="tvUpOpenAdd()" style="flex-shrink:0;padding:6px 13px;border-radius:16px;border:1px dashed #1db954;background:transparent;color:#1db954;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;">➕ Přidat playlist</button>`;
+    }).join('') + `<button onclick="tvUpOpenAdd()" style="flex-shrink:0;padding:6px 13px;border-radius:16px;border:1px dashed #1db954;background:transparent;color:#1db954;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;">➕ Přidat playlist</button><button onclick="tvUpOpenTest()" style="flex-shrink:0;padding:6px 13px;border-radius:16px;border:1px dashed #5dade2;background:transparent;color:#5dade2;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;">🧪 Otestovat playlist</button>`;
 }
 function _tvAdminSelectSource(id) {
     const st = window._tvAdminState;
@@ -39803,6 +39804,7 @@ function _tvUpRenderBar() {
         <button onclick="tvUpRename('${l.id}')" title="Přejmenovat" style="${btn}">✏️</button>
         <button onclick="tvUpDelete('${l.id}')" title="Smazat playlist" style="${btn}border-color:#ff6b6b;color:#ff6b6b;">🗑</button>
         <button onclick="tvUpOpenAdd()" title="Přidat další playlist" style="${btn}border-color:#1db954;color:#1db954;">➕</button>
+        <button onclick="tvUpOpenTest()" title="Otestovat playlist" style="${btn}border-color:#5dade2;color:#5dade2;">🧪</button>
     </div>`;
 }
 
@@ -39904,6 +39906,155 @@ async function tvUpDoAdd() {
     }
 }
 window.tvUpDoAdd = tvUpDoAdd;
+
+// ── 🧪 Otestovat playlist: načíst odkaz/soubor, zkusit kanály ve VLC, a teprve pak uložit pod názvem ──
+const _tvUpTest = { norm: '', parsed: [], mode: 'url', url: '', defName: '', shown: 0, filter: '' };
+function tvUpOpenTest(prefUrl) {
+    document.getElementById('tvUpTestModal')?.remove();
+    Object.assign(_tvUpTest, { norm: '', parsed: [], mode: 'url', url: '', defName: '', shown: 0, filter: '' });
+    const m = document.createElement('div');
+    m.id = 'tvUpTestModal';
+    m.style.cssText = 'position:fixed;inset:0;z-index:2000002;background:rgba(0,0,0,0.96);display:flex;flex-direction:column;overflow:hidden;';
+    const inp = 'background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;font-size:0.9rem;box-sizing:border-box;';
+    m.innerHTML = `
+      <div style="background:var(--bg-card);flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <button onclick="tvUpCloseTest()" style="background:none;border:1px solid var(--border);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:0.85rem;">← Zpět</button>
+        <h3 style="flex:1;margin:0;font-family:'Playfair Display',serif;font-size:1.05rem;color:#5dade2;">🧪 Otestovat playlist</h3>
+        <button onclick="tvUpCloseTest()" style="background:none;border:1px solid var(--border);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:10px 16px;background:var(--bg-card);border-bottom:1px solid var(--border);flex-shrink:0;">
+        <div style="display:flex;gap:8px;">
+          <input id="tvUpTestUrl" type="url" placeholder="https://…/playlist.m3u" autocapitalize="off" autocomplete="off" spellcheck="false" style="flex:1;min-width:0;${inp}">
+          <button id="tvUpTestLoad" onclick="tvUpTestLoad()" style="background:#5dade2;border:none;color:#000;font-weight:700;padding:0 14px;border-radius:8px;cursor:pointer;">Načíst</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+          <input type="file" id="tvUpTestFile" style="display:none;" onchange="tvUpTestLoad(true)">
+          <button onclick="document.getElementById('tvUpTestFile').click()" style="background:transparent;border:1px dashed var(--border);color:#ccc;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;">📁 Nebo nahrát soubor</button>
+          <div id="tvUpTestStatus" style="flex:1;font-size:0.76rem;color:var(--text-muted);line-height:1.35;"></div>
+        </div>
+        <input id="tvUpTestSearch" type="text" placeholder="Hledat kanál v playlistu…" oninput="tvUpTestFilter(this.value)" style="display:none;width:100%;margin-top:8px;${inp}">
+      </div>
+      <div id="tvUpTestList" style="flex:1;overflow-y:auto;overscroll-behavior:contain;padding:8px 12px;"></div>
+      <div style="flex-shrink:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px));background:var(--bg-card);border-top:1px solid var(--border);">
+        <button id="tvUpTestSave" onclick="tvUpTestAskName()" disabled style="width:100%;background:#1db954;border:none;color:#000;font-weight:700;padding:12px;border-radius:10px;cursor:pointer;font-size:0.95rem;opacity:0.4;">💾 Uložit playlist</button>
+      </div>`;
+    document.body.appendChild(m);
+    const u = m.querySelector('#tvUpTestUrl');
+    if (prefUrl && /^https?:\/\//i.test(prefUrl.trim())) { u.value = prefUrl.trim(); tvUpTestLoad(); }
+}
+window.tvUpOpenTest = tvUpOpenTest;
+function tvUpCloseTest() { document.getElementById('tvUpTestNameSheet')?.remove(); document.getElementById('tvUpTestModal')?.remove(); }
+window.tvUpCloseTest = tvUpCloseTest;
+function _tvUpTestStatus(msg, isErr) { const el = document.getElementById('tvUpTestStatus'); if (el) { el.textContent = msg || ''; el.style.color = isErr ? '#ff6b6b' : 'var(--text-muted)'; } }
+async function tvUpTestLoad(fromFile) {
+    const btn = document.getElementById('tvUpTestLoad');
+    try {
+        let text = '', url = '', defName = '';
+        if (fromFile) {
+            const f = document.getElementById('tvUpTestFile'); const file = f && f.files && f.files[0];
+            if (!file) return;
+            _tvUpTestStatus('⏳ Čtu soubor…');
+            text = await file.text();
+            defName = (file.name || '').replace(/\.[^.]+$/, '');
+            _tvUpTest.mode = 'file'; _tvUpTest.url = '';
+        } else {
+            url = ((document.getElementById('tvUpTestUrl') || {}).value || '').trim();
+            if (!/^https?:\/\/\S+$/i.test(url)) throw new Error('Zadej platný odkaz začínající http:// nebo https://');
+            if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+            _tvUpTestStatus('⏳ Stahuji playlist…');
+            text = await _tvUpFetchText(url);
+            try { defName = new URL(url).hostname.replace(/^www\./, ''); } catch (e) {}
+            _tvUpTest.mode = 'url'; _tvUpTest.url = url;
+        }
+        const norm = _tvUpNormalizeM3U(text);
+        const parsed = parseM3U(norm);
+        if (!parsed.length) throw new Error('V playlistu nejsou žádné kanály (hledám #EXTINF + URL streamu).');
+        Object.assign(_tvUpTest, { norm, parsed, defName, shown: 0, filter: '' });
+        const sr = document.getElementById('tvUpTestSearch'); if (sr) { sr.style.display = ''; sr.value = ''; }
+        const sv = document.getElementById('tvUpTestSave');
+        if (sv) { sv.disabled = false; sv.style.opacity = ''; sv.textContent = `💾 Uložit playlist (${parsed.length} kanálů)`; }
+        _tvUpTestStatus(`✅ Načteno ${parsed.length} kanálů — vyzkoušej je tlačítkem ▶ a pak ulož.`);
+        _tvUpTestRender(true);
+    } catch (e) {
+        _tvUpTestStatus('❌ ' + (e && e.message ? e.message : e), true);
+    } finally { if (btn) { btn.disabled = false; btn.style.opacity = ''; } }
+}
+window.tvUpTestLoad = tvUpTestLoad;
+function tvUpTestFilter(v) { _tvUpTest.filter = (v || '').trim().toLowerCase(); _tvUpTestRender(true); }
+window.tvUpTestFilter = tvUpTestFilter;
+function _tvUpTestRender(reset) {
+    const box = document.getElementById('tvUpTestList'); if (!box) return;
+    const list = _tvUpTest.parsed.filter(c => !_tvUpTest.filter || (c.name + ' ' + (c.group || '')).toLowerCase().includes(_tvUpTest.filter));
+    if (reset) { _tvUpTest.shown = 0; box.innerHTML = ''; box.scrollTop = 0; }
+    box.querySelector('#tvUpTestMore')?.remove();
+    const next = list.slice(_tvUpTest.shown, _tvUpTest.shown + 150);
+    next.forEach(c => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:6px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;';
+        row.innerHTML = `${c.logo ? `<img src="${_tvUpEsc(c.logo)}" width="32" height="32" loading="lazy" referrerpolicy="no-referrer" style="object-fit:contain;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'">` : ''}
+            <div style="flex:1;min-width:0;"><div style="font-size:0.88rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_tvUpEsc(c.name)}</div>${c.group ? `<div style="font-size:0.7rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_tvUpEsc(c.group)}</div>` : ''}</div>
+            <button title="Otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">▶ VLC</button>
+            <button title="Kopírovat odkaz" style="background:none;border:1px solid var(--border);color:#ccc;width:34px;height:32px;border-radius:8px;cursor:pointer;flex-shrink:0;">📋</button>`;
+        const [bPlay, bCopy] = row.querySelectorAll('button');
+        bPlay.onclick = () => { bPlay.textContent = '▶ ✓'; openInVlcUrl(c.url); };
+        bCopy.onclick = async () => { try { await navigator.clipboard.writeText(c.url); bCopy.textContent = '✓'; setTimeout(() => bCopy.textContent = '📋', 1200); } catch (e) { prompt('Odkaz na stream:', c.url); } };
+        box.appendChild(row);
+    });
+    _tvUpTest.shown += next.length;
+    if (_tvUpTest.shown < list.length) {
+        const more = document.createElement('button');
+        more.id = 'tvUpTestMore';
+        more.textContent = `Zobrazit další (${list.length - _tvUpTest.shown})`;
+        more.style.cssText = 'width:100%;padding:10px;margin:4px 0 12px;background:transparent;border:1px dashed var(--border);color:#ccc;border-radius:10px;cursor:pointer;';
+        more.onclick = () => _tvUpTestRender(false);
+        box.appendChild(more);
+    } else if (!list.length) {
+        box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">Nic nenalezeno.</div>';
+    }
+}
+// Uložit → vyskočí okno s názvem
+function tvUpTestAskName() {
+    if (!_tvUpTest.parsed.length) return;
+    document.getElementById('tvUpTestNameSheet')?.remove();
+    const sh = document.createElement('div');
+    sh.id = 'tvUpTestNameSheet';
+    sh.style.cssText = 'position:fixed;inset:0;z-index:2000003;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;justify-content:center;';
+    sh.onclick = (e) => { if (e.target === sh) sh.remove(); };
+    sh.innerHTML = `<div style="width:100%;max-width:520px;background:var(--bg-card);border:1px solid var(--border);border-bottom:none;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;">
+        <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:#5dade2;font-weight:700;margin-bottom:10px;">💾 Název playlistu</div>
+        <input id="tvUpTestName" type="text" maxlength="60" placeholder="Např. Moje IPTV" autocomplete="off" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:8px;font-size:1rem;box-sizing:border-box;">
+        <div style="display:flex;gap:8px;margin-top:12px;">
+            <button onclick="document.getElementById('tvUpTestNameSheet').remove()" style="flex:1;background:none;border:1px solid var(--border);color:#ccc;padding:11px;border-radius:10px;cursor:pointer;">Zrušit</button>
+            <button id="tvUpTestNameOk" onclick="tvUpTestDoSave()" style="flex:2;background:#1db954;border:none;color:#000;font-weight:700;padding:11px;border-radius:10px;cursor:pointer;">💾 Uložit</button>
+        </div></div>`;
+    document.body.appendChild(sh);
+    const i = sh.querySelector('#tvUpTestName');
+    i.value = _tvUpTest.defName || '';
+    i.addEventListener('keydown', (e) => { if (e.key === 'Enter') tvUpTestDoSave(); });
+    setTimeout(() => { try { i.focus(); i.select(); } catch (e) {} }, 50);
+}
+window.tvUpTestAskName = tvUpTestAskName;
+function tvUpTestDoSave() {
+    const t = _tvUpTest;
+    if (!t.parsed.length) return;
+    const name = (((document.getElementById('tvUpTestName') || {}).value || '').trim() || t.defName || 'Playlist').slice(0, 60);
+    const st = _tvUpState();
+    const id = 'up_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    const l = { id, name, kind: t.mode === 'url' ? 'url' : 'file', url: t.mode === 'url' ? t.url : '', count: t.parsed.length, ts: Date.now(), persisted: true, all: null, channels: [], activeGroup: 'all', searchText: '' };
+    l.persisted = _tvUpPut(_TV_UP_TXT_KEY + id, t.norm);
+    st.lists.push(l);
+    _tvUpSaveMeta();
+    _tvUpAfterChange();
+    tvUpCloseTest();
+    tvUpCloseAdd();
+    const adminM = document.getElementById('tvChannelAdminModal');
+    const tvM = document.getElementById('tvModal');
+    if (adminM && adminM.style.display === 'flex' && typeof _tvAdminSelectSource === 'function') _tvAdminSelectSource(id);
+    else if (tvM && tvM.classList.contains('open')) switchTvTab(id);
+    try { (typeof _favToast === 'function' ? _favToast : alert)(`💾 Playlist „${name}“ uložen (${l.count} kanálů)`); } catch (e) {}
+    if (!l.persisted) alert('⚠️ Playlist se nevešel do úložiště zařízení — zůstane jen do zavření aplikace.' + (l.kind === 'url' ? ' (Odkaz se příště stáhne znovu.)' : ' Přidej ho příště znovu.'));
+}
+window.tvUpTestDoSave = tvUpTestDoSave;
 
 function tvUpRefresh(id) { _tvUpRefresh(id, false); }
 window.tvUpRefresh = tvUpRefresh;
@@ -48305,6 +48456,7 @@ window.KinoList = (function() {
             <button onclick="trailersFindFilm(this,'${x.id}')" style="padding:7px 12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:0.78rem;">🔍 Detail filmu</button>
             <button onclick="trailersWatchlist(this,'${x.id}')" style="padding:7px 12px;border-radius:10px;border:1px solid #6090ff;background:rgba(96,144,255,0.12);color:#6090ff;cursor:pointer;font-size:0.78rem;">🔖 Watchlist</button>
             <button onclick="trailersToList(this,'${x.id}')" style="padding:7px 12px;border-radius:10px;border:1px solid #6090ff;background:rgba(96,144,255,0.12);color:#6090ff;cursor:pointer;font-size:0.78rem;">📁 Do seznamu</button>
+            <button onclick="trailersManualSearch('${x.id}')" style="padding:7px 12px;border-radius:10px;border:1px solid #6090ff;background:rgba(96,144,255,0.12);color:#6090ff;cursor:pointer;font-size:0.78rem;">🔎 Hledat v Sinatoru</button>
             <button onclick="window.open('https://youtu.be/${x.id}','_blank')" style="padding:7px 12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:0.78rem;">↗ YouTube</button>
           </div></div></div>`).join('');
     msg.style.display = arr.length ? 'none' : 'block';
@@ -48349,36 +48501,41 @@ window.KinoList = (function() {
   // 🔍 Detail filmu: z názvu videa („Manipulation (2026) CZ HD trailer“) vytáhne název a najde ho na TMDB
   window.trailersFindFilm = async function(btn, id) {
     const x = _items.find(i => i.id === id); if (!x) return;
-    const key = (typeof tmdbApiKey !== 'undefined' && tmdbApiKey) || '';
-    if (!key) { alert('Chybí TMDB API klíč.'); return; }
-    let q = x.title.replace(/[|–—].*$/, '').replace(/\b(CZ|SK)\b.*$/i, '').replace(/\b(HD|4K|trailer|teaser|upoutávka|oficiální)\b.*$/i, '');
-    const ym = q.match(/\((\d{4})\)/); const year = ym ? ym[1] : '';
-    q = q.replace(/\(\d{4}\)/, '').replace(/[:\-]\s*$/, '').trim();
-    if (!q) { alert('Z názvu videa se nepodařilo poznat film.'); return; }
     const orig = btn.textContent; btn.textContent = '⏳'; btn.disabled = true;
     try {
-      let r = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${key}&language=cs-CZ&query=${encodeURIComponent(q)}`).then(r => r.json());
-      let list = (r.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv');
-      if (year) { const y = list.filter(m => String(m.release_date || m.first_air_date || '').startsWith(year)); if (y.length) list = y; }
-      if (!list.length) { alert(`„${q}“ jsem na TMDB nenašel.`); return; }
-      const hit = list[0]; const f = window._siOpenDetail || (typeof openDetail === 'function' ? openDetail : null);
-      if (f) f(hit.id, hit.media_type === 'tv' ? 'tv' : 'movie'); else alert('Detail se nepodařilo otevřít.');
-    } catch (e) { alert('Vyhledání selhalo: ' + ((e && e.message) || e)); }
+      const h = await trailersResolve(x);
+      const f = window._siOpenDetail || (typeof openDetail === 'function' ? openDetail : null);
+      if (f) f(h.id, h.type); else alert('Detail se nepodařilo otevřít.');
+    } catch (e) { if (e && e.code === 'NOTFOUND') trailersManualSearch(id, e.q); else alert('Vyhledání selhalo: ' + ((e && e.message) || e)); }
     finally { btn.textContent = orig; btn.disabled = false; }
   };
   // Najde film/seriál z názvu videa na TMDB (výsledek si pamatuje u položky)
+  // Očištění názvu videa na hledaný název (odstraní oficiální/HD/trailer/CZ/#hashtagy…, rok vytáhne zvlášť)
+  function trailersCleanQuery(title) {
+    let t = String(title || '').replace(/[|–—].*$/, '').replace(/#\S+/g, ' ');
+    const ym = t.match(/\((\d{4})\)/); const year = ym ? ym[1] : '';
+    t = t.replace(/\(\d{4}\)/g, ' ');
+    t = t.replace(/(^|[\s(\[])(?:ofici[aá]ln[ií]|official|f?hd|uhd|4k|trailer|teaser|upout[aá]vka|dabing|titulky|uk[aá]zka|cz|sk)(?=$|[\s)\],.!?:])/gi, ' ');
+    t = t.replace(/(^|[\s(\[])(?:ofici[aá]ln[ií]|official|f?hd|uhd|4k|trailer|teaser|upout[aá]vka|dabing|titulky|uk[aá]zka|cz|sk)(?=$|[\s)\],.!?:])/gi, ' ');
+    t = t.replace(/[:\-–]\s*$/, '').replace(/\s+/g, ' ').trim();
+    return { q: t, year };
+  }
+  const _TR_MAP_KEY = 'sinator_trailer_map_v1';
+  function trailersMapGet(id) { try { return JSON.parse((window._store || localStorage).getItem(_TR_MAP_KEY) || '{}')[id] || null; } catch (e) { return null; } }
+  function trailersMapSet(id, hit) { try { const m = JSON.parse((window._store || localStorage).getItem(_TR_MAP_KEY) || '{}'); m[id] = hit; const keys = Object.keys(m); if (keys.length > 500) delete m[keys[0]]; (window._store || localStorage).setItem(_TR_MAP_KEY, JSON.stringify(m)); } catch (e) {} }
+  // Najde film/seriál z názvu videa na TMDB (výsledek si pamatuje u položky; ručně opravené názvy trvale)
   async function trailersResolve(x) {
     if (x._hit) return x._hit;
+    const saved = trailersMapGet(x.id); if (saved) { x._hit = saved; return saved; }
     const key = (typeof tmdbApiKey !== 'undefined' && tmdbApiKey) || '';
     if (!key) throw new Error('Chybí TMDB API klíč.');
-    let q = x.title.replace(/[|–—].*$/, '').replace(/\b(CZ|SK)\b.*$/i, '').replace(/\b(HD|4K|trailer|teaser|upoutávka|oficiální)\b.*$/i, '');
-    const ym = q.match(/\((\d{4})\)/); const year = ym ? ym[1] : '';
-    q = q.replace(/\(\d{4}\)/, '').replace(/[:\-]\s*$/, '').trim();
-    if (!q) throw new Error('Z názvu videa se nepodařilo poznat film.');
+    const { q, year } = trailersCleanQuery(x.title);
+    const nf = (msg) => { const e = new Error(msg); e.code = 'NOTFOUND'; e.q = q; return e; };
+    if (!q) throw nf('Z názvu videa se nepodařilo poznat film.');
     const r = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${key}&language=cs-CZ&query=${encodeURIComponent(q)}`).then(r => r.json());
     let list = (r.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv');
     if (year) { const y = list.filter(m => String(m.release_date || m.first_air_date || '').startsWith(year)); if (y.length) list = y; }
-    if (!list.length) throw new Error(`„${q}“ jsem na TMDB nenašel.`);
+    if (!list.length) throw nf(`„${q}“ jsem na TMDB nenašel.`);
     const h = list[0];
     x._hit = { id: h.id, type: h.media_type === 'tv' ? 'tv' : 'movie', title: h.title || h.name || q, year: String(h.release_date || h.first_air_date || '').slice(0, 4), poster: h.poster_path || '' };
     return x._hit;
@@ -48387,9 +48544,58 @@ window.KinoList = (function() {
     const x = _items.find(i => i.id === id); if (!x) return;
     const orig = btn.textContent; btn.textContent = '⏳'; btn.disabled = true;
     try { const h = await trailersResolve(x); await fn(h); }
-    catch (e) { alert((e && e.message) || e); }
+    catch (e) { if (e && e.code === 'NOTFOUND') trailersManualSearch(id, e.q); else alert((e && e.message) || e); }
     finally { btn.textContent = orig; btn.disabled = false; }
   }
+  // 🔎 Ruční hledání v Sinatoru (TMDB): zadám přesný název → vyberu správný titul → detail / watchlist / seznam
+  window.trailersManualSearch = function(id, preQ) {
+    const x = _items.find(i => i.id === id); if (!x) return;
+    document.getElementById('trailersSearchSheet')?.remove();
+    const q0 = (preQ != null && preQ !== '') ? preQ : trailersCleanQuery(x.title).q;
+    const ov = document.createElement('div');
+    ov.id = 'trailersSearchSheet';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:4400;display:flex;align-items:flex-end;justify-content:center;';
+    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    ov.innerHTML = `<div style="background:var(--bg-card);border-radius:16px 16px 0 0;padding:16px;width:100%;max-width:520px;max-height:85vh;display:flex;flex-direction:column;box-sizing:border-box;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><div style="flex:1;font-weight:700;color:#6090ff;">🔎 Hledat v Sinatoru</div><button id="trsClose" style="background:none;border:1px solid var(--border);color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;">✕</button></div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.35;">Video: ${esc(x.title)}<br>Zadej přesný název filmu/seriálu a vyber správný výsledek.</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;"><input id="trsInput" type="text" value="${esc(q0)}" placeholder="Přesný název…" autocomplete="off" style="flex:1;min-width:0;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;font-size:0.95rem;"><button id="trsGo" style="background:#6090ff;border:none;color:#000;font-weight:700;padding:0 14px;border-radius:8px;cursor:pointer;">🔍 Hledat</button></div>
+      <div id="trsRes" style="overflow-y:auto;overscroll-behavior:contain;flex:1;min-height:60px;color:var(--text-muted);font-size:0.85rem;"></div></div>`;
+    document.body.appendChild(ov);
+    const inp = ov.querySelector('#trsInput'), res = ov.querySelector('#trsRes');
+    ov.querySelector('#trsClose').onclick = () => ov.remove();
+    const choose = (m) => ({ id: m.id, type: m.media_type === 'tv' ? 'tv' : 'movie', title: m.title || m.name || '', year: String(m.release_date || m.first_air_date || '').slice(0, 4), poster: m.poster_path || '' });
+    const remember = (h) => { x._hit = h; trailersMapSet(x.id, h); };
+    const go = async () => {
+      const q = inp.value.trim(); if (!q) return;
+      const key = (typeof tmdbApiKey !== 'undefined' && tmdbApiKey) || '';
+      if (!key) { res.textContent = 'Chybí TMDB API klíč.'; return; }
+      res.innerHTML = '<div style="padding:14px;text-align:center;"><span class="sin-pick-spin" style="width:22px;height:22px;border-width:3px;"></span></div>';
+      try {
+        const r = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${key}&language=cs-CZ&query=${encodeURIComponent(q)}`).then(r => r.json());
+        const list = (r.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv').slice(0, 12);
+        if (!list.length) { res.innerHTML = '<div style="padding:12px;">Nic nenalezeno — zkus jiný název.</div>'; return; }
+        res.innerHTML = '';
+        list.forEach(m => {
+          const h = choose(m);
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;gap:10px;align-items:center;padding:8px;margin-bottom:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;';
+          row.innerHTML = `${h.poster ? `<img src="https://image.tmdb.org/t/p/w92${h.poster}" width="40" height="60" style="border-radius:6px;object-fit:cover;flex-shrink:0;">` : '<div style="width:40px;height:60px;border-radius:6px;background:var(--bg-card);flex-shrink:0;"></div>'}
+            <div style="flex:1;min-width:0;"><div style="color:var(--text);font-weight:600;font-size:0.9rem;">${esc(h.title)} <span style="color:var(--text-muted);font-weight:400;">${esc(h.year)}</span></div><div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px;">${h.type === 'tv' ? '📺 Seriál' : '🎬 Film'}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;"><button data-a="d" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:0.76rem;cursor:pointer;">🔍 Detail</button><button data-a="w" style="padding:5px 10px;border-radius:8px;border:1px solid #6090ff;background:rgba(96,144,255,0.12);color:#6090ff;font-size:0.76rem;cursor:pointer;">🔖 Watchlist</button><button data-a="l" style="padding:5px 10px;border-radius:8px;border:1px solid #6090ff;background:rgba(96,144,255,0.12);color:#6090ff;font-size:0.76rem;cursor:pointer;">📁 Do seznamu</button></div></div>`;
+          row.querySelector('[data-a="d"]').onclick = () => { remember(h); ov.remove(); const f = window._siOpenDetail || (typeof openDetail === 'function' ? openDetail : null); if (f) f(h.id, h.type); };
+          row.querySelector('[data-a="w"]').onclick = async (ev) => { const b = ev.currentTarget, o = b.textContent; remember(h); b.textContent = '⏳'; b.disabled = true; try { await window.myBackendAddWatchlist(h.id, h.type, h.title, h.year, h.poster); } catch (e) { alert((e && e.message) || e); } b.textContent = o; b.disabled = false; };
+          row.querySelector('[data-a="l"]').onclick = async () => { remember(h); try { await window.myBackendAddToList(h.id, h.type); } catch (e) { alert((e && e.message) || e); } };
+          res.appendChild(row);
+        });
+      } catch (e) { res.innerHTML = '<div style="padding:12px;color:#ff6b6b;">Vyhledání selhalo: ' + esc((e && e.message) || e) + '</div>'; }
+    };
+    ov.querySelector('#trsGo').onclick = go;
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    if (q0) go();
+    setTimeout(() => { try { inp.focus(); inp.select(); } catch (e) {} }, 50);
+  };
   // 🔖 Watchlist (přidá/odebere v Sinatoru, zrcadlí do Histry)
   window.trailersWatchlist = (btn, id) => trailersWithHit(btn, id, h => window.myBackendAddWatchlist(h.id, h.type, h.title, h.year, h.poster));
   // 📁 Do seznamu (Sinator picker, zrcadlí do Histry)
