@@ -2202,6 +2202,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <button class="source-btn" id="srcbtn-uzisi" onclick="searchOnSource('uzisi')"><span class="src-status"></span>🎯 Uzi.si</button>
                 <button class="source-btn" id="srcbtn-sktorrent" onclick="searchOnSource('sktorrent')"><span class="src-status"></span>🧲 SKTorrent</button>
             </div>
+            <div class="sources-section-title" style="margin-top:18px;">📡 TV archivy</div>
+            <div class="sources-grid">
+                <button class="source-btn" id="srcbtn-ivysilani" onclick="searchOnSource('ivysilani')"><span class="src-status"></span>📡 iVysílání ČT</button>
+                <button class="source-btn" id="srcbtn-nova" onclick="searchOnSource('nova')"><span class="src-status"></span>📺 Nova</button>
+                <button class="source-btn" id="srcbtn-iprima" onclick="searchOnSource('iprima')"><span class="src-status"></span>📺 iPrima</button>
+            </div>
             <div class="sources-section-title" style="margin-top:18px;">📦 Ostatní</div>
             <div class="sources-grid">
                 <button class="source-btn" id="srcbtn-dokufilmy" onclick="searchOnSource('dokufilmy')"><span class="src-status"></span>🎥 Dokufilmy</button>
@@ -8513,6 +8519,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             'uzila': `https://uzi.la/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}`,
             'mrkaj': `https://mrkaj.me/hladaj/${(state.currentSearchTitle||'').toLowerCase().replace(/\s+/g,'+')}?t=${state.currentSearchType==='tv'?'s':'m'}`,
             'openloadmovies': `https://openloadmovies.live/?s=${title}`,
+            // TV archivy (adresy vyhledávání potvrzeny uživatelem)
+            'ivysilani': `https://www.ceskatelevize.cz/ivysilani/hledani/?keyword=${title}`,
+            'nova': `https://tv.nova.cz/hledat?q=${title}`,
+            'iprima': `https://www.iprima.cz/vyhledavani?q=${title}`,
             // ⚠️ Nejisté: přesný formát vyhledávání na dupe.cz se nepodařilo ověřit
             // (web blokuje automatické stahování). Odhad podle běžného WordPress
             // formátu vyhledávání — pokud netrefuje výsledky, je potřeba upravit.
@@ -16030,9 +16040,6 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                             <button class="action-btn-modal csfd" onclick="openCsfd('${seriesTitleJs}', '')">🎬 ČSFD</button>
                             <button class="action-btn-modal kinobox" onclick="openKinobox('${seriesTitleJs}', '')">🎫 Kinobox</button>
                             <button class="action-btn-modal imdb" onclick="openImdb('${seriesTitleJs}', '')">🎬 IMDb</button>
-                            <button class="action-btn-modal" style="background:rgba(0,85,165,0.15);border-color:#0055a5;color:#60b0ff;" onclick="openCT('${seriesTitleJs}')">📡 iVysílání ČT</button>
-                            <button class="action-btn-modal" style="background:rgba(224,60,60,0.12);border-color:#e03c3c;color:#ff7b7b;" onclick="openNova('${seriesTitleJs}')">📺 Nova</button>
-                            <button class="action-btn-modal" style="background:rgba(0,160,227,0.12);border-color:#00a0e3;color:#5cc8f5;" onclick="openIPrima('${seriesTitleJs}')">📺 iPrima</button>
                             <button class="action-btn-modal" onclick="openEdna('${seriesTitleJs}')">📺 Edna</button>
                             <button class="action-btn-modal" onclick="openHistra('${seriesTitleJs}')">🎦 Histra.net</button>
                             ${state.trakt.accessToken ? `<button class="action-btn-modal trakt-btn" onclick="openTraktSearch('${seriesTitleJs}')">📊 Trakt</button>` : ''}
@@ -16309,9 +16316,6 @@ ${(typeof histraReady==='function'&&histraReady()) ? `<button class="action-btn-
 <button class="action-btn-modal kinobox" onclick="openKinobox('${safeTitle}', '${year}')">🎫 Kinobox</button>
 <button class="action-btn-modal imdb" onclick="openImdb('${safeTitle}', '${year}')">🎬 IMDb</button>
 <button class="action-btn-modal" onclick="openTvGuru('${safeTitle}')">📺 TVguru</button>
-<button class="action-btn-modal" style="background:rgba(0,85,165,0.15);border-color:#0055a5;color:#60b0ff;" onclick="openCT('${safeTitle}')">📡 iVysílání ČT</button>
-<button class="action-btn-modal" style="background:rgba(224,60,60,0.12);border-color:#e03c3c;color:#ff7b7b;" onclick="openNova('${safeTitle}')">📺 Nova</button>
-<button class="action-btn-modal" style="background:rgba(0,160,227,0.12);border-color:#00a0e3;color:#5cc8f5;" onclick="openIPrima('${safeTitle}')">📺 iPrima</button>
 <button class="action-btn-modal" onclick="openEdna('${safeTitle}')">📺 Edna</button>
 <button class="action-btn-modal" onclick="openMrkni('${safeTitle}', '${year}')">📺 Mrkni.tv</button>
 <button class="action-btn-modal" onclick="openHistra('${safeTitle}')">🎦 Histra.net</button>
