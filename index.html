@@ -7135,6 +7135,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const _cb = $('pwaCarryKeyBtn'), _ci = $('pwaCarryKeyInfo');
             if (_cb) _cb.style.display = (_hasKey && !_inst) ? 'block' : 'none';
             if (_ci) _ci.style.display = (_hasKey && !_inst) ? 'block' : 'none';
+            // iOS: „Přidat na plochu“ bere aktuální adresu, takže klíč/jméno/schválení musí být v hashi právě teď
+            if (_hasKey && !_inst && (_isIOSDevice() || _isAndroidDevice()) && window._carryKeyHash) window._carryKeyHash(true);
         } catch (e) {}
 
         // Reset
@@ -7164,6 +7166,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         }
     }
     window.updateInstallSectionUI = updateInstallSectionUI;
+    // iOS Safari: při návratu do záložky (např. po schválení adminem) hash znovu obnov, aby ho instalace vzala s sebou
+    document.addEventListener('visibilitychange', function() {
+        try { if (document.visibilityState === 'visible' && (_isIOSDevice() || _isAndroidDevice()) && !_isStandaloneMode()) updateInstallSectionUI(); } catch (e) {}
+    });
 
     async function installPWA() {
         try { window._carryKeyHash(true); } catch (e) {}
