@@ -723,7 +723,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
 <div id="searchOverlay" class="search-overlay">
     <div class="search-overlay-inner" style="position:relative;">
         <button class="close-btn" onclick="toggleSearchOverlay()">✕</button>
-        <input type="text" id="searchInput" placeholder="Hledat filmy, seriály nebo herce..." autocomplete="off">
+        <input type="text" id="searchInput" placeholder="Hledat filmy, seriály nebo herce..." autocomplete="off" inputmode="search" enterkeyhint="search">
         <button class="close-btn" id="voiceSearchBtn" onclick="startVoiceSearch()" title="Hlasové vyhledávání" style="font-size:1.1rem;">🎤</button>
         <button class="search-btn" onclick="startSearch()">Hledat</button>
     </div>
@@ -7200,14 +7200,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             btn.classList.toggle('active', state.searchOpen);
             
             if (state.searchOpen) {
-                setTimeout(() => {
-                    const input = $('searchInput');
-                    if (input) {
-                        input.value = '';
-                        input.focus();
-                        input.click();
-                    }
-                }, 100);
+                // iOS Safari: focus() musí běžet synchronně v obsluze klepnutí, jinak nevyjede klávesnice
+                const input = $('searchInput');
+                if (input) {
+                    input.value = '';
+                    input.focus();
+                }
             }
         }
     }
