@@ -649,6 +649,11 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
            style="width:100%;padding:13px 14px;border-radius:10px;border:1px solid #333;background:#1c1c1c;color:#fff;font-size:1rem;text-align:center;box-sizing:border-box;"
            onkeydown="if(event.key==='Enter')submitAccessRequest()">
     <div id="accessReqMsg" style="font-size:0.84rem;margin-top:10px;min-height:18px;line-height:1.4;"></div>
+    <div style="margin-top:6px;padding-top:12px;border-top:1px solid #262626;">
+      <input type="text" id="accessReqCode" maxlength="12" placeholder="Kód z instalace (když ho máš)" autocomplete="off" autocapitalize="characters"
+             style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#1c1c1c;color:#fff;font-size:0.9rem;text-align:center;box-sizing:border-box;letter-spacing:2px;">
+      <button type="button" onclick="useInstallCode()" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid rgba(255,215,0,0.4);background:transparent;color:#ffd700;font-size:0.88rem;cursor:pointer;">Použít kód (bez schvalování)</button>
+    </div>
     <button id="accessReqSendBtn" type="button" onclick="submitAccessRequest()" style="width:100%;margin-top:12px;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,#ffd700,#e5a800);color:#1a1a1a;font-weight:800;font-size:1rem;cursor:pointer;">Odeslat adminovi</button>
     <button type="button" onclick="closeAccessRequestModal()" style="width:100%;margin-top:8px;padding:11px;border-radius:10px;border:1px solid #333;background:transparent;color:#aaa;font-size:0.9rem;cursor:pointer;">Zavřít</button>
   </div>
@@ -1695,6 +1700,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <button class="settings-btn-small" id="pwaCarryKeyBtn" onclick="prepareKeyForInstall()" style="display:none;width:100%;margin-top:10px;">🔑 Přenést klíč, jméno a přístup do instalace</button>
                 <div id="pwaCarryKeyInfo" style="display:none;font-size:0.7rem;color:var(--text-muted);line-height:1.4;margin-top:4px;">TMDB klíč, přezdívka a schválení přístupu se na 10 minut přidají do adresy (za #). Když appku přidáš na plochu, vezme si je s sebou a po prvním spuštění je nebudeš zadávat ani schvalovat znovu. U instalace přes tlačítko výš se to dělá samo.</div>
 
+                <div id="pwaInstallCodeBox" style="display:none;font-size:0.75rem;color:var(--text-muted);line-height:1.5;margin-top:6px;text-align:center;">Kdyby se po instalaci appka přesto zeptala na jméno, zadej tam tento kód: <b id="pwaInstallCodeVal" style="color:var(--gold,#ffd700);letter-spacing:2px;"></b> (platí 48 h, jednorázový)</div>
+
                 <!-- Android, ale prohlížeč ještě nenabídl instalaci automaticky -->
                 <div id="androidManualInstallInfo" style="display:none;background:rgba(0,180,216,0.08);border:1px solid rgba(0,180,216,0.25);border-radius:10px;padding:12px;margin-top:10px;font-size:0.8rem;line-height:1.7;color:var(--text-main);">
                     <b>🤖 Instalace na Androidu (ručně):</b><br>
@@ -2365,8 +2372,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     (function() {
         try {
             var h = location.hash || '';
-            if (!/[#&](?:tmdb|did)=/.test(h)) return;
+            if (!/[#&](?:tmdb|did|inst)=/.test(h)) return;
             var q = new URLSearchParams(h.replace(/^#/, ''));
+            var _ic = (q.get('inst') || '').toUpperCase(); if (/^[A-Z2-9]{10}$/.test(_ic)) window._instFromHash = _ic;
             var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
             var t = q.get('tmdb');
             if (t && /^[A-Za-z0-9._-]{32,500}$/.test(t) && !_store.getItem('sinator_tmdb_api_key')) { _store.setItem('sinator_tmdb_api_key', t); window._tmdbFromInvite = true; }
@@ -2400,9 +2408,18 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 history.replaceState(null, '', base + '#' + q.toString());
                 clearTimeout(window._ckT);
                 window._ckT = setTimeout(function() { window._carryKeyHash(false); }, 10 * 60 * 1000);
+                // Jednorázový kód v Firebase: klíč/jméno/schválení pak v URL nejsou, nese je jen krátký kód
+                if (typeof window._createInstallToken === 'function') {
+                    window._createInstallToken().then(function(code) {
+                        if (!code) return;
+                        if (/[#&](?:tmdb|did|inst)=/.test(location.hash)) history.replaceState(null, '', base + '#inst=' + code);
+                        var bx = document.getElementById('pwaInstallCodeBox'), v = document.getElementById('pwaInstallCodeVal');
+                        if (bx && v) { v.textContent = code; bx.style.display = 'block'; }
+                    }).catch(function() {});
+                }
                 return true;
             }
-            if (/[#&](?:tmdb|did)=/.test(location.hash)) history.replaceState(null, '', base);
+            if (/[#&](?:tmdb|did|inst)=/.test(location.hash)) history.replaceState(null, '', base);
         } catch (e) {}
         return false;
     };
@@ -45844,6 +45861,75 @@ try {
   const _an = localStorage.getItem(ACCESS_NICK_KEY);
   if (_an) _attachAccessReqListener(_an);
 } catch(e) {}
+
+// ── PŘENOS DO INSTALACE: jednorázový kód (presence/_inst_<KÓD>) ─────────────
+// Safari/prohlížeč uloží k náhodnému kódu: did (schválené zařízení), jméno, schválení, TMDB klíč.
+// Nainstalovaná appka (jiné úložiště) kód vyzvedne z adresy (#inst=KÓD) nebo ho uživatel zadá ručně,
+// převezme did + jméno + klíč, kód se smaže a appka se odemkne bez nové žádosti.
+function _randInstCode(n) {
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', a = new Uint32Array(n);
+  window.crypto.getRandomValues(a);
+  return Array.from(a, x => c[x % c.length]).join('');
+}
+window._createInstallToken = async function() {
+  try {
+    const granted = localStorage.getItem(ACCESS_GRANTED_KEY) === '1';
+    const nick = localStorage.getItem(ACCESS_NICK_KEY) || '';
+    const un = localStorage.getItem(USER_NICK_KEY) || localStorage.getItem('sinator_d_nick') || '';
+    const tk = (localStorage.getItem('sinator_tmdb_api_key') || '').trim();
+    if (!granted && !nick && !un && !tk) return null;
+    const rec = { did: _getDeviceId(), ts: Date.now() };
+    if (nick) rec.rn = nick;
+    if (granted) rec.ag = 1;
+    if (un) rec.un = un;
+    if (tk) rec.tk = tk;
+    const old = window._instCode;
+    if (!old || Date.now() - (window._instCodeTs || 0) > 20 * 60 * 1000) {
+      window._instCode = _randInstCode(10); window._instCodeTs = Date.now(); window._instWrote = 0;
+      if (old) { try { await remove(ref(rtdb, 'presence/_inst_' + old)); } catch (e) {} }
+    }
+    if (Date.now() - (window._instWrote || 0) > 5 * 60 * 1000) {
+      await set(ref(rtdb, 'presence/_inst_' + window._instCode), rec);
+      window._instWrote = Date.now();
+    }
+    return window._instCode;
+  } catch (e) { return null; }
+};
+window._claimInstallToken = async function(code) {
+  code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!/^[A-Z2-9]{10}$/.test(code)) return { ok: false, msg: '⚠️ Neplatný kód.' };
+  try {
+    const rRef = ref(rtdb, 'presence/_inst_' + code);
+    const snap = await get(rRef);
+    if (!snap.exists()) return { ok: false, msg: '⚠️ Kód neexistuje nebo už byl použit.' };
+    const r = snap.val() || {};
+    if (!r.ts || Date.now() - r.ts > 48 * 3600 * 1000) { try { await remove(rRef); } catch (e) {} return { ok: false, msg: '⚠️ Kód vypršel.' }; }
+    if (r.did) localStorage.setItem(DEVICE_ID_KEY, String(r.did));   // instalace = totéž schválené zařízení
+    if (r.rn) localStorage.setItem(ACCESS_NICK_KEY, String(r.rn));
+    if (r.ag && r.rn) {
+      localStorage.setItem(ACCESS_GRANTED_KEY, '1');
+      localStorage.setItem('sinator_pwd_never_required', '1');
+      localStorage.removeItem('sinator_pwd_always_required');
+    }
+    if (r.un) { localStorage.setItem(USER_NICK_KEY, String(r.un)); localStorage.setItem('sinator_d_nick', String(r.un)); }
+    if (r.tk && !(localStorage.getItem('sinator_tmdb_api_key') || '').trim()) localStorage.setItem('sinator_tmdb_api_key', String(r.tk));
+    try { await remove(rRef); } catch (e) {}   // jednorázový
+    return { ok: true };
+  } catch (e) { return { ok: false, msg: '⚠️ Nepodařilo se ověřit kód: ' + (e && e.message || e) }; }
+};
+window.useInstallCode = async function() {
+  const inp = document.getElementById('accessReqCode');
+  const r = await window._claimInstallToken(inp ? inp.value : '');
+  if (r.ok) { if (typeof window._setAccessReqStatus === 'function') window._setAccessReqStatus('✅ Kód přijat, načítám…', '#22c55e'); setTimeout(() => location.replace(location.pathname + location.search), 400); }
+  else if (typeof window._setAccessReqStatus === 'function') window._setAccessReqStatus(r.msg, '#ff6b6b');
+};
+// Automatické vyzvednutí: nainstalovaná appka s #inst=KÓD v adrese a bez schválení
+try {
+  const _sa = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  if (window._instFromHash && _sa && localStorage.getItem(ACCESS_GRANTED_KEY) !== '1') {
+    window._claimInstallToken(window._instFromHash).then(r => { if (r.ok) location.replace(location.pathname + location.search); });
+  }
+} catch (e) {}
 
 // Admin: seznam žádostí (čekající + schválení)
 function _renderAccessRequests(all) {
