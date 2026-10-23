@@ -9,27 +9,52 @@
     // se čte jako prázdné a zápisy jdou jen do paměti — skutečná data v telefonu se nemění.
     // Musí běžet úplně první, před ostatními skripty, proto je to tady v <head>.
     (function () {
-        var FLAG = 'sinator_test_user_mode', on = false;
+        var FLAG = 'sinator_test_user_mode', IPH = 'sinator_test_iphone', PFX = '__emu_pwa__:', on = false, emu = '';
         try { on = window.localStorage.getItem(FLAG) === '1'; } catch (e) {}
+        try { emu = window.localStorage.getItem(IPH) || ''; } catch (e) {}
+        if (emu !== 'safari' && emu !== 'pwa') emu = '';
         window._testUserMode = on;
         if (!on) return;
+        window._testIphoneEmu = emu;
+        // Emulátor iPhonu: appka si myslí, že běží na iPhonu — 'safari' = karta v Safari, 'pwa' = appka přidaná na plochu
+        // (navíc s oddělenou „čerstvou“ pamětí, jako má skutečná iOS instalace; bez TMDB klíče, jména a schválení).
+        if (emu) {
+            var UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+            var def = function (o, k, v) { try { Object.defineProperty(o, k, { get: function () { return v; }, configurable: true }); } catch (e) {} };
+            def(navigator, 'userAgent', UA);
+            def(navigator, 'appVersion', UA.replace('Mozilla/', ''));
+            def(navigator, 'platform', 'iPhone');
+            def(navigator, 'vendor', 'Apple Computer, Inc.');
+            def(navigator, 'maxTouchPoints', 5);
+            def(navigator, 'standalone', emu === 'pwa');
+            var mm = window.matchMedia && window.matchMedia.bind(window);
+            if (mm) window.matchMedia = function (q) {
+                if (/display-mode\s*:\s*standalone/.test(String(q))) {
+                    return { matches: emu === 'pwa', media: String(q), onchange: null, addEventListener: function () {}, removeEventListener: function () {},
+                             addListener: function () {}, removeListener: function () {}, dispatchEvent: function () { return false; } };
+                }
+                return mm(q);
+            };
+        }
         var PASS = {};
-        ['sinator_tmdb_api_key', FLAG,
+        (emu === 'pwa' ? [FLAG, IPH] : ['sinator_tmdb_api_key', FLAG, IPH,
          'sinator_access_granted', 'sinator_access_nick', 'sinator_device_id', 'sinator_user_nick', 'sinator_d_nick',
-         'sinator_app_unlocked', 'sinator_pwd_never_required', 'sinator_pwd_always_required'].forEach(function (k) { PASS[k] = 1; });
+         'sinator_app_unlocked', 'sinator_pwd_never_required', 'sinator_pwd_always_required']).forEach(function (k) { PASS[k] = 1; });
         var sand = { local: {}, session: {} }, P = Storage.prototype;
         var g = P.getItem, st = P.setItem, rm = P.removeItem, cl = P.clear;
         function which(o) { try { return o === window.localStorage ? 'local' : 'session'; } catch (e) { return 'session'; } }
-        P.getItem = function (k) { k = String(k); if (PASS[k]) return g.call(this, k); var m = sand[which(this)]; return Object.prototype.hasOwnProperty.call(m, k) ? m[k] : null; };
-        P.setItem = function (k, v) { k = String(k); if (PASS[k]) return st.call(this, k, v); sand[which(this)][k] = String(v); };
-        P.removeItem = function (k) { k = String(k); if (PASS[k]) return rm.call(this, k); delete sand[which(this)][k]; };
-        P.clear = function () { sand[which(this)] = {}; };
+        var pwaLocal = function (o) { return emu === 'pwa' && which(o) === 'local'; };   // „plocha“: trvalá oddělená paměť pod prefixem
+        P.getItem = function (k) { k = String(k); if (PASS[k]) return g.call(this, k); if (pwaLocal(this)) return g.call(this, PFX + k); var m = sand[which(this)]; return Object.prototype.hasOwnProperty.call(m, k) ? m[k] : null; };
+        P.setItem = function (k, v) { k = String(k); if (PASS[k]) return st.call(this, k, v); if (pwaLocal(this)) return st.call(this, PFX + k, v); sand[which(this)][k] = String(v); };
+        P.removeItem = function (k) { k = String(k); if (PASS[k]) return rm.call(this, k); if (pwaLocal(this)) return rm.call(this, PFX + k); delete sand[which(this)][k]; };
+        P.clear = function () { if (pwaLocal(this)) { try { Object.keys(window.localStorage).forEach(function (x) { if (x.indexOf(PFX) === 0) rm.call(window.localStorage, x); }); } catch (e) {} } sand[which(this)] = {}; };
+        window._emuWipePwa = function () { try { Object.keys(window.localStorage).forEach(function (x) { if (x.indexOf(PFX) === 0) rm.call(window.localStorage, x); }); } catch (e) {} };
         document.addEventListener('DOMContentLoaded', function () {
             var b = document.createElement('div');
             b.id = 'testUserBanner';
             b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:2147483000;display:flex;align-items:center;gap:10px;background:#7a3b00;color:#fff;border:1px solid #ffb347;border-radius:999px;padding:7px 8px 7px 14px;font:600 12px/1.2 Inter,system-ui,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,0.6);max-width:94vw;';
-            b.innerHTML = '<span>🧪 TEST: běžný uživatel (jen TMDB klíč)</span><button style="background:#ffb347;color:#000;border:0;border-radius:999px;padding:6px 12px;font:700 12px Inter,system-ui,sans-serif;cursor:pointer;">Ukončit</button>';
-            b.querySelector('button').onclick = function () { try { window.localStorage.removeItem(FLAG); } catch (e) {} location.reload(); };
+            b.innerHTML = '<span>🧪 TEST: běžný uživatel' + (emu === 'pwa' ? ' · 📱 iPhone – appka na ploše (čistá instalace)' : emu === 'safari' ? ' · 📱 iPhone – Safari' : ' (jen TMDB klíč)') + '</span><button style="background:#ffb347;color:#000;border:0;border-radius:999px;padding:6px 12px;font:700 12px Inter,system-ui,sans-serif;cursor:pointer;">Ukončit</button>';
+            b.querySelector('button').onclick = function () { try { window._emuWipePwa(); window.localStorage.removeItem(FLAG); window.localStorage.removeItem(IPH); } catch (e) {} location.replace(location.pathname + location.search); };
             document.body.appendChild(b);
         });
     })();
@@ -1946,6 +1971,17 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                         <div id="testUserToggleKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;pointer-events:none;"></div>
                     </div>
                     <div style="font-size:0.88rem;color:#eee;font-weight:600;">Režim TEST — běžný uživatel</div>
+                </div>
+                <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,179,71,0.25);">
+                    <span class="settings-label" style="color:#ffb347;">📱 Emulátor iPhonu</span>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px;line-height:1.4;">
+                        Appka se chová, jako by běžela na iPhonu (iOS Safari). „Safari“ = karta v prohlížeči (ukáže iOS instalaci a kód pro přenos). „Appka na ploše“ = čistá instalace s oddělenou pamětí bez klíče, jména a schválení — otestuješ, jestli se přenos z Safari povedl (kód v adrese <b>#inst=…</b> se vyzvedne sám, jinak ho zadáš ručně). Zapnutí spustí i TEST režim; Ukončit smaže vše.
+                    </div>
+                    <select id="testIphoneSelect" onchange="setTestIphoneMode(this.value)" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#1c1c1c;color:#fff;font-size:0.9rem;">
+                        <option value="">Vypnuto (skutečné zařízení)</option>
+                        <option value="safari">📱 iPhone – Safari (karta)</option>
+                        <option value="pwa">📲 iPhone – appka na ploše (čistá instalace)</option>
+                    </select>
                 </div>
             </div>
             <div class="settings-section" id="tvBrokenSettingsBox" style="display:none;background:rgba(229,9,20,0.06);border:1px solid rgba(229,9,20,0.2);border-radius:12px;padding:14px 16px;">
@@ -45423,6 +45459,20 @@ window.toggleTestUserMode = function() {
   try { localStorage.setItem('sinator_test_user_mode', '1'); } catch (e) {}
   location.reload();
 };
+window.setTestIphoneMode = function(mode) {
+  const sel = document.getElementById('testIphoneSelect');
+  const cur = (function() { try { return localStorage.getItem('sinator_test_iphone') || ''; } catch (e) { return ''; } })();
+  if (!window._isAdminLevel2()) { if (sel) sel.value = cur; return; }
+  mode = (mode === 'safari' || mode === 'pwa') ? mode : '';
+  if (mode === cur) return;
+  try {
+    if (typeof window._emuWipePwa === 'function' && mode !== 'pwa') window._emuWipePwa();   // nová „plocha“ = nová instalace
+    if (mode) { localStorage.setItem('sinator_test_user_mode', '1'); localStorage.setItem('sinator_test_iphone', mode); }
+    else localStorage.removeItem('sinator_test_iphone');
+  } catch (e) {}
+  location.reload();   // hash v adrese (#inst=…) zůstane, takže ho „plocha“ po přepnutí vyzvedne
+};
+(function() { try { const s = document.getElementById('testIphoneSelect'); if (s) s.value = localStorage.getItem('sinator_test_iphone') || ''; } catch (e) {} })();
 window._isAdminLevel2 = function() {
   return localStorage.getItem('sinator_admin_mode') === '1' && localStorage.getItem('sinator_admin_level') === '2';
 };
