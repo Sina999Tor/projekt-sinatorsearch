@@ -17078,13 +17078,12 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     function openKinobox(title, year) { window.open(`https://www.kinobox.cz/vyhledavani?term=${encodeURIComponent(year ? `${title} ${year}` : title)}`, '_blank'); }
     function openCsfd(t, y) { window.open(`https://www.csfd.cz/hledat/?q=${encodeURIComponent(t+' '+y)}`, '_blank'); }
     function openTvGuru(t) { window.open(`https://www.tvguru.cz/hledej/?q=${encodeURIComponent(t)}`, '_blank'); }
-    function openCT(t) { window.open(`https://www.ceskatelevize.cz/hledani/?q=${encodeURIComponent(t)}`, '_blank'); }
+    function openCT(t) { window.open(`https://www.ceskatelevize.cz/ivysilani/hledani/?keyword=${encodeURIComponent(t)}`, '_blank'); }
     function openEdna(t) { window.open(`https://www.edna.cz/vyhledavani/?q=${encodeURIComponent(t)}`, '_blank'); }
     window.openEdna = openEdna;
     function openNova(t) { window.open(`https://tv.nova.cz/hledat?q=${encodeURIComponent(t)}`, '_blank'); }
     window.openNova = openNova;
-    // Přímá adresa vyhledávání na iPrimě není ověřená → hledá se přes Google omezený na iprima.cz
-    function openIPrima(t) { window.open(`https://www.google.com/search?q=${encodeURIComponent('site:iprima.cz ' + t)}`, '_blank'); }
+    function openIPrima(t) { window.open(`https://www.iprima.cz/vyhledavani?q=${encodeURIComponent(t)}`, '_blank'); }
     window.openIPrima = openIPrima;
     function openImdb(t, y) { window.open(`https://www.imdb.com/find?q=${encodeURIComponent(t+' '+y)}`, '_blank'); }
     function openHistra(t) { window.open(`https://histra.net/search?q=${encodeURIComponent(t)}`, '_blank'); }
