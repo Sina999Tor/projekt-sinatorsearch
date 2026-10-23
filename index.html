@@ -1593,7 +1593,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     <span class="dot" id="histraStatusDot"></span>
                     <span id="histraStatusText">Nepřipojeno</span>
                 </div>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin:8px 0;line-height:1.5;">Zadej osobní token z <a href="https://histra.net" target="_blank" style="color:#8b5cf6;">histra.net</a>. Synchronizuje se historie sledování (filmy a epizody, se skutečným časem zhlédnutí) a nové seznamy — watchlist se nestahuje a existující seznamy se nemění, založí se jen ty, co v Sinatoru ještě nemáš (podle názvu). Appka navíc při každém spuštění sama zkontroluje, jestli na Histře nepřibylo něco nového, a pokud ano, potichu to doplní.</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin:8px 0;line-height:1.5;">Zadej osobní token z <a href="https://histra.net" target="_blank" style="color:#8b5cf6;">histra.net</a>. Synchronizuje se historie sledování (filmy a epizody, se skutečným časem zhlédnutí) a nové seznamy — watchlist se nestahuje a existující seznamy se nemění, založí se jen ty, co v Sinatoru ještě nemáš (podle názvu). Appka při každém spuštění (i po návratu do ní z pozadí) sama porovná Histru a Sinator oběma směry, doplní, co chybí, a v oznámení ukáže, co přesně se přidalo.</div>
                 <div style="font-size:0.68rem;color:#f5a623;margin-bottom:8px;line-height:1.5;">⚠️ Histra API nepovoluje volání přímo z prohlížeče (CORS) — aby sync fungoval, potřebuješ na svém sinator-backend nasadit malý proxy endpoint <code>/api/histra-proxy</code>. Kód a instrukce od Claude, stačí zkopírovat do repa.</div>
                 <input type="password" id="histraTokenInput" placeholder="Histra token" style="width:100%;margin-bottom:8px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;" autocomplete="off">
                 <div class="settings-actions">
@@ -2743,7 +2743,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const showTmdb = histraExtractTmdb(showObj);
             if (!showTmdb || season == null || number == null) return null;
             const showTitle = showObj.title || showObj.name || '';
-            return { kind: 'episode', tmdb: showTmdb, season: parseInt(season, 10), number: parseInt(number, 10), watchedAt, title: showTitle, year: histraExtractYear(showObj) };
+            const epTitle = (e.episode && typeof e.episode === 'object') ? (e.episode.title || e.episode.name || '') : (e.episode_title || '');
+            return { kind: 'episode', tmdb: showTmdb, season: parseInt(season, 10), number: parseInt(number, 10), watchedAt, title: showTitle, epTitle, year: histraExtractYear(showObj) };
         }
         const movieObj = e.movie || e;
         const movieTmdb = histraExtractTmdb(movieObj);
@@ -4392,9 +4393,55 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // silent=true se používá pro automatickou kontrolu při startu appky —
     // stejná logika, jen bez alertů/blokování tlačítka a s tichým toastem
     // místo psaní průběhu do UI (nastavení navíc nemusí být zrovna otevřené).
-    window.syncFromHistra = async function(btn, silent) {
+
+    // ── Oznámení po synchronizaci: co přesně se přidalo (Histra → Sinator a Sinator → Histra) ──
+    window.sinShowSyncNotice = function(o) {
+        try {
+            const toSin = (o && o.toSin) || [], toH = (o && o.toHistra) || [], lists = (o && o.lists) || 0;
+            if (!toSin.length && !toH.length && !lists) return;
+            const esc = x => String(x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            const part = (head, arr) => {
+                if (!arr.length) return '';
+                const shown = arr.slice(0, 6).map(x => `<div style="padding:2px 0;opacity:.92;">${esc(x)}</div>`).join('');
+                const more = arr.length > 6 ? `<div style="opacity:.6;padding-top:2px;">…a dalších ${arr.length - 6}</div>` : '';
+                return `<div style="margin-top:8px;"><div style="font-weight:700;color:#c4b5fd;">${head} (${arr.length})</div>${shown}${more}</div>`;
+            };
+            const html = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><b>🔄 Synchronizace Histra ↔ Sinator</b><span style="opacity:.6;font-size:1rem;">✕</span></div>`
+                + part('📥 Přidáno do Sinatoru', toSin)
+                + part('📤 Přidáno do Histry', toH)
+                + (lists ? `<div style="margin-top:8px;font-weight:700;color:#c4b5fd;">📁 Nové seznamy: ${lists}</div>` : '');
+            let el = document.getElementById('sinSyncNotice');
+            if (el) el.remove();
+            el = document.createElement('div');
+            el.id = 'sinSyncNotice';
+            el.style.cssText = 'position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:10px;right:10px;max-width:460px;margin:0 auto;background:#141a2e;color:#fff;border:1px solid #8b5cf6;border-radius:14px;padding:12px 14px;z-index:2147483647;font-size:0.85rem;line-height:1.4;box-shadow:0 8px 28px rgba(0,0,0,0.6);transition:opacity .3s ease,transform .3s ease;opacity:0;transform:translateY(-10px);cursor:pointer;';
+            el.innerHTML = html;
+            const hide = () => { el.style.opacity = '0'; el.style.transform = 'translateY(-10px)'; setTimeout(() => { try { el.remove(); } catch (e) {} }, 320); };
+            el.addEventListener('click', hide);
+            document.body.appendChild(el);
+            requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
+            setTimeout(hide, 12000);
+            // Appka je na pozadí → systémové upozornění (jen pokud je povolené v prohlížeči)
+            if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+                (async () => {
+                    try {
+                        let r = null;
+                        try { r = await navigator.serviceWorker.getRegistration('/notify-scope/'); } catch (e) {}
+                        if (!r || !r.showNotification) { try { r = await navigator.serviceWorker.getRegistration(); } catch (e) {} }
+                        const body = [...toSin.slice(0, 4).map(x => '📥 ' + x), ...toH.slice(0, 4).map(x => '📤 ' + x)].join('\n');
+                        if (r && r.showNotification) r.showNotification('Sinator — synchronizace', { body, tag: 'sinator-sync', icon: '/apple-touch-icon.png', badge: '/favicon.png' });
+                        else new Notification('Sinator — synchronizace', { body, tag: 'sinator-sync' });
+                    } catch (e) {}
+                })();
+            }
+        } catch (e) { console.warn('sinShowSyncNotice:', e); }
+    };
+
+    window.syncFromHistra = async function(btn, silent, opts) {
+        const force = !!(opts && opts.force);
         if (!histraReady()) { if (!silent) alert('⚠️ Nejdřív zadej a ulož Histra token výše.'); return; }
         if (!myBackendReady()) { if (!silent) alert('⚠️ Histra se synchronizuje do vlastního Sinator backendu — nejdřív nastav a ulož jeho klíč výše.'); return; }
+        if (window._histraSyncBusy) { if (!silent) alert('⏳ Synchronizace už právě běží, chvilku vydrž.'); return; }
         const statusEl = $('histraSyncStatus');
         const setStatus = (t) => { if (statusEl && !silent) statusEl.textContent = t; };
         if (btn) { btn.disabled = true; btn.textContent = '⏳ Synchronizuji…'; }
@@ -4403,6 +4450,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         // jedním klikem vrátit zpět (viz undoLastHistraSync), kdyby se
         // parsování netrefilo a přidalo něco špatně.
         const log = { ts: Date.now(), movies: [], episodes: [], createdLists: [] };
+        window._histraSyncBusy = true;
         try {
             setStatus('Ověřuji token…');
             await histraApi('/api/v1/auth/me');
@@ -4415,7 +4463,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             let p1arr = [], pushIncomplete = false;
             try { p1arr = histraUnwrapList(await histraApi('/api/v1/tracking/history?extended=full&lang=cs-CZ&limit=20&offset=0')); } catch (e) { p1arr = []; }
             if (silent && Date.now() < Number(_store.getItem('sinator_histra_blocked_until') || 0)) return;
-            if (silent && p1arr.length && _quickSig(p1arr) === _store.getItem('sinator_histra_sync_sig_v1')) { _store.setItem('sinator_histra_last_sync', String(Date.now())); return; }
+            if (silent && !force && p1arr.length && _quickSig(p1arr) === _store.getItem('sinator_histra_sync_sig_v1')) { _store.setItem('sinator_histra_last_sync', String(Date.now())); return; }
 
             setStatus('Stahuji stávající historii ze Sinatoru…');
             const [existingMovies, existingEpisodes] = await Promise.all([
@@ -4443,6 +4491,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             // záznam historie. V "Hist. filmy/epizody" se pak díky
             // dedupeHistoryItems zobrazí nahoře (řazeno podle nejnovějšího
             // zhlédnutí) s odznakem "👁 Nx" (kolikrát bylo shlédnuto).
+            const addedToSin = new Map(), addedToHistra = [], metaM = new Map(), metaE = new Map();
+            const _p2 = n => String(n).padStart(2, '0');
+            const lblMovie = (id, title, year) => `🎬 ${title || ('TMDB ' + id)}${year ? ' (' + year + ')' : ''}`;
+            const lblEp = (tm, se, ep, title, epTitle) => `📺 ${title || ('TMDB ' + tm)} S${_p2(se)}E${_p2(ep)}${epTitle ? ' – ' + epTitle : ''}`;
             const newMovieItems = [], newEpisodeItems = [];
             let skipped = 0;
             let locallyMarkedMovies = 0, locallyMarkedEpisodes = 0;
@@ -4459,20 +4511,24 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     if (!state.watched[wKey]) {
                         state.watched[wKey] = { id: parsed.tmdb, type: 'movie', title: parsed.title || '', year: parsed.year || '', posterPath: '', addedAt: Date.now() };
                         locallyMarkedMovies++;
+                        addedToSin.set('m' + parsed.tmdb, lblMovie(parsed.tmdb, parsed.title, parsed.year));
                     }
                     const k = Number(parsed.tmdb);
                     if (!hisMovies.has(k)) hisMovies.set(k, []);
                     hisMovies.get(k).push(_tsOf(parsed.watchedAt));
+                    if (!metaM.has(k)) metaM.set(k, { title: parsed.title, year: parsed.year });
                 } else {
                     const wKey = `ep_${parsed.tmdb}_${parsed.season}_${parsed.number}`;
                     if (!state.watched[wKey]) {
                         state.watched[wKey] = { id: wKey, type: 'episode', title: parsed.title ? `${parsed.title} S${parsed.season}E${parsed.number}` : '', year: parsed.year || '', posterPath: '', addedAt: Date.now(), tvId: parsed.tmdb, seasonNumber: parsed.season, epNumber: parsed.number };
                         locallyMarkedEpisodes++;
+                        addedToSin.set(`e${parsed.tmdb}_${parsed.season}_${parsed.number}`, lblEp(parsed.tmdb, parsed.season, parsed.number, parsed.title, parsed.epTitle));
                         touchedTvIds.add(parsed.tmdb);
                     }
                     const k = `${Number(parsed.tmdb)}_${Number(parsed.season)}_${Number(parsed.number)}`;
                     if (!hisEps.has(k)) hisEps.set(k, []);
                     hisEps.get(k).push(_tsOf(parsed.watchedAt));
+                    if (!metaE.has(k)) metaE.set(k, { title: parsed.title, epTitle: parsed.epTitle });
                 }
             }
             // Záznamy ve Sinatoru po položkách (film / epizoda)
@@ -4510,6 +4566,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 if (!confirm(`Histra sync chce přidat ${_newTotal} nových záznamů do historie (filmy ${newMovieItems.length}, epizody ${newEpisodeItems.length}).\n\n${_cnt}\n\nPokud víš, že jsi tolik nového neshlédl, dej Zrušit.`)) { setStatus('Zrušeno — nic nepřidáno.'); return; }
             }
 
+            newMovieItems.forEach(it => { const kk = 'm' + it.id; if (!addedToSin.has(kk)) { const m = metaM.get(it.id) || {}; addedToSin.set(kk, lblMovie(it.id, m.title, m.year)); } });
+            newEpisodeItems.forEach(it => { const kk = `e${it.id}_${it.season}_${it.episode}`; if (!addedToSin.has(kk)) { const m = metaE.get(`${it.id}_${it.season}_${it.episode}`) || {}; addedToSin.set(kk, lblEp(it.id, it.season, it.episode, m.title, m.epTitle)); } });
+
             // Uložit lokální watched příznaky hned — i kdyby dál něco selhalo
             // (např. upload do backend historie), checkboxy v appce už budou sedět.
             if (locallyMarkedMovies || locallyMarkedEpisodes) {
@@ -4535,18 +4594,39 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 const todo = [];
                 sinMovies.forEach((arr, id) => { const key = 'm' + id; if (!hisMovies.has(id) && !pushed.has(key)) todo.push({ key, id, type: 'movie', ts: Math.max(...arr) }); });
                 sinEps.forEach((arr, k) => { const key = 'e' + k; if (!hisEps.has(k) && !pushed.has(key)) { const [tm, se, ep] = k.split('_').map(Number); todo.push({ key, id: tm, type: 'tv', season: se, episode: ep, ts: Math.max(...arr) }); } });
-                const batch = todo.slice(0, silent ? 60 : 300);
+                const batch = todo.slice(0, silent ? 100 : 300);
                 let okN = 0;
                 for (let bi = 0; bi < batch.length; bi += 3) {
                     setStatus(`Zapisuji do Histry, co tam chybí… (${bi}/${batch.length})`);
                     await Promise.all(batch.slice(bi, bi + 3).map(async t => {
-                        try { await histraWriteWatched(t.id, t.type, t.season, t.episode, t.ts || undefined); pushed.add(t.key); okN++; } catch (e) {}
+                        try { await histraWriteWatched(t.id, t.type, t.season, t.episode, t.ts || undefined); pushed.add(t.key); okN++; addedToHistra.push(t); } catch (e) {}
                     }));
                 }
                 if (okN) { _store.setItem('sinator_histra_pushed_v1', JSON.stringify([...pushed].slice(-6000))); window._histraHistCache = null; }
                 if (todo.length > batch.length) { pushIncomplete = true; setStatus(`Do Histry zapsáno ${okN}, zbývá ${todo.length - batch.length} (dalším syncem).`); }
                 if (okN < batch.length) pushIncomplete = true;
             } catch (e) { console.warn('Sinator → Histra doplnění selhalo:', e); }
+
+            // Názvy toho, co se zapsalo do Histry (pro oznámení)
+            const pushedLabels = [];
+            try {
+                const _nm = {}; let _lookups = 0;
+                for (const t of addedToHistra) {
+                    const isEp = t.season != null && t.episode != null;
+                    let name = '';
+                    const w = state.watched[isEp ? `ep_${t.id}_${t.season}_${t.episode}` : `${t.type === 'tv' ? 'tv' : 'movie'}_${t.id}`];
+                    if (w && w.title) name = String(w.title).replace(/\s*S\d+E\d+\s*$/i, '');
+                    if (!name) {
+                        const ck = `${t.type}_${t.id}`;
+                        if (_nm[ck] === undefined && tmdbApiKey && _lookups < 8) {
+                            _lookups++;
+                            try { const d = await (await fetch(`${BASE}/${t.type === 'tv' ? 'tv' : 'movie'}/${t.id}?api_key=${tmdbApiKey}&language=cs-CZ`)).json(); _nm[ck] = d.name || d.title || ''; } catch (e) { _nm[ck] = ''; }
+                        }
+                        name = _nm[ck] || '';
+                    }
+                    pushedLabels.push(isEp ? lblEp(t.id, t.season, t.episode, name, '') : lblMovie(t.id, name, ''));
+                }
+            } catch (e) { console.warn('Štítky pro oznámení:', e); }
 
             // Pro seriály, kde Histra přidala nové shlédnuté epizody, zkusíme
             // dopočítat, jestli je tím pádem celý seriál (odvysílaný a celý
@@ -4650,8 +4730,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const locallyMarked = locallyMarkedMovies + locallyMarkedEpisodes;
             const summary = `✅ Hotovo — doplněno do historie: filmy +${newMovieItems.length}, epizody +${newEpisodeItems.length}.` + (locallyMarked ? `\n☑️ Označeno jako shlédnuto přímo v appce: filmy +${locallyMarkedMovies}, epizody +${locallyMarkedEpisodes}.` : '') + (listsCreated ? `\n📁 Nové seznamy: ${listsCreated} (celkem ${listItemsAdded} položek). Existující seznamy zůstaly beze změny.` : '') + (skipped ? `\n⚠️ ${skipped} položek se nepodařilo přiřadit (neznámý formát odpovědi).` : '') + `\nPokud sync přidal něco špatně, použij tlačítko „↩️ Vrátit poslední sync" níž.`;
             setStatus(summary);
-            if (newMovieItems.length || newEpisodeItems.length || listsCreated || locallyMarked) {
-                try { if (typeof _favToast === 'function') _favToast(`✅ Histra: doplněno ${newMovieItems.length + newEpisodeItems.length} položek do historie` + (locallyMarked ? `, označeno ${locallyMarked} jako shlédnuto` : '') + (listsCreated ? ` + ${listsCreated} nových seznamů` : '')); } catch (e) {}
+            if (addedToSin.size || pushedLabels.length || listsCreated) {
+                window.sinShowSyncNotice({ toSin: [...addedToSin.values()], toHistra: pushedLabels, lists: listsCreated });
             } else if (!silent) {
                 try { if (typeof _favToast === 'function') _favToast('✅ Histra sync hotový — nic nového'); } catch (e) {}
             }
@@ -4662,6 +4742,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             // selhání proxy/CORS zůstalo neviditelné napořád (viz autoCheckHistraSync).
             if (silent) { try { if (typeof _favToast === 'function') _favToast('⚠️ Histra auto-sync selhal: ' + (e && e.message ? e.message : e)); } catch (_) {} }
         } finally {
+            window._histraSyncBusy = false;
             if (btn) { btn.disabled = false; btn.textContent = '🔄 Synchronizovat nyní'; }
         }
     };
@@ -4812,25 +4893,21 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         try {
             if (typeof histraReady !== 'function' || !histraReady()) return;
             if (typeof myBackendReady !== 'function' || !myBackendReady()) return;
-            const lastCheck = parseInt(_store.getItem('sinator_histra_last_autocheck') || '0', 10);
-            if (Date.now() - lastCheck < 10 * 60 * 1000) return;
             _store.setItem('sinator_histra_last_autocheck', String(Date.now()));
-
-            const lastSyncTs = parseInt(_store.getItem('sinator_histra_last_sync') || '0', 10);
-            // 3 stránky po 20 (~60 posledních záznamů) — pojistka pro dny, kdy
-            // se toho na Histře stihlo naklikat víc, ať se žádná novinka
-            // "neztratí" mezi stránkami kvůli řazení odpovědi z API.
-            const recentRaw = await histraFetchAllPaged('/api/v1/tracking/history?extended=full&lang=cs-CZ', 20, 3);
-            const hasNew = (recentRaw || []).some(raw => histraExtractWatchedAt(raw) > lastSyncTs);
-            if (hasNew) {
-                console.log('Histra: nalezeno nové sledování, spouštím automatický sync na pozadí…');
-                await window.syncFromHistra(null, true);
-            }
+            // Vždy plné porovnání obou směrů (Histra ↔ Sinator) — bez throttlu a bez
+            // heuristiky „novější než poslední sync“ (ta minula zpětně datovaná shlédnutí).
+            await window.syncFromHistra(null, true, { force: true });
         } catch (e) {
             console.warn('Histra auto-check error:', e);
             try { if (typeof _favToast === 'function') _favToast('⚠️ Histra auto-check selhal: ' + (e && e.message ? e.message : e)); } catch (_) {}
         }
     };
+    // Návrat do appky z pozadí (PWA) po delší pauze = další „spuštění“ → sync znovu.
+    let _hHiddenAt = 0;
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) { _hHiddenAt = Date.now(); return; }
+        if (_hHiddenAt && Date.now() - _hHiddenAt > 120000) { _hHiddenAt = 0; setTimeout(() => { try { window.autoCheckHistraSync(); } catch (e) {} }, 800); }
+    });
 
     // ── Automatická kontrola Histra syncu při otevření Hist. filmy/seriály/epizody ──
     // Na rozdíl od autoCheckHistraSync (jen při startu appky, throttle 10 min) tahle
@@ -4850,12 +4927,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             _store.setItem('sinator_histra_last_tabcheck', String(Date.now()));
             window._histraTabCheckInProgress = true;
 
-            const lastSyncTs = parseInt(_store.getItem('sinator_histra_last_sync') || '0', 10);
-            const recentRaw = await histraFetchAllPaged('/api/v1/tracking/history?extended=full&lang=cs-CZ', 20, 3);
-            const hasNew = (recentRaw || []).some(raw => histraExtractWatchedAt(raw) > lastSyncTs);
-            if (hasNew) {
-                console.log('Histra: nalezeno nové sledování při otevření historie, spouštím sync…');
-                await window.syncFromHistra(null, true);
+            {
+                await window.syncFromHistra(null, true, { force: true });
                 // Uživatel mohl mezitím tab zavřít/přepnout — dosynchronizovaná
                 // data znovu vykreslíme, jen pokud je pořád na stejném tabu.
                 if (window._myBackendActiveTab === tab && typeof renderMyBackendTab === 'function') {
@@ -6169,6 +6242,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-23b', date: '23. 10. 2026', items: [
+            '🔄 Histra ↔ Sinator: synchronizace shlédnutého teď proběhne při každém spuštění appky (a po návratu do ní z pozadí) — plné porovnání obou směrů, bez 10min omezení a bez spoléhání na čas posledního syncu (zpětně datovaná shlédnutí se dřív minula, např. epizoda označená na Histře se v Sinatoru neukázala)',
+            '🔔 Po synchronizaci naskočí oznámení se jmény toho, co se přidalo: „📥 Přidáno do Sinatoru“ a „📤 Přidáno do Histry“ (např. 📺 Upíří deníky S02E19 – Skutečný Klaus); klepnutím se zavře, jinak zmizí samo. Když je appka na pozadí a máš povolená upozornění, přijde systémové',
+        ] },
         { version: '2026-10-23', date: '23. 10. 2026', items: [
             '🎬 Totéž u filmů: film shlédnutý na Histře se při otevření detailu doplní do Sinatoru (včetně zelených rámečků karet)',
             '🔄 Seznam epizod se teď při otevření seriálu sám srovná s Histrou i Sinator backendem: epizody označené jako shlédnuté na Histře (nebo na jiném zařízení) se ukážou jako „✅ Shlédnuto“, počty u sezón se přepočítají a co chybí na Sinator backendu, se tam doplní. Z Histry se při tom nic nemaže ani nepřepisuje',
@@ -21374,7 +21451,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     }
 
     // Přidáme badge update při startu
-    document.addEventListener('DOMContentLoaded', () => { updateWatchedCount(); if(state.trakt.accessToken) { setTimeout(syncWatchedFromTrakt, 3000); syncMdblistFromTrakt(); } updateMdblistStatus(); refreshMySinatorWatchedCache(); setTimeout(() => { if (typeof autoCheckHistraSync === 'function') autoCheckHistraSync(); }, 5000); });
+    document.addEventListener('DOMContentLoaded', () => { updateWatchedCount(); if(state.trakt.accessToken) { setTimeout(syncWatchedFromTrakt, 3000); syncMdblistFromTrakt(); } updateMdblistStatus(); refreshMySinatorWatchedCache(); setTimeout(() => { if (typeof autoCheckHistraSync === 'function') autoCheckHistraSync(); }, 2500); });
 
     function toggleToolbar() {
         const state = parseInt(_store.getItem('sinator_toolbar_state') || '0');
