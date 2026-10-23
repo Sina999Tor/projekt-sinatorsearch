@@ -3221,6 +3221,103 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         return r;
     }
     window.myHistoryAddBoth = myHistoryAddBoth;
+
+    // Histra ↔ Sinator ↔ lokální stav: při otevření detailu seriálu srovná shlédnuté epizody.
+    // Dřív se Histra do seznamu epizod promítla jen při celém syncu (a auto-check bral jen záznamy
+    // novější než poslední sync), takže epizody označené na Histře se v Sinatoru neukázaly.
+    // Teď: sjednocení Histra + Sinator backend → lokální state.watched; co chybí na backendu, se doplní tam.
+    // (Histra se z téhle funkce NIKDY nemaže ani nepřepisuje — jen se z ní čte.)
+    window._hReconAt = window._hReconAt || {};
+    // Totéž pro filmy: film shlédnutý na Histře se při otevření detailu doplní do Sinator backendu
+    // (s časem z Histry) a do lokálního stavu; zelené rámečky karet se přepočítají. Histra se nemění.
+    window.histraReconcileMovie = async function(movieId, force) {
+        try {
+            movieId = Number(movieId);
+            if (!movieId) return false;
+            if (typeof histraReady !== 'function' || !histraReady()) return false;
+            window._hReconMovieAt = window._hReconMovieAt || {};
+            if (!force && Date.now() - (window._hReconMovieAt[movieId] || 0) < 60000) return false;
+            window._hReconMovieAt[movieId] = Date.now();
+            const his = await histraHistoryForId(movieId, 'movie', !!force);
+            if (!his || !his.length) return false;
+            const sinOn = typeof myBackendReady === 'function' && myBackendReady();
+            let changed = false;
+            const lk = `movie_${movieId}`;
+            if (!state.watched[lk]) {
+                state.watched[lk] = { id: movieId, type: 'movie', title: (his[0].title || ''), year: (his[0].year || ''), posterPath: '', addedAt: Date.now() };
+                try { saveWatched(); } catch (e) {}
+                changed = true;
+            }
+            if (sinOn) {
+                let sin = [];
+                try { sin = await myHistoryGetForId('movies', movieId); } catch (e) { console.warn('Histra reconcile movie (Sinator):', e); return changed; }
+                if (!Array.isArray(sin) || !sin.length) {
+                    try { await myHistoryAdd(movieId, 'movie', undefined, undefined, his[his.length - 1].watchedAt || undefined); changed = true; }
+                    catch (e) { console.warn('Sinator doplnění filmu selhalo:', e); }
+                }
+                try { if (typeof mySinatorWatchedCache === 'object' && !mySinatorWatchedCache.movies.has(String(movieId))) { mySinatorWatchedCache.movies.add(String(movieId)); changed = true; } } catch (e) {}
+            }
+            if (changed) {
+                try { refreshCardWatchedBorders(movieId, true); } catch (e) {}
+                try { if (typeof initMySinatorWatchedBadge === 'function') initMySinatorWatchedBadge(movieId, 'movie'); } catch (e) {}
+                try { if (typeof initMySinatorWatchHistory === 'function') initMySinatorWatchHistory(movieId, 'movie'); } catch (e) {}
+                try { if (typeof updateWatchedCount === 'function') updateWatchedCount(); } catch (e) {}
+            }
+            return changed;
+        } catch (e) { console.warn('histraReconcileMovie error:', e); return false; }
+    };
+    window.histraReconcileShow = async function(tvId, force) {
+        try {
+            tvId = Number(tvId);
+            if (!tvId) return 0;
+            const sinOn = typeof myBackendReady === 'function' && myBackendReady();
+            const hisOn = typeof histraReady === 'function' && histraReady();
+            if (!sinOn && !hisOn) return 0;
+            if (!force && Date.now() - (window._hReconAt[tvId] || 0) < 60000) return 0;
+            window._hReconAt[tvId] = Date.now();
+            let his = [], sin = [];
+            if (hisOn) { try { his = await histraHistoryForId(tvId, 'tv', !!force); } catch (e) { console.warn('Histra reconcile (Histra):', e); } }
+            if (sinOn) { try { sin = await myHistoryGetForId('episodes', tvId); } catch (e) { console.warn('Histra reconcile (Sinator):', e); } }
+            const have = new Set();   // epizody, které už jsou lokálně
+            Object.keys(state.watched).forEach(k => { if (k.startsWith(`ep_${tvId}_`)) have.add(k); });
+            const inSin = new Set();
+            (Array.isArray(sin) ? sin : []).forEach(r => { if (r && r.season != null && r.episode != null) inSin.add(`ep_${tvId}_${Number(r.season)}_${Number(r.episode)}`); });
+            let added = 0; const toSin = [];
+            const addLocal = (key, season, number, title) => {
+                if (state.watched[key]) return;
+                state.watched[key] = { id: key, type: 'episode', title: title || '', year: '', posterPath: '', addedAt: Date.now(), tvId, seasonNumber: season, epNumber: number };
+                added++;
+            };
+            (Array.isArray(sin) ? sin : []).forEach(r => {
+                if (!r || r.season == null || r.episode == null || Number(r.season) < 0) return;
+                addLocal(`ep_${tvId}_${Number(r.season)}_${Number(r.episode)}`, Number(r.season), Number(r.episode), '');
+            });
+            const seen = new Set();
+            (his || []).forEach(h => {
+                const sn = Number(h.season), n = Number(h.number);
+                if (!isFinite(sn) || !isFinite(n) || sn < 0 || n < 1) return;
+                const key = `ep_${tvId}_${sn}_${n}`;
+                if (seen.has(key)) return; seen.add(key);
+                addLocal(key, sn, n, h.title ? `${h.title} S${sn}E${n}` : '');
+                if (sinOn && !inSin.has(key)) toSin.push({ sn, n, at: h.watchedAt });
+            });
+            if (added) { try { saveWatched(); } catch (e) {} }
+            // doplnit do Sinator backendu to, co tam chybí (jen z Histry; bez zápisu zpět do Histry)
+            if (toSin.length) {
+                for (const x of toSin) { try { await myHistoryAdd(tvId, 'tv', x.sn, x.n, x.at || undefined); } catch (e) { console.warn('Sinator doplnění epizody selhalo:', e); } }
+                try { if (window._epHistoryCountsCache) delete window._epHistoryCountsCache[tvId]; } catch (e) {}
+                try { if (typeof refreshMySinatorWatchedCache === 'function') refreshMySinatorWatchedCache(); } catch (e) {}
+            }
+            if (added || toSin.length) {
+                try { document.querySelectorAll(`[id^="episodes-${tvId}-"]`).forEach(c => { if (c.dataset.loaded && c.style.display === 'none') delete c.dataset.loaded; }); } catch (e) {}
+                try { if (typeof refreshAllSeasonHeaders === 'function') refreshAllSeasonHeaders(tvId); } catch (e) {}
+                try { if (typeof refreshOpenEpisodeCounts === 'function') refreshOpenEpisodeCounts(tvId); } catch (e) {}
+                try { if (typeof initMySinatorWatchedBadge === 'function') initMySinatorWatchedBadge(tvId, 'tv'); } catch (e) {}
+                try { if (typeof updateWatchedCount === 'function') updateWatchedCount(); } catch (e) {}
+            }
+            return added;
+        } catch (e) { console.warn('histraReconcileShow error:', e); return 0; }
+    };
     function histraRefreshDetail(id, type) {
         try {
             const tot = (window._histraTotalEps && window._histraTotalEps[id]) || 0;
@@ -6018,6 +6115,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-23', date: '23. 10. 2026', items: [
+            '🎬 Totéž u filmů: film shlédnutý na Histře se při otevření detailu doplní do Sinatoru (včetně zelených rámečků karet)',
+            '🔄 Seznam epizod se teď při otevření seriálu sám srovná s Histrou i Sinator backendem: epizody označené jako shlédnuté na Histře (nebo na jiném zařízení) se ukážou jako „✅ Shlédnuto“, počty u sezón se přepočítají a co chybí na Sinator backendu, se tam doplní. Z Histry se při tom nic nemaže ani nepřepisuje',
+        ] },
         { version: '2026-10-17e', date: '17. 10. 2026', items: [
             '🎞️ Zábava → nová sekce „Trailery“: nová videa z YouTube kanálu Totalfilm.cz (stejně jako je postuje bot Palantír na Discordu) — náhled, název, „dnes / včera v 20:28“, ▶ přehrání přímo v appce, „🔍 Detail filmu“ (z názvu videa najde film na TMDB) a ↗ otevření na YouTube. Filtr „Vše / Jen trailery“. Načítá se přes novou serverovou funkci /api/yt (soubor api/yt.js v ZIPu) a když není nasazená, přes veřejné proxy; ID kanálu se zjistí samo z @TotalfilmCz (jde nastavit i ručně přes ⚙️ kanál)',
         ] },
@@ -15772,7 +15873,17 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         // Store tvId for season refresh
         container.dataset.tvid = tvId;
         container.dataset.seasons = JSON.stringify(seasons.map(s=>({season_number:s.season_number,episode_count:s.episode_count,name:s.name})));
+        // Srovnání shlédnutých epizod s Histrou / Sinator backendem (na pozadí)
+        if (typeof window.histraReconcileShow === 'function') window.histraReconcileShow(tvId);
     }
+
+    function refreshAllSeasonHeaders(tvId) {
+        const container = document.getElementById('seasons-container');
+        if (!container?.dataset.seasons || String(container.dataset.tvid) !== String(tvId)) return;
+        let seasons; try { seasons = JSON.parse(container.dataset.seasons); } catch (e) { return; }
+        seasons.forEach(s => { try { refreshSeasonHeader(tvId, s.season_number); } catch (e) {} });
+    }
+    window.refreshAllSeasonHeaders = refreshAllSeasonHeaders;
 
     // Aktualizuje jen hlavičku dané sezóny (barevný pruh, "✅"/počet odškrtnutých
     // epizod) přímo v DOM — beze změny scroll pozice a bez zavření/znovuotevření
@@ -16351,6 +16462,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             try { if (window.initWatchlistMarks) initWatchlistMarks(id, type); } catch (e) {}
             initHistraWatchedBadge(id, type, d.number_of_episodes || 0);
             initHistraWatchHistory(id, type);
+            if (type === 'movie' && typeof window.histraReconcileMovie === 'function') window.histraReconcileMovie(id);
             // Swipe doleva/doprava na plakátu/backdropu = procházení dalších fotek (banerů) titulu
             initModalBackdropSwipe(id, type);
             // POZOR: nikdy nepoužívat "innerHTML +=" tady dole — to celý obsah
