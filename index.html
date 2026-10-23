@@ -1198,6 +1198,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             <span style="font-size:1.6rem;">🎞️</span>
             <div><div style="font-weight:700;color:#00b4d8;">StreamIMDb 2026</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">streamimdb.ru</div></div>
         </button>
+        <button onclick="window.open('https://tv.nova.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📺</span>
+            <div><div style="font-weight:700;color:#00b4d8;">TV Nova</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">tv.nova.cz</div></div>
+        </button>
+        <button onclick="window.open('https://www.iprima.cz', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">📺</span>
+            <div><div style="font-weight:700;color:#00b4d8;">iPrima</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">iprima.cz</div></div>
+        </button>
         <button onclick="window.open('https://mrkni.tv', '_blank')" class="menu-row-btn" style="border-color:var(--border);" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">👁️</span>
             <div><div style="font-weight:700;color:#00b4d8;">Mrkni.tv</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">mrkni.tv</div></div>
@@ -16299,6 +16307,8 @@ ${(typeof histraReady==='function'&&histraReady()) ? `<button class="action-btn-
 <button class="action-btn-modal imdb" onclick="openImdb('${safeTitle}', '${year}')">🎬 IMDb</button>
 <button class="action-btn-modal" onclick="openTvGuru('${safeTitle}')">📺 TVguru</button>
 <button class="action-btn-modal" style="background:rgba(0,85,165,0.15);border-color:#0055a5;color:#60b0ff;" onclick="openCT('${safeTitle}')">📡 ČT</button>
+<button class="action-btn-modal" style="background:rgba(224,60,60,0.12);border-color:#e03c3c;color:#ff7b7b;" onclick="openNova('${safeTitle}')">📺 Nova</button>
+<button class="action-btn-modal" style="background:rgba(0,160,227,0.12);border-color:#00a0e3;color:#5cc8f5;" onclick="openIPrima('${safeTitle}')">📺 iPrima</button>
 <button class="action-btn-modal" onclick="openEdna('${safeTitle}')">📺 Edna</button>
 <button class="action-btn-modal" onclick="openMrkni('${safeTitle}', '${year}')">📺 Mrkni.tv</button>
 <button class="action-btn-modal" onclick="openHistra('${safeTitle}')">🎦 Histra.net</button>
@@ -17068,6 +17078,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     function openCT(t) { window.open(`https://www.ceskatelevize.cz/hledani/?q=${encodeURIComponent(t)}`, '_blank'); }
     function openEdna(t) { window.open(`https://www.edna.cz/vyhledavani/?q=${encodeURIComponent(t)}`, '_blank'); }
     window.openEdna = openEdna;
+    function openNova(t) { window.open(`https://tv.nova.cz/hledani?q=${encodeURIComponent(t)}`, '_blank'); }
+    window.openNova = openNova;
+    function openIPrima(t) { window.open(`https://www.iprima.cz/hledani?query=${encodeURIComponent(t)}`, '_blank'); }
+    window.openIPrima = openIPrima;
     function openImdb(t, y) { window.open(`https://www.imdb.com/find?q=${encodeURIComponent(t+' '+y)}`, '_blank'); }
     function openHistra(t) { window.open(`https://histra.net/search?q=${encodeURIComponent(t)}`, '_blank'); }
     function openMrkni(title, year) {
