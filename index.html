@@ -7396,14 +7396,15 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         closeHelperModals();
         $('musicModal')?.classList.add('open');
         $('btnMusicToggle')?.classList.add('active');
-        setTimeout(() => {
+        {
             const input = $('musicSearchInput');
             if(input) {
                 input.value = '';
-                input.focus();
+                input.focus(); // synchronně kvůli iOS klávesnici
             }
-            $('musicResultsContainer').innerHTML = '';
-        }, 100);
+            const rc = $('musicResultsContainer');
+            if(rc) rc.innerHTML = '';
+        }
         if(window.updatePwaBtn) updatePwaBtn();
     }
     
@@ -21859,7 +21860,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         if(input) { input.value = title || ''; }
         updateKinoLinks(title || '');
         document.getElementById('kinoModal').classList.add('open');
-        setTimeout(() => { if(input) input.focus(); }, 200);
+        if(input) input.focus(); // synchronně kvůli iOS klávesnici
     }
 
     function updateKinoLinks(title) {
@@ -40162,7 +40163,7 @@ function tvUpTestAskName() {
     const i = sh.querySelector('#tvUpTestName');
     i.value = _tvUpTest.defName || '';
     i.addEventListener('keydown', (e) => { if (e.key === 'Enter') tvUpTestDoSave(); });
-    setTimeout(() => { try { i.focus(); i.select(); } catch (e) {} }, 50);
+    try { i.focus(); i.select(); } catch (e) {}
 }
 window.tvUpTestAskName = tvUpTestAskName;
 function tvUpTestDoSave() {
@@ -42735,7 +42736,7 @@ function renderIvysilaniTab(tab) {
 
     // Focus do search inputu pokud je tab hledat
     if (tab === 'hledat') {
-        setTimeout(() => document.getElementById('ivysSearchQ')?.focus(), 80);
+        document.getElementById('ivysSearchQ')?.focus();
     }
 }
 
@@ -43614,7 +43615,7 @@ function renderIprimaTab(tab) {
     body.innerHTML = html;
 
     if (tab === 'hledat') {
-        setTimeout(() => document.getElementById('iprimaSearchQ')?.focus(), 80);
+        document.getElementById('iprimaSearchQ')?.focus();
     }
 }
 
@@ -48725,7 +48726,7 @@ window.KinoList = (function() {
     ov.querySelector('#trsGo').onclick = go;
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
     if (q0) go();
-    setTimeout(() => { try { inp.focus(); inp.select(); } catch (e) {} }, 50);
+    try { inp.focus(); inp.select(); } catch (e) {}
   };
   // 🔖 Watchlist (přidá/odebere v Sinatoru, zrcadlí do Histry)
   window.trailersWatchlist = (btn, id) => trailersWithHit(btn, id, h => window.myBackendAddWatchlist(h.id, h.type, h.title, h.year, h.poster));
