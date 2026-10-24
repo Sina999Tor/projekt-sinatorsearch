@@ -1790,6 +1790,97 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <div id="homeBtnsList" style="display:flex;flex-direction:column;gap:6px;margin-top:10px;"></div>
                 <button class="settings-btn-small" style="width:100%;margin-top:10px;" onclick="homeBtnsReset()">↺ Zobrazit všechna tlačítka</button>
             </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section" id="cacheSection">
+                <span class="settings-label">🧹 Vyčistit cache</span>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">Smaže dočasně uložená data appky v telefonu: postery a názvy, uložené seznamy Histry, index shlédnutých, loga kanálů, žánry, trailery a mezipaměť prohlížeče. <b>Nemaže</b> API klíče, přihlášení, tokeny, seznamy, shlédnuté, oblíbené, hodnocení ani nastavení. Vše potřebné se při dalším použití samo znovu stáhne (při příštím spuštění je potřeba internet).</div>
+                <div id="cacheInfo" style="font-size:0.78rem;color:#ddd;margin-top:10px;line-height:1.5;">Počítám…</div>
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                    <button class="settings-btn-small" style="flex:1;" onclick="cacheInfoRefresh()">🔄 Přepočítat</button>
+                    <button class="settings-btn-small" id="cacheClearBtn" style="flex:2;border-color:#f5a623;color:#f5a623;" onclick="clearAppCache()">🧹 Vyčistit cache</button>
+                </div>
+                <div id="cacheResult" style="font-size:0.78rem;color:#4caf50;margin-top:8px;line-height:1.5;"></div>
+            </div>
+            <script>
+            (function () {
+                // Jen dočasná, znovu stažitelná data. Klíče, tokeny, seznamy, shlédnuté, oblíbené a nastavení se NIKDY nemažou.
+                var KEYS = ['sinator_histra_watched_idx_v1', 'sinator_backend_meta_cache_v1', 'sinator_backend_ep_title_cache_v1',
+                            'sinator_genre_cache', 'sinator_person_country_cache', 'sinator_tv_logo_cache_v1', 'sinator_trailers_cache_v1'];
+                var PREFIXES = ['sinator_hlist_v1_'];
+                function isCacheKey(k) { return KEYS.indexOf(k) >= 0 || PREFIXES.some(function (p) { return k.indexOf(p) === 0; }); }
+                function st() { return window._store || localStorage; }
+                function rawGet(k) { try { var v = st().getItem(k); return v === null ? null : String(v); } catch (e) { return null; } }
+                function listKeys() {
+                    var out = {};
+                    [function () { return localStorage; }, function () { return sessionStorage; }].forEach(function (g) {
+                        try { var S = g(); for (var i = 0; i < S.length; i++) { var k = S.key(i); if (k && isCacheKey(k)) out[k] = 1; } } catch (e) {}
+                    });
+                    KEYS.forEach(function (k) { if (rawGet(k) !== null) out[k] = 1; });
+                    return Object.keys(out);
+                }
+                function sizeOf(k) {
+                    var raw = rawGet(k); if (raw === null) return { n: 0, b: 0 };
+                    var n = 1;
+                    try {
+                        var o = JSON.parse(raw);
+                        if (Array.isArray(o)) n = o.length;
+                        else if (o && typeof o === 'object') {
+                            if (Array.isArray(o.items)) n = o.items.length;
+                            else if (o.movies && o.shows) n = Object.keys(o.movies).length + Object.keys(o.shows).length;
+                            else n = Object.keys(o).length;
+                        }
+                    } catch (e) {}
+                    return { n: n, b: raw.length };
+                }
+                async function swFiles() {
+                    var r = { names: [], files: 0 };
+                    try {
+                        if (!window.caches) return r;
+                        r.names = await caches.keys();
+                        for (var i = 0; i < r.names.length; i++) { try { r.files += (await (await caches.open(r.names[i])).keys()).length; } catch (e) {} }
+                    } catch (e) {}
+                    return r;
+                }
+                function fmt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
+                function kb(b) { return b < 1024 ? b + ' B' : (b / 1024 < 1024 ? Math.round(b / 1024) + ' KB' : (b / 1048576).toFixed(1) + ' MB'); }
+                async function scan() {
+                    var keys = listKeys(), recs = 0, bytes = 0;
+                    keys.forEach(function (k) { var z = sizeOf(k); recs += z.n; bytes += z.b; });
+                    var sw = await swFiles();
+                    return { keys: keys, recs: recs, bytes: bytes, sw: sw };
+                }
+                window.cacheInfoRefresh = async function () {
+                    var el = document.getElementById('cacheInfo'); if (!el) return;
+                    try {
+                        var r = await scan();
+                        el.innerHTML = '📦 Uloženo teď: <b>' + fmt(r.recs) + '</b> položek v ' + r.keys.length + ' úložištích appky (≈ ' + kb(r.bytes * 2) + ')'
+                            + ' + <b>' + fmt(r.sw.files) + '</b> souborů v mezipaměti prohlížeče.';
+                    } catch (e) { el.textContent = 'Nepodařilo se spočítat.'; }
+                };
+                window.clearAppCache = async function () {
+                    var btn = document.getElementById('cacheClearBtn'), res = document.getElementById('cacheResult');
+                    var r = await scan();
+                    var total = r.recs + r.sw.files;
+                    if (!r.keys.length && !r.sw.files) { if (res) res.textContent = 'ℹ️ Není co mazat — cache je prázdná.'; return; }
+                    if (!confirm('Smazat ' + fmt(total) + ' dočasně uložených položek?\n\nKlíče, přihlášení, seznamy, shlédnuté, oblíbené a nastavení zůstanou beze změny.')) return;
+                    if (btn) { btn.disabled = true; btn.textContent = '⏳ Mažu…'; }
+                    try {
+                        r.keys.forEach(function (k) {
+                            try { st().removeItem(k); } catch (e) {}
+                            try { localStorage.removeItem(k); } catch (e) {}
+                            try { sessionStorage.removeItem(k); } catch (e) {}
+                        });
+                        // paměťové kopie, aby se právě smazaná cache hned nezapsala zpět
+                        try { window._hwIdx = null; window._histraHistCache = null; window._histraHistBusy = null; window._histraTvInfo = {}; window._histraIncompleteCache = null; window._tvLogoCache = {}; } catch (e) {}
+                        for (var i = 0; i < r.sw.names.length; i++) { try { await caches.delete(r.sw.names[i]); } catch (e) {} }
+                    } finally { if (btn) { btn.disabled = false; btn.textContent = '🧹 Vyčistit cache'; } }
+                    var msg = '✅ Vyčištěno: ' + fmt(r.recs) + ' položek z ' + r.keys.length + ' úložišť (≈ ' + kb(r.bytes * 2) + ') + ' + fmt(r.sw.files) + ' souborů z mezipaměti prohlížeče. Klíče a nastavení zůstaly.';
+                    if (res) res.textContent = msg;
+                    try { if (typeof showToast === 'function') showToast('🧹 Cache vyčištěna (' + fmt(total) + ' položek)'); } catch (e) {}
+                    window.cacheInfoRefresh();
+                };
+            })();
+            </script>
             </div><!-- /swPageExperimental -->
             <div class="sw-page" id="swPageProfile">
             <div class="settings-section" style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.2);border-radius:12px;padding:14px 16px;">
@@ -2703,6 +2794,29 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         }
         return all;
     }
+    // Paralelní varianta stránkování (po dávkách "conc" stránek najednou) — pro velké seznamy
+    // s pevným limit/offset. Končí na první krátké/prázdné/opakované stránce nebo chybě.
+    async function histraFetchAllPagedPar(basePath, limit, maxPages, conc) {
+        limit = limit || 100; maxPages = maxPages || 200; conc = conc || 4;
+        const sep = basePath.includes('?') ? '&' : '?';
+        let all = [], prevSig = null;
+        for (let p = 0; p < maxPages; p += conc) {
+            const n = Math.min(conc, maxPages - p);
+            const res = await Promise.all(Array.from({ length: n }, (_, k) =>
+                histraApi(`${basePath}${sep}limit=${limit}&offset=${(p + k) * limit}`).then(histraUnwrapList, () => null)));
+            let stop = false;
+            for (const items of res) {
+                if (!items || !items.length) { stop = true; break; }
+                const sig = histraPageSignature(items);
+                if (sig === prevSig) { stop = true; break; }
+                prevSig = sig;
+                all = all.concat(items);
+                if (items.length < limit) { stop = true; break; }
+            }
+            if (stop) break;
+        }
+        return all;
+    }
     // Zkusí z objektu vytáhnout tmdb id z několika běžných tvarů, které se
     // v odpovědích API objevují (přímé pole, ids.tmdb, external_ids.tmdb...).
     function histraExtractTmdb(obj) {
@@ -3076,17 +3190,114 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const poster = e.poster_path || e.poster || e.poster_url || inner.poster_path || inner.poster || '';
         return { id: tm, type: isShow ? 'tv' : 'movie', title: e.title || e.name || inner.title || inner.name || '', year: histraExtractYear(e) || histraExtractYear(inner), poster_path: poster || '' };
     }
-    async function histraLoadItems(title, loader, mapper) {
+    // ── Rychlé načítání seznamů Histry ──
+    // 1) uložená cache seznamu se ukáže okamžitě a obnoví se na pozadí (stale-while-revalidate)
+    // 2) postery a české názvy se NEČEKAJÍ před vykreslením — donačtou se na pozadí a opraví se přímo v kartách
+    const _HLC_PREFIX = 'sinator_hlist_v1_';
+    function _hListCacheGet(key) {
+        try {
+            const o = JSON.parse(localStorage.getItem(_HLC_PREFIX + key) || 'null');
+            if (!o || !Array.isArray(o.items)) return null;
+            return { items: o.items, at: o.at || 0, fresh: Date.now() - (o.at || 0) < 120000 };
+        } catch (e) { return null; }
+    }
+    function _hListCacheSet(key, items) {
+        try {
+            const slim = items.map(it => ({ id: it.id, type: it.type, title: it.title || '', year: it.year || '', poster_path: it.poster_path || '', _w: it._w || 0 }));
+            localStorage.setItem(_HLC_PREFIX + key, JSON.stringify({ at: Date.now(), items: slim }));
+        } catch (e) {}
+    }
+    // po zápisu/smazání shlédnutí se cache označí jako zastaralá (ukáže se, ale hned se obnoví)
+    function _hListCacheClear(prefix) {
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (!k || !k.startsWith(_HLC_PREFIX + (prefix || ''))) continue;
+                const o = JSON.parse(localStorage.getItem(k) || 'null');
+                if (o) { o.at = 0; localStorage.setItem(k, JSON.stringify(o)); }
+            }
+        } catch (e) {}
+    }
+    function _hPatchCard(it) {
+        const body = $('histraListsBody'); if (!body) return;
+        const el = body.querySelector(`[data-hid="${it.id}"][data-htype="${it.type}"]`); if (!el) return;
+        if (it.title) {
+            el.dataset.az = it.title;
+            const t = el.querySelector('.h-title');
+            if (t && t.firstChild && t.firstChild.nodeType === 3) t.firstChild.nodeValue = it.title;
+        }
+        const sub = el.lastElementChild && el.lastElementChild.children[1];
+        if (sub && it.year) sub.textContent = (it.type === 'tv' ? '📺' : '🎬') + ' ' + it.year;
+        if (it.poster_path) {
+            const url = String(it.poster_path).startsWith('http') ? it.poster_path : `https://image.tmdb.org/t/p/w500${it.poster_path}`;
+            const img = el.querySelector(':scope > img');
+            if (img) { if (img.getAttribute('src') !== url) img.src = url; }
+            else {
+                const ph = el.querySelector(':scope > div[style*="aspect-ratio"]');
+                if (ph) ph.outerHTML = `<img src="${url}" loading="lazy" style="width:100%;aspect-ratio:2/3;object-fit:cover;display:block;">`;
+            }
+        }
+    }
+    async function _hBgPosters(title, items, tok, cacheKey) {
+        if (typeof fetchMyBackendPosters !== 'function') return;
+        const CH = 45;
+        for (let i = 0; i < items.length; i += CH) {
+            if (window._hLoadTok !== tok) return;
+            const chunk = items.slice(i, i + CH);
+            try { await fetchMyBackendPosters(chunk); } catch (e) {}
+            if (window._hLoadTok !== tok) return;
+            chunk.forEach(_hPatchCard);
+        }
+        if (window._hLoadTok !== tok) return;
+        if (cacheKey) _hListCacheSet(cacheKey, items);
+        const v = state._histraView;
+        if (v && v.kind === 'items' && v.title === title && v.sort === 'az') {
+            const body = $('histraListsBody');
+            histraRenderItems(title, items, body ? body.scrollTop : 0, 'az');
+        }
+    }
+    async function histraLoadItems(title, loader, mapper, opts) {
+        opts = opts || {};
         _hSetHeader('🟣 ' + title, '← Histra');
-        state._histraView = { kind: 'loading' };
+        const tok = window._hLoadTok = (window._hLoadTok || 0) + 1;
         const body = $('histraListsBody');
-        body.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-muted);">⏳ Načítám…</div>';
+        const sigOf = arr => arr.map(x => x.type + x.id).join(',');
+        let shown = null; // seznam zobrazený z cache
+        if (opts.cacheKey) {
+            const c = _hListCacheGet(opts.cacheKey);
+            if (c && c.items.length) {
+                try { applyMyBackendPostersCacheOnly(c.items); } catch (e) {}
+                histraRenderItems(title, c.items, 0);
+                shown = c.items;
+                _hBgPosters(title, c.items, tok, opts.cacheKey);
+                if (c.fresh) return;
+            }
+        }
+        if (!shown) {
+            state._histraView = { kind: 'loading' };
+            body.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-muted);">⏳ Načítám…</div>';
+        }
         try {
             const raw = await loader();
-            let items = raw.map(mapper || histraMapItem).filter(Boolean);
-            try { items = await fetchMyBackendPosters(items); } catch (e) {}
-            histraRenderItems(title, items, 0);
+            if (window._hLoadTok !== tok) return;
+            const items = raw.map(mapper || histraMapItem).filter(Boolean);
+            try { applyMyBackendPostersCacheOnly(items); } catch (e) {}
+            if (shown) {
+                const v = state._histraView;
+                if (!(v && v.kind === 'items' && v.title === title)) return; // uživatel mezitím odešel
+                if (sigOf(items) === sigOf(shown)) { // beze změny — jen uložit, nepřekreslovat
+                    if (opts.cacheKey) _hListCacheSet(opts.cacheKey, shown);
+                    return;
+                }
+                histraRenderItems(title, items, body.scrollTop);
+            } else {
+                if (!(state._histraView && state._histraView.kind === 'loading')) return; // uživatel se vrátil zpět
+                histraRenderItems(title, items, 0);
+            }
+            if (opts.cacheKey) _hListCacheSet(opts.cacheKey, items);
+            _hBgPosters(title, items, tok, opts.cacheKey);
         } catch (e) {
+            if (window._hLoadTok !== tok || shown) return;
             state._histraView = { kind: 'overview' };
             body.innerHTML = `<div style="text-align:center;padding:40px 10px;color:var(--text-muted);">❌ Nepodařilo se načíst: ${_hEsc(e.message || e)}</div>`;
         }
@@ -3155,6 +3366,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             if (_hIsTv(type)) _hwAddShow(idx, String(id), season != null ? Number(season) : 0, episode != null ? Number(episode) : 0, ts || Date.now());
             else idx.movies[String(id)] = 1;
             _hwSave(); _hwApply();
+            try { _hListCacheClear('watched'); } catch (e2) {}
         } catch (e) {}
     }
     function _hwApply() {
@@ -3233,11 +3445,18 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     async function histraHistoryAll(force) {
         const c = window._histraHistCache;
         if (!force && c && Date.now() - c.at < 120000) return c.items;
-        const raw = await histraFetchHistoryRaw();
-        const items = [];
-        raw.forEach(e => { const p = histraParseHistoryEntry(e); if (p) items.push(p); });
-        window._histraHistCache = { at: Date.now(), items };
-        return items;
+        // když už se historie stahuje, počkáme na stejný požadavek (dřív se stahovala 2–3× souběžně)
+        if (window._histraHistBusy) return window._histraHistBusy;
+        window._histraHistBusy = (async () => {
+            try {
+                const raw = await histraFetchHistoryRaw();
+                const items = [];
+                raw.forEach(e => { const p = histraParseHistoryEntry(e); if (p) items.push(p); });
+                window._histraHistCache = { at: Date.now(), items };
+                return items;
+            } finally { window._histraHistBusy = null; }
+        })();
+        return window._histraHistBusy;
     }
     async function histraHistoryForId(id, type, force) {
         const all = await histraHistoryAll(force);
@@ -3277,6 +3496,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             : { movie: { tmdb: String(entry.tmdb) } };
         await histraApi('/api/v1/watched', { method: 'DELETE', body });
         window._histraHistCache = null;
+        try { _hListCacheClear('watched'); } catch (e) {}
         try { histraRefreshWatchedIndex(true).then(() => _hwApply()); } catch (e) {}
     }
     // Sinator → Histra (bez ptaní): zavolá se vždy, když se shlédnuto zapisuje do Sinatoru
@@ -4373,14 +4593,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         hist.forEach(x => { if (x && x.kind === 'episode') add(x.tmdb, Number(x.season) || 0, Number(x.number) || 0); });
         Object.keys(state.watched || {}).forEach(k => { if (k.startsWith('ep_')) { const p = k.split('_'); add(p[1], Number(p[2]) || 0, Number(p[3]) || 0); } });
         const uniq = [...new Set(ids.map(String))];
-        for (let i = 0; i < uniq.length; i += 8) {
-            await Promise.all(uniq.slice(i, i + 8).map(async id => {
+        for (let i = 0; i < uniq.length; i += 16) {
+            await Promise.all(uniq.slice(i, i + 16).map(async id => {
                 try {
                     let inf = window._histraTvInfo[id];
                     if (!inf || Date.now() - inf.at > 600000) {
-                        const d = await (await fetch(`${BASE}/tv/${id}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
+                        const d = await (await _fetchWithTimeout(`${BASE}/tv/${id}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
                         if (!d || !d.id) return;
-                        inf = { at: Date.now(), total: d.number_of_episodes || 0, next: !!d.next_episode_to_air };
+                        inf = { at: Date.now(), full: true, total: d.number_of_episodes || 0, next: !!d.next_episode_to_air, name: d.name || '', first: d.first_air_date || '', poster: d.poster_path || '' };
                         window._histraTvInfo[id] = inf;
                     }
                     if (inf.next) return;
@@ -4408,17 +4628,23 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const at = Number(x.watchedAt) || 0; if (at > e.at) e.at = at;
         });
         const ids = [...shows.keys()], out = [];
-        for (let i = 0; i < ids.length; i += 8) {
-            await Promise.all(ids.slice(i, i + 8).map(async id => {
+        for (let i = 0; i < ids.length; i += 16) {
+            await Promise.all(ids.slice(i, i + 16).map(async id => {
                 try {
-                    const d = await (await fetch(`${BASE}/tv/${id}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
-                    if (!d || !d.id) return;
-                    const total = d.number_of_episodes || 0, next = d.next_episode_to_air || null;
+                    // sdílená cache s histraCompleteSet — každý seriál se z TMDB stáhne jen jednou
+                    let inf = window._histraTvInfo[id];
+                    if (!inf || !inf.full || Date.now() - inf.at > 600000) {
+                        const d = await (await _fetchWithTimeout(`${BASE}/tv/${id}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
+                        if (!d || !d.id) return;
+                        inf = { at: Date.now(), full: true, total: d.number_of_episodes || 0, next: !!d.next_episode_to_air, name: d.name || '', first: d.first_air_date || '', poster: d.poster_path || '' };
+                        window._histraTvInfo[id] = inf;
+                    }
+                    const total = inf.total, next = inf.next;
                     const w = shows.get(id).eps.size;
                     const incomplete = (total > 0 && w < total) || !!next;
                     if (!incomplete) return;
                     if (state.watched && state.watched['tv_' + id] && !next) return; // ručně označené jako dokoukané
-                    out.push({ id: Number(id), type: 'tv', title: d.name || '', year: Number((d.first_air_date || '').slice(0, 4)) || 0, poster_path: d.poster_path || '', _w: shows.get(id).at });
+                    out.push({ id: Number(id), type: 'tv', title: inf.name || '', year: Number((inf.first || '').slice(0, 4)) || 0, poster_path: inf.poster || '', _w: shows.get(id).at });
                 } catch (e) {}
             }));
         }
@@ -4430,15 +4656,17 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const wantTv = type === 'tv';
         histraLoadItems(wantTv ? 'Shlédnuté seriály' : 'Shlédnuté filmy', async () => {
             const kind = wantTv ? 'show' : 'movie';
-            const [raw, prog] = await Promise.all([
-                histraFetchAllPaged(`/api/v1/tracking/history?kind=${kind}&extended=full&lang=cs-CZ`, 100, 200),
-                histraProgressRaw(wantTv ? 'tv' : 'movie').catch(() => [])
+            // vše se stahuje souběžně (dřív: historie → pak celá historie znovu → pak TMDB po jednom)
+            const [raw, prog, inc] = await Promise.all([
+                histraFetchAllPagedPar(`/api/v1/tracking/history?kind=${kind}&extended=full&lang=cs-CZ`, 100, 200, 4),
+                histraProgressRaw(wantTv ? 'tv' : 'movie').catch(() => []),
+                wantTv ? histraIncompleteShows().catch(() => []) : Promise.resolve([])
             ]);
             // rozkoukané ven — ve shlédnutých jen dokoukané
             const inProgress = new Set();
             prog.forEach(e => { const it = histraMapProgress(e, wantTv ? 'tv' : 'movie'); if (it) inProgress.add(Number(it.id)); });
             if (wantTv) {
-                try { (await histraIncompleteShows()).forEach(it => inProgress.add(Number(it.id))); } catch (e) {}
+                try { inc.forEach(it => inProgress.add(Number(it.id))); } catch (e) {}
                 // celé shlédnuté seriály jsou dokoukané — ve Shlédnutých zůstanou, i když je Histra vede v „continue“
                 try { (await histraCompleteSet([...inProgress])).forEach(id => inProgress.delete(id)); } catch (e) {}
             }
@@ -4451,7 +4679,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 if (!prev || it._w > prev._w) seen.set(it.id, it);
             });
             return [...seen.values()].sort((a, b) => b._w - a._w);
-        }, x => x);
+        }, x => x, { cacheKey: wantTv ? 'watched_tv' : 'watched_movie' });
     };
     window.histraSetSort = function(v) {
         const cur = state._histraView; if (!cur || cur.kind !== 'items') return;
@@ -49393,7 +49621,7 @@ window.addEventListener('load', function() {
     security:{icon:'🔐', name:'Heslo a obsah',     sub:'Přístupové heslo, explicitní obsah',       c:'#ff6b6b', node:'swPageSecurity'},
     update:  {icon:'🔄', name:'Aktualizace',       sub:'Kontrola verze a historie změn',           c:'#1db954', node:'swPageUpdate'},
     backup:  {icon:'💾', name:'Záloha dat',        sub:'Export a import',                          c:'#8bc34a', node:'swPageBackup'},
-    experimental:{icon:'🧪', name:'Experimentální funkce', sub:'Upozornění na nové epizody a streamy', c:'#38bdf8', node:'swPageExperimental', pre:function(){ if(window.homeBtnsRender) window.homeBtnsRender(); }},
+    experimental:{icon:'🧪', name:'Experimentální funkce', sub:'Upozornění na nové epizody a streamy', c:'#38bdf8', node:'swPageExperimental', pre:function(){ if(window.homeBtnsRender) window.homeBtnsRender(); if(window.cacheInfoRefresh) window.cacheInfoRefresh(); }},
     admin:   {icon:'🛡️', name:'Admin',             sub:function(){ try{ if(typeof updateAdminStatus==='function') updateAdminStatus(); }catch(e){} var on=false,l2=false; try{ on=localStorage.getItem('sinator_admin_mode')==='1'; l2=on&&localStorage.getItem('sinator_admin_level')==='2'; }catch(e){} return 'Admin: ' + (on ? (l2 ? '✅ Aktivní (level 2)' : '✅ Aktivní') : 'Neaktivní'); }, c:'#ffaa00', node:'settingsTabContentAdmin'}
   };
 
