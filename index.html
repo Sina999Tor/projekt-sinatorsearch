@@ -4705,6 +4705,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const freshKeys = new Set();
             const hisMovies = new Map(), hisEps = new Map();
             const _tsOf = v => typeof v === 'number' ? v : (Number(v) || Date.parse(v) || 0);
+            // Sync jen „od teď“: do Sinatoru se z Histry nepřidává nic staršího než SINCE (výchozí = půlnoc dne prvního
+            // spuštění této verze) a do Histry se ze Sinatoru zapisuje jen shlédnutí od SINCE dál. Starší historie se nechává být.
+            const SINCE = (() => {
+                let v = 0; try { v = Number(_store.getItem('sinator_histra_since_v1')) || 0; } catch (e) {}
+                if (!v) { const d = new Date(); d.setHours(0, 0, 0, 0); v = d.getTime(); try { _store.setItem('sinator_histra_since_v1', String(v)); } catch (e) {} }
+                return v;
+            })();
             for (let hi = 0; hi < historyRaw.length; hi++) {
                 const raw = historyRaw[hi];
                 if (historyRaw.length > 20 && hi % 25 === 0) setStatus(`Historie: ${hi + 1}/${historyRaw.length}…`);
@@ -4712,7 +4719,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 if (!parsed) { skipped++; if (skipped <= 3) console.warn('[Histra sync] nepřečtený záznam historie:', raw); continue; }
                 if (parsed.kind === 'movie') {
                     const wKey = `movie_${parsed.tmdb}`;
-                    if (!state.watched[wKey]) {
+                    if (!state.watched[wKey] && _tsOf(parsed.watchedAt) >= SINCE) {
                         if (!dry) state.watched[wKey] = { id: parsed.tmdb, type: 'movie', title: parsed.title || '', year: parsed.year || '', posterPath: '', addedAt: Date.now() };
                         locallyMarkedMovies++;
                         addedToSin.set('m' + parsed.tmdb, lblMovie(parsed.tmdb, parsed.title, parsed.year));
@@ -4724,7 +4731,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     if (!metaM.has(k)) metaM.set(k, { title: parsed.title, year: parsed.year });
                 } else {
                     const wKey = `ep_${parsed.tmdb}_${parsed.season}_${parsed.number}`;
-                    if (!state.watched[wKey]) {
+                    if (!state.watched[wKey] && _tsOf(parsed.watchedAt) >= SINCE) {
                         if (!dry) state.watched[wKey] = { id: wKey, type: 'episode', title: parsed.title ? `${parsed.title} S${parsed.season}E${parsed.number}` : '', year: parsed.year || '', posterPath: '', addedAt: Date.now(), tvId: parsed.tmdb, seasonNumber: parsed.season, epNumber: parsed.number };
                         locallyMarkedEpisodes++;
                         addedToSin.set(`e${parsed.tmdb}_${parsed.season}_${parsed.number}`, lblEp(parsed.tmdb, parsed.season, parsed.number, parsed.title, parsed.epTitle));
@@ -4774,10 +4781,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     .forEach(h => { if (!base.includes(h)) { base.push(h); rewatchKeys.add(key + '_' + h); } });
                 return base;
             };
-            hisMovies.forEach((arr, id) => pickNewRe(arr, sinMovies.get(id) || [], 'm' + id).forEach(w => { const ik = `m${id}_${w}`; if (imported.has(ik)) return; newKeys.push(ik); newMovieItems.push({ id, watched_at: w }); log.movies.push({ tmdb: id, watchedAt: w }); }));
+            hisMovies.forEach((arr, id) => pickNewRe(arr, sinMovies.get(id) || [], 'm' + id).filter(w => w >= SINCE).forEach(w => { const ik = `m${id}_${w}`; if (imported.has(ik)) return; newKeys.push(ik); newMovieItems.push({ id, watched_at: w }); log.movies.push({ tmdb: id, watchedAt: w }); }));
             hisEps.forEach((arr, k) => {
                 const [tm, se, ep] = k.split('_').map(Number);
-                pickNewRe(arr, sinEps.get(k) || [], 'e' + k).forEach(w => { const ik = `e${tm}_${se}_${ep}_${w}`; if (imported.has(ik)) return; newKeys.push(ik); newEpisodeItems.push({ id: tm, season: se, episode: ep, watched_at: w }); log.episodes.push({ tmdb: tm, season: se, number: ep, watchedAt: w }); });
+                pickNewRe(arr, sinEps.get(k) || [], 'e' + k).filter(w => w >= SINCE).forEach(w => { const ik = `e${tm}_${se}_${ep}_${w}`; if (imported.has(ik)) return; newKeys.push(ik); newEpisodeItems.push({ id: tm, season: se, episode: ep, watched_at: w }); log.episodes.push({ tmdb: tm, season: se, number: ep, watchedAt: w }); });
             });
             // Hromadně označené: stovky epizod jednoho seriálu ve stejné minutě („označit celý seriál“ nebo kaskáda při zápisu
             // do Histry) nejsou skutečné sledování → tiše se nepřenášejí; při ručním syncu se zeptá.
@@ -4804,7 +4811,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const _newTotal = newMovieItems.length + newEpisodeItems.length;
             const _cnt = `Histra: ${historyRaw.length} záznamů historie, Sinator: ${existingMovies.length} filmů + ${existingEpisodes.length} epizod.`;
             try { console.log('[Histra sync] ' + _cnt + ` Nových: filmy ${newMovieItems.length}, epizody ${newEpisodeItems.length}.`); } catch (e) {}
-            _info = `Histra ${historyRaw.length} záznamů (nepřečteno ${skipped}), Sinator ${existingMovies.length} filmů + ${existingEpisodes.length} epizod, nových ${_newTotal}${bulkSkipped ? `, hromadně označených přeskočeno ${bulkSkipped}` : ''}`;
+            _info = `Sync jen od ${new Date(SINCE).toLocaleDateString('cs-CZ')}. Histra ${historyRaw.length} záznamů (nepřečteno ${skipped}), Sinator ${existingMovies.length} filmů + ${existingEpisodes.length} epizod, nových ${_newTotal}${bulkSkipped ? `, hromadně označených přeskočeno ${bulkSkipped}` : ''}`;
             if (_newTotal > 150 && !dry) {
                 if (silent) {
                     // Podezřele moc „nových“ → tiše se přenese jen to nejčerstvější (posledních 14 dní, max. 60);
@@ -4882,6 +4889,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     sinMovies.forEach((arr, id) => { if (!hisMovies.has(id)) return; reSin(arr, hisMovies.get(id)).forEach(ts => { const key = `m${id}_${ts}`; if (!pushed.has(key)) todo.push({ key, id, type: 'movie', ts, rewatch: true }); }); });
                     sinEps.forEach((arr, k) => { if (!hisEps.has(k)) return; const [tm, se, ep] = k.split('_').map(Number); reSin(arr, hisEps.get(k)).forEach(ts => { const key = `e${k}_${ts}`; if (!pushed.has(key)) todo.push({ key, id: tm, type: 'tv', season: se, episode: ep, ts, rewatch: true }); }); });
                 }
+                for (let i = todo.length - 1; i >= 0; i--) if (!(todo[i].ts >= SINCE)) todo.splice(i, 1);   // jen shlédnutí od SINCE dál
                 // Histra u zapisovaných shlédnutí nemusí zachovat původní datum (dostane „dnes“) a u seriálů může
                 // označit i víc epizod najednou → tiše se zapisuje jen čerstvé (posledních 14 dní); starší jen ručně a po potvrzení.
                 if (silent) { const _c = Date.now() - 14 * 86400000; for (let i = todo.length - 1; i >= 0; i--) if (!(todo[i].ts > _c)) todo.splice(i, 1); }
@@ -6562,6 +6570,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-25e', date: '25. 10. 2026', items: [
+            '🔄 Histra sync je teď jen „od teď“: z Histry se do Sinatoru nepřidává nic staršího než den prvního spuštění této verze (25. 10. 2026) a ze Sinatoru se do Histry zapisuje jen to, co shlédneš od tohoto dne. Stará historie se nepřenáší ani znovu nedotahuje (konec přidávání už shlédnutých epizod a „znovu“ záznamů)',
+        ] },
         { version: '2026-10-25d', date: '25. 10. 2026', items: [
             '🎭 Histra → Rozkoukané seriály: seriály, které mají označené všechny epizody (např. Tráva), se tu už neukazují — jsou dokoukané a patří do Shlédnutých. Platí, pokud nemá oznámený další díl',
         ] },
