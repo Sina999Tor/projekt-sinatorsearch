@@ -2794,16 +2794,25 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         }
         return all;
     }
-    // Paralelní varianta stránkování (po dávkách "conc" stránek najednou) — pro velké seznamy
-    // s pevným limit/offset. Končí na první krátké/prázdné/opakované stránce nebo chybě.
-    async function histraFetchAllPagedPar(basePath, limit, maxPages, conc) {
+    // Paralelní varianta stránkování: 1. stránka sama (zjistí skutečnou velikost stránky), pak dávky "conc"
+    // stránek najednou. adaptive = server smí vracet menší stránky než limit (krok = velikost 1. stránky).
+    // Končí na první krátké/prázdné/opakované stránce nebo chybě.
+    async function histraFetchAllPagedPar(basePath, limit, maxPages, conc, adaptive, onProgress) {
         limit = limit || 100; maxPages = maxPages || 200; conc = conc || 4;
         const sep = basePath.includes('?') ? '&' : '?';
-        let all = [], prevSig = null;
-        for (let p = 0; p < maxPages; p += conc) {
-            const n = Math.min(conc, maxPages - p);
-            const res = await Promise.all(Array.from({ length: n }, (_, k) =>
-                histraApi(`${basePath}${sep}limit=${limit}&offset=${(p + k) * limit}`).then(histraUnwrapList, () => null)));
+        const getPage = off => histraApi(`${basePath}${sep}limit=${limit}&offset=${off}`).then(histraUnwrapList, () => null);
+        const first = await getPage(0);
+        if (!first || !first.length) return [];
+        let all = first.slice();
+        if (onProgress) { try { onProgress(all.length); } catch (e) {} }
+        const ps = adaptive ? first.length : limit;
+        if (first.length < ps || (!adaptive && first.length < limit)) return all;
+        let prevSig = histraPageSignature(first);
+        for (let p = 1; p < maxPages;) {
+            // když 1. stránka nebyla plná, server asi omezuje velikost stránky — nejdřív jen jedna zkušební stránka
+            const n = Math.min((p === 1 && first.length < limit) ? 1 : conc, maxPages - p);
+            const base = p; p += n;
+            const res = await Promise.all(Array.from({ length: n }, (_, k) => getPage((base + k) * ps)));
             let stop = false;
             for (const items of res) {
                 if (!items || !items.length) { stop = true; break; }
@@ -2811,8 +2820,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 if (sig === prevSig) { stop = true; break; }
                 prevSig = sig;
                 all = all.concat(items);
-                if (items.length < limit) { stop = true; break; }
+                if (items.length < ps) { stop = true; break; }
             }
+            if (onProgress) { try { onProgress(all.length); } catch (e) {} }
             if (stop) break;
         }
         return all;
@@ -3253,7 +3263,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const v = state._histraView;
         if (v && v.kind === 'items' && v.title === title && v.sort === 'az') {
             const body = $('histraListsBody');
-            histraRenderItems(title, items, body ? body.scrollTop : 0, 'az');
+            histraRenderItems(title, v.items || items, body ? body.scrollTop : 0, 'az');
         }
     }
     async function histraLoadItems(title, loader, mapper, opts) {
@@ -3280,8 +3290,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         try {
             const raw = await loader();
             if (window._hLoadTok !== tok) return;
-            const items = raw.map(mapper || histraMapItem).filter(Boolean);
+            let items = raw.map(mapper || histraMapItem).filter(Boolean);
             try { applyMyBackendPostersCacheOnly(items); } catch (e) {}
+            if (shown && opts.refine) { // z cache už něco vidíš — upřesnění proběhne neviditelně, překreslí se jen při změně
+                try { items = await opts.refine(items) || items; } catch (e) {}
+                if (window._hLoadTok !== tok) return;
+            }
             if (shown) {
                 const v = state._histraView;
                 if (!(v && v.kind === 'items' && v.title === title)) return; // uživatel mezitím odešel
@@ -3293,6 +3307,26 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             } else {
                 if (!(state._histraView && state._histraView.kind === 'loading')) return; // uživatel se vrátil zpět
                 histraRenderItems(title, items, 0);
+                if (opts.refine) { // první vykreslení hned, rozkoukané se odeberou až po dopočítání na pozadí
+                    body.insertAdjacentHTML('afterbegin', '<div id="hRefineNote" style="font-size:0.72rem;color:var(--text-muted);padding:4px 2px;">⏳ Upřesňuji seznam (odebírám rozkoukané)…</div>');
+                    const bg = _hBgPosters(title, items, tok, null);
+                    let fin = null;
+                    try { fin = await opts.refine(items); } catch (e) {}
+                    if (window._hLoadTok !== tok) return;
+                    const v2 = state._histraView;
+                    if (!(v2 && v2.kind === 'items' && v2.title === title)) return;
+                    const note = document.getElementById('hRefineNote');
+                    if (fin && sigOf(fin) !== sigOf(items)) {
+                        try { applyMyBackendPostersCacheOnly(fin); } catch (e) {}
+                        histraRenderItems(title, fin, body.scrollTop);
+                        items = fin;
+                    } else if (note) note.remove();
+                    if (opts.cacheKey) {
+                        _hListCacheSet(opts.cacheKey, items);
+                        bg.then(() => { if (window._hLoadTok === tok) _hListCacheSet(opts.cacheKey, items); });
+                    }
+                    return;
+                }
             }
             if (opts.cacheKey) _hListCacheSet(opts.cacheKey, items);
             _hBgPosters(title, items, tok, opts.cacheKey);
@@ -3426,9 +3460,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // Nefiltrovaná historie má strop počtu stránek a při chybě stránky se tiše ořízne; filmy jsou proto
     // načtené i samostatně a duplicity se odfiltrují (podle id záznamu, jinak podle titulu + času).
     async function histraFetchHistoryRaw(onProgress) {
-        const a = await histraFetchAllPaged('/api/v1/tracking/history?extended=full&lang=cs-CZ', 100, 400, onProgress, true);
-        let m = [];
-        try { m = await histraFetchAllPaged('/api/v1/tracking/history?kind=movie&extended=full&lang=cs-CZ', 100, 100, null, true); } catch (e) {}
+        const [a, m] = await Promise.all([
+            histraFetchAllPagedPar('/api/v1/tracking/history?extended=full&lang=cs-CZ', 100, 400, 8, true, onProgress),
+            histraFetchAllPagedPar('/api/v1/tracking/history?kind=movie&extended=full&lang=cs-CZ', 100, 100, 4, true).catch(() => [])
+        ]);
         const seen = new Set(), out = [];
         for (const e of a.concat(m)) {
             let k = null;
@@ -4654,32 +4689,41 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     }
     window.histraOpenWatched = function(type) {
         const wantTv = type === 'tv';
+        const t = wantTv ? 'tv' : 'movie';
+        // rozkoukané (continue) — rychlý dotaz, souběžně s historií
+        let progSet = null;
+        const getProg = async () => {
+            if (progSet) return progSet;
+            const prog = await histraProgressRaw(t).catch(() => []);
+            const set = new Set();
+            prog.forEach(e => { const it = histraMapProgress(e, t); if (it) set.add(Number(it.id)); });
+            return (progSet = set);
+        };
+        // pomalá část (celá historie + TMDB po seriálech) — jen u seriálů, mimo kritickou cestu prvního zobrazení
+        const refine = wantTv ? async (items) => {
+            const inProgress = new Set(await getProg());
+            try { (await histraIncompleteShows()).forEach(it => inProgress.add(Number(it.id))); } catch (e) {}
+            try { (await histraCompleteSet([...inProgress])).forEach(id => inProgress.delete(id)); } catch (e) {}
+            return items.filter(it => !inProgress.has(Number(it.id)));
+        } : null;
         histraLoadItems(wantTv ? 'Shlédnuté seriály' : 'Shlédnuté filmy', async () => {
             const kind = wantTv ? 'show' : 'movie';
-            // vše se stahuje souběžně (dřív: historie → pak celá historie znovu → pak TMDB po jednom)
-            const [raw, prog, inc] = await Promise.all([
-                histraFetchAllPagedPar(`/api/v1/tracking/history?kind=${kind}&extended=full&lang=cs-CZ`, 100, 200, 4),
-                histraProgressRaw(wantTv ? 'tv' : 'movie').catch(() => []),
-                wantTv ? histraIncompleteShows().catch(() => []) : Promise.resolve([])
-            ]);
-            // rozkoukané ven — ve shlédnutých jen dokoukané
-            const inProgress = new Set();
-            prog.forEach(e => { const it = histraMapProgress(e, wantTv ? 'tv' : 'movie'); if (it) inProgress.add(Number(it.id)); });
-            if (wantTv) {
-                try { inc.forEach(it => inProgress.add(Number(it.id))); } catch (e) {}
-                // celé shlédnuté seriály jsou dokoukané — ve Shlédnutých zůstanou, i když je Histra vede v „continue“
-                try { (await histraCompleteSet([...inProgress])).forEach(id => inProgress.delete(id)); } catch (e) {}
-            }
+            const progP = getProg();
+            const raw = await histraFetchAllPagedPar(`/api/v1/tracking/history?kind=${kind}&extended=full&lang=cs-CZ`, 100, 200, 6, true, n => {
+                const v = state._histraView, b = $('histraListsBody');
+                if (v && v.kind === 'loading' && b) b.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--text-muted);">⏳ Načítám… ${n} záznamů</div>`;
+            });
+            const prog = await progP;
             const seen = new Map();
             raw.forEach(e => {
-                const it = histraMapProgress(e, wantTv ? 'tv' : 'movie'); if (!it) return;
-                if (inProgress.has(Number(it.id))) return;
+                const it = histraMapProgress(e, t); if (!it) return;
+                if (prog.has(Number(it.id))) return; // rozkoukané ven
                 it._w = Number(histraExtractWatchedAt(e)) || 0;
                 const prev = seen.get(it.id);
                 if (!prev || it._w > prev._w) seen.set(it.id, it);
             });
             return [...seen.values()].sort((a, b) => b._w - a._w);
-        }, x => x, { cacheKey: wantTv ? 'watched_tv' : 'watched_movie' });
+        }, x => x, { cacheKey: wantTv ? 'watched_tv' : 'watched_movie', refine });
     };
     window.histraSetSort = function(v) {
         const cur = state._histraView; if (!cur || cur.kind !== 'items') return;
