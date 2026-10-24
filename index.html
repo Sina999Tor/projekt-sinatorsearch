@@ -4353,6 +4353,44 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         if (!tm) return null;
         return { id: tm, type: isShow ? 'tv' : 'movie', title: src.title || src.name || e.title || e.name || '', year: histraExtractYear(src) || histraExtractYear(e), poster_path: src.poster_path || src.poster || src.poster_url || e.poster_path || e.poster || '' };
     }
+    // Seriály s částečně shlédnutými epizodami v historii Histry (nebo s oznámeným dalším dílem) — dokud
+    // nejsou shlédnuté celé, patří vždy do Rozkoukaných (a ne do Shlédnutých), i když je Histra ve
+    // svém „continue“ seznamu nevrací.
+    window._histraIncompleteCache = null;
+    async function histraIncompleteShows() {
+        const c = window._histraIncompleteCache;
+        if (c && Date.now() - c.at < 600000) return c.items;
+        if (typeof tmdbApiKey === 'undefined' || !tmdbApiKey) return [];
+        const hist = await histraHistoryAll(false);
+        const shows = new Map();
+        hist.forEach(x => {
+            if (!x || x.kind !== 'episode' || !x.tmdb) return;
+            const s = Number(x.season) || 0, n = Number(x.number) || 0;
+            if (s <= 0) return;
+            const id = String(x.tmdb);
+            let e = shows.get(id); if (!e) { e = { eps: new Set(), at: 0 }; shows.set(id, e); }
+            e.eps.add(s + ':' + n);
+            const at = Number(x.watchedAt) || 0; if (at > e.at) e.at = at;
+        });
+        const ids = [...shows.keys()], out = [];
+        for (let i = 0; i < ids.length; i += 8) {
+            await Promise.all(ids.slice(i, i + 8).map(async id => {
+                try {
+                    const d = await (await fetch(`${BASE}/tv/${id}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
+                    if (!d || !d.id) return;
+                    const total = d.number_of_episodes || 0, next = d.next_episode_to_air || null;
+                    const w = shows.get(id).eps.size;
+                    const incomplete = (total > 0 && w < total) || !!next;
+                    if (!incomplete) return;
+                    if (state.watched && state.watched['tv_' + id] && !next) return; // ručně označené jako dokoukané
+                    out.push({ id: Number(id), type: 'tv', title: d.name || '', year: Number((d.first_air_date || '').slice(0, 4)) || 0, poster_path: d.poster_path || '', _w: shows.get(id).at });
+                } catch (e) {}
+            }));
+        }
+        out.sort((a, b) => b._w - a._w);
+        window._histraIncompleteCache = { at: Date.now(), items: out };
+        return out;
+    }
     window.histraOpenWatched = function(type) {
         const wantTv = type === 'tv';
         histraLoadItems(wantTv ? 'Shlédnuté seriály' : 'Shlédnuté filmy', async () => {
@@ -4364,6 +4402,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             // rozkoukané ven — ve shlédnutých jen dokoukané
             const inProgress = new Set();
             prog.forEach(e => { const it = histraMapProgress(e, wantTv ? 'tv' : 'movie'); if (it) inProgress.add(Number(it.id)); });
+            if (wantTv) { try { (await histraIncompleteShows()).forEach(it => inProgress.add(Number(it.id))); } catch (e) {} }
             const seen = new Map();
             raw.forEach(e => {
                 const it = histraMapProgress(e, wantTv ? 'tv' : 'movie'); if (!it) return;
@@ -4391,6 +4430,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 const k = it.type + '_' + it.id; if (seen.has(k)) return;
                 seen.add(k); out.push(it);
             });
+            if (wantTv) {
+                try { (await histraIncompleteShows()).forEach(it => { const k = 'tv_' + it.id; if (seen.has(k)) return; seen.add(k); out.push(it); }); } catch (e) { console.warn('incomplete shows:', e); }
+            }
             return out;
         }, x => x);
     };
@@ -6412,6 +6454,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-24b', date: '24. 10. 2026', items: [
+            { admin: true, text: '🛡️ Nastavení → dlaždice Admin: stav (Neaktivní / Aktivní level 2) se ukazuje správně hned po otevření nastavení, ne až po vstupu do Admin sekce' },
+        ] },
+        { version: '2026-10-24a', date: '24. 10. 2026', items: [
+            { admin: true, text: '🔔 Oznámení o synchronizaci Histra ↔ Sinator vidí jen přihlášený Admin level 2 (ostatním sync běží potichu na pozadí, bez oznámení, toastů i systémových upozornění). Klepnutí na oznámení otevře plný výpis (všechny přidané položky) v novém okně, ✕ jen zavře' },
+            '🎭 Rozkoukané seriály: dokud seriál není shlédnutý celý (nebo má oznámený další díl), zůstává vždy v Rozkoukaných — i když je Histra ve svém seznamu nevrací a i když je poslední shlédnutá epizoda starší než 180 dní. Ve Shlédnutých už se takový seriál neobjeví',
+        ] },
         { version: '2026-10-23g', date: '23. 10. 2026', items: [
             '🧯 Histra sync: epizody označené v Histře hromadně (desítky až tisíce epizod jednoho seriálu ve stejné minutě — „označit celý seriál“) se už automaticky nepřenášejí do Sinatoru; při ručním syncu se appka zeptá a v oznámení je vidět, který seriál se přeskočil',
             '📤 Zápis do Histry: tichý sync při startu zapisuje jen čerstvá shlédnutí ze Sinatoru (posledních 14 dní); starší historii jen ručně a po potvrzení — Histra u zapisovaných položek nezachovává původní datum',
@@ -19462,8 +19511,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                                 const watchedEps = ex.eps.size;
                                 if (state.watched[`tv_${tvId}`] && !nextEpisode) return; // opravdu dokoukané
                                 if (!nextEpisode) {
-                                    // bez známého dalšího dílu jen aktivně sledované (nedávno, nedokončené)
-                                    if (!(watchedEps > 0 && watchedEps < totalEps && ex.at && Date.now() - ex.at < 180 * 864e5)) return;
+                                    // nedokoukané seriály zůstávají v Rozkoukaných, dokud nejsou shlédnuté celé (bez časového limitu)
+                                    if (!(watchedEps > 0 && watchedEps < totalEps)) return;
                                 }
                                 results.push({
                                     id: Number(tvId), title: d.name || 'Seriál', year: (d.first_air_date || '').slice(0, 4), posterPath: d.poster_path || '',
@@ -49206,7 +49255,7 @@ window.addEventListener('load', function() {
     update:  {icon:'🔄', name:'Aktualizace',       sub:'Kontrola verze a historie změn',           c:'#1db954', node:'swPageUpdate'},
     backup:  {icon:'💾', name:'Záloha dat',        sub:'Export a import',                          c:'#8bc34a', node:'swPageBackup'},
     experimental:{icon:'🧪', name:'Experimentální funkce', sub:'Upozornění na nové epizody a streamy', c:'#38bdf8', node:'swPageExperimental', pre:function(){ if(window.homeBtnsRender) window.homeBtnsRender(); }},
-    admin:   {icon:'🛡️', name:'Admin',             sub:function(){ var l=$('adminModeLabel'); return 'Admin: ' + (l ? l.textContent : 'Neaktivní'); }, c:'#ffaa00', node:'settingsTabContentAdmin'}
+    admin:   {icon:'🛡️', name:'Admin',             sub:function(){ try{ if(typeof updateAdminStatus==='function') updateAdminStatus(); }catch(e){} var on=false,l2=false; try{ on=localStorage.getItem('sinator_admin_mode')==='1'; l2=on&&localStorage.getItem('sinator_admin_level')==='2'; }catch(e){} return 'Admin: ' + (on ? (l2 ? '✅ Aktivní (level 2)' : '✅ Aktivní') : 'Neaktivní'); }, c:'#ffaa00', node:'settingsTabContentAdmin'}
   };
 
   // PWA instalace patří k „Aplikace“
