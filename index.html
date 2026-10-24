@@ -3204,6 +3204,17 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         return all.filter(x => x.kind === want && Number(x.tmdb) === Number(id)).sort((a, b) => b.watchedAt - a.watchedAt);
     }
     // ── Zápis shlédnutí do Histry ──
+    function histraNoteWrote(id, type, season, episode) {
+        try {
+            const key = (_hIsTv(type) && season != null && episode != null) ? `e${id}_${season}_${episode}` : (_hIsTv(type) ? null : `m${id}`);
+            if (!key) return;
+            const o = JSON.parse(_store.getItem('sinator_histra_wrote_v1') || '{}');
+            const arr = (o[key] || []).concat(Date.now()).slice(-5);
+            delete o[key]; o[key] = arr;
+            const ks = Object.keys(o); if (ks.length > 3000) ks.slice(0, ks.length - 3000).forEach(k => delete o[k]);
+            _store.setItem('sinator_histra_wrote_v1', JSON.stringify(o));
+        } catch (e) {}
+    }
     async function histraWriteWatched(id, type, season, episode, ts) {
         if (!histraReady()) return false;
         const iso = new Date(ts || histraTsNow()).toISOString();
@@ -3214,7 +3225,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         let lastErr = null;
         // nejdřív se skutečným časem zhlédnutí (aby seděl se Sinatorem), pak bez něj
         for (const body of [{ ...base, watched_at: iso }, base]) {
-            try { await histraApi('/api/v1/watched', { method: 'POST', body }); window._histraHistCache = null; _hwNoteWatched(id, type, season, episode, ts); return true; }
+            try { await histraApi('/api/v1/watched', { method: 'POST', body }); window._histraHistCache = null; histraNoteWrote(id, type, season, episode); _hwNoteWatched(id, type, season, episode, ts); return true; }
             catch (e) { lastErr = e; }
         }
         throw lastErr || new Error('Zápis do Histry selhal.');
@@ -3417,17 +3428,21 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const rows = (Array.isArray(sin) ? sin : []).map(it => ({ ts: new Date(it.watched_at).getTime(), season: it.season, episode: it.episode, sin: it }));
         his.forEach(h => {
             const m = rows.find(r => !r.his && (r.season || null) == (h.season || null) && (r.episode || null) == (h.number || null) && Math.abs((r.ts || 0) - Number(h.watchedAt)) <= 600000);
-            if (m) m.his = h; else rows.push({ ts: h.watchedAt, season: h.season, episode: h.number, his: h });
+            if (m) { m.his = h; return; }
+            // řádek ze Sinatoru bez platného data → doplň datum z Histry (stejný film / epizoda)
+            const nd = rows.find(r => !r.his && !isFinite(r.ts) && (r.season || null) == (h.season || null) && (r.episode || null) == (h.number || null));
+            if (nd) { nd.ts = Number(h.watchedAt); nd.his = h; return; }
+            rows.push({ ts: h.watchedAt, season: h.season, episode: h.number, his: h });
         });
         rows.sort((a, b) => (b.ts || 0) - (a.ts || 0));
         window._uhRows = window._uhRows || {}; window._uhRows[id] = rows;
         if (!rows.length) { box.innerHTML = ''; return; }
         const rowHtml = (r, idx) => {
-            const d = new Date(r.ts); if (isNaN(d)) return '';
-            const ds = `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()}`;
-            const tm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            const d = new Date(r.ts); const bad = isNaN(d);
+            const ds = bad ? 'datum neznámé' : `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()}`;
+            const tm = bad ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
             const ep = (type === 'tv' && (r.season || r.episode)) ? ` <span style="opacity:0.7;">– S${String(r.season).padStart(2, '0')}E${String(r.episode).padStart(2, '0')}</span>` : '';
-            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);"><span style="opacity:0.8;">🕓</span><span style="flex:1;">${ds} – ${tm}${ep}</span><button onclick="window.deleteCombinedHistory(${id},'${type}',${idx})" title="Smazat tento záznam" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;padding:2px 6px;">✕</button></div>`;
+            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);"><span style="opacity:0.8;">🕓</span><span style="flex:1;">${ds}${tm ? ' – ' + tm : ''}${ep}</span><button onclick="window.deleteCombinedHistory(${id},'${type}',${idx})" title="Smazat tento záznam" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;padding:2px 6px;">✕</button></div>`;
         };
         const older = rows.slice(1).map((r, i) => rowHtml(r, i + 1)).join('');
         const tog = rows.length > 1 ? `<button onclick="window.toggleCombinedHistory(${id})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.8rem;display:flex;align-items:center;gap:4px;padding:4px 0;"><span id="uhArrow_${id}" style="display:inline-block;transition:transform 0.2s;">▸</span> Zobrazit celou historii (${rows.length - 1} další${rows.length - 1 === 1 ? '' : rows.length - 1 < 5 ? 'í' : 'ch'})</button>` : '';
@@ -3858,7 +3873,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
             const ep = (_hIsTv(type) && it.season != null) ? ` <span style="opacity:0.7;">– S${String(it.season).padStart(2, '0')}E${String(it.number).padStart(2, '0')}</span>` : '';
             return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);">
-                <span style="opacity:0.8;">🕓</span><span style="flex:1;">${dateStr} – ${timeStr}${ep}</span>
+                <span style="opacity:0.8;">🕓</span><span style="flex:1;">${dateStr}${timeStr ? ' – ' + timeStr : ''}${ep}</span>
                 <button onclick="window.deleteHistraHistoryEntry(${id},'${type}',${idx})" title="Smazat tento záznam" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;padding:2px 6px;">✕</button>
             </div>`;
         };
@@ -4552,10 +4567,26 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             // (kdyby backend duplicity slučoval, sync by je jinak přidával pořád dokola).
             let imported = new Set(); try { imported = new Set(JSON.parse(_store.getItem('sinator_histra_imported_v1') || '[]')); } catch (e) {}
             const newKeys = [];
-            hisMovies.forEach((arr, id) => pickNew(arr, sinMovies.get(id) || []).forEach(w => { const ik = `m${id}_${w}`; if (imported.has(ik)) return; newKeys.push(ik); newMovieItems.push({ id, watched_at: w }); log.movies.push({ tmdb: id, watchedAt: w }); }));
+            // Opakované shlédnutí (re-watch): shlédnutí na jedné straně NOVĚJŠÍ než nejnovější na druhé straně
+            // (a v posledních 90 dnech) se přenese i když mají obě strany stejný počet. Dřív se porovnával jen
+            // počet, takže druhé shlédnutí položky, kterou už druhá strana měla, zůstalo jen na jedné straně.
+            const REWATCH_MS = 90 * 86400000;
+            const wrote = (() => { try { return JSON.parse(_store.getItem('sinator_histra_wrote_v1') || '{}'); } catch (e) { return {}; } })();
+            const rewatchKeys = new Set();
+            const nearWrote = (key, t) => (wrote[key] || []).some(a => Math.abs(a - t) <= 15 * 60000);
+            const pickNewRe = (hArr, sArr, key) => {
+                const base = pickNew(hArr, sArr);
+                const sv = sArr.filter(t => t > 0);
+                if (!sv.length) return base;               // Sinator nemá platné datum → nelze poznat re-watch
+                const maxS = Math.max(...sv), now = Date.now();
+                hArr.filter(h => h > maxS + TOL && h > now - REWATCH_MS && h <= now + TOL && !nearWrote(key, h)).sort((a, b) => a - b).slice(-5)
+                    .forEach(h => { if (!base.includes(h)) { base.push(h); rewatchKeys.add(key + '_' + h); } });
+                return base;
+            };
+            hisMovies.forEach((arr, id) => pickNewRe(arr, sinMovies.get(id) || [], 'm' + id).forEach(w => { const ik = `m${id}_${w}`; if (imported.has(ik)) return; newKeys.push(ik); newMovieItems.push({ id, watched_at: w }); log.movies.push({ tmdb: id, watchedAt: w }); }));
             hisEps.forEach((arr, k) => {
                 const [tm, se, ep] = k.split('_').map(Number);
-                pickNew(arr, sinEps.get(k) || []).forEach(w => { const ik = `e${tm}_${se}_${ep}_${w}`; if (imported.has(ik)) return; newKeys.push(ik); newEpisodeItems.push({ id: tm, season: se, episode: ep, watched_at: w }); log.episodes.push({ tmdb: tm, season: se, number: ep, watchedAt: w }); });
+                pickNewRe(arr, sinEps.get(k) || [], 'e' + k).forEach(w => { const ik = `e${tm}_${se}_${ep}_${w}`; if (imported.has(ik)) return; newKeys.push(ik); newEpisodeItems.push({ id: tm, season: se, episode: ep, watched_at: w }); log.episodes.push({ tmdb: tm, season: se, number: ep, watchedAt: w }); });
             });
             // Pojistka: podezřele hodně „nových“ záznamů = skoro jistě chyba porovnání, ne opravdu 2000 nových shlédnutí.
             const _newTotal = newMovieItems.length + newEpisodeItems.length;
@@ -4566,8 +4597,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 if (!confirm(`Histra sync chce přidat ${_newTotal} nových záznamů do historie (filmy ${newMovieItems.length}, epizody ${newEpisodeItems.length}).\n\n${_cnt}\n\nPokud víš, že jsi tolik nového neshlédl, dej Zrušit.`)) { setStatus('Zrušeno — nic nepřidáno.'); return; }
             }
 
-            newMovieItems.forEach(it => { const kk = 'm' + it.id; if (!addedToSin.has(kk)) { const m = metaM.get(it.id) || {}; addedToSin.set(kk, lblMovie(it.id, m.title, m.year)); } });
-            newEpisodeItems.forEach(it => { const kk = `e${it.id}_${it.season}_${it.episode}`; if (!addedToSin.has(kk)) { const m = metaE.get(`${it.id}_${it.season}_${it.episode}`) || {}; addedToSin.set(kk, lblEp(it.id, it.season, it.episode, m.title, m.epTitle)); } });
+            newMovieItems.forEach(it => { const kk = 'm' + it.id; if (!addedToSin.has(kk)) { const m = metaM.get(it.id) || {}; addedToSin.set(kk, lblMovie(it.id, m.title, m.year) + (rewatchKeys.has(`m${it.id}_${it.watched_at}`) ? ' 🔁 znovu' : '')); } });
+            newEpisodeItems.forEach(it => { const kk = `e${it.id}_${it.season}_${it.episode}`; if (!addedToSin.has(kk)) { const m = metaE.get(`${it.id}_${it.season}_${it.episode}`) || {}; addedToSin.set(kk, lblEp(it.id, it.season, it.episode, m.title, m.epTitle) + (rewatchKeys.has(`e${it.id}_${it.season}_${it.episode}_${it.watched_at}`) ? ' 🔁 znovu' : '')); } });
 
             // Uložit lokální watched příznaky hned — i kdyby dál něco selhalo
             // (např. upload do backend historie), checkboxy v appce už budou sedět.
@@ -4594,6 +4625,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 const todo = [];
                 sinMovies.forEach((arr, id) => { const key = 'm' + id; if (!hisMovies.has(id) && !pushed.has(key)) todo.push({ key, id, type: 'movie', ts: Math.max(...arr) }); });
                 sinEps.forEach((arr, k) => { const key = 'e' + k; if (!hisEps.has(k) && !pushed.has(key)) { const [tm, se, ep] = k.split('_').map(Number); todo.push({ key, id: tm, type: 'tv', season: se, episode: ep, ts: Math.max(...arr) }); } });
+                // Re-watch ve Sinatoru: shlédnutí novější než nejnovější v Histře (posledních 90 dní) se zapíše i když Histra položku už má
+                {
+                    const now = Date.now();
+                    const reSin = (sArr, hArr) => { const hv = (hArr || []).filter(t => t > 0); if (!hv.length) return []; const maxH = Math.max(...hv); return sArr.filter(t => t > maxH + TOL && t > now - REWATCH_MS && t <= now + TOL).sort((a, b) => a - b).slice(-5); };
+                    sinMovies.forEach((arr, id) => { if (!hisMovies.has(id)) return; reSin(arr, hisMovies.get(id)).forEach(ts => { const key = `m${id}_${ts}`; if (!pushed.has(key)) todo.push({ key, id, type: 'movie', ts, rewatch: true }); }); });
+                    sinEps.forEach((arr, k) => { if (!hisEps.has(k)) return; const [tm, se, ep] = k.split('_').map(Number); reSin(arr, hisEps.get(k)).forEach(ts => { const key = `e${k}_${ts}`; if (!pushed.has(key)) todo.push({ key, id: tm, type: 'tv', season: se, episode: ep, ts, rewatch: true }); }); });
+                }
                 const batch = todo.slice(0, silent ? 100 : 300);
                 let okN = 0;
                 for (let bi = 0; bi < batch.length; bi += 3) {
@@ -4624,7 +4662,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                         }
                         name = _nm[ck] || '';
                     }
-                    pushedLabels.push(isEp ? lblEp(t.id, t.season, t.episode, name, '') : lblMovie(t.id, name, ''));
+                    pushedLabels.push((isEp ? lblEp(t.id, t.season, t.episode, name, '') : lblMovie(t.id, name, '')) + (t.rewatch ? ' 🔁 znovu' : ''));
                 }
             } catch (e) { console.warn('Štítky pro oznámení:', e); }
 
@@ -6242,6 +6280,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-23c', date: '23. 10. 2026', items: [
+            '🔁 Zrcadlení opakovaného shlédnutí Sinator ↔ Histra: když film/epizodu, kterou druhá strana už má, shlédneš znovu (novější shlédnutí než to poslední na druhé straně, max. 90 dní zpět), přenese se i to druhé shlédnutí — ve Sinatoru se ukáže „👁 2×“ a v Histře přibude další shlédnutí. Dřív se porovnával jen počet, takže druhé shlédnutí zůstalo jen na jedné straně',
+            '🕓 Detail: v „Historie sledování“ už datum shlédnutí nemizí — když záznam ve Sinatoru nemá platné datum, doplní se z Histry, a pokud ho nemá nikdo, ukáže se „datum neznámé“ místo prázdného řádku',
+        ] },
         { version: '2026-10-23b', date: '23. 10. 2026', items: [
             '🔄 Histra ↔ Sinator: synchronizace shlédnutého teď proběhne při každém spuštění appky (a po návratu do ní z pozadí) — plné porovnání obou směrů, bez 10min omezení a bez spoléhání na čas posledního syncu (zpětně datovaná shlédnutí se dřív minula, např. epizoda označená na Histře se v Sinatoru neukázala)',
             '🔔 Po synchronizaci naskočí oznámení se jmény toho, co se přidalo: „📥 Přidáno do Sinatoru“ a „📤 Přidáno do Histry“ (např. 📺 Upíří deníky S02E19 – Skutečný Klaus); klepnutím se zavře, jinak zmizí samo. Když je appka na pozadí a máš povolená upozornění, přijde systémové',
@@ -17056,15 +17098,15 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         if (!items.length) { box.innerHTML = ''; return; }
         const rowHtml = it => {
             const d = new Date(it.watched_at);
-            if (isNaN(d)) return '';
-            const dateStr = `${d.getDate()}. ${d.getMonth()+1}. ${d.getFullYear()}`;
-            const timeStr = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            const bad = isNaN(d);
+            const dateStr = bad ? 'datum neznámé' : `${d.getDate()}. ${d.getMonth()+1}. ${d.getFullYear()}`;
+            const timeStr = bad ? '' : `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
             let epLabel = '';
             if (type === 'tv' && it.episode) {
                 const ep = it.episode;
                 epLabel = ` <span style="opacity:0.7;">– S${String(ep.season).padStart(2,'0')}E${String(ep.number).padStart(2,'0')}${ep.title ? ' – '+ep.title : ''}</span>`;
             }
-            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);"><span style="opacity:0.8;">🕓</span><span>${dateStr} – ${timeStr}</span>${epLabel}</div>`;
+            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);"><span style="opacity:0.8;">🕓</span><span>${dateStr}${timeStr ? ' – ' + timeStr : ''}</span>${epLabel}</div>`;
         };
         const latestHtml = rowHtml(items[0]);
         const olderHtml = items.slice(1).map(rowHtml).join('');
@@ -17119,15 +17161,15 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         if (!items.length) { box.innerHTML = ''; return; }
         const rowHtml = it => {
             const d = new Date(it.watched_at);
-            if (isNaN(d)) return '';
-            const dateStr = `${d.getDate()}. ${d.getMonth()+1}. ${d.getFullYear()}`;
-            const timeStr = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            const bad = isNaN(d);
+            const dateStr = bad ? 'datum neznámé' : `${d.getDate()}. ${d.getMonth()+1}. ${d.getFullYear()}`;
+            const timeStr = bad ? '' : `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
             let epLabel = '';
             if (type === 'tv' && (it.season || it.episode)) {
                 epLabel = ` <span style="opacity:0.7;">– S${String(it.season).padStart(2,'0')}E${String(it.episode).padStart(2,'0')}</span>`;
             }
             return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);">
-                <span style="opacity:0.8;">🕓</span><span style="flex:1;">${dateStr} – ${timeStr}${epLabel}</span>
+                <span style="opacity:0.8;">🕓</span><span style="flex:1;">${dateStr}${timeStr ? ' – ' + timeStr : ''}${epLabel}</span>
                 <button onclick="window.deleteMySinatorHistoryEntry(${id},'${type}',${it.watched_at},${it.season ?? 'null'},${it.episode ?? 'null'})" title="Smazat tento záznam" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;padding:2px 6px;">✕</button>
             </div>`;
         };
@@ -17197,11 +17239,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         if (!items.length) { box.innerHTML = ''; return; }
         const rowHtml = it => {
             const d = new Date(it.watched_at);
-            if (isNaN(d)) return '';
-            const dateStr = `${d.getDate()}. ${d.getMonth()+1}. ${d.getFullYear()}`;
-            const timeStr = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            const bad = isNaN(d);
+            const dateStr = bad ? 'datum neznámé' : `${d.getDate()}. ${d.getMonth()+1}. ${d.getFullYear()}`;
+            const timeStr = bad ? '' : `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
             return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text);">
-                <span style="opacity:0.8;">🕓</span><span style="flex:1;">${dateStr} – ${timeStr}</span>
+                <span style="opacity:0.8;">🕓</span><span style="flex:1;">${dateStr}${timeStr ? ' – ' + timeStr : ''}</span>
                 <button onclick="window.deleteMySinatorEpisodeHistoryEntry(${tvId},${seasonNumber},${episodeNumber},${it.watched_at})" title="Smazat tento záznam" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;padding:2px 6px;">✕</button>
             </div>`;
         };
