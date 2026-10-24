@@ -4361,6 +4361,36 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // Seriály s částečně shlédnutými epizodami v historii Histry (nebo s oznámeným dalším dílem) — dokud
     // nejsou shlédnuté celé, patří vždy do Rozkoukaných (a ne do Shlédnutých), i když je Histra ve
     // svém „continue“ seznamu nevrací.
+    // Seriály, které jsou shlédnuté celé (všechny epizody označené v Histře / Sinatoru, nebo ručně označený celý seriál
+    // bez dalšího oznámeného dílu) — ty do Rozkoukaných nepatří, jsou dokoukané.
+    window._histraTvInfo = {};
+    async function histraCompleteSet(ids) {
+        const out = new Set();
+        if (typeof tmdbApiKey === 'undefined' || !tmdbApiKey || !ids || !ids.length) return out;
+        let hist = []; try { hist = await histraHistoryAll(false); } catch (e) {}
+        const eps = new Map();
+        const add = (id, s, n) => { if (!(s > 0)) return; id = String(id); let e = eps.get(id); if (!e) { e = new Set(); eps.set(id, e); } e.add(s + ':' + n); };
+        hist.forEach(x => { if (x && x.kind === 'episode') add(x.tmdb, Number(x.season) || 0, Number(x.number) || 0); });
+        Object.keys(state.watched || {}).forEach(k => { if (k.startsWith('ep_')) { const p = k.split('_'); add(p[1], Number(p[2]) || 0, Number(p[3]) || 0); } });
+        const uniq = [...new Set(ids.map(String))];
+        for (let i = 0; i < uniq.length; i += 8) {
+            await Promise.all(uniq.slice(i, i + 8).map(async id => {
+                try {
+                    let inf = window._histraTvInfo[id];
+                    if (!inf || Date.now() - inf.at > 600000) {
+                        const d = await (await fetch(`${BASE}/tv/${id}?api_key=${tmdbApiKey}&language=cs-CZ`)).json();
+                        if (!d || !d.id) return;
+                        inf = { at: Date.now(), total: d.number_of_episodes || 0, next: !!d.next_episode_to_air };
+                        window._histraTvInfo[id] = inf;
+                    }
+                    if (inf.next) return;
+                    const w = (eps.get(id) || new Set()).size;
+                    if ((state.watched && state.watched['tv_' + id]) || (inf.total > 0 && w >= inf.total)) out.add(Number(id));
+                } catch (e) {}
+            }));
+        }
+        return out;
+    }
     window._histraIncompleteCache = null;
     async function histraIncompleteShows() {
         const c = window._histraIncompleteCache;
@@ -4407,7 +4437,11 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             // rozkoukané ven — ve shlédnutých jen dokoukané
             const inProgress = new Set();
             prog.forEach(e => { const it = histraMapProgress(e, wantTv ? 'tv' : 'movie'); if (it) inProgress.add(Number(it.id)); });
-            if (wantTv) { try { (await histraIncompleteShows()).forEach(it => inProgress.add(Number(it.id))); } catch (e) {} }
+            if (wantTv) {
+                try { (await histraIncompleteShows()).forEach(it => inProgress.add(Number(it.id))); } catch (e) {}
+                // celé shlédnuté seriály jsou dokoukané — ve Shlédnutých zůstanou, i když je Histra vede v „continue“
+                try { (await histraCompleteSet([...inProgress])).forEach(id => inProgress.delete(id)); } catch (e) {}
+            }
             const seen = new Map();
             raw.forEach(e => {
                 const it = histraMapProgress(e, wantTv ? 'tv' : 'movie'); if (!it) return;
@@ -4444,6 +4478,11 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     out.forEach(it => { const w = last.get(Number(it.id)); if (w) it._w = w; });
                     out.sort((a, b) => (b._w || 0) - (a._w || 0));
                 } catch (e) {}
+                // dokoukané seriály (všechny epizody označené) do Rozkoukaných nepatří
+                try {
+                    const done = await histraCompleteSet(out.map(it => it.id));
+                    if (done.size) for (let i = out.length - 1; i >= 0; i--) if (done.has(Number(out[i].id))) out.splice(i, 1);
+                } catch (e) { console.warn('complete shows:', e); }
             }
             return out;
         }, x => x);
@@ -6523,6 +6562,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-25d', date: '25. 10. 2026', items: [
+            '🎭 Histra → Rozkoukané seriály: seriály, které mají označené všechny epizody (např. Tráva), se tu už neukazují — jsou dokoukané a patří do Shlédnutých. Platí, pokud nemá oznámený další díl',
+        ] },
         { version: '2026-10-25c', date: '25. 10. 2026', items: [
             '🔧 Histra seznamy (Rozkoukané seriály, Shlédnuté…): u seriálu se za názvem ukazovala „poslední shlédnutá“ epizoda podle času zápisu (např. Upíří deníky S2E6), i když ses ve skutečnosti dostal dál (S3E4). Teď se ukazuje nejdál shlédnutá epizoda (nejvyšší řada a díl)',
         ] },
