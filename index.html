@@ -2740,14 +2740,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 season = e.season != null ? e.season : e.season_number;
                 number = e.episode_number != null ? e.episode_number : (e.number != null ? e.number : e.episode);
             }
-            const showTmdb = histraExtractTmdb(showObj);
+            const showTmdb = histraExtractTmdb(showObj) || parseInt(e.show_tmdb || e.show_tmdb_id, 10) || null;
             if (!showTmdb || season == null || number == null) return null;
             const showTitle = showObj.title || showObj.name || '';
             const epTitle = (e.episode && typeof e.episode === 'object') ? (e.episode.title || e.episode.name || '') : (e.episode_title || '');
             return { kind: 'episode', tmdb: showTmdb, season: parseInt(season, 10), number: parseInt(number, 10), watchedAt, title: showTitle, epTitle, year: histraExtractYear(showObj) };
         }
-        const movieObj = e.movie || e;
-        const movieTmdb = histraExtractTmdb(movieObj);
+        const movieObj = e.movie || e.media || e.item || e;
+        const movieTmdb = histraExtractTmdb(movieObj) || histraExtractTmdb(e) || (e.ids ? histraExtractTmdb({ ids: e.ids }) : null);
         if (!movieTmdb) return null;
         const movieTitle = movieObj.title || movieObj.name || '';
         return { kind: 'movie', tmdb: movieTmdb, watchedAt, title: movieTitle, year: histraExtractYear(movieObj) };
@@ -3189,10 +3189,30 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
 
     // ── Historie sledování (čtení s cache) ──
     window._histraHistCache = null;
+    // Nefiltrovaná historie + zvlášť filmy (kind=movie — stejný dotaz, jaký používá Histra → Shlédnuté filmy).
+    // Nefiltrovaná historie má strop počtu stránek a při chybě stránky se tiše ořízne; filmy jsou proto
+    // načtené i samostatně a duplicity se odfiltrují (podle id záznamu, jinak podle titulu + času).
+    async function histraFetchHistoryRaw(onProgress) {
+        const a = await histraFetchAllPaged('/api/v1/tracking/history?extended=full&lang=cs-CZ', 100, 400, onProgress, true);
+        let m = [];
+        try { m = await histraFetchAllPaged('/api/v1/tracking/history?kind=movie&extended=full&lang=cs-CZ', 100, 100, null, true); } catch (e) {}
+        const seen = new Set(), out = [];
+        for (const e of a.concat(m)) {
+            let k = null;
+            if (e && typeof e === 'object') {
+                if (e.id != null || e.history_id != null) k = 'id' + (e.id != null ? e.id : e.history_id);
+                else { const q = histraParseHistoryEntry(e); k = q ? `${q.kind}_${q.tmdb}_${q.season || ''}_${q.number || ''}_${Math.floor((q.watchedAt || 0) / 60000)}` : null; }
+            }
+            if (k) { if (seen.has(k)) continue; seen.add(k); }
+            out.push(e);
+        }
+        return out;
+    }
+    window.histraFetchHistoryRaw = histraFetchHistoryRaw;
     async function histraHistoryAll(force) {
         const c = window._histraHistCache;
         if (!force && c && Date.now() - c.at < 120000) return c.items;
-        const raw = await histraFetchAllPaged('/api/v1/tracking/history?extended=full&lang=cs-CZ', 100, 200);
+        const raw = await histraFetchHistoryRaw();
         const items = [];
         raw.forEach(e => { const p = histraParseHistoryEntry(e); if (p) items.push(p); });
         window._histraHistCache = { at: Date.now(), items };
@@ -4424,7 +4444,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const html = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><b>🔄 Synchronizace Histra ↔ Sinator</b><span style="opacity:.6;font-size:1rem;">✕</span></div>`
                 + part('📥 Přidáno do Sinatoru', toSin)
                 + part('📤 Přidáno do Histry', toH)
-                + (lists ? `<div style="margin-top:8px;font-weight:700;color:#c4b5fd;">📁 Nové seznamy: ${lists}</div>` : '');
+                + (lists ? `<div style="margin-top:8px;font-weight:700;color:#c4b5fd;">📁 Nové seznamy: ${lists}</div>` : '')
+                + ((o && o.warn) ? `<div style="margin-top:8px;opacity:.65;font-size:0.78rem;">⚠️ ${o.warn} záznamů z Histry se nepodařilo přečíst (chybí TMDB id)</div>` : '');
             let el = document.getElementById('sinSyncNotice');
             if (el) el.remove();
             el = document.createElement('div');
@@ -4489,11 +4510,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const existEpSet = new Set(existingEpisodes.map(r => `${r.id}_${r.season}_${r.episode}_${r.watched_at}`));
 
             setStatus('Stahuji historii sledování z Histra…');
-            const historyRaw = await histraFetchAllPaged(
-                '/api/v1/tracking/history?extended=full&lang=cs-CZ', 100, 200,
-                (count, page) => setStatus(`Stahuji historii sledování z Histra… (stránka ${page}, zatím ${count} položek)`),
-                true
-            );
+            const historyRaw = await window.histraFetchHistoryRaw((count, page) => setStatus(`Stahuji historii sledování z Histry… (stránka ${page}, zatím ${count} položek)`));
 
             // Jen historie sledování (filmy + epizody) — watchlist a seznamy se
             // záměrně nesynchronizují (dělaly v appce balast). Nové položky se
@@ -4520,7 +4537,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 const raw = historyRaw[hi];
                 if (historyRaw.length > 20 && hi % 25 === 0) setStatus(`Historie: ${hi + 1}/${historyRaw.length}…`);
                 const parsed = histraParseHistoryEntry(raw);
-                if (!parsed) { skipped++; continue; }
+                if (!parsed) { skipped++; if (skipped <= 3) console.warn('[Histra sync] nepřečtený záznam historie:', raw); continue; }
                 if (parsed.kind === 'movie') {
                     const wKey = `movie_${parsed.tmdb}`;
                     if (!state.watched[wKey]) {
@@ -4769,7 +4786,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const summary = `✅ Hotovo — doplněno do historie: filmy +${newMovieItems.length}, epizody +${newEpisodeItems.length}.` + (locallyMarked ? `\n☑️ Označeno jako shlédnuto přímo v appce: filmy +${locallyMarkedMovies}, epizody +${locallyMarkedEpisodes}.` : '') + (listsCreated ? `\n📁 Nové seznamy: ${listsCreated} (celkem ${listItemsAdded} položek). Existující seznamy zůstaly beze změny.` : '') + (skipped ? `\n⚠️ ${skipped} položek se nepodařilo přiřadit (neznámý formát odpovědi).` : '') + `\nPokud sync přidal něco špatně, použij tlačítko „↩️ Vrátit poslední sync" níž.`;
             setStatus(summary);
             if (addedToSin.size || pushedLabels.length || listsCreated) {
-                window.sinShowSyncNotice({ toSin: [...addedToSin.values()], toHistra: pushedLabels, lists: listsCreated });
+                window.sinShowSyncNotice({ toSin: [...addedToSin.values()], toHistra: pushedLabels, lists: listsCreated, warn: skipped });
             } else if (!silent) {
                 try { if (typeof _favToast === 'function') _favToast('✅ Histra sync hotový — nic nového'); } catch (e) {}
             }
@@ -6280,6 +6297,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-23d', date: '23. 10. 2026', items: [
+            '🔧 Histra → Sinator: opraveno, že některé filmy shlédnuté na Histře (např. nové filmy z kina) se do Sinatoru nepřenesly a v detailu chyběla historie sledování (počet shlédnutí i data). Historie z Histry se teď načítá úplněji — filmy navíc samostatně (stejný dotaz jako Histra → Shlédnuté filmy), s vyšším limitem stránek a bez duplicit — a čtení záznamů zvládne víc tvarů odpovědi Histry. Záznamy, které se nepodaří přečíst, appka ohlásí v oznámení po synchronizaci',
+        ] },
         { version: '2026-10-23c', date: '23. 10. 2026', items: [
             '🔁 Zrcadlení opakovaného shlédnutí Sinator ↔ Histra: když film/epizodu, kterou druhá strana už má, shlédneš znovu (novější shlédnutí než to poslední na druhé straně, max. 90 dní zpět), přenese se i to druhé shlédnutí — ve Sinatoru se ukáže „👁 2×“ a v Histře přibude další shlédnutí. Dřív se porovnával jen počet, takže druhé shlédnutí zůstalo jen na jedné straně',
             '🕓 Detail: v „Historie sledování“ už datum shlédnutí nemizí — když záznam ve Sinatoru nemá platné datum, doplní se z Histry, a pokud ho nemá nikdo, ukáže se „datum neznámé“ místo prázdného řádku',
