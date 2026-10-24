@@ -1614,6 +1614,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 </div>
                 <div class="settings-actions" style="margin-top:8px;">
                     <button class="settings-btn-small" style="width:100%;border-color:#4caf50;color:#4caf50;" onclick="openHistraCleanupTool()">🧹 Zkontrolovat a vyčistit obsah</button>
+                    <button id="histraResultsBtn" class="settings-btn-small" style="width:100%;margin-top:6px;border-color:#8b5cf6;color:#a78bfa;display:none;" onclick="sinOpenSyncReport(sinGetSyncReports())">📋 Výsledky</button>
                 </div>
                 <div id="histraSyncStatus" style="font-size:0.75rem;margin-top:8px;white-space:pre-wrap;line-height:1.5;"></div>
                 <div id="histraLastSync" style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;"></div>
@@ -3118,13 +3119,17 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         if (window._hwIdx) return window._hwIdx;
         let o = null;
         try { o = JSON.parse(localStorage.getItem(_HW_KEY) || 'null'); } catch (e) {}
-        window._hwIdx = (o && o.movies && o.shows) ? o : { at: 0, movies: {}, shows: {} };
+        window._hwIdx = (o && o.movies && o.shows && o.v === 2) ? o : { v: 2, at: 0, movies: {}, shows: {} };
         return window._hwIdx;
     }
     function _hwSave() { try { localStorage.setItem(_HW_KEY, JSON.stringify(window._hwIdx)); } catch (e) {} }
     function _hwAddShow(idx, id, s, n, at) {
+        // s/n = nejdál shlédnutá epizoda (nejvyšší řada, v ní nejvyšší díl) — ne ta s nejnovějším časem zápisu
+        // (čas zápisu je kvůli synchronizaci a opakovaným shlédnutím nespolehlivý); at = čas posledního shlédnutí.
         const c = idx.shows[id];
-        if (!c || at > c.at || (at === c.at && (s > c.s || (s === c.s && n > c.n)))) idx.shows[id] = { s, n, at };
+        if (!c) { idx.shows[id] = { s, n, at }; return; }
+        if (at > c.at) c.at = at;
+        if (s > c.s || (s === c.s && n > c.n)) { c.s = s; c.n = n; }
     }
     function histraRefreshWatchedIndex(force) {
         const idx = _hwLoad();
@@ -3134,7 +3139,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         window._hwBusy = (async () => {
             try {
                 const hist = await histraHistoryAll(true);
-                const n = { at: Date.now(), movies: {}, shows: {} };
+                const n = { v: 2, at: Date.now(), movies: {}, shows: {} };
                 hist.forEach(x => { if (x.kind === 'movie') n.movies[x.tmdb] = 1; else _hwAddShow(n, x.tmdb, x.season, x.number, x.watchedAt || 0); });
                 window._hwIdx = n; _hwSave();
             } catch (e) {}
@@ -4432,6 +4437,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             });
             if (wantTv) {
                 try { (await histraIncompleteShows()).forEach(it => { const k = 'tv_' + it.id; if (seen.has(k)) return; seen.add(k); out.push(it); }); } catch (e) { console.warn('incomplete shows:', e); }
+                // nejnověji sledované nahoře
+                try {
+                    const last = new Map();
+                    (await histraHistoryAll(false)).forEach(x => { if (x && x.kind === 'episode') { const id = Number(x.tmdb), at = Number(x.watchedAt) || 0; if (at > (last.get(id) || 0)) last.set(id, at); } });
+                    out.forEach(it => { const w = last.get(Number(it.id)); if (w) it._w = w; });
+                    out.sort((a, b) => (b._w || 0) - (a._w || 0));
+                } catch (e) {}
             }
             return out;
         }, x => x);
@@ -4490,6 +4502,35 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // místo psaní průběhu do UI (nastavení navíc nemusí být zrovna otevřené).
 
     // ── Oznámení po synchronizaci: co přesně se přidalo (Histra → Sinator a Sinator → Histra) ──
+    // ── Výsledky synchronizace: posledních 10 běhů se zapisuje, otevře se tlačítkem „📋 Výsledky“ (Nastavení → Histra) ──
+    window.sinGetSyncReports = function() { try { return JSON.parse(_store.getItem('sinator_histra_reports_v1') || '[]'); } catch (e) { return []; } };
+    window.sinSaveSyncReport = function(r) {
+        try {
+            let arr = window.sinGetSyncReports(); arr.unshift(r); arr = arr.slice(0, 10);
+            for (let n = arr.length; n > 0; n--) { try { _store.setItem('sinator_histra_reports_v1', JSON.stringify(arr.slice(0, n))); return; } catch (e) {} }
+        } catch (e) {}
+    };
+    window.sinOpenSyncReport = function(list) {
+        try {
+            const esc = x => String(x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            const sec = (h, arr) => (arr && arr.length) ? `<h3>${h} (${arr.length})</h3><ul>${arr.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+            const runs = (list || []).map(r => `<section><h2>${esc(new Date(r.ts).toLocaleString('cs-CZ'))}${r.silent ? ' · na pozadí' : ' · ručně'}</h2>`
+                + (r.info ? `<div class="dim">${esc(r.info)}</div>` : '')
+                + sec('📥 Přidáno do Sinatoru', r.toSin) + sec('📤 Přidáno do Histry', r.toHistra)
+                + (r.lists ? `<h3>📁 Nové seznamy: ${r.lists}</h3>` : '')
+                + (r.err ? `<div class="err">❌ ${esc(r.err)}</div>` : '')
+                + (r.note ? `<div class="note">${esc(r.note)}</div>` : '')
+                + (r.warn ? `<div class="dim">⚠️ ${r.warn} záznamů z Histry se nepodařilo přečíst (chybí TMDB id)</div>` : '')
+                + `</section>`).join('') || '<p class="dim">Zatím žádné výsledky synchronizace.</p>';
+            const page = `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Výsledky synchronizace Histra ↔ Sinator</title>`
+                + `<style>body{background:#0b1020;color:#fff;font:15px/1.5 system-ui,sans-serif;margin:0 auto;padding:16px;max-width:760px}h1{font-size:1.2rem}h2{font-size:1rem;margin:0 0 4px}h3{font-size:.95rem;color:#c4b5fd;margin:14px 0 6px}section{border-top:1px solid #2a3350;padding:14px 0}ul{margin:0;padding-left:20px}li{padding:2px 0}.note{color:#ffd180;margin-top:12px}.err{color:#ff8a80;font-weight:700;margin-top:12px}.dim{opacity:.65;font-size:.85rem}</style></head><body>`
+                + `<h1>🔄 Výsledky synchronizace Histra ↔ Sinator</h1>${runs}</body></html>`;
+            const url = URL.createObjectURL(new Blob([page], { type: 'text/html;charset=utf-8' }));
+            const w = window.open(url, '_blank');
+            if (!w) location.href = url;
+            setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 60000);
+        } catch (e) { console.warn('sinOpenSyncReport:', e); }
+    };
     window.sinShowSyncNotice = function(o) {
         try {
             // Výsledky synchronizace Histry vidí jen přihlášený Admin level 2; ostatním sync běží potichu na pozadí.
@@ -4519,6 +4560,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const hide = () => { el.style.opacity = '0'; el.style.transform = 'translateY(-10px)'; setTimeout(() => { try { el.remove(); } catch (e) {} }, 320); };
             // Klik na okno → plný výpis v novém okně; klik na ✕ → jen zavřít
             const openFull = () => {
+                if (o && o.full) { window.sinOpenSyncReport(window.sinGetSyncReports()); return; }
                 try {
                     const sec = (h, arr) => arr.length ? `<h2>${h} (${arr.length})</h2><ul>${arr.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
                     const page = `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Synchronizace Histra ↔ Sinator</title>`
@@ -4618,6 +4660,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             let skipped = 0;
             let locallyMarkedMovies = 0, locallyMarkedEpisodes = 0;
             const touchedTvIds = new Set();
+            // „Čerstvé“ = skutečně nové shlédnutí (posledních 36 h). Oznámení při startu appky se ukáže jen kvůli nim,
+            // starší doplňování historie na pozadí (dotahování zpoždění) neotravuje při každém spuštění.
+            const _freshCut = Date.now() - 36 * 3600e3;
+            const freshKeys = new Set();
             const hisMovies = new Map(), hisEps = new Map();
             const _tsOf = v => typeof v === 'number' ? v : (Number(v) || Date.parse(v) || 0);
             for (let hi = 0; hi < historyRaw.length; hi++) {
@@ -4631,6 +4677,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                         if (!dry) state.watched[wKey] = { id: parsed.tmdb, type: 'movie', title: parsed.title || '', year: parsed.year || '', posterPath: '', addedAt: Date.now() };
                         locallyMarkedMovies++;
                         addedToSin.set('m' + parsed.tmdb, lblMovie(parsed.tmdb, parsed.title, parsed.year));
+                        if (_tsOf(parsed.watchedAt) > _freshCut) freshKeys.add('m' + parsed.tmdb);
                     }
                     const k = Number(parsed.tmdb);
                     if (!hisMovies.has(k)) hisMovies.set(k, []);
@@ -4643,6 +4690,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                         locallyMarkedEpisodes++;
                         addedToSin.set(`e${parsed.tmdb}_${parsed.season}_${parsed.number}`, lblEp(parsed.tmdb, parsed.season, parsed.number, parsed.title, parsed.epTitle));
                         touchedTvIds.add(parsed.tmdb);
+                        if (_tsOf(parsed.watchedAt) > _freshCut) freshKeys.add(`e${parsed.tmdb}_${parsed.season}_${parsed.number}`);
                     }
                     const k = `${Number(parsed.tmdb)}_${Number(parsed.season)}_${Number(parsed.number)}`;
                     if (!hisEps.has(k)) hisEps.set(k, []);
@@ -4739,6 +4787,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
 
             newMovieItems.forEach(it => { const kk = 'm' + it.id; if (!addedToSin.has(kk)) { const m = metaM.get(it.id) || {}; addedToSin.set(kk, lblMovie(it.id, m.title, m.year) + (rewatchKeys.has(`m${it.id}_${it.watched_at}`) ? ' 🔁 znovu' : '')); } });
             newEpisodeItems.forEach(it => { const kk = `e${it.id}_${it.season}_${it.episode}`; if (!addedToSin.has(kk)) { const m = metaE.get(`${it.id}_${it.season}_${it.episode}`) || {}; addedToSin.set(kk, lblEp(it.id, it.season, it.episode, m.title, m.epTitle) + (rewatchKeys.has(`e${it.id}_${it.season}_${it.episode}_${it.watched_at}`) ? ' 🔁 znovu' : '')); } });
+
+            newMovieItems.forEach(it => { if (it.watched_at > _freshCut) freshKeys.add('m' + it.id); });
+            newEpisodeItems.forEach(it => { if (it.watched_at > _freshCut) freshKeys.add(`e${it.id}_${it.season}_${it.episode}`); });
 
             if (dry) {
                 const fmt = t => t ? new Date(t).toLocaleString('cs-CZ') : '—';
@@ -4933,8 +4984,25 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const summary = `✅ Hotovo — doplněno do historie: filmy +${newMovieItems.length}, epizody +${newEpisodeItems.length}.` + (locallyMarked ? `\n☑️ Označeno jako shlédnuto přímo v appce: filmy +${locallyMarkedMovies}, epizody +${locallyMarkedEpisodes}.` : '') + (listsCreated ? `\n📁 Nové seznamy: ${listsCreated} (celkem ${listItemsAdded} položek). Existující seznamy zůstaly beze změny.` : '') + (skipped ? `\n⚠️ ${skipped} položek se nepodařilo přiřadit (neznámý formát odpovědi).` : '') + `\nPokud sync přidal něco špatně, použij tlačítko „↩️ Vrátit poslední sync" níž.`;
             setStatus(summary);
             _res(_info + ` → přidáno do Sinatoru ${addedToSin.size}, do Histry ${pushedLabels.length}` + (deferred ? `, odloženo ${deferred}` : ''));
-            if (addedToSin.size || pushedLabels.length || listsCreated || deferred || bulkSkipped) {
-                window.sinShowSyncNotice({ toSin: [...addedToSin.values()], toHistra: pushedLabels, lists: listsCreated, warn: skipped, note: [deferred ? `⚠️ ${deferred} dalších „nových“ záznamů vypadá podezřele — nepřidáno. Projdi je ručně: Nastavení → Histra → Synchronizovat nyní.` : '', bulkSkipped ? `⚠️ Přeskočeno ${bulkSkipped} hromadně označených epizod (${bulkInfo.slice(0, 3).map(b => b.show).join(', ')}) — vypadá to na označení celého seriálu, ne na sledování.` : ''].filter(Boolean).join(' ') });
+            // Tichý sync při startu: oznámení jen když je v něm něco čerstvého; starší doplnění jen do „Poslední běh“ v Nastavení.
+            try {
+                if (addedToSin.size || pushedLabels.length || listsCreated || deferred || bulkSkipped) {
+                    window.sinSaveSyncReport({ ts: Date.now(), silent: !!silent, info: _info, toSin: [...addedToSin.values()].slice(0, 800), toHistra: pushedLabels.slice(0, 800), lists: listsCreated, warn: skipped,
+                        note: [deferred ? `⚠️ ${deferred} dalších „nových“ záznamů vypadá podezřele — nepřidáno (ruční sync v Nastavení → Histra).` : '', bulkSkipped ? `⚠️ Přeskočeno ${bulkSkipped} hromadně označených epizod (${bulkInfo.slice(0, 3).map(b => b.show).join(', ')}).` : '', (addedToSin.size > 800 || pushedLabels.length > 800) ? 'Zobrazeno max. 800 položek na běh.' : ''].filter(Boolean).join(' ') });
+                }
+            } catch (e) {}
+            let _toSin = [...addedToSin.values()], _toH = pushedLabels, _olderN = 0, _suppress = false;
+            if (silent) {
+                const fs = [...addedToSin.entries()].filter(([k]) => freshKeys.has(k)).map(([, v]) => v);
+                const fh = pushedLabels.filter((_, i) => { const t = addedToHistra[i]; return t && t.ts && t.ts > _freshCut; });
+                _olderN = (addedToSin.size - fs.length) + (pushedLabels.length - fh.length);
+                _toSin = fs; _toH = fh;
+                _suppress = !_toSin.length && !_toH.length && !listsCreated;
+            }
+            if (_suppress) {
+                // nic čerstvého → bez oznámení
+            } else if (addedToSin.size || pushedLabels.length || listsCreated || deferred || bulkSkipped) {
+                window.sinShowSyncNotice({ full: true, toSin: _toSin, toHistra: _toH, lists: listsCreated, warn: skipped, note: [_olderN ? `ℹ️ Dalších ${_olderN} starších záznamů se doplnilo na pozadí.` : '', deferred ? `⚠️ ${deferred} dalších „nových“ záznamů vypadá podezřele — nepřidáno. Projdi je ručně: Nastavení → Histra → Synchronizovat nyní.` : '', bulkSkipped ? `⚠️ Přeskočeno ${bulkSkipped} hromadně označených epizod (${bulkInfo.slice(0, 3).map(b => b.show).join(', ')}) — vypadá to na označení celého seriálu, ne na sledování.` : ''].filter(Boolean).join(' ') });
             } else if (!silent && typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2()) {
                 try { if (typeof _favToast === 'function') _favToast('✅ Histra sync hotový — nic nového'); } catch (e) {}
             }
@@ -4942,7 +5010,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             setStatus('❌ Chyba: ' + e.message);
             console.error('Histra sync error:', e);
             _res('CHYBA: ' + (e && e.message ? e.message : e) + (_info ? ' | ' + _info : ''));
-            if (silent) { try { window.sinShowSyncNotice({ err: 'Histra sync selhal: ' + (e && e.message ? e.message : e) }); } catch (_) {} }
+            try { window.sinSaveSyncReport({ ts: Date.now(), silent: !!silent, err: 'Histra sync selhal: ' + (e && e.message ? e.message : e) }); } catch (_) {}
+            if (silent) { try { window.sinShowSyncNotice({ full: true, err: 'Histra sync selhal: ' + (e && e.message ? e.message : e) }); } catch (_) {} }
             // I v tichém (automatickém) běhu chceme o chybě vědět — jinak by
             // selhání proxy/CORS zůstalo neviditelné napořád (viz autoCheckHistraSync).
             if (silent && typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2()) { try { if (typeof _favToast === 'function') _favToast('⚠️ Histra auto-sync selhal: ' + (e && e.message ? e.message : e)); } catch (_) {} }
@@ -6454,6 +6523,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-25c', date: '25. 10. 2026', items: [
+            '🔧 Histra seznamy (Rozkoukané seriály, Shlédnuté…): u seriálu se za názvem ukazovala „poslední shlédnutá“ epizoda podle času zápisu (např. Upíří deníky S2E6), i když ses ve skutečnosti dostal dál (S3E4). Teď se ukazuje nejdál shlédnutá epizoda (nejvyšší řada a díl)',
+        ] },
+        { version: '2026-10-25b', date: '25. 10. 2026', items: [
+            { admin: true, text: '📋 Nastavení → Histra → pod „Zkontrolovat a vyčistit obsah“ nové tlačítko „Výsledky“: v novém okně ukáže výpis posledních 10 synchronizací (co se přidalo do Sinatoru a do Histry, nové seznamy, chyby, přeskočené a odložené záznamy) — i těch, které proběhly potichu na pozadí. Klepnutí na oznámení o syncu otevře stejný výpis' },
+            '🎭 Rozkoukané seriály: úplně nahoře jsou teď nejnověji sledované (výchozí řazení „Naposledy sledované“), a jen nedokoukané; platí i pro Histra → Rozkoukané seriály',
+        ] },
+        { version: '2026-10-25a', date: '25. 10. 2026', items: [
+            { admin: true, text: '🔕 Histra sync při startu appky: oznámení se ukáže jen když je v něm něco čerstvého (shlédnuté za posledních 36 hodin). Starší záznamy, které se doplňují na pozadí (zpožděná historie z Histry po dávkách), už nevyskakují při každém spuštění — jen se zapíšou a výsledek je v Nastavení → Histra → „Posledních běh“. Ruční sync ukazuje vždy vše' },
+        ] },
         { version: '2026-10-24b', date: '24. 10. 2026', items: [
             { admin: true, text: '🛡️ Nastavení → dlaždice Admin: stav (Neaktivní / Aktivní level 2) se ukazuje správně hned po otevření nastavení, ne až po vstupu do Admin sekce' },
         ] },
@@ -19299,6 +19378,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             const watchedShows = Array.isArray(watchedShowsRaw) ? watchedShowsRaw : [];
 
             // Pro každý seriál zjistíme počet shlédnutých vs celkový počet epizod
+            window._watchingSortMode = 'recent'; // výchozí: nejnověji sledované nahoře
             const sortBtnStyle = 'padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:20px;color:var(--text-muted);font-size:0.72rem;cursor:pointer;font-weight:600;white-space:nowrap;';
             $('modalScrollBody').innerHTML = `<div style="padding:16px 16px 0;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
@@ -19306,9 +19386,9 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                     <div id="watchingProgress" style="font-size:0.8rem;color:#00b4d8;font-weight:600;"></div>
                 </div>
                 <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
-                    <button class="watching-sort-btn" data-sort="new" onclick="setWatchingSort('new',this)" style="${sortBtnStyle}background:#00b4d8;color:#fff;border-color:#00b4d8;">🆕 Nové epizody</button>
+                    <button class="watching-sort-btn" data-sort="recent" onclick="setWatchingSort('recent',this)" style="${sortBtnStyle}background:#00b4d8;color:#fff;border-color:#00b4d8;">🕐 Naposledy sledované</button>
+                    <button class="watching-sort-btn" data-sort="new" onclick="setWatchingSort('new',this)" style="${sortBtnStyle}">🆕 Nové epizody</button>
                     <button class="watching-sort-btn" data-sort="az" onclick="setWatchingSort('az',this)" style="${sortBtnStyle}">🔤 A-Z</button>
-                    <button class="watching-sort-btn" data-sort="recent" onclick="setWatchingSort('recent',this)" style="${sortBtnStyle}">🕐 Naposledy sledované</button>
                 </div>
                 <div id="watchingGrid" style="display:flex;flex-direction:column;gap:10px;"></div>
             </div>`;
@@ -19526,6 +19606,11 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 }
             } catch (e) { console.warn('Sinator/Histra watching merge error:', e); }
 
+            // Seriály bez data posledního shlédnutí (jen lokální zaškrtávátka) → datum z lokálních epizod
+            try {
+                const _lastLocal = id => { let m = 0; Object.keys(state.watched).forEach(k => { if (k.startsWith(`ep_${id}_`)) { const a = Number(state.watched[k] && state.watched[k].addedAt) || 0; if (a > m) m = a; } }); return m; };
+                results.forEach(r => { if (!r.lastWatchedAt) r.lastWatchedAt = _lastLocal(r.id); });
+            } catch (e) {}
             if (autoMarkedComplete) { saveWatched(); }
             if (progressEl) progressEl.textContent = '';
             if (!results.length) {
@@ -45870,6 +45955,7 @@ function updateAdminStatus() {
   // Přepínač "Značení nefunkčních TV streamů" — vidí a mění jen Admin level 2
   const tvBrokenBox = document.getElementById('tvBrokenSettingsBox');
   if (tvBrokenBox) tvBrokenBox.style.display = isLvl2 ? 'block' : 'none';
+  const _resBtn = document.getElementById('histraResultsBtn'); if (_resBtn) _resBtn.style.display = isLvl2 ? 'block' : 'none';
   const testBox = document.getElementById('testUserModeBox'); if (testBox) testBox.style.display = isLvl2 ? 'block' : 'none';
   const inviteKeyRow = document.getElementById('inviteKeyRow'); if (inviteKeyRow) inviteKeyRow.style.display = isLvl2 ? 'block' : 'none';
   if (!isLvl2) { const cb = document.getElementById('inviteWithKey'); if (cb) cb.checked = false; if (typeof window._inviteRefreshPreview === 'function') window._inviteRefreshPreview(); }
