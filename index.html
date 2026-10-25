@@ -1750,7 +1750,28 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             </div>
             <!-- ============ TAB: OSTATNÍ ============ -->
             <div class="settings-tab-content" id="settingsTabContentOther">
-            <div class="sw-page" id="swPageExperimental">
+            <div class="sw-page" id="swPageExperimental"></div><!-- /swPageExperimental (menu: vykresluje swEngine) -->
+            <div class="sw-page" id="swPageExpLook">
+            <div class="settings-section" id="homeBtnsSection">
+                <span class="settings-label">🏠 Přizpůsobit tlačítka domovské obrazovky</span>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">Zapni / vypni zobrazení jednotlivých tlačítek v horní liště. Nastavení nejde vypnout, aby se k němu šlo vždy vrátit. Ukládá se jen v tomto zařízení.</div>
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-top:10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;">
+                    <span style="flex:1;font-size:0.85rem;color:var(--text);">🖼️ Šipka ▲ schová i logo<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">Po sbalení lišty se místo malého loga zobrazí jen tlačítka</div></span>
+                    <div id="hbLogoSw" onclick="homeBtnsToggleLogo()" style="width:44px;height:24px;border-radius:12px;position:relative;flex-shrink:0;transition:background .2s;background:#333;cursor:pointer;"><div id="hbLogoKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;pointer-events:none;"></div></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-top:6px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;">
+                    <span style="flex:1;font-size:0.85rem;color:var(--text);">🔽 Schovat šipku pro sbalení lišty<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">Když máš málo tlačítek, lištu sbalovat nemusíš. Lišta zůstane vždy rozbalená</div></span>
+                    <div id="hbArrowSw" onclick="homeBtnsToggleArrow()" style="width:44px;height:24px;border-radius:12px;position:relative;flex-shrink:0;transition:background .2s;background:#333;cursor:pointer;"><div id="hbArrowKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;pointer-events:none;"></div></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-top:6px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;">
+                    <span style="flex:1;font-size:0.85rem;color:var(--text);">ℹ️ Schovat informace na domovské obrazovce<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">Skryje pruh s textem a tlačítkem „i“ pod horní lištou</div></span>
+                    <div id="hbNoticeSw" onclick="homeBtnsToggleNotice()" style="width:44px;height:24px;border-radius:12px;position:relative;flex-shrink:0;transition:background .2s;background:#333;cursor:pointer;"><div id="hbNoticeKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;pointer-events:none;"></div></div>
+                </div>
+                <div id="homeBtnsList" style="display:flex;flex-direction:column;gap:6px;margin-top:10px;"></div>
+                <button class="settings-btn-small" style="width:100%;margin-top:10px;" onclick="homeBtnsReset()">↺ Zobrazit všechna tlačítka</button>
+            </div>
+            </div><!-- /swPageExpLook -->
+            <div class="sw-page" id="swPageExpNotify">
             <div class="settings-section" id="notifySection" style="background:rgba(96,144,255,0.07);border:1px solid rgba(96,144,255,0.3);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:#6090ff;">🔔 Upozornění</span>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">
@@ -1771,26 +1792,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 </div>
                 <div id="notifyStatus" style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;line-height:1.4;"></div>
             </div>
-            <div class="settings-divider"></div>
-            <div class="settings-section" id="homeBtnsSection">
-                <span class="settings-label">🏠 Přizpůsobit tlačítka domovské obrazovky</span>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">Zapni / vypni zobrazení jednotlivých tlačítek v horní liště. Nastavení nejde vypnout, aby se k němu šlo vždy vrátit. Ukládá se jen v tomto zařízení.</div>
-                <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-top:10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;">
-                    <span style="flex:1;font-size:0.85rem;color:var(--text);">🖼️ Šipka ▲ schová i logo<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">Po sbalení lišty se místo malého loga zobrazí jen tlačítka</div></span>
-                    <div id="hbLogoSw" onclick="homeBtnsToggleLogo()" style="width:44px;height:24px;border-radius:12px;position:relative;flex-shrink:0;transition:background .2s;background:#333;cursor:pointer;"><div id="hbLogoKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;pointer-events:none;"></div></div>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-top:6px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;">
-                    <span style="flex:1;font-size:0.85rem;color:var(--text);">🔽 Schovat šipku pro sbalení lišty<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">Když máš málo tlačítek, lištu sbalovat nemusíš. Lišta zůstane vždy rozbalená</div></span>
-                    <div id="hbArrowSw" onclick="homeBtnsToggleArrow()" style="width:44px;height:24px;border-radius:12px;position:relative;flex-shrink:0;transition:background .2s;background:#333;cursor:pointer;"><div id="hbArrowKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;pointer-events:none;"></div></div>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-top:6px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;">
-                    <span style="flex:1;font-size:0.85rem;color:var(--text);">ℹ️ Schovat informace na domovské obrazovce<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">Skryje pruh s textem a tlačítkem „i“ pod horní lištou</div></span>
-                    <div id="hbNoticeSw" onclick="homeBtnsToggleNotice()" style="width:44px;height:24px;border-radius:12px;position:relative;flex-shrink:0;transition:background .2s;background:#333;cursor:pointer;"><div id="hbNoticeKnob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;pointer-events:none;"></div></div>
-                </div>
-                <div id="homeBtnsList" style="display:flex;flex-direction:column;gap:6px;margin-top:10px;"></div>
-                <button class="settings-btn-small" style="width:100%;margin-top:10px;" onclick="homeBtnsReset()">↺ Zobrazit všechna tlačítka</button>
-            </div>
-            <div class="settings-divider"></div>
+            </div><!-- /swPageExpNotify -->
+            <div class="sw-page" id="swPageExpCache">
             <div class="settings-section" id="cacheSection">
                 <span class="settings-label">🧹 Vyčistit cache</span>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">Smaže dočasně uložená data appky v telefonu: postery a názvy, uložené seznamy Histry, index shlédnutých, loga kanálů, žánry, trailery a mezipaměť prohlížeče. <b>Nemaže</b> API klíče, přihlášení, tokeny, seznamy, shlédnuté, oblíbené, hodnocení ani nastavení. Vše potřebné se při dalším použití samo znovu stáhne (při příštím spuštění je potřeba internet).</div>
@@ -1881,7 +1884,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 };
             })();
             </script>
-            </div><!-- /swPageExperimental -->
+            </div><!-- /swPageExpCache -->
             <div class="sw-page" id="swPageProfile">
             <div class="settings-section" style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.2);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:var(--gold,#ffd700);">👤 Tvoje jméno / přezdívka</span>
@@ -3155,6 +3158,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const m = $('histraListsModal'); if (m) m.style.display = 'none';
         state._histraView = null;
         if (window.updatePwaBtn) updatePwaBtn();
+    };
+    // Jeden krok zpět uvnitř Histry (seznam / načítání → přehled). Vrací true, když se něco vrátilo; false = jsme na přehledu.
+    window.histraBackStep = function() {
+        const v = state._histraView;
+        if (v && (v.kind === 'items' || v.kind === 'loading')) {
+            window._hLoadTok = (window._hLoadTok || 0) + 1; // zruší rozpracované načítání
+            histraShowOverview();
+            return true;
+        }
+        return false;
     };
     window.histraListsBack = function() {
         const v = state._histraView;
@@ -44845,7 +44858,7 @@ window.openSlozkaDetail = function(idx) {
     // Track that we're in folder detail for back-button handling
     document.getElementById('slozkyModal').dataset.inFolder = '1';
     // Push extra history state so back = return to folder list
-    if(window.isStandalone && isStandalone()) history.pushState({pwaGuard:true, slozkyFolder:true},'',window.location.href);
+    // (záznam v historii řeší globální engine pro gesto zpět)
     renderSlozkaDetailBody(idx);
     refreshSlozkaCzTitles(idx);
 };
@@ -45101,12 +45114,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if(window.renderSlozkyList) renderSlozkyList();
             return;
         }
-        var closer = getTopmostCloser();
-        if (closer) {
-            closer();
-            modalStack = [];
-            return;
-        }
+        if (window._sinBack && window._sinBack()) { modalStack = []; return; }
         showExitConfirm();
     }
     window.pwaCloseBtnClick = pwaCloseBtnClick;
@@ -45141,57 +45149,167 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ── Sentinel & popstate ──────────────────────────────────────
     function pushSentinel() {
-        history.pushState({ pwaGuard: true }, '', window.location.href);
+        // záměrně prázdné: sentinely se vkládají při dotycích (viz topUp), jinak je Chrome přeskakuje
     }
     window.pushSentinel = pushSentinel;
 
-    // ── Blokování swipe gest zpět (Android systémová gesta) ──────
-    (function() {
-        var touchStartX = 0;
-        var EDGE_THRESHOLD = 30; // px od okraje
-        document.addEventListener('touchstart', function(e) {
-            if (e.touches.length > 0) { touchStartX = e.touches[0].clientX; }
-        }, { passive: false });
-        document.addEventListener('touchmove', function(e) {
-            if (e.touches.length === 0) return;
-            var x = e.touches[0].clientX;
-            var screenW = window.innerWidth;
-            if (touchStartX <= EDGE_THRESHOLD || touchStartX >= screenW - EDGE_THRESHOLD) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        }, { passive: false });
-    })();
-
-    if (isStandalone()) {
-        window.addEventListener('load', function() {
-            pushSentinel();
-            pushSentinel();
-        });
-
-        window.addEventListener('popstate', function(e) {
-            // Inside složky folder detail → go back to folder list
-            var slozkyModal = document.getElementById('slozkyModal');
-            if (slozkyModal && slozkyModal.classList.contains('open') && slozkyModal.dataset.inFolder === '1') {
-                if(window.renderSlozkyList) renderSlozkyList();
-                pushSentinel();
-                return;
-            }
-
-            var closer = getTopmostCloser();
-            if (closer) {
-                closer();
-                if (modalStack.length > 0) {
-                    var parent = modalStack.pop();
-                    setTimeout(function() { parent.openFn(); }, 50);
-                }
-                pushSentinel();
-                return;
-            }
-            pushSentinel();
-            showExitConfirm();
-        });
+    // ══ Systémové gesto / tlačítko ZPĚT = zpět v appce ═══════════════════════════════
+    // Dřív: sentinely se vkládaly do historie už při načtení (bez doteku) — Chrome takové záznamy při "zpět"
+    // přeskakuje, a gesto tak appku rovnou opustilo; navíc se zavíraly jen vybrané modaly a boční gesta se blokovala.
+    // Teď: sentinely se vloží až po prvním doteku, gesto zavře/vrátí nejvyšší vrstvu (modal, podstránku, detail…)
+    // a teprve když není co zavřít, zeptá se na ukončení.
+    function isAppMode() {
+        try {
+            return isStandalone() || window.matchMedia('(display-mode: fullscreen)').matches || window.matchMedia('(display-mode: minimal-ui)').matches;
+        } catch (e) { return false; }
     }
+    var BLOCK_IDS = ['nickSetupOverlay', 'accessReqOverlay'];          // povinné kroky — zpět je jen spolkne
+    var SKIP_IDS = { exitConfirmOverlay: 1, lockScreen: 1, pwaCloseBtn: 1, slozkyToast: 1 };
+    function _cs(el) { try { return getComputedStyle(el); } catch (e) { return null; } }
+    function _visible(el) {
+        var c = _cs(el);
+        if (!c || c.display === 'none' || c.visibility === 'hidden' || parseFloat(c.opacity) < 0.05 || c.pointerEvents === 'none') return false;
+        var r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+    }
+    function _isLayer(el) {
+        var c = _cs(el);
+        if (!c || c.position !== 'fixed') return false;
+        var r = el.getBoundingClientRect();
+        if (r.width < window.innerWidth * 0.55 || r.height < window.innerHeight * 0.35) return false;
+        // mimo obrazovku (zavřené panely vysunuté transformem) se nepočítá
+        return r.bottom > 40 && r.top < window.innerHeight - 40 && r.right > 40 && r.left < window.innerWidth - 40;
+    }
+    function _candidates() {
+        var out = [], seen = new Set();
+        function add(el) { if (el && el.nodeType === 1 && !seen.has(el)) { seen.add(el); out.push(el); } }
+        Array.prototype.forEach.call(document.body.children, add);
+        document.querySelectorAll('[id$="Modal"],[id$="Overlay"],[id$="Sheet"],[id$="Picker"],[id$="Popup"],[id$="modal"],[id$="overlay"],.modal,.overlay,.sw-window,[class*="modal"],[class*="overlay"],[class*="sheet"],[class*="popup"],[class*="lightbox"]').forEach(add);
+        return out;
+    }
+    function _isBackBtn(b) {
+        var t = (b.textContent || '').trim();
+        var lab = (b.getAttribute('aria-label') || '') + ' ' + (b.getAttribute('title') || '');
+        return /^←/.test(t) || /^zp[ěe]t\b/i.test(t) || /(^|\s)(zp[ěe]t|back)(\s|$)/i.test(lab);
+    }
+    function _isCloseBtn(b) {
+        var oc = b.getAttribute('onclick') || '', lab = (b.getAttribute('aria-label') || '') + ' ' + (b.getAttribute('title') || '');
+        var idc = (b.id || '') + ' ' + (typeof b.className === 'string' ? b.className : '');
+        if (/(^|[^a-z])(close|hide|dismiss)[A-Za-z]*\(/i.test(oc) || /zav[řr]/i.test(oc)) return true;
+        if (/zav[řr]|close/i.test(lab)) return true;
+        if (/close|dismiss|(^|[-_ ])x($|[-_ ])/i.test(idc)) return true;
+        return false;
+    }
+    function _findBtn(layer, test, headerOnly) {
+        var lr = layer.getBoundingClientRect();
+        var list = layer.querySelectorAll('button,[role="button"],a,.back-btn,[onclick]');
+        var best = null;
+        for (var i = 0; i < list.length; i++) {
+            var b = list[i];
+            if (b.disabled || !test(b) || !_visible(b)) continue;
+            var r = b.getBoundingClientRect();
+            var inHeader = (r.top - lr.top) < 120;
+            if (headerOnly && !inHeader) continue;
+            if (inHeader) return b;          // první v hlavičce vyhrává
+            if (!best) best = b;
+        }
+        return best;
+    }
+    // Vnitřní navigace modalů, které mají vlastní „podstránky“
+    var SPECIAL = {
+        histraListsModal: function () {
+            return function () { if (window.histraBackStep && window.histraBackStep()) return; if (window.closeHistraListsModal) window.closeHistraListsModal(); else hideEl('histraListsModal'); };
+        },
+        slozkyModal: function (el) {
+            if (el.dataset && el.dataset.inFolder === '1' && window.renderSlozkyList) return function () { window.renderSlozkyList(); };
+            return null;
+        },
+        modal: function () {
+            return function () { if (typeof window.navigateBack === 'function') window.navigateBack(); else if (typeof window.closeModal === 'function') window.closeModal(); };
+        }
+    };
+    function hideEl(id) { var e = document.getElementById(id); if (e) { e.classList.remove('open', 'show'); e.style.display = 'none'; } }
+    function _actionFor(el) {
+        var id = el.id || '';
+        if (id && SPECIAL[id]) { var sp = SPECIAL[id](el); if (sp) return sp; }
+        var bk = _findBtn(el, _isBackBtn, true);                      // „← …“ v hlavičce = vlastní zpět appky
+        if (bk) return function () { bk.click(); };
+        var mapped = id && ((window.MODAL_CLOSE_MAP || {})[id] || (window._modalCloseMap || {})[id]);
+        if (mapped) return mapped;
+        var cb = _findBtn(el, _isCloseBtn, false);                     // ✕ / Zavřít
+        if (cb) return function () { cb.click(); };
+        var oc = el.getAttribute('onclick') || '';
+        if (/event\.target\s*===?\s*this/.test(oc)) return function () { el.click(); };   // klik na pozadí
+        return null;
+    }
+    function _topLayer() {
+        var best = null, bestZ = -Infinity, bestAct = null;
+        _candidates().forEach(function (el) {
+            if (SKIP_IDS[el.id] || BLOCK_IDS.indexOf(el.id) >= 0) return;
+            if (!_visible(el) || !_isLayer(el)) return;
+            var z = parseInt((_cs(el) || {}).zIndex, 10); if (isNaN(z)) z = 0;
+            if (z < bestZ) return;
+            var act = _actionFor(el);
+            if (!act) return;                                           // bez způsobu zavření to není vrstva (např. pozadí)
+            best = el; bestZ = z; bestAct = act;
+        });
+        return best ? { el: best, act: bestAct } : null;
+    }
+    // true = zpět se v appce zpracovalo (něco se zavřelo / vrátilo)
+    function handleBack() {
+        var ex = document.getElementById('exitConfirmOverlay');
+        if (ex && ex.classList.contains('show')) { hideExitConfirm(); return true; }
+        if (document.body.classList.contains('app-locked')) return false;
+        for (var i = 0; i < BLOCK_IDS.length; i++) { var bl = document.getElementById(BLOCK_IDS[i]); if (bl && _visible(bl)) return true; }
+        var top = _topLayer();
+        if (!top) return false;
+        try { top.act(); } catch (e) { console.warn('zpět:', e); }
+        // modal otevřený přes pushModalAndOpen → po zavření se znovu otevře rodič
+        if (!_visible(top.el) && modalStack.length > 0) {
+            var parent = modalStack.pop();
+            setTimeout(function () { try { parent.openFn(); } catch (e) {} }, 50);
+        }
+        try { updatePwaBtn(); } catch (e) {}
+        return true;
+    }
+    window._sinBack = handleBack;
+    function _backToast(msg) {
+        try {
+            var t = document.getElementById('sinBackToast');
+            if (!t) {
+                t = document.createElement('div'); t.id = 'sinBackToast';
+                t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 20px;border-radius:20px;font-size:0.85rem;z-index:2147483000;pointer-events:none;transition:opacity 0.3s;border:1px solid #444;';
+                document.body.appendChild(t);
+            }
+            t.textContent = msg; t.style.opacity = '1';
+            clearTimeout(t._to); t._to = setTimeout(function () { t.style.opacity = '0'; }, 2000);
+        } catch (e) {}
+    }
+
+    // Sentinely (záznamy v historii, které „zpět“ spotřebuje) se vkládají POSTUPNĚ při skutečných dotycích:
+    // Chrome přeskakuje záznamy vložené bez uživatelské akce (a jedna akce autorizuje jen jeden záznam),
+    // proto se při „zpět“ nic znovu nevkládá — hloubka se doplňuje dalšími doteky (max. MAX_DEPTH).
+    var _depth = 0, MAX_DEPTH = 8, _lastPush = 0, _lastExitTry = 0;
+    function topUp(e) {
+        if (_depth >= MAX_DEPTH) return;
+        if (e && e.type === 'pointerdown' && e.pointerType && e.pointerType !== 'mouse') return;   // dotyk = až pointerup
+        if (e && e.type === 'pointerup' && e.pointerType === 'mouse') return;                      // myš = pointerdown
+        var now = Date.now(); if (now - _lastPush < 250) return;
+        _lastPush = now;
+        try { history.pushState({ pwaGuard: true, d: ++_depth }, '', window.location.href); } catch (e2) { _depth--; }
+    }
+    ['pointerdown', 'pointerup', 'keydown'].forEach(function (ev) { window.addEventListener(ev, topUp, { capture: true, passive: true }); });
+    window._sinBackDepth = function () { return _depth; };
+
+    window.addEventListener('popstate', function () {
+        if (_depth > 0) _depth--;
+        if (handleBack()) return;
+        if (isAppMode()) { showExitConfirm(); return; }
+        // v záložce prohlížeče: druhé zpět do 2 s appku opustí
+        if (Date.now() - _lastExitTry < 2000) { try { history.go(-(_depth + 1)); } catch (e) {} return; }
+        _lastExitTry = Date.now();
+        _backToast('Stiskni zpět ještě jednou pro opuštění');
+    });
 
     // ── MutationObserver to hide/show PWA button ─────────────────
     document.addEventListener('DOMContentLoaded', function() {
@@ -49665,7 +49783,10 @@ window.addEventListener('load', function() {
     security:{icon:'🔐', name:'Heslo a obsah',     sub:'Přístupové heslo, explicitní obsah',       c:'#ff6b6b', node:'swPageSecurity'},
     update:  {icon:'🔄', name:'Aktualizace',       sub:'Kontrola verze a historie změn',           c:'#1db954', node:'swPageUpdate'},
     backup:  {icon:'💾', name:'Záloha dat',        sub:'Export a import',                          c:'#8bc34a', node:'swPageBackup'},
-    experimental:{icon:'🧪', name:'Experimentální funkce', sub:'Upozornění na nové epizody a streamy', c:'#38bdf8', node:'swPageExperimental', pre:function(){ if(window.homeBtnsRender) window.homeBtnsRender(); if(window.cacheInfoRefresh) window.cacheInfoRefresh(); }},
+    experimental:{icon:'🧪', name:'Experimentální funkce', sub:'Vzhled, upozornění, cache', c:'#38bdf8', node:'swPageExperimental', children:['expLook','expNotify','expCache'], pre:function(){ renderSubMenu('experimental'); }},
+    expLook:   {icon:'🎨', name:'Vzhled',     sub:'Tlačítka a lišta domovské obrazovky', c:'#f472b6', node:'swPageExpLook',   parent:'experimental', pre:function(){ if(window.homeBtnsRender) window.homeBtnsRender(); }},
+    expNotify: {icon:'🔔', name:'Upozornění', sub:'Nové epizody a streamy',              c:'#6090ff', node:'swPageExpNotify', parent:'experimental'},
+    expCache:  {icon:'🧹', name:'Cache',      sub:'Smazání dočasných dat v telefonu',    c:'#f5a623', node:'swPageExpCache',  parent:'experimental', pre:function(){ if(window.cacheInfoRefresh) window.cacheInfoRefresh(); }},
     admin:   {icon:'🛡️', name:'Admin',             sub:function(){ try{ if(typeof updateAdminStatus==='function') updateAdminStatus(); }catch(e){} var on=false,l2=false; try{ on=localStorage.getItem('sinator_admin_mode')==='1'; l2=on&&localStorage.getItem('sinator_admin_level')==='2'; }catch(e){} return 'Admin: ' + (on ? (l2 ? '✅ Aktivní (level 2)' : '✅ Aktivní') : 'Neaktivní'); }, c:'#ffaa00', node:'settingsTabContentAdmin'}
   };
 
@@ -49688,7 +49809,7 @@ window.addEventListener('load', function() {
     win.className='sw-window'; win.id='swWindow';
     win.innerHTML='<div class="sw-head"><button class="sw-back" type="button">← Zpět</button><h3 class="sw-title" id="swTitle" style="font-family:\'Playfair Display\',serif;"></h3><button class="sw-x" type="button" title="Zavřít">✕</button></div><div class="sw-body" id="swBody"></div>';
     document.body.appendChild(win);
-    win.querySelector('.sw-back').onclick=function(){ closeWin(); };
+    win.querySelector('.sw-back').onclick=function(){ goBack(); };
     win.querySelector('.sw-x').onclick=function(){ closeWin(); if(window.closeSettingsModal) window.closeSettingsModal(); };
     return win;
   }
@@ -49697,6 +49818,24 @@ window.addEventListener('load', function() {
     var n=$(PAGES[current].node);
     if(n && n.__swPh && n.__swPh.parentNode) n.__swPh.parentNode.insertBefore(n, n.__swPh);
     current=null;
+  }
+  function goBack(){
+    var d=current && PAGES[current];
+    if(d && d.parent) openPage(d.parent); else closeWin();
+  }
+  // Menu podstránek (stejný vzhled řádků jako hlavní menu Nastavení)
+  function renderSubMenu(parentKey){
+    var def=PAGES[parentKey], n=$(def.node); if(!n) return;
+    var h='<div style="display:flex;flex-direction:column;gap:12px;">';
+    (def.children||[]).forEach(function(k){
+      var d=PAGES[k];
+      h+='<button type="button" class="menu-row-btn sw-item" data-sw="'+k+'"><span style="font-size:1.6rem;">'+d.icon+'</span><div><div class="sw-name" style="color:'+d.c+';font-weight:700;">'+d.name+'</div><div class="sw-sub" style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;"></div></div></button>';
+    });
+    n.innerHTML=h+'</div>';
+    var items=n.querySelectorAll('.sw-item');
+    for(var i=0;i<items.length;i++){
+      (function(b){ var k=b.getAttribute('data-sw'), d=PAGES[k]; b.querySelector('.sw-sub').textContent=typeof d.sub==='function'?d.sub():d.sub; b.onclick=function(){ openPage(k); }; })(items[i]);
+    }
   }
   function closeWin(){
     restore();
@@ -49707,7 +49846,7 @@ window.addEventListener('load', function() {
   function openPage(key){
     var def=PAGES[key]; if(!def) return;
     movePwa(); build();
-    var m=$('settingsMenu'); if(m) m.__swScroll=m.scrollTop;
+    var m=$('settingsMenu'); if(m && !(win && win.classList.contains('open'))) m.__swScroll=m.scrollTop;
     restore();
     var n=$(def.node); if(!n) return;
     if(!n.__swPh){ n.__swPh=document.createComment('sw'); n.parentNode.insertBefore(n.__swPh,n); }
