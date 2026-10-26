@@ -45252,13 +45252,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // Vnitřní navigace modalů, které mají vlastní „podstránky“
     var SPECIAL = {
         histraListsModal: function () {
-            return function () { if (window.histraBackStep && window.histraBackStep()) return; if (window.closeHistraListsModal) window.closeHistraListsModal(); else hideEl('histraListsModal'); };
+            return function () {
+                if (window.histraBackStep && window.histraBackStep()) return;
+                if (window.histraListsBack) window.histraListsBack();          // zavře Histru a vrátí na Seznamy
+                else if (window.closeHistraListsModal) window.closeHistraListsModal(); else hideEl('histraListsModal');
+            };
         },
         slozkyModal: function (el) {
             if (el.dataset && el.dataset.inFolder === '1' && window.renderSlozkyList) return function () { window.renderSlozkyList(); };
             return null;
         },
         modal: function () {
+            // „← Zpět / ← Shlédnuté…“ (detail z seznamu) nebo „Zpět na Seznamy“ / ✕ v liště okna — přesně jako tlačítka v UI.
+            // (Samotné navigateBack() umí jen návrat z detailu do seznamu; ze seznamu by ho otevřelo znovu.)
+            var nav = document.getElementById('modalNavBar');
+            var btn = nav && (nav.querySelector('.modal-back-btn') || nav.querySelector('.modal-close-btn') || nav.querySelector('button'));
+            if (btn && _visible(btn)) return function () { btn.click(); };
             return function () { if (typeof window.navigateBack === 'function') window.navigateBack(); else if (typeof window.closeModal === 'function') window.closeModal(); };
         }
     };
@@ -45266,6 +45275,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function _actionFor(el) {
         var id = el.id || '';
         if (id && SPECIAL[id]) { var sp = SPECIAL[id](el); if (sp) return sp; }
+        var tb0 = _findBtn(el, function (b) { return /^zp[ěe]t na /i.test((b.getAttribute('title') || '').trim()); }, false);   // „Zpět na Seznamy“
+        if (tb0) return function () { tb0.click(); };
         var bk = _findBtn(el, _isBackBtn, true);                      // „← …“ v hlavičce = vlastní zpět appky
         if (bk) return function () { bk.click(); };
         var mapped = id && ((window.MODAL_CLOSE_MAP || {})[id] || (window._modalCloseMap || {})[id]);
