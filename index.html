@@ -10518,7 +10518,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         if (!tmdbApiKey) { alert('Nejprve zadejte TMDB API klíč v nastavení!'); return; }
         if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
             alert('Nejprve v Nastavení > Klíče > Propojení > Trakt.tv vyplň vlastní Client ID a Client Secret.');
-            openSettingsModal(); if(window.swOpen) window.swOpen('connect'); switchConnectService('trakt');
+            openSettingsModal(); if(window.swOpen) window.swOpen('cnTrakt');
             return;
         }
         const authUrl = `https://trakt.tv/oauth/authorize?response_type=code&client_id=${TRAKT_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
@@ -49774,9 +49774,9 @@ window.addEventListener('load', function() {
     ['', ['profile','tmdb','ai','connect','look','apps','security','update','backup','experimental','admin']]
   ];
   var PAGES = {
-    ai:      {icon:'🤖', name:'AI klíče',          sub:'Gemini, Groq, OpenRouter',                 c:'#a78bfa', node:'settingsTabContentKeys', pre:function(){ window.switchKeysSubTab('ai'); }},
-    tmdb:    {icon:'🎬', name:'TMDB a OMDb',       sub:'API klíče pro filmová data',               c:'#00b4d8', node:'settingsTabContentKeys', pre:function(){ window.switchKeysSubTab('tmdb'); }},
-    connect: {icon:'🔗', name:'Propojení účtů',    sub:'Trakt, Simkl, Sinator, Histra, iVysílání', c:'#1cb99a', node:'settingsTabContentKeys', pre:function(){ window.switchKeysSubTab('connect'); }},
+    ai:      {icon:'🤖', name:'AI klíče',          sub:'Gemini, Groq, OpenRouter',                 c:'#a78bfa', node:'settingsSubtabContentAi', pre:function(){ window.switchKeysSubTab('ai'); }},
+    tmdb:    {icon:'🎬', name:'TMDB a OMDb',       sub:'API klíče pro filmová data',               c:'#00b4d8', node:'settingsSubtabContentTmdb', pre:function(){ window.switchKeysSubTab('tmdb'); }},
+    connect: {icon:'🔗', name:'Propojení účtů',    sub:'Trakt, Simkl, Sinator, Histra, iVysílání', c:'#1cb99a', node:'settingsSubtabContentConnect', pre:function(){ window.switchKeysSubTab('connect'); }},
     look:    {icon:'🎨', name:'Vzhled',            sub:'Téma, písma, ikony, fullscreen',           c:'#f472b6', node:'settingsTabContentAppearance', pre:function(){ if(window.renderCustomLookUI) window.renderCustomLookUI(); }},
     apps:    {icon:'📱', name:'Aplikace',          sub:'Instalace, Stremio/Nuvio, externí přehrávání', c:'#818cf8', node:'swPageApps'},
     profile: {icon:'👤', name:'Profil a pozvánka', sub:function(){ var n=$('currentUserNickDisplay'); return n && n.textContent && n.textContent.trim()!=='—' ? n.textContent.trim() : 'Přezdívka, pozvat kamaráda'; }, c:'#ffd700', node:'swPageProfile'},
@@ -49787,8 +49787,88 @@ window.addEventListener('load', function() {
     expLook:   {icon:'🎨', name:'Vzhled',     sub:'Tlačítka a lišta domovské obrazovky', c:'#f472b6', node:'swPageExpLook',   parent:'experimental', pre:function(){ if(window.homeBtnsRender) window.homeBtnsRender(); }},
     expNotify: {icon:'🔔', name:'Upozornění', sub:'Nové epizody a streamy',              c:'#6090ff', node:'swPageExpNotify', parent:'experimental'},
     expCache:  {icon:'🧹', name:'Cache',      sub:'Smazání dočasných dat v telefonu',    c:'#f5a623', node:'swPageExpCache',  parent:'experimental', pre:function(){ if(window.cacheInfoRefresh) window.cacheInfoRefresh(); }},
-    admin:   {icon:'🛡️', name:'Admin',             sub:function(){ try{ if(typeof updateAdminStatus==='function') updateAdminStatus(); }catch(e){} var on=false,l2=false; try{ on=localStorage.getItem('sinator_admin_mode')==='1'; l2=on&&localStorage.getItem('sinator_admin_level')==='2'; }catch(e){} return 'Admin: ' + (on ? (l2 ? '✅ Aktivní (level 2)' : '✅ Aktivní') : 'Neaktivní'); }, c:'#ffaa00', node:'settingsTabContentAdmin'}
+    admin:   {icon:'🛡️', name:'Admin',             sub:function(){ try{ if(typeof updateAdminStatus==='function') updateAdminStatus(); }catch(e){} var on=false,l2=false; try{ on=localStorage.getItem('sinator_admin_mode')==='1'; l2=on&&localStorage.getItem('sinator_admin_level')==='2'; }catch(e){} return 'Admin: ' + (on ? (l2 ? '✅ Aktivní (level 2)' : '✅ Aktivní') : 'Neaktivní'); }, c:'#ffaa00', node:'settingsTabContentAdmin', pre:function(){ try{ if(typeof updateAdminStatus==='function') updateAdminStatus(); }catch(e){} }}
   };
+
+  // ── Podmenu: každá stránka s více sekcemi se mění na menu karet (stejný vzhled jako hlavní Nastavení) ──
+  function _t(id,def){ var e=$(id); var t=e && e.textContent ? e.textContent.replace(/\s+/g,' ').trim() : ''; return t||def; }
+  var SUBSPEC = {
+    profile:{container:'swPageProfile', kids:[
+      {key:'pfName',   icon:'👤', name:'Jméno / přezdívka', c:'#ffd700', sub:function(){ var n=_t('currentUserNickDisplay',''); return n && n!=='—' ? n : 'Jak tě vidí ostatní'; }, els:[{label:'Tvoje jméno'}]},
+      {key:'pfInvite', icon:'📨', name:'Pozvat kamaráda',   c:'#25d366', sub:'Odkaz přes Messenger nebo WhatsApp', els:[{label:'Pozvat kamaráda'}]}]},
+    apps:{container:'swPageApps', kids:[
+      {key:'apInstall', icon:'📲', name:'Instalace aplikace',            c:'#818cf8', sub:'Na plochu jako samostatná appka', els:[{id:'installAppSection'}]},
+      {key:'apExt',     icon:'🧩', name:'Instalace do externí aplikace', c:'#a78bfa', sub:'Stremio / Nuvio',                 els:[{label:'Instalace do externí aplikace'}]},
+      {key:'apPlay',    icon:'▶️', name:'Přehrávání v externí aplikaci', c:'#60a5fa', sub:'Přehrát přes jinou appku',        els:[{label:'Přehrávání v externí aplikaci'}]}]},
+    security:{container:'swPageSecurity', kids:[
+      {key:'secPwd',      icon:'🔐', name:'Přístupové heslo', c:'#ff6b6b', sub:'Heslo k zamčení appky',        els:[{label:'Přístupové heslo'}]},
+      {key:'secExplicit', icon:'🔞', name:'Explicitní obsah', c:'#f87171', sub:'Obsah pro dospělé',            els:[{label:'Explicitní obsah'}]}]},
+    update:{container:'swPageUpdate', kids:[
+      {key:'updApp',  icon:'🔄', name:'Aktualizace aplikace', c:'#1db954', sub:'Kontrola nové verze', els:[{label:'Aktualizace aplikace'}]},
+      {key:'updHist', icon:'🕘', name:'Historie změn',        c:'#34d399', sub:'Co se v kterých verzích změnilo', els:[{label:'Historie změn'}]}]},
+    look:{container:'settingsTabContentAppearance', kids:[
+      {key:'lkTheme',  icon:'💡', name:'Téma a barvy',     c:'#f472b6', sub:'Tmavý / světlý režim, barvy', els:[{label:'Vzhled aplikace'}]},
+      {key:'lkCustom', icon:'🖌️', name:'Vlastní vzhled',   c:'#ec4899', sub:'Písma, barvy, uložené vzhledy', els:[{id:'customLookRoot'}], pre:function(){ if(window.renderCustomLookUI) window.renderCustomLookUI(); }},
+      {key:'lkIcons',  icon:'🎨', name:'Ikony',            c:'#e879f9', sub:'Barevné ikony tlačítek', els:[{label:'Ikony'}]},
+      {key:'lkWatch',  icon:'📺', name:'Kde se to dá sledovat', c:'#c084fc', sub:'Streamovací služby v detailu', els:[{label:'Kde se to dá sledovat'}]},
+      {key:'lkFull',   icon:'⛶',  name:'Fullscreen',       c:'#a78bfa', sub:function(){ var m=_t('settingsFullscreenBtn','').match(/\(([^)]+)\)/); return m ? m[1].charAt(0).toUpperCase()+m[1].slice(1) : 'Celá obrazovka'; }, els:[{id:'settingsFullscreenBtn'}]}]},
+    admin:{container:'settingsTabContentAdmin', kids:[
+      {key:'adAccess', icon:'🛡️', name:'Admin přístup',           c:'#ffaa00', sub:function(){ var on=false; try{ on=localStorage.getItem('sinator_admin_mode')==='1'; }catch(e){} return on?'✅ Aktivní':'Neaktivní'; }, els:[{label:'Admin přístup'}]},
+      {key:'adUsers',  icon:'👥', name:'Registrovaní uživatelé',  c:'#38bdf8', sub:'Přehled, žádosti o přístup', els:[{id:'adminUsersSectionBox'},{id:'adminUsersNoLvl2Msg'}], hideIfHidden:true},
+      {key:'adTest',   icon:'🧪', name:'TEST: běžný uživatel',    c:'#fbbf24', sub:'Načíst appku jako běžný uživatel', els:[{id:'testUserModeBox'}], hideIfHidden:true},
+      {key:'adBroken', icon:'🚫', name:'Nefunkční TV streamy',    c:'#f87171', sub:'Sdílené značení pro všechny', els:[{id:'tvBrokenSettingsBox'}], hideIfHidden:true},
+      {key:'adIptv',   icon:'📡', name:'Správa IPTV kanálů',      c:'#60a5fa', sub:'Kanály a kategorie', els:[{id:'tvChannelAdminSettingsBox'}], hideIfHidden:true}]},
+    ai:{container:'settingsSubtabContentAi', kids:[
+      {key:'aiGemini', icon:'🤖', name:'Gemini',     c:'#a78bfa', sub:function(){ return _t('geminiStatusText','API klíč pro AI vyhledávání'); },     els:[{label:'Gemini'}]},
+      {key:'aiGroq',   icon:'⚡', name:'Groq',       c:'#fbbf24', sub:function(){ return _t('groqStatusText','Rychlý fallback'); },                    els:[{label:'Groq'}]},
+      {key:'aiOr',     icon:'🌐', name:'OpenRouter', c:'#34d399', sub:function(){ return _t('openRouterStatusText','Záložní služba'); },              els:[{label:'OpenRouter'}]}]},
+    tmdb:{container:'settingsSubtabContentTmdb', kids:[
+      {key:'tmTmdb', icon:'🎬', name:'TMDB', c:'#00b4d8', sub:function(){ return _t('tmdbStatusText','API klíč'); }, els:[{label:'TMDB API'}]},
+      {key:'tmOmdb', icon:'🍿', name:'OMDb', c:'#f59e0b', sub:function(){ return _t('omdbStatusText','API klíč'); }, els:[{label:'OMDb'}]}]},
+    connect:{container:'settingsSubtabContentConnect', kids:[
+      {key:'cnTrakt',  icon:'🔺', name:'Trakt.tv',        c:'#ef4444', sub:function(){ return _t('traktStatusText','Nepřipojeno'); },  nodeId:'connectPanelTrakt',     pre:function(){ window.switchConnectService('trakt'); }},
+      {key:'cnSimkl',  icon:'🎯', name:'Simkl',           c:'#1cb99a', sub:function(){ return _t('simklStatusText','Nepřipojeno'); },  nodeId:'connectPanelSimkl',     pre:function(){ window.switchConnectService('simkl'); }},
+      {key:'cnSinator',icon:'🧩', name:'Sinator backend', c:'#6090ff', sub:function(){ return _t('myBackendStatus','Vlastní backend'); }, nodeId:'connectPanelSinator', pre:function(){ window.switchConnectService('sinator'); }},
+      {key:'cnHistra', icon:'📼', name:'Histra.net',      c:'#8b5cf6', sub:function(){ return _t('histraStatusText','Nepřipojeno'); }, nodeId:'connectPanelHistra',    pre:function(){ window.switchConnectService('histra'); }},
+      {key:'cnIvys',   icon:'📡', name:'iVysílání ČT',    c:'#60b0ff', sub:function(){ return _t('ivysilaniStatusText','Nepřipojeno'); }, nodeId:'connectPanelIvysilani', pre:function(){ window.switchConnectService('ivysilani'); }}]}
+  };
+  var _holder=null, _prepared=false;
+  function getHolder(){ if(!_holder){ _holder=document.createElement('div'); _holder.id='swSubHolder'; _holder.style.display='none'; document.body.appendChild(_holder); } return _holder; }
+  function _norm(x){ return String(x||'').toLowerCase(); }
+  function findEl(spec, cont){
+    if(spec.id) return $(spec.id);
+    if(spec.label && cont){
+      var want=_norm(spec.label), ks=cont.children;
+      for(var i=0;i<ks.length;i++){ var k=ks[i]; if(k.classList.contains('settings-divider')) continue; var l=k.querySelector('.settings-label'); if(l && _norm(l.textContent).indexOf(want)>=0) return k; }
+    }
+    return null;
+  }
+  // Sekce se přesunou do vlastních podstránek (prvky se jen přemístí — ID i obsluha událostí zůstávají)
+  function prepare(){
+    if(_prepared) return; _prepared=true;
+    movePwa();
+    Object.keys(SUBSPEC).forEach(function(pk){
+      var sp=SUBSPEC[pk], parent=PAGES[pk], cont=$(sp.container); if(!parent || !cont) return;
+      var kids=[];
+      sp.kids.forEach(function(k){
+        var els=[], nodeId=k.nodeId;
+        (k.els||[]).forEach(function(spec){ var e=findEl(spec,cont); if(e) els.push(e); });
+        if(nodeId){ var ne=$(nodeId); if(!ne) return; getHolder().appendChild(ne); }
+        else {
+          if(!els.length) return;
+          var w=document.createElement('div'); w.className='sw-page'; w.id='swSub_'+k.key; getHolder().appendChild(w);
+          els.forEach(function(e){ w.appendChild(e); });
+          nodeId=w.id;
+        }
+        PAGES[k.key]={icon:k.icon,name:k.name,sub:k.sub,c:k.c,node:nodeId,parent:pk,pre:k.pre,els:els,hideIfHidden:!!k.hideIfHidden};
+        kids.push(k.key);
+      });
+      if(!kids.length) return;
+      parent.children=kids;
+      var op=parent.pre;
+      parent.pre=function(){ if(op) op(); renderSubMenu(pk); };
+    });
+  }
 
   // PWA instalace patří k „Aplikace“
   function movePwa(){
@@ -49829,6 +49909,7 @@ window.addEventListener('load', function() {
     var h='<div style="display:flex;flex-direction:column;gap:12px;">';
     (def.children||[]).forEach(function(k){
       var d=PAGES[k];
+      if(d.hideIfHidden && d.els && d.els.length && d.els.every(function(e){ return e.style.display==='none'; })) return;
       h+='<button type="button" class="menu-row-btn sw-item" data-sw="'+k+'"><span style="font-size:1.6rem;">'+d.icon+'</span><div><div class="sw-name" style="color:'+d.c+';font-weight:700;">'+d.name+'</div><div class="sw-sub" style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;"></div></div></button>';
     });
     n.innerHTML=h+'</div>';
@@ -49844,6 +49925,7 @@ window.addEventListener('load', function() {
     var m=$('settingsMenu'); if(m) m.scrollTop=m.__swScroll||0;
   }
   function openPage(key){
+    prepare();
     var def=PAGES[key]; if(!def) return;
     movePwa(); build();
     var m=$('settingsMenu'); if(m && !(win && win.classList.contains('open'))) m.__swScroll=m.scrollTop;
@@ -49879,7 +49961,8 @@ window.addEventListener('load', function() {
   window.swCloseWin=closeWin;
 
   function init(){
-    movePwa(); renderMenu();
+    prepare(); renderMenu();
+    try{ var stl=document.createElement('style'); stl.textContent='.sw-body .connect-back-btn{display:none !important}'; document.head.appendChild(stl); }catch(e){}
     var sm=$('settingsModal');
     if(sm) new MutationObserver(function(){ if(!sm.classList.contains('open') && win && win.classList.contains('open')) closeWin(); }).observe(sm,{attributes:true,attributeFilter:['class']});
   }
