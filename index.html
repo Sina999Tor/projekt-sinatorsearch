@@ -10096,6 +10096,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         loadPopularContent();
     }
 
+    // Gesto zpět mimo okna: z jiné záložky (Seriály, Anime…) nebo z výsledků hledání → hlavní stránka (Filmy)
+    window.sinInPageBack = function() {
+        try {
+            const onHome = state.view === 'movies' && !state.searchQuery && !state._aiResultsLocked;
+            if (onHome) return false;
+            goHome();
+            return true;
+        } catch (e) { return false; }
+    };
+
     function tmdbAdult() { return adultContent ? '&include_adult=true' : '&include_adult=false'; }
 
     function toggleAdultContent() {
@@ -45264,7 +45274,25 @@ document.addEventListener('DOMContentLoaded', function() {
         if (cb) return function () { cb.click(); };
         var oc = el.getAttribute('onclick') || '';
         if (/event\.target\s*===?\s*this/.test(oc)) return function () { el.click(); };   // klik na pozadí
+        // Překryvy vytvořené za běhu (spodní listy, výběry, prohlížeče obrázků…) se zavírají posluchači událostí —
+        // zkusíme klik na pozadí, tlačítko „✕ / Zavřít / Zrušit“, Escape a nakonec prvek odstraníme.
+        var c = _cs(el) || {}, r = el.getBoundingClientRect(), z = parseInt(c.zIndex, 10) || 0;
+        var big = r.width >= window.innerWidth * 0.9 && r.height >= window.innerHeight * 0.6;
+        if (big && (!id || z >= 1000)) return function () { _genericDismiss(el); };
         return null;
+    }
+    var _TXT_CLOSE = /^(✕|✖|✗|×|x|❌|zav[řr]ít|zav[řr]ít okno|zru[šs]it|zp[ěe]t|nechci|ne)$/i;
+    function _genericDismiss(el) {
+        var alive = function () { return document.body.contains(el) && _visible(el); };
+        try { el.click(); } catch (e) {}                                   // klik na pozadí (e.target === overlay)
+        if (!alive()) return;
+        // slova (Zavřít/Zrušit/Zpět…) kdekoli; samotné „✕“ jen v horní části (jinak by šlo o mazání položky v seznamu)
+        var tb = _findBtn(el, function (b) { return /^(zav[řr]ít|zav[řr]ít okno|zru[šs]it|zp[ěe]t|nechci)$/i.test((b.textContent || '').trim()); }, false)
+              || _findBtn(el, function (b) { return /^(✕|✖|✗|×|x|❌)$/i.test((b.textContent || '').trim()); }, true);
+        if (tb) { try { tb.click(); } catch (e) {} if (!alive()) return; }
+        try { ['keydown', 'keyup'].forEach(function (t) { var ev = new KeyboardEvent(t, { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true }); document.dispatchEvent(ev); window.dispatchEvent(ev); }); } catch (e) {}
+        if (!alive()) return;
+        if (!el.id) { try { el.remove(); } catch (e) {} }                  // dynamický překryv bez id — odstranit
     }
     function _topLayer() {
         var best = null, bestZ = -Infinity, bestAct = null;
@@ -45286,7 +45314,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (document.body.classList.contains('app-locked')) return false;
         for (var i = 0; i < BLOCK_IDS.length; i++) { var bl = document.getElementById(BLOCK_IDS[i]); if (bl && _visible(bl)) return true; }
         var top = _topLayer();
-        if (!top) return false;
+        if (!top) { try { if (typeof window.sinInPageBack === 'function' && window.sinInPageBack()) return true; } catch (e) {} return false; }
         try { top.act(); } catch (e) { console.warn('zpět:', e); }
         // modal otevřený přes pushModalAndOpen → po zavření se znovu otevře rodič
         if (!_visible(top.el) && modalStack.length > 0) {
