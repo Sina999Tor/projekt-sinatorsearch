@@ -4840,6 +4840,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             for (let n = arr.length; n > 0; n--) { try { _store.setItem('sinator_histra_reports_v1', JSON.stringify(arr.slice(0, n))); return; } catch (e) {} }
         } catch (e) {}
     };
+    window.sinOpenFromReport = function(type, id) {
+        try {
+            if (typeof window.openDetail !== 'function') return false;
+            window.openDetail(Number(id), type === 'tv' ? 'tv' : 'movie');
+            return true;
+        } catch (e) { return false; }
+    };
     window.sinTrimSyncReports = function(fromTs) {
         try {
             const arr = window.sinGetSyncReports().filter(r => r.ts >= fromTs);
@@ -4854,7 +4861,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             const esc = x => String(x).replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));
             const fmt = t => new Date(t).toLocaleString('cs-CZ');
             const ago = t => { const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 1 ? 'právě teď' : m < 60 ? `před ${m} min` : m < 2880 ? `před ${Math.round(m / 60)} h` : `před ${Math.round(m / 1440)} dny`; };
-            const sec = (h, arr) => (arr && arr.length) ? `<h3>${h} (${arr.length})</h3><ul>${arr.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+            const sec = (h, arr, keys) => (arr && arr.length) ? `<h3>${h} (${arr.length})</h3><ul>${arr.map((x, i) => { const k = keys && keys[i] && /^(movie|tv):\d+$/.test(keys[i]) ? keys[i] : ''; return k ? `<li class=\"open\" data-open=\"${k}\">${esc(x)}</li>` : `<li>${esc(x)}</li>`; }).join('')}</ul>` : '';
             const lastTs = parseInt(_store.getItem('sinator_histra_last_sync') || '0', 10);
             const lastRes = _store.getItem('sinator_histra_last_result') || '';
             const newest = (list && list[0]) ? list[0].ts : 0;
@@ -4862,14 +4869,15 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 + `<div>Poslední kontrola: <b>${lastTs ? esc(fmt(lastTs)) + ' (' + ago(lastTs) + ')' : 'zatím neproběhla'}</b></div>`
                 + (newest ? `<div>Poslední zapsaný běh: <b>${esc(fmt(newest))}</b></div>` : '')
                 + (lastRes ? `<div class=\"dim\" style=\"margin-top:6px\">${esc(lastRes)}</div>` : '')
-                + `<div class=\"dim\" style=\"margin-top:6px\">Otevřeno ${esc(fmt(Date.now()))}</div></section>`;
+                + `<div class=\"dim\" style=\"margin-top:6px\">Otevřeno ${esc(fmt(Date.now()))}</div>`
+                + ((list || []).some(r => (r.toSinK && r.toSinK.length) || (r.toHistraK && r.toHistraK.length)) ? `<div class=\"hint\">👆 Klepnutím na film nebo seriál otevřeš jeho detail.</div>` : '') + `</section>`;
             const runs = (list || []).map(r => {
                 const head = r.empty
                     ? `<h2>${esc(fmt(r.ts))} · ✅ nic nového${r.count > 1 ? ` <span class=\"dim\">(${r.count}× kontrola od ${esc(fmt(r.since || r.ts))})</span>` : ''}</h2>`
                     : `<h2>${esc(fmt(r.ts))}${r.silent ? ' · na pozadí' : ' · ručně'}</h2>`;
                 return `<section data-ts="${r.ts}">${head}`
                 + (r.info ? `<div class=\"dim\">${esc(r.info)}</div>` : '')
-                + sec('📥 Přidáno do Sinatoru', r.toSin) + sec('📤 Přidáno do Histry', r.toHistra)
+                + sec('📥 Přidáno do Sinatoru', r.toSin, r.toSinK) + sec('📤 Přidáno do Histry', r.toHistra, r.toHistraK)
                 + (r.lists ? `<h3>📁 Nové seznamy: ${r.lists}</h3>` : '')
                 + (r.err ? `<div class=\"err\">❌ ${esc(r.err)}</div>` : '')
                 + (r.note ? `<div class=\"note\">${esc(r.note)}</div>` : '')
@@ -4885,15 +4893,19 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 + 'if(!done){try{localStorage.setItem(KEY,JSON.stringify(keep));}catch(e){msg.style.color="#fca5a5";msg.textContent="Nepodařilo se uložit.";return;}}'
                 + 'Array.prototype.forEach.call(document.querySelectorAll("section[data-ts]"),function(s){if(Number(s.getAttribute("data-ts"))<from)s.remove();});'
                 + 'msg.style.color="#86efac";msg.textContent="✅ Smazáno "+removed+" starších záznamů, nechán jen dnešek ("+keep.length+").";btn.disabled=true;btn.style.opacity=".5";};})();<\/script>';
+            const OPEN_SCRIPT = '<script>(function(){var APP=' + JSON.stringify(location.origin + location.pathname) + ';'
+                + 'document.addEventListener("click",function(e){var li=e.target.closest&&e.target.closest("li[data-open]");if(!li)return;var p=li.getAttribute("data-open").split(":");'
+                + 'try{var o=window.opener;if(o&&!o.closed&&o.sinOpenFromReport&&o.sinOpenFromReport(p[0],p[1])){try{o.focus();}catch(x){}try{window.close();}catch(x){}return;}}catch(x){}'
+                + 'location.href=APP+"#sinopen="+p[0]+":"+p[1];});})();<\/script>';
             const page = `<!doctype html><html lang=\"cs\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Výsledky synchronizace Histra ↔ Sinator</title>`
-                + `<style>body{background:#0b1020;color:#fff;font:15px/1.5 system-ui,sans-serif;margin:0 auto;padding:16px;max-width:760px}h1{font-size:1.2rem}h2{font-size:1rem;margin:0 0 4px}h3{font-size:.95rem;color:#c4b5fd;margin:14px 0 6px}section{border-top:1px solid #2a3350;padding:14px 0}section.now{background:#141a2e;border:1px solid #8b5cf6;border-radius:12px;padding:12px 14px;margin:10px 0}ul{margin:0;padding-left:20px}li{padding:2px 0}.note{color:#ffd180;margin-top:12px}.err{color:#ff8a80;font-weight:700;margin-top:12px}.dim{opacity:.65;font-size:.85rem}</style></head><body>`
+                + `<style>body{background:#0b1020;color:#fff;font:15px/1.5 system-ui,sans-serif;margin:0 auto;padding:16px;max-width:760px}h1{font-size:1.2rem}h2{font-size:1rem;margin:0 0 4px}h3{font-size:.95rem;color:#c4b5fd;margin:14px 0 6px}section{border-top:1px solid #2a3350;padding:14px 0}section.now{background:#141a2e;border:1px solid #8b5cf6;border-radius:12px;padding:12px 14px;margin:10px 0}ul{margin:0;padding-left:20px}li{padding:2px 0}li.open{cursor:pointer;padding:7px 0;color:#e9e5ff;text-decoration:underline dotted #8b5cf6;text-underline-offset:4px}li.open:active{opacity:.6}.hint{margin-top:8px;color:#a78bfa;font-size:.85rem}.note{color:#ffd180;margin-top:12px}.err{color:#ff8a80;font-weight:700;margin-top:12px}.dim{opacity:.65;font-size:.85rem}</style></head><body>`
                 + `<h1>🔄 Výsledky synchronizace Histra ↔ Sinator</h1>${now}${runs}`
                 + `<div style=\"border-top:1px solid #2a3350;padding:18px 0 40px\"><button id=\"trimBtn\" style=\"width:100%;padding:14px;border-radius:12px;border:1px solid #f87171;background:#2a1418;color:#fca5a5;font:inherit;font-weight:700\">🗑️ Smazat předchozí a nechat jen dnešek</button><div id=\"trimMsg\" style=\"margin-top:10px;color:#86efac\"></div></div>`
-                + TRIM_SCRIPT + `</body></html>`;
+                + TRIM_SCRIPT + OPEN_SCRIPT + `</body></html>`;
             const url = URL.createObjectURL(new Blob([page], { type: 'text/html;charset=utf-8' }));
             const w = window.open(url, '_blank');
             if (!w) location.href = url;
-            setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 60000);
+            // blob se záměrně neruší — po otevření detailu ve stejné záložce se na výsledky dá vrátit tlačítkem zpět
         } catch (e) { console.warn('sinOpenSyncReport:', e); }
     };
     window.sinShowSyncNotice = function(o) {
@@ -5361,7 +5373,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             try {
                 {
                     const _hadChanges = !!(addedToSin.size || pushedLabels.length || listsCreated || deferred || bulkSkipped);
-                    window.sinSaveSyncReport({ ts: Date.now(), silent: !!silent, empty: !_hadChanges, info: _info, toSin: [...addedToSin.values()].slice(0, 800), toHistra: pushedLabels.slice(0, 800), lists: listsCreated, warn: skipped,
+                    window.sinSaveSyncReport({ ts: Date.now(), silent: !!silent, empty: !_hadChanges, info: _info, toSin: [...addedToSin.values()].slice(0, 800), toHistra: pushedLabels.slice(0, 800),
+                        toSinK: [...addedToSin.keys()].slice(0, 800).map(k => k[0] === 'm' ? 'movie:' + k.slice(1) : 'tv:' + k.slice(1).split('_')[0]),
+                        toHistraK: addedToHistra.slice(0, 800).map(t => (t && (t.type === 'tv' || (t.season != null && t.episode != null)) ? 'tv:' : 'movie:') + (t && t.id)), lists: listsCreated, warn: skipped,
                         note: [deferred ? `⚠️ ${deferred} dalších „nových“ záznamů vypadá podezřele — nepřidáno (ruční sync v Nastavení → Histra).` : '', bulkSkipped ? `⚠️ Přeskočeno ${bulkSkipped} hromadně označených epizod (${bulkInfo.slice(0, 3).map(b => b.show).join(', ')}).` : '', (addedToSin.size > 800 || pushedLabels.length > 800) ? 'Zobrazeno max. 800 položek na běh.' : ''].filter(Boolean).join(' ') });
                 }
             } catch (e) {}
@@ -45204,6 +45218,21 @@ document.addEventListener('DOMContentLoaded', function() {
         // záměrně prázdné: sentinely se vkládají při dotycích (viz topUp), jinak je Chrome přeskakuje
     }
     window.pushSentinel = pushSentinel;
+
+    // Odkaz z výsledků synchronizace: #sinopen=movie:123 / tv:123 → po startu otevře detail
+    (function () {
+        function parse() { var m = /[#&]sinopen=(movie|tv):(\d+)/.exec(location.hash || ''); return m ? { type: m[1], id: Number(m[2]) } : null; }
+        var tries = 0;
+        function attempt() {
+            var t = parse(); if (!t) return;
+            var ready = typeof window.openDetail === 'function' && !document.body.classList.contains('app-locked');
+            if (!ready) { if (++tries < 80) setTimeout(attempt, 500); return; }
+            try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+            try { window.openDetail(t.id, t.type); } catch (e) {}
+        }
+        window.addEventListener('hashchange', function () { tries = 0; attempt(); });
+        window.addEventListener('load', function () { setTimeout(attempt, 800); });
+    })();
 
     // ══ Systémové gesto / tlačítko ZPĚT = zpět v appce ═══════════════════════════════
     // Dřív: sentinely se vkládaly do historie už při načtení (bez doteku) — Chrome takové záznamy při "zpět"
