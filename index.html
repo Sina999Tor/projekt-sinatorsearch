@@ -4840,6 +4840,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             for (let n = arr.length; n > 0; n--) { try { _store.setItem('sinator_histra_reports_v1', JSON.stringify(arr.slice(0, n))); return; } catch (e) {} }
         } catch (e) {}
     };
+    window.sinTrimSyncReports = function(fromTs) {
+        try {
+            const arr = window.sinGetSyncReports().filter(r => r.ts >= fromTs);
+            _store.setItem('sinator_histra_reports_v1', JSON.stringify(arr));
+            return arr.length;
+        } catch (e) { return -1; }
+    };
     window.sinOpenSyncReport = function(list) {
         try {
             // vždy čerstvá data z úložiště v okamžiku otevření (ne ta, co přišla při vykreslení tlačítka)
@@ -4860,7 +4867,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 const head = r.empty
                     ? `<h2>${esc(fmt(r.ts))} · ✅ nic nového${r.count > 1 ? ` <span class=\"dim\">(${r.count}× kontrola od ${esc(fmt(r.since || r.ts))})</span>` : ''}</h2>`
                     : `<h2>${esc(fmt(r.ts))}${r.silent ? ' · na pozadí' : ' · ručně'}</h2>`;
-                return `<section>${head}`
+                return `<section data-ts="${r.ts}">${head}`
                 + (r.info ? `<div class=\"dim\">${esc(r.info)}</div>` : '')
                 + sec('📥 Přidáno do Sinatoru', r.toSin) + sec('📤 Přidáno do Histry', r.toHistra)
                 + (r.lists ? `<h3>📁 Nové seznamy: ${r.lists}</h3>` : '')
@@ -4869,9 +4876,20 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 + (r.warn ? `<div class=\"dim\">⚠️ ${r.warn} záznamů z Histry se nepodařilo přečíst (chybí TMDB id)</div>` : '')
                 + `</section>`;
             }).join('') || '<p class=\"dim\">Zatím žádné výsledky synchronizace.</p>';
+            const TRIM_SCRIPT = '<script>(function(){var KEY="sinator_histra_reports_v1";var btn=document.getElementById("trimBtn"),msg=document.getElementById("trimMsg");'
+                + 'btn.onclick=function(){var d=new Date();d.setHours(0,0,0,0);var from=d.getTime();var arr=[];try{arr=JSON.parse(localStorage.getItem(KEY)||"[]");}catch(e){}'
+                + 'var keep=arr.filter(function(r){return r.ts>=from;});var removed=arr.length-keep.length;'
+                + 'if(!removed){msg.style.color="#fbbf24";msg.textContent="Není co mazat — všechny záznamy jsou z dneška.";return;}'
+                + 'if(!confirm("Smazat "+removed+" starších záznamů a nechat "+keep.length+" dnešních?"))return;'
+                + 'var done=false;try{if(window.opener&&window.opener.sinTrimSyncReports){window.opener.sinTrimSyncReports(from);done=true;}}catch(e){}'
+                + 'if(!done){try{localStorage.setItem(KEY,JSON.stringify(keep));}catch(e){msg.style.color="#fca5a5";msg.textContent="Nepodařilo se uložit.";return;}}'
+                + 'Array.prototype.forEach.call(document.querySelectorAll("section[data-ts]"),function(s){if(Number(s.getAttribute("data-ts"))<from)s.remove();});'
+                + 'msg.style.color="#86efac";msg.textContent="✅ Smazáno "+removed+" starších záznamů, nechán jen dnešek ("+keep.length+").";btn.disabled=true;btn.style.opacity=".5";};})();<\/script>';
             const page = `<!doctype html><html lang=\"cs\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Výsledky synchronizace Histra ↔ Sinator</title>`
                 + `<style>body{background:#0b1020;color:#fff;font:15px/1.5 system-ui,sans-serif;margin:0 auto;padding:16px;max-width:760px}h1{font-size:1.2rem}h2{font-size:1rem;margin:0 0 4px}h3{font-size:.95rem;color:#c4b5fd;margin:14px 0 6px}section{border-top:1px solid #2a3350;padding:14px 0}section.now{background:#141a2e;border:1px solid #8b5cf6;border-radius:12px;padding:12px 14px;margin:10px 0}ul{margin:0;padding-left:20px}li{padding:2px 0}.note{color:#ffd180;margin-top:12px}.err{color:#ff8a80;font-weight:700;margin-top:12px}.dim{opacity:.65;font-size:.85rem}</style></head><body>`
-                + `<h1>🔄 Výsledky synchronizace Histra ↔ Sinator</h1>${now}${runs}</body></html>`;
+                + `<h1>🔄 Výsledky synchronizace Histra ↔ Sinator</h1>${now}${runs}`
+                + `<div style=\"border-top:1px solid #2a3350;padding:18px 0 40px\"><button id=\"trimBtn\" style=\"width:100%;padding:14px;border-radius:12px;border:1px solid #f87171;background:#2a1418;color:#fca5a5;font:inherit;font-weight:700\">🗑️ Smazat předchozí a nechat jen dnešek</button><div id=\"trimMsg\" style=\"margin-top:10px;color:#86efac\"></div></div>`
+                + TRIM_SCRIPT + `</body></html>`;
             const url = URL.createObjectURL(new Blob([page], { type: 'text/html;charset=utf-8' }));
             const w = window.open(url, '_blank');
             if (!w) location.href = url;
