@@ -19150,6 +19150,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                         </div>
                         ${dur ? `<div style="color:var(--text-muted);font-size:0.8rem;">${dur}</div>` : ''}
                         <div style="color:var(--accent);font-size:0.8rem;">▶ YT</div>
+                        <button type="button" title="Přehrát v externí aplikaci (SmartTube…)" style="flex:0 0 auto;border:1px solid var(--border);background:var(--bg-card);color:#fff;border-radius:10px;padding:6px 10px;font-size:1rem;cursor:pointer;" onclick="event.stopPropagation();playMusicExternal(decodeURIComponent('${safeQuery.replace(/'/g, '%27')}'))">📱</button>
                     </div>`;
                 });
             });
@@ -23076,7 +23077,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         </button>
         <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, openArchivTvModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">📼</span>
-            <div><div style="color:#0077cc;font-weight:700;">Archív TV</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">iVysílání ČT a iPrima — archiv a živé vysílání</div></div>
+            <div><div style="color:#0077cc;font-weight:700;">Archív TV</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">iVysílání ČT, iPrima a Nova — archiv a živé vysílání</div></div>
         </button>
         <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, function(){ openKinoModal(''); })" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎦</span>
@@ -23085,7 +23086,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     </div>
 </div>
 
-<!-- 📼 Archív TV modal (výběr ČT / Prima) -->
+<!-- 📼 Archív TV modal (výběr ČT / Prima / Nova) -->
 <div class="kino-modal-overlay" id="archivTvModal" onclick="if(event.target===this)closeArchivTvModal()">
     <div class="kino-modal">
         <div class="kino-modal-header">
@@ -23100,6 +23101,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             <button onclick="pushModalAndOpen('archivTvModal', openArchivTvModal, openIprimaModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
                 <span style="font-size:1.6rem;">🔴</span>
                 <div><div style="color:#e30613;font-weight:700;">iPrima</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Archiv a živé vysílání Prima</div></div>
+            </button>
+            <button onclick="pushModalAndOpen('archivTvModal', openArchivTvModal, openNovaModal)" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+                <span style="font-size:1.6rem;">🟠</span>
+                <div><div style="color:#f59e0b;font-weight:700;">Nova</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Archiv a živé vysílání TV Nova a Voyo</div></div>
             </button>
         </div>
     </div>
@@ -23116,6 +23121,100 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     }
     window.openArchivTvModal = openArchivTvModal;
     window.closeArchivTvModal = closeArchivTvModal;
+</script>
+
+<!-- 🟠 Nova modal (TV Nova / Voyo) -->
+<div class="kino-modal-overlay" id="novaModal" onclick="if(event.target===this)closeNovaModal()">
+    <div class="kino-modal">
+        <div class="kino-modal-header">
+            <h3>🟠 Nova — TV Nova a Voyo</h3>
+            <button class="close-kino" onclick="closeNovaModal()" title="Zavřít">✕</button>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;">
+            <div>
+                <div style="font-weight:700;color:#f59e0b;margin-bottom:8px;">🔍 Hledat pořad nebo seriál</div>
+                <div style="display:flex;gap:8px;">
+                    <input id="novaSearchInput" type="search" placeholder="Např. Ulice, Specialisté…" style="flex:1;min-width:0;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated,#1c2340);color:#fff;font:inherit;" onkeydown="if(event.key==='Enter')novaSearch('nova')">
+                </div>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                    <button type="button" onclick="novaSearch('nova')" class="menu-row-btn" style="flex:1;justify-content:center;border-color:#f59e0b;">📺 TV Nova</button>
+                    <button type="button" onclick="novaSearch('voyo')" class="menu-row-btn" style="flex:1;justify-content:center;border-color:#f59e0b;">🍿 Voyo (archiv)</button>
+                </div>
+                <div id="novaRecent" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+            </div>
+            <div>
+                <div style="font-weight:700;color:#f59e0b;margin-bottom:8px;">📼 Oblíbené pořady (otevře hledání)</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;"><button type="button" class="novaChip" onclick="novaSearchFor('Ulice')">Ulice</button><button type="button" class="novaChip" onclick="novaSearchFor('Ordinace v růžové zahradě 2')">Ordinace v růžové zahradě 2</button><button type="button" class="novaChip" onclick="novaSearchFor('Specialisté')">Specialisté</button><button type="button" class="novaChip" onclick="novaSearchFor('Policie Modrava')">Policie Modrava</button><button type="button" class="novaChip" onclick="novaSearchFor('Tvoje tvář má známý hlas')">Tvoje tvář má známý hlas</button><button type="button" class="novaChip" onclick="novaSearchFor('Televizní noviny')">Televizní noviny</button><button type="button" class="novaChip" onclick="novaSearchFor('Víkend')">Víkend</button></div>
+            </div>
+            <div>
+                <div style="font-weight:700;color:#f59e0b;margin-bottom:8px;">📡 Živé vysílání</div>
+                <div style="display:flex;flex-direction:column;gap:7px;">
+                <button onclick="window.open('https://tv.nova.cz/sledujte-zive/1-nova','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;"><span class="lob-logo">Nova</span><span class="lob-name">Nova</span><span class="lob-arrow">→</span></button>
+                <button onclick="window.open('https://tv.nova.cz/sledujte-zive/2-nova-cinema','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;"><span class="lob-logo" style="font-size:0.65rem;">Cinema</span><span class="lob-name">Nova Cinema</span><span class="lob-arrow">→</span></button>
+                <button onclick="window.open('https://tv.nova.cz/sledujte-zive/3-nova-action','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;"><span class="lob-logo" style="font-size:0.65rem;">Action</span><span class="lob-name">Nova Action</span><span class="lob-arrow">→</span></button>
+                <button onclick="window.open('https://tv.nova.cz/sledujte-zive/4-nova-fun','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;"><span class="lob-logo">Fun</span><span class="lob-name">Nova Fun</span><span class="lob-arrow">→</span></button>
+                <button onclick="window.open('https://tv.nova.cz/sledujte-zive/29-nova-lady','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;"><span class="lob-logo">Lady</span><span class="lob-name">Nova Lady</span><span class="lob-arrow">→</span></button>
+                <button onclick="window.open('https://tv.nova.cz/sledujte-zive/5-nova-krimi','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;"><span class="lob-logo" style="font-size:0.65rem;">Krimi</span><span class="lob-name">Nova Krimi</span><span class="lob-arrow">→</span></button>
+                <button onclick="window.open('https://tn.nova.cz/tnlive','_blank')" class="live-official-btn" style="border-left-color:#f59e0b;"><span class="lob-logo" style="font-size:0.65rem;">TN</span><span class="lob-name">TN Nova (zpravodajství)</span><span class="lob-arrow">→</span></button>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" onclick="window.open('https://tv.nova.cz/','_blank')" class="menu-row-btn" style="flex:1 1 140px;justify-content:center;">tv.nova.cz</button>
+                <button type="button" onclick="window.open('https://voyo.nova.cz/','_blank')" class="menu-row-btn" style="flex:1 1 140px;justify-content:center;">voyo.nova.cz</button>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+    .novaChip{padding:8px 12px;border-radius:999px;border:1px solid #f59e0b;background:rgba(245,158,11,.1);color:#fff;font:inherit;font-size:.82rem;cursor:pointer;}
+    .novaChip:active{opacity:.6}
+</style>
+<script>
+    (function () {
+        var KEY = 'sinator_nova_recent';
+        function recent() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } }
+        function renderRecent() {
+            var el = document.getElementById('novaRecent'); if (!el) return;
+            var r = recent();
+            el.innerHTML = r.length ? '<span style="width:100%;font-size:.75rem;opacity:.6;">Naposledy hledáno:</span>' : '';
+            r.forEach(function (q) {
+                var b = document.createElement('button'); b.type = 'button'; b.className = 'novaChip'; b.textContent = q;
+                b.onclick = function () { document.getElementById('novaSearchInput').value = q; novaSearch('nova'); };
+                el.appendChild(b);
+            });
+        }
+        function remember(q) {
+            var r = recent().filter(function (x) { return x.toLowerCase() !== q.toLowerCase(); });
+            r.unshift(q);
+            try { localStorage.setItem(KEY, JSON.stringify(r.slice(0, 8))); } catch (e) {}
+            renderRecent();
+        }
+        window.novaSearch = function (where) {
+            var inp = document.getElementById('novaSearchInput');
+            var q = (inp && inp.value || '').trim();
+            if (!q) { if (inp) inp.focus(); return; }
+            remember(q);
+            var url = where === 'voyo'
+                ? 'https://voyo.nova.cz/hledej?q=' + encodeURIComponent(q)
+                : 'https://tv.nova.cz/hledat?q=' + encodeURIComponent(q);
+            window.open(url, '_blank');
+        };
+        window.novaSearchFor = function (title) {
+            var inp = document.getElementById('novaSearchInput'); if (inp) inp.value = title;
+            window.novaSearch('nova');
+        };
+        window.openNovaModal = function () {
+            var m = document.getElementById('novaModal');
+            m.style.display = '';
+            m.classList.add('open');
+            renderRecent();
+        };
+        window.closeNovaModal = function () {
+            document.getElementById('novaModal').classList.remove('open');
+            var stack = window.modalStack || [];
+            if (stack.length > 0) { var p = stack.pop(); p.openFn(); }
+        };
+    })();
 </script>
 
 <!-- 🌐 ŽIVÁ TV OFICIÁLNÍ WEBY MODAL -->
@@ -45242,6 +45341,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'ivysilaniModal': function() { if(typeof closeIvysilaniModal==='function') closeIvysilaniModal(); },
         'iprimaModal':    function() { if(typeof closeIprimaModal==='function') closeIprimaModal(); },
         'archivTvModal':  function() { if(typeof closeArchivTvModal==='function') closeArchivTvModal(); },
+    'novaModal':      function() { if(typeof closeNovaModal==='function') closeNovaModal(); },
         'aiModal':        function() { if(typeof closeAiModal==='function') closeAiModal(); },
         'zabavaModal':    function() { if(typeof closeZabavaModal==='function') closeZabavaModal(); },
         'zabavaKinoModal':    function() { if(typeof closeZabavaKinoModal==='function') closeZabavaKinoModal(); },
