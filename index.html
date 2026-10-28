@@ -1268,6 +1268,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             <input type="text" id="musicSearchInput" placeholder="Hledat interpreta, písničku nebo album..." autocomplete="off">
             <button onclick="searchMusic()">🔍 Hledat</button>
             <button onclick="searchMusicYoutube()" style="background:#ff0000;padding:12px 14px;" title="Hledat na YouTube">▶</button>
+            <button onclick="playMusicExternal((document.getElementById('musicSearchInput')||{}).value)" style="background:#2b3358;padding:12px 14px;" title="Přehrát v externí aplikaci (SmartTube…)">📱</button>
             <div id="musicSearchLiveResults" style="display:none;position:absolute;left:24px;right:24px;top:100%;background:var(--bg-card);border:1px solid var(--border);border-top:none;border-radius:0 0 14px 14px;max-height:380px;overflow-y:auto;z-index:10001;box-shadow:0 8px 32px rgba(0,0,0,0.8);"></div>
         </div>
         <div class="music-database-tabs">
@@ -6970,6 +6971,18 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         showExternalPlayAppChooser(apps, title);
     }
     window.playInExternalApp = playInExternalApp;
+
+    // Hudba: stejný výběr jako u filmů, ale SmartTube / YouTube je v nabídce VŽDY (hudba se hledá na YouTube),
+    // ostatní zapnuté appky (🔎 Detail) přibydou za ním; dole je i systémové „Jiná aplikace…“.
+    function playMusicExternal(query) {
+        const q = String(query || '').trim();
+        if (!q) { try { showToast('Nejdřív něco napiš do hledání'); } catch (e) {} return; }
+        const all = getExternalPlayApps();
+        const st = all.find(a => a.id === 'smarttube') || DEFAULT_EXTERNAL_PLAY_APPS.find(a => a.id === 'smarttube');
+        const others = all.filter(a => a.enabled && a.id !== 'smarttube' && !['stremio', 'nuvio', 'nuvio_enhanced', 'streamlet', 'vlc', 'moderntv_web'].includes(a.id));
+        showExternalPlayAppChooser([{ ...st, enabled: true }, ...others], q);
+    }
+    window.playMusicExternal = playMusicExternal;
 
     // === Přímé "one-click" odkazy na streamovací platformy podle titulu ===
     // TMDB u watch/providers nedává URL konkrétní služby pro daný titul, jen obecný
@@ -18644,6 +18657,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                     <div class="music-card-info"><div class="music-card-title">${r.title}</div><div class="music-card-meta">${artists} ${date ? `• ${date}` : ''}</div></div>
                     <div class="music-card-actions">
                         <button class="music-card-btn" onclick="event.stopPropagation();playOnYouTube('${safeArtists} - ${safeTitle} album')">▶️ YouTube</button>
+                        <button class="music-card-btn" title="Přehrát v externí aplikaci" onclick="event.stopPropagation();playMusicExternal('${safeArtists} - ${safeTitle} album')">📱</button>
                         <button class="music-card-btn" onclick="event.stopPropagation();showReleaseTracklist('${r.id}', '${safeTitle}', '${safeArtists}')">🎵 Skladby</button>
                     </div>
                 </div>`;
@@ -18946,6 +18960,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                     <button class="action-btn-modal" onclick="openYouTubeChannel('${name}')">🎤 Oficiální kanál</button>
                     <button class="action-btn-modal" onclick="playOnYouTube('${name} official videos')">🎬 Oficiální klipy</button>
                     <button class="action-btn-modal" onclick="playOnYouTube('${name} live')">🎤 Live vystoupení</button>
+                    <button class="action-btn-modal" onclick="playMusicExternal('${name}')">📱 Přehrát v externí aplikaci</button>
                 </div>
             `;
             currentArtistData = { bio: finalBio, gallery: galleryImages, releases: releases, name: name, wikipediaImage: wikipediaImage, bioSource: bioSource };
@@ -19040,6 +19055,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                                     <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${artists}</div>
                                     <div style="display:flex; gap:4px; flex-wrap:wrap;">
                                         <button class="music-card-btn" style="flex:1; min-width:60px; font-size:0.72rem;" onclick="playOnYouTube('${safeArtists} - ${safeAlbum}')">▶️ YT</button>
+                                        <button class="music-card-btn" style="flex:0 0 auto; font-size:0.72rem;" title="Přehrát v externí aplikaci" onclick="playMusicExternal('${safeArtists} - ${safeAlbum}')">📱</button>
                                         <button class="music-card-btn" style="flex:1; min-width:60px; font-size:0.72rem;" onclick="showReleaseTracklist('${album.id}', '${safeAlbum}', '${safeArtists}')">🎵 Skladby</button>
                                     </div>
                                 </div>
