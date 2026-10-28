@@ -1278,6 +1278,79 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             <button class="music-db-tab" onclick="openDBSearch('genius')">Genius (texty)</button>
             <button class="music-db-tab" onclick="openDBSearch('czech')">🇨 České zdroje</button>
         </div>
+        <div id="musicIdentifyBox" style="padding:12px 24px 4px;">
+            <button type="button" id="musicIdentifyBtn" onclick="musicIdentifyToggle()" style="width:100%;padding:13px 14px;border-radius:12px;border:1px solid #ef7a7a;background:rgba(239,122,122,.12);color:var(--text,#fff);font:inherit;font-weight:700;cursor:pointer;">🎙️ Poznat skladbu poslechem / zabroukáním</button>
+            <div id="musicIdentifyPanel" style="display:none;margin-top:10px;padding:14px;border:1px solid var(--border,#2a3350);border-radius:14px;background:var(--bg-card,#141a2e);line-height:1.5;">
+                <div style="font-weight:700;margin-bottom:10px;">Jak na to (cca 15 sekund)</div>
+                <!-- vizuální nápověda: jak vypadá Google a kde je mikrofon -->
+                <div aria-hidden="true" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;background:#202124;border:1px solid #3c4043;margin-bottom:6px;">
+                    <span style="font-weight:800;font-size:1rem;color:#8ab4f8;">G</span>
+                    <span style="flex:1;opacity:.55;font-size:.85rem;">Hledat nebo zadat adresu…</span>
+                    <span style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#ef7a7a;box-shadow:0 0 0 4px rgba(239,122,122,.28);font-size:1.05rem;">🎙️</span>
+                </div>
+                <div aria-hidden="true" style="display:flex;justify-content:flex-end;margin:0 4px 10px;">
+                    <span style="font-size:.8rem;padding:6px 12px;border-radius:999px;background:#303134;border:1px solid #5f6368;">🎵 Vyhledat skladbu</span>
+                </div>
+                <ol style="margin:0 0 12px;padding-left:20px;font-size:.92rem;">
+                    <li>Klepni na <b>Otevřít Google</b> níže.</li>
+                    <li>Stiskni ikonu mikrofonu 🎙️ a zvol <b>„Vyhledat skladbu“</b>.</li>
+                    <li>Pusť skladbu, nebo ji <b>zabroukej, zazpívej či zahvízdej</b> (10–15 s).</li>
+                    <li>Zkopíruj název skladby, vrať se sem a klepni na <b>Vložit a hledat</b>.</li>
+                </ol>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button type="button" onclick="musicOpenGoogle()" style="flex:1 1 150px;padding:12px;border-radius:10px;border:1px solid #4285f4;background:rgba(66,133,244,.16);color:inherit;font:inherit;font-weight:700;cursor:pointer;">🎙️ Otevřít Google</button>
+                    <button type="button" id="musicPasteBtn" onclick="musicPasteSearch()" style="flex:1 1 150px;padding:12px;border-radius:10px;border:1px solid #ef7a7a;background:rgba(239,122,122,.16);color:inherit;font:inherit;font-weight:700;cursor:pointer;">📋 Vložit a hledat</button>
+                </div>
+                <div id="musicIdentifyMsg" style="margin-top:8px;font-size:.8rem;opacity:.7;"></div>
+            </div>
+        </div>
+        <script>
+        (function () {
+            var $ = function (id) { return document.getElementById(id); };
+            var _wentToGoogle = false;
+            window.musicIdentifyToggle = function () {
+                var p = $('musicIdentifyPanel'); if (!p) return;
+                p.style.display = p.style.display === 'none' ? 'block' : 'none';
+            };
+            // Otevře Google (Android: přímo „Vyhledat skladbu“, když to jde; iOS: aplikace Google; jinak google.com)
+            window.musicOpenGoogle = function () {
+                var ua = navigator.userAgent || '', fallback = 'https://www.google.com/';
+                _wentToGoogle = true;
+                var msg = $('musicIdentifyMsg');
+                if (msg) msg.textContent = 'Otevírám Google… Po rozpoznání se sem vrať a klepni na „Vložit a hledat“.';
+                try {
+                    if (/Android/i.test(ua)) {
+                        location.href = 'intent:#Intent;action=com.google.android.googlequicksearchbox.MUSIC_SEARCH;package=com.google.android.googlequicksearchbox;S.browser_fallback_url=' + encodeURIComponent(fallback) + ';end';
+                    } else if (/iPhone|iPad|iPod/i.test(ua)) {
+                        location.href = 'googleapp://';
+                        setTimeout(function () { if (!document.hidden) window.open(fallback, '_blank'); }, 1200);
+                    } else {
+                        window.open(fallback, '_blank');
+                        if (msg) msg.textContent = 'Na počítači nejde zabroukat do appky — použij telefon, nebo na google.com klikni na mikrofon a „Vyhledat skladbu“.';
+                    }
+                } catch (e) { window.open(fallback, '_blank'); }
+            };
+            // Název z Googlu → vložit do hledání (schránka; když ji prohlížeč nepustí, zeptá se)
+            window.musicPasteSearch = async function () {
+                var inp = $('musicSearchInput'), msg = $('musicIdentifyMsg'), txt = '';
+                try { txt = await navigator.clipboard.readText(); } catch (e) { txt = prompt('Vlož název skladby:', '') || ''; }
+                txt = String(txt || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+                if (!txt) { if (msg) msg.textContent = 'Schránka je prázdná — zkopíruj nejdřív název skladby z Googlu.'; return; }
+                if (inp) inp.value = txt;
+                if (msg) msg.textContent = 'Hledám: ' + txt;
+                _wentToGoogle = false;
+                try { if (typeof window.searchMusic === 'function') window.searchMusic(); } catch (e) {}
+            };
+            // po návratu z Googlu zvýrazníme „Vložit a hledat“
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden || !_wentToGoogle) return;
+                var b = $('musicPasteBtn'); if (!b) return;
+                try { b.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
+                b.style.boxShadow = '0 0 0 4px rgba(239,122,122,.5)';
+                setTimeout(function () { b.style.boxShadow = ''; }, 4000);
+            });
+        })();
+        </script>
         <div class="music-modal-body" id="musicResultsContainer"></div>
     </div>
 </div>
@@ -4843,6 +4916,30 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     window.sinOpenFromReport = function(type, id) {
         try {
             if (typeof window.openDetail !== 'function') return false;
+            const ov = document.getElementById('sinReportOverlay');
+            if (ov) {
+                // detail se musí ukázat NAD vším → výsledky se na chvíli schovají (a Nastavení zavře); po zavření detailu se vrátí
+                ov.style.display = 'none';
+                window.__sinReportReturn = true;
+                window.__sinReportOpened = false;
+                try { if (typeof closeSettingsModal === 'function') closeSettingsModal(); } catch (e) {}
+                const m = document.getElementById('modal');
+                const showAgain = () => {
+                    if (!window.__sinReportReturn) return;
+                    const o2 = document.getElementById('sinReportOverlay'); if (o2) o2.style.display = 'flex';
+                    window.__sinReportReturn = false; window.__sinReportOpened = false;
+                };
+                if (m && !window.__sinReportObs) {
+                    window.__sinReportObs = new MutationObserver(() => {
+                        if (!window.__sinReportReturn) return;
+                        if (m.classList.contains('open')) { window.__sinReportOpened = true; return; }
+                        if (window.__sinReportOpened) setTimeout(() => { if (!m.classList.contains('open')) showAgain(); }, 350);
+                    });
+                    window.__sinReportObs.observe(m, { attributes: true, attributeFilter: ['class'] });
+                }
+                // detail se z nějakého důvodu neotevřel → výsledky se vrátí
+                setTimeout(() => { if (window.__sinReportReturn && !window.__sinReportOpened && !(m && m.classList.contains('open'))) showAgain(); }, 4000);
+            }
             window.openDetail(Number(id), type === 'tv' ? 'tv' : 'movie');
             return true;
         } catch (e) { return false; }
@@ -4889,19 +4986,35 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 + 'var keep=arr.filter(function(r){return r.ts>=from;});var removed=arr.length-keep.length;'
                 + 'if(!removed){msg.style.color="#fbbf24";msg.textContent="Není co mazat — všechny záznamy jsou z dneška.";return;}'
                 + 'if(!confirm("Smazat "+removed+" starších záznamů a nechat "+keep.length+" dnešních?"))return;'
-                + 'var done=false;try{if(window.opener&&window.opener.sinTrimSyncReports){window.opener.sinTrimSyncReports(from);done=true;}}catch(e){}'
+                + 'var done=false;try{var o=(window.parent&&window.parent!==window)?window.parent:window.opener;if(o&&o.sinTrimSyncReports){o.sinTrimSyncReports(from);done=true;}}catch(e){}'
                 + 'if(!done){try{localStorage.setItem(KEY,JSON.stringify(keep));}catch(e){msg.style.color="#fca5a5";msg.textContent="Nepodařilo se uložit.";return;}}'
                 + 'Array.prototype.forEach.call(document.querySelectorAll("section[data-ts]"),function(s){if(Number(s.getAttribute("data-ts"))<from)s.remove();});'
                 + 'msg.style.color="#86efac";msg.textContent="✅ Smazáno "+removed+" starších záznamů, nechán jen dnešek ("+keep.length+").";btn.disabled=true;btn.style.opacity=".5";};})();<\/script>';
             const OPEN_SCRIPT = '<script>(function(){var APP=' + JSON.stringify(location.origin + location.pathname) + ';'
                 + 'document.addEventListener("click",function(e){var li=e.target.closest&&e.target.closest("li[data-open]");if(!li)return;var p=li.getAttribute("data-open").split(":");'
-                + 'try{var o=window.opener;if(o&&!o.closed&&o.sinOpenFromReport&&o.sinOpenFromReport(p[0],p[1])){try{o.focus();}catch(x){}try{window.close();}catch(x){}return;}}catch(x){}'
+                + 'try{var inF=window.parent&&window.parent!==window;var o=inF?window.parent:window.opener;if(o&&!o.closed&&o.sinOpenFromReport&&o.sinOpenFromReport(p[0],p[1])){if(!inF){try{o.focus();}catch(x){}try{window.close();}catch(x){}}return;}}catch(x){}'
                 + 'location.href=APP+"#sinopen="+p[0]+":"+p[1];});})();<\/script>';
             const page = `<!doctype html><html lang=\"cs\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Výsledky synchronizace Histra ↔ Sinator</title>`
                 + `<style>body{background:#0b1020;color:#fff;font:15px/1.5 system-ui,sans-serif;margin:0 auto;padding:16px;max-width:760px}h1{font-size:1.2rem}h2{font-size:1rem;margin:0 0 4px}h3{font-size:.95rem;color:#c4b5fd;margin:14px 0 6px}section{border-top:1px solid #2a3350;padding:14px 0}section.now{background:#141a2e;border:1px solid #8b5cf6;border-radius:12px;padding:12px 14px;margin:10px 0}ul{margin:0;padding-left:20px}li{padding:2px 0}li.open{cursor:pointer;padding:7px 0;color:#e9e5ff;text-decoration:underline dotted #8b5cf6;text-underline-offset:4px}li.open:active{opacity:.6}.hint{margin-top:8px;color:#a78bfa;font-size:.85rem}.note{color:#ffd180;margin-top:12px}.err{color:#ff8a80;font-weight:700;margin-top:12px}.dim{opacity:.65;font-size:.85rem}</style></head><body>`
                 + `<h1>🔄 Výsledky synchronizace Histra ↔ Sinator</h1>${now}${runs}`
                 + `<div style=\"border-top:1px solid #2a3350;padding:18px 0 40px\"><button id=\"trimBtn\" style=\"width:100%;padding:14px;border-radius:12px;border:1px solid #f87171;background:#2a1418;color:#fca5a5;font:inherit;font-weight:700\">🗑️ Smazat předchozí a nechat jen dnešek</button><div id=\"trimMsg\" style=\"margin-top:10px;color:#86efac\"></div></div>`
                 + TRIM_SCRIPT + OPEN_SCRIPT + `</body></html>`;
+            try {
+                // Výsledky se ukážou přímo v appce (vrstva nad vším) — detail se pak otevře nad nimi, ne pod samostatnou záložkou
+                const old = document.getElementById('sinReportOverlay'); if (old) old.remove();
+                const ov = document.createElement('div');
+                ov.id = 'sinReportOverlay';
+                ov.style.cssText = 'position:fixed;inset:0;z-index:99000;background:#0b1020;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);';
+                ov.innerHTML = '<div style="flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #2a3350;background:#0f162b;"><button type="button" id="sinReportBack" style="padding:8px 16px;border-radius:20px;border:1px solid #2a3350;background:#141a2e;color:#fff;font:inherit;font-weight:600;">← Zpět</button><div style="font-weight:700;">🔄 Výsledky synchronizace</div></div>';
+                const fr = document.createElement('iframe');
+                fr.style.cssText = 'flex:1 1 auto;border:0;width:100%;background:#0b1020;';
+                fr.srcdoc = page;
+                ov.appendChild(fr);
+                document.body.appendChild(ov);
+                ov.querySelector('#sinReportBack').onclick = () => { window.__sinReportReturn = false; ov.remove(); };
+                return;
+            } catch (e2) { console.warn('sinOpenSyncReport overlay:', e2); }
+            // záloha: samostatná záložka
             const url = URL.createObjectURL(new Blob([page], { type: 'text/html;charset=utf-8' }));
             const w = window.open(url, '_blank');
             if (!w) location.href = url;
