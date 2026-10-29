@@ -7042,6 +7042,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-29c', date: '29. 10. 2026', items: [
+            '🎯 AI vyhledávání přesnější: výsledky se řadí podle shody (konkrétní tituly → nejpřesnější klíčové slovo → ostatní klíčová slova → jen žánr), ne jen podle popularity; zrušeno přimíchávání obecně populárních filmů ze stejného žánru (např. Gladiátor/Návrat do budoucnosti u dotazu na motorkářské závody)'
+        ] },
         { version: '2026-10-29b', date: '29. 10. 2026', items: [
             '🛠️ AI vyhledávání: už se netočí donekonečna na „OpenRouter analyzuje…“ — každá AI služba (Gemini, Groq, OpenRouter) má celkový limit 25 s včetně čtení odpovědi, po něm se přejde na další / přímé hledání. Chyby od OpenRouteru (např. vyčerpaný limit) se teď správně zapisují do hlášky o chybě'
         ] },
@@ -12662,6 +12665,11 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
 
                 const seenIds_s = new Set();
                 const found_s = [];
+                // Relevance výsledků: 3 = konkrétní tituly/reference, 2.5/2 = shoda na klíčová slova,
+                // 1 = jen žánr (nejméně přesné), 0.5 = TMDB „similar“. Řadí se podle toho, pak podle popularity —
+                // dřív se vše řadilo jen podle popularity a populární žánrovky (Gladiátor…) vyskočily nahoru.
+                let _relFrom = 0;
+                const _markRel = (v) => { for (let i=_relFrom;i<found_s.length;i++) { if (found_s[i]._rel == null) found_s[i]._rel = v; } _relFrom = found_s.length; };
 
                 // Helper: search title on TMDB
                 async function _smartAddTitle(title, type) {
@@ -12785,6 +12793,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     }
                 }
 
+                _markRel(3);
                 // 6. discoverParams (filter-based: language, year, genre)
                 if (parsed.discoverParams) {
                     const dp = parsed.discoverParams;
@@ -12806,6 +12815,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     } catch(e) {}
                 }
 
+                _markRel(3);
                 // 7. Hybridní discover: with_genres + with_keywords_str z AI (vždy, až 3 stránky)
                 const hasExplicitTitles = (parsed.titles||[]).length + (parsed.tvTitles||[]).length + (parsed.animatedTitles||[]).length > 0;
                 // Bezpečnostní pojistka: u FICTIONAL CHARACTER dotazů (characterActor vyplněný) NEBO
@@ -12835,6 +12845,20 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     }
                     for (const discType of discTypes_h) {
                         const vf = discType === 'movie' ? '&vote_count.gte=10' : '&vote_count.gte=5';
+                        // Nejspecifičtější klíčové slovo (první) samostatně, bez žánrového omezení — nejpřesnější shoda
+                        if (kwIdsForGenre.length) {
+                            try {
+                                const spec = await Promise.all([1,2].map(pg => {
+                                    let u = `${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_keywords=${kwIdsForGenre[0]}&sort_by=popularity.desc${vf}&page=${pg}`;
+                                    if (aiYear) u += (discType==='tv' ? `&first_air_date_year=${aiYear}` : `&primary_release_year=${aiYear}`);
+                                    return _fetchWithTimeout(u).then(r=>r.json()).catch(()=>({results:[]}));
+                                }));
+                                for (const pr of spec) for (const item of (pr.results || [])) {
+                                    if (!seenIds_s.has(item.id)) { seenIds_s.add(item.id); found_s.push({...item, media_type: discType}); }
+                                }
+                                _markRel(2.5);
+                            } catch(e) {}
+                        }
                         // Fetch pages 1–3 in parallel for richer results
                         const pages = [1,2,3];
                         const pageFetches = pages.map(pg => {
@@ -12846,7 +12870,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                         });
                         // Also fetch without keywords (broader) for page 1 — jen pokud jsou žánry
                         let broadFetch = null;
-                        if (kwIdsForGenre.length && aiGenres) {
+                        if (false && kwIdsForGenre.length && aiGenres) {
                             let broadUrl = `${BASE}/discover/${discType}?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&with_genres=${aiGenres}&sort_by=popularity.desc${vf}&page=1`;
                             if (aiYear) broadUrl += (discType==='tv' ? `&first_air_date_year=${aiYear}` : `&primary_release_year=${aiYear}`);
                             broadFetch = _fetchWithTimeout(broadUrl).then(r=>r.json()).catch(()=>({results:[]}));
@@ -12857,9 +12881,11 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                                 if (!seenIds_s.has(item.id)) { seenIds_s.add(item.id); found_s.push({...item, media_type: discType}); }
                             }
                         }
+                        _markRel(kwIdsForGenre.length ? 2 : 1);
                     }
                 }
 
+                _markRel(2);
                 // 7b. Keyword discover (fallback nebo doplněk — bez žánrů nebo pokud stále málo výsledků)
                 // Stejná pojistka jako u 7a: u FICTIONAL CHARACTER a explicitních filtrových dotazů (discoverParams) ignorovat keywords.
                 const kws_s = (parsed.characterActor || parsed.discoverParams) ? [] : (parsed.keywords || []);
@@ -12897,6 +12923,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     }
                 }
 
+                _markRel(2);
                 // 7c. with_keywords_str discover (bez žánrů — pro tematické hledání bez explicitního žánru)
                 if (aiKwStr && !aiGenres && mediaCount_s < 40) {
                     const kwTerms2 = aiKwStr.split(',').map(s=>s.trim()).filter(Boolean).slice(0,5);
@@ -12922,6 +12949,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     }
                 }
 
+                _markRel(2);
                 // 8. Rozšíření o podobné tituly (TMDB /similar), pokud je výsledků málo — najde vizuálně/tematicky podobné i mimo keywords
                 {
                     const mediaCountNow = found_s.filter(x=>x.media_type!=='actor'&&x.media_type!=='director').length;
@@ -12941,6 +12969,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     }
                 }
 
+                _markRel(0.5);
                 if (found_s.length === 0) {
                     // Než sáhneme po nespolehlivém textovém hledání, zkusíme tematickou databázi
                     const fallbackPreset = _getThemePreset(parsed.query || query);
@@ -12964,7 +12993,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 // právě to řazení "nejlepší", kvůli kterému byl discoverParams vůbec použit.
                 const persons_s = found_s.filter(x => x.media_type === 'actor' || x.media_type === 'director');
                 const mediaRaw_s = found_s.filter(x => x.media_type !== 'actor' && x.media_type !== 'director');
-                const media_s = parsed.discoverParams ? mediaRaw_s : mediaRaw_s.sort((a,b) => (b.popularity||0) - (a.popularity||0));
+                const media_s = parsed.discoverParams ? mediaRaw_s : mediaRaw_s.sort((a,b) => ((b._rel ?? 0) - (a._rel ?? 0)) || ((b.popularity||0) - (a.popularity||0)));
                 appendGrid([...persons_s, ...media_s], true);
                 state._aiLastParsed = {...parsed, _seenIds: [...seenIds_s], _discoverPage: 2};
                 _showAiLoadMore(parsed.query || query);
