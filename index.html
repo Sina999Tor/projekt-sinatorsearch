@@ -2269,6 +2269,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         </div>
         <div class="ivysilani-tabs">
             <button class="ivysilani-tab active" onclick="ivysilaniSetTab('hledat')">🔍 Hledat</button>
+<button class="ivysilani-tab" onclick="ivysilaniSetTab('zive')">📡 Živě</button>
             <button class="ivysilani-tab" onclick="ivysilaniSetTab('oblibene')">❤️ Oblíbené</button>
             <button class="ivysilani-tab" onclick="ivysilaniSetTab('filmy')">🎬 Filmy</button>
             <button class="ivysilani-tab" onclick="ivysilaniSetTab('serialy')">📺 Seriály</button>
@@ -2290,6 +2291,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         </div>
         <div class="iprima-tabs">
             <button class="iprima-tab active" onclick="iprimaSetTab('hledat')">🔍 Hledat</button>
+<button class="iprima-tab" onclick="iprimaSetTab('zive')">📡 Živě</button>
             <button class="iprima-tab" onclick="iprimaSetTab('oblibene')">❤️ Oblíbené</button>
             <button class="iprima-tab" onclick="iprimaSetTab('filmy')">🎬 Filmy</button>
             <button class="iprima-tab" onclick="iprimaSetTab('serialy')">📺 Seriály</button>
@@ -23166,6 +23168,41 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     </div>
 </div>
 <style>
+    #novaModal .lob-logo,#ivysilaniBody .lob-logo,#iprimaBody .lob-logo{width:auto;min-width:48px;padding:0 10px;box-sizing:border-box;white-space:nowrap}
+</style>
+<script>
+    // Živé kanály (stejný seznam a styl jako v okně Nova)
+    window.LIVE_CT = [
+        { logo: 'ČT1', name: 'ČT1', url: 'https://www.ceskatelevize.cz/zive/ct1/' },
+        { logo: 'ČT2', name: 'ČT2', url: 'https://www.ceskatelevize.cz/zive/ct2/' },
+        { logo: 'ČT24', name: 'ČT24', url: 'https://www.ceskatelevize.cz/zive/ct24/' },
+        { logo: 'SPORT', name: 'ČT sport', url: 'https://www.ceskatelevize.cz/zive/sport/' },
+        { logo: ':D', name: 'ČT :D', url: 'https://www.ceskatelevize.cz/zive/decko/' },
+        { logo: 'ART', name: 'ČT art', url: 'https://www.ceskatelevize.cz/zive/art/' }
+    ];
+    window.LIVE_PRIMA = [
+        { logo: 'Prima', name: 'Prima', url: 'https://www.iprima.cz/zive' },
+        { logo: 'MAX', name: 'Prima MAX', url: 'https://www.iprima.cz/zive/max' },
+        { logo: 'LOVE', name: 'Prima LOVE', url: 'https://www.iprima.cz/zive/love' },
+        { logo: 'KRIMI', name: 'Prima KRIMI', url: 'https://www.iprima.cz/zive/krimi' },
+        { logo: 'ZOOM', name: 'Prima ZOOM', url: 'https://www.iprima.cz/zive/zoom' },
+        { logo: 'COOL', name: 'Prima COOL', url: 'https://www.iprima.cz/zive/cool' },
+        { logo: 'SHOW', name: 'Prima SHOW', url: 'https://www.iprima.cz/zive/show' },
+        { logo: 'STAR', name: 'Prima STAR', url: 'https://www.iprima.cz/zive/star' },
+        { logo: 'SPORT', name: 'Prima SPORT', url: 'https://www.iprima.cz/zive/sport' },
+        { logo: 'CNN', name: 'CNN Prima NEWS', url: 'https://cnn.iprima.cz/vysilani' }
+    ];
+    window.liveChannelsHtml = function (channels, color) {
+        return '<div style="font-weight:700;color:' + color + ';margin-bottom:8px;">📡 Živé vysílání</div>'
+            + '<div style="display:flex;flex-direction:column;gap:7px;">'
+            + channels.map(function (c) {
+                return '<button type="button" class="live-official-btn" style="border-left-color:' + color + ';" onclick="window.open(\'' + c.url + '\',\'_blank\')">'
+                    + '<span class="lob-logo">' + c.logo + '</span><span class="lob-name">' + c.name + '</span><span class="lob-arrow">→</span></button>';
+            }).join('')
+            + '</div>';
+    };
+</script>
+<style>
     .novaChip{padding:8px 12px;border-radius:999px;border:1px solid #f59e0b;background:rgba(245,158,11,.1);color:#fff;font:inherit;font-size:.82rem;cursor:pointer;}
     .novaChip:active{opacity:.6}
 </style>
@@ -43527,7 +43564,7 @@ function ivysilaniSetTab(tab) {
     ivysilaniState.tab = tab;
     ivysilaniFilter = { genre: '', letter: '' }; // reset filtrů při změně tabu
     document.querySelectorAll('.ivysilani-tab').forEach((b,i) => {
-        const tabs = ['hledat','oblibene','filmy','serialy','dokumenty','detske','moje'];
+        const tabs = ['hledat','zive','oblibene','filmy','serialy','dokumenty','detske','moje'];
         b.classList.toggle('active', tabs[i] === tab);
     });
     renderIvysilaniTab(tab);
@@ -43657,6 +43694,9 @@ function renderIvysilaniTab(tab) {
         </div>`;
 
     // ── Oblíbené ─────────────────────────────────────────────────────────────
+    } else if (tab === 'zive') {
+        html += `<div style="margin-bottom:14px;">${window.liveChannelsHtml(window.LIVE_CT, '#3b82f6')}<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="menu-row-btn" style="flex:1 1 150px;justify-content:center;" onclick="window.open('https://www.ceskatelevize.cz/zive/','_blank')">Přehled živě</button><button type="button" class="menu-row-btn" style="flex:1 1 150px;justify-content:center;" onclick="window.open('https://www.ceskatelevize.cz/ivysilani/','_blank')">iVysílání (archiv)</button></div></div>`;
+
     } else if (tab === 'oblibene') {
         const items = lists.oblibene || [];
         html += `<div style="margin-bottom:12px;">
@@ -44551,7 +44591,7 @@ function iprimaSetTab(tab) {
     iprimaState.tab = tab;
     document.querySelectorAll('.iprima-tab').forEach(t => t.classList.remove('active'));
     const tabs = document.querySelectorAll('.iprima-tab');
-    const tabOrder = ['hledat', 'oblibene', 'filmy', 'serialy', 'porady', 'moje'];
+    const tabOrder = ['hledat', 'zive', 'oblibene', 'filmy', 'serialy', 'porady', 'moje'];
     const idx = tabOrder.indexOf(tab);
     if (tabs[idx]) tabs[idx].classList.add('active');
     renderIprimaTab(tab);
@@ -44621,6 +44661,9 @@ function renderIprimaTab(tab) {
         </div>`;
 
     // ── Oblíbené ──────────────────────────────────────────────────────────────
+    } else if (tab === 'zive') {
+        html += `<div style="margin-bottom:14px;">${window.liveChannelsHtml(window.LIVE_PRIMA, '#e30613')}<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="menu-row-btn" style="flex:1 1 150px;justify-content:center;" onclick="window.open('https://www.iprima.cz/zive','_blank')">iprima.cz/zive</button><button type="button" class="menu-row-btn" style="flex:1 1 150px;justify-content:center;" onclick="window.open('https://www.iprima.cz','_blank')">iprima.cz</button></div></div>`;
+
     } else if (tab === 'oblibene') {
         const items = lists.oblibene || [];
         html += `<div style="margin-bottom:12px;">
