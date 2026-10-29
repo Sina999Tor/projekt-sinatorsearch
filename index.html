@@ -7042,6 +7042,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-29b', date: '29. 10. 2026', items: [
+            '🛠️ AI vyhledávání: už se netočí donekonečna na „OpenRouter analyzuje…“ — každá AI služba (Gemini, Groq, OpenRouter) má celkový limit 25 s včetně čtení odpovědi, po něm se přejde na další / přímé hledání. Chyby od OpenRouteru (např. vyčerpaný limit) se teď správně zapisují do hlášky o chybě'
+        ] },
         { version: '2026-10-29', date: '29. 10. 2026', items: [
             '🧪 Nastavení → AI klíče: u Gemini, Groq i OpenRouter nové tlačítko „Otestovat“ — ověří, jestli klíč opravdu funguje (zkouší zadaný klíč, jinak uložený); výsledek se ukáže u stavu, bez spotřeby tokenů'
         ] },
@@ -12280,11 +12283,18 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             async function _callWithTools(url, apiKey, model, messages, hdrs, temp, _retryCount) {
                 const attempt = _retryCount || 0;
                 const useTemp = typeof temp === 'number' ? temp + (attempt * 0.2) : 0.1 + (attempt * 0.2);
+                // Celkový limit 25 s i na čtení těla odpovědi (OpenRouter občas pošle hlavičky a pak
+                // tělo nikdy nedokončí → res.json() visel navždy a hledání se točilo donekonečna)
+                const _ctrl = new AbortController();
+                const _onAbort = () => _ctrl.abort();
+                signal.addEventListener('abort', _onAbort);
+                const _timer = setTimeout(() => { console.warn('[AI] '+model+' timeout 25s'); _ctrl.abort(); }, 25000);
+                try {
                 const res = await _withAiTimeout(fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, ...(hdrs||{}) },
                     body: JSON.stringify({ model, messages, tools: aiTools, tool_choice: {type:'function', function:{name:'smart_movie_search'}}, max_tokens: 2048, temperature: useTemp }),
-                    signal
+                    signal: _ctrl.signal
                 }), 20000).catch((e) => { console.warn('[AI] '+model+' network chyba:', e?.message||e); return null; });
                 if (signal.aborted) return null;
                 if (!res) return null;
@@ -12310,12 +12320,23 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 }
                 const j = await res.json().catch(() => null);
                 if (!j) return null;
+                if (j?.error && !j?.choices) {
+                    const em = `${model}: ${(j.error.message || j.error.code || 'chyba').toString().slice(0,300)}`;
+                    console.warn('[AI] '+em);
+                    (window._lastAiErrors = window._lastAiErrors || []).push(em);
+                    if (!window._lastAiError) window._lastAiError = em;
+                    return null;
+                }
                 const msg = j?.choices?.[0]?.message;
                 if (!msg) return null;
                 // Vrátit tool_call nebo text content
                 if (msg.tool_calls?.length) return { tool_calls: msg.tool_calls };
                 if (msg.content) return { content: msg.content };
                 return null;
+                } finally {
+                    clearTimeout(_timer);
+                    signal.removeEventListener('abort', _onAbort);
+                }
             }
 
             // ── KONVERZE tool_call → parsed formát ────────────────────────────
@@ -12407,6 +12428,10 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 // (např. "gemini-2.5-flash") Google postupně vyřazuje z provozu a volání
                 // pak vrací 404, což se dřív tiše polykalo a AI hledání přestalo fungovat úplně.
                 let geminiRes = null, geminiErrInfo = '';
+                const _gCtrl = new AbortController();
+                const _gOnAbort = () => _gCtrl.abort();
+                signal.addEventListener('abort', _gOnAbort);
+                const _gTimer = setTimeout(() => { console.warn('[AI] Gemini timeout 25s'); _gCtrl.abort(); }, 25000);
                 try {
                     geminiRes = await _withAiTimeout(fetch(
                         `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${geminiApiKey}`,
@@ -12418,7 +12443,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                               tool_config:{function_calling_config:{mode:'ANY', allowed_function_names:['smart_movie_search']}},
                               generationConfig:{temperature:0.1, maxOutputTokens:2048}
                           }),
-                          signal }
+                          signal: _gCtrl.signal }
                     ), 20000);
                 } catch(e) { geminiErrInfo = 'network: ' + (e?.message||e); }
                 // Tento běh mezitím zrušilo novější hledání (nebo zavření overlaye) —
@@ -12444,6 +12469,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     const errBody = await geminiRes.text().catch(()=>'');
                     geminiErrInfo = `HTTP ${geminiRes.status}: ${errBody.slice(0,300)}`;
                 }
+                clearTimeout(_gTimer); signal.removeEventListener('abort', _gOnAbort);
                 if (!data && geminiErrInfo) {
                     console.warn('[AI] Gemini volání selhalo —', geminiErrInfo);
                     if (!window._lastAiError) window._lastAiError = 'Gemini: ' + geminiErrInfo;
