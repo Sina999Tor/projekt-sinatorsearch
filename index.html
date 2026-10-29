@@ -7043,8 +7043,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
-        { version: '2026-10-29e', date: '29. 10. 2026', items: [
-            '📦 Kolekce: nové tlačítko ⊿ i v záložce Kolekce — řazení 🔥 Populární, 📅 Nejnovější, 👁 Nejsledovanější (podle počtu filmů, které jsi zhlédl), 🔤 A → Z a 🎭 Žánr (vybereš žánr a zobrazí se jen kolekce s filmy v tomto žánru)',
+        { version: '2026-10-29f', date: '29. 10. 2026', items: [
+            '📦 Kolekce: nové tlačítko ⊿ i v záložce Kolekce — řazení 🔥 Populární, 📅 Nejnovější, 👁 Nejsledovanější (podle počtu filmů, které jsi zhlédl), 🔤 A → Z a 🎭 Žánr (vybereš žánr a zobrazí se jen kolekce s filmy v tomto žánru); seznam je nekonečný u všech řazení — Populární / Nejnovější / Žánr se řadí přímo podle TMDB filmů, Nejsledovanější podle tvých zhlédnutých filmů, A → Z postupně po písmenech',
         ] },
         { version: '2026-10-29d', date: '29. 10. 2026', items: [
             '📦 Nová záložka „Kolekce“ ve výběru Filmy / Seriály / Minisérie / Anime / Herci / Režiséři — mřížka filmových kolekcí (Star Wars, Pán prstenů, Avatar…), klepnutí otevře seznam filmů kolekce, srdíčkem jde kolekce přidat do oblíbených',
@@ -8298,10 +8298,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     }
     window.renderCollGenreOptions = function() {
         const dd = $('tabSortDropdown');
-        const present = new Set();
-        (window._collViewAll || []).forEach(c => (c.parts || []).forEach(p => (p.genre_ids || []).forEach(g => present.add(g))));
         const cg = String(state.collGenre || '');
-        const list = (TMDB_GENRES.movie || []).filter(g => typeof g.id === 'number' && (!present.size || present.has(g.id)));
+        const list = (TMDB_GENRES.movie || []).filter(g => typeof g.id === 'number');
         dd.innerHTML = `<button class="tab-sort-opt${!cg?' active':''}" onclick="applyCollGenre('')">🎭 Všechny žánry</button>`
             + list.map(g => `<button class="tab-sort-opt${cg===String(g.id)?' active':''}" onclick="applyCollGenre('${g.id}')">${g.name}</button>`).join('')
             + `<button class="tab-sort-opt" onclick="event.stopPropagation();renderSortOptions()">← Zpět</button>`;
@@ -8309,12 +8307,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     function _collCloseSortDd() { const dd = $('tabSortDropdown'); if (dd) dd.style.display = 'none'; $('globalSortBtn')?.classList.remove('active'); }
     window.applyCollSort = function(val) {
         state.collSort = val; state.collGenre = '';
-        _collCloseSortDd(); renderCollectionsView(true);
+        _collCloseSortDd(); startCollectionsFeed();
     };
     window.applyCollGenre = function(gid) {
         state.collGenre = gid || '';
         if (gid) state.collSort = 'popular';
-        _collCloseSortDd(); renderCollectionsView(true);
+        _collCloseSortDd(); startCollectionsFeed();
     };
 
     window.renderReleaseTypeOptions = function() {
@@ -13579,54 +13577,143 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         return c;
     }
     function _collClean(n) { return String(n || '').replace(/\s*[\(\-–]?\s*(kolekce|collection)\)?\s*$/i, '').trim() || String(n || ''); }
-    function renderCollectionsView(scrollTop) {
+    // ── Nekonečný feed kolekcí: Populární/Nejnovější/Nejsledovanější/Žánr = curated + TMDB hledání "collection";
+    //    A–Z = hledání po písmenech a, b, c… (každá dávka seřazená abecedně) ──
+    const _COLL_LETTERS = 'abcdefghijklmnopqrstuvwxyz0123456789'.split('');
+    function _collNorm(n) { return String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/^(the|a|an)\s+/, '').trim(); }
+    async function _collEnrich(c) {
+        if (c.parts) return c;
+        try {
+            const r = await _fetchWithTimeout(`${BASE}/collection/${c.id}?api_key=${tmdbApiKey}&language=cs-CZ`);
+            const d = await r.json();
+            if (d && d.id) { c.parts = d.parts || []; if (d.name) c.name = d.name; c.poster_path = d.poster_path || c.poster_path; c.backdrop_path = d.backdrop_path || c.backdrop_path; }
+        } catch (e) {}
+        return c;
+    }
+    function startCollectionsFeed() {
         if (state.view !== 'collections') return;
-        const all = (window._collViewAll || []).map(_collMetrics);
-        const sort = state.collSort || 'popular', gid = state.collGenre ? Number(state.collGenre) : 0;
-        let list = gid ? all.filter(c => (c.parts || []).some(p => (p.genre_ids || []).includes(gid))) : all.slice();
-        if (gid) list.forEach(c => { c._gpop = (c.parts || []).filter(p => (p.genre_ids || []).includes(gid)).reduce((m, p) => Math.max(m, p.popularity || 0), 0); });
-        if (gid) list.sort((a, b) => b._gpop - a._gpop);
-        else if (sort === 'newest') list.sort((a, b) => b._newest.localeCompare(a._newest));
-        else if (sort === 'watched') list.sort((a, b) => (b._watched - a._watched) || (b._pop - a._pop));
-        else if (sort === 'az') list.sort((a, b) => _collClean(a.name).localeCompare(_collClean(b.name), 'cs'));
-        else list.sort((a, b) => b._pop - a._pop);
-        state.totalPages = 1;
+        state._collFeed = { sort: state.collSort || 'popular', gid: state.collGenre ? Number(state.collGenre) : 0,
+            seen: new Set(), phase: 'curated', page: 1, totalPages: 1, letterIdx: 0, done: false, shown: 0 };
+        state.totalPages = 1; state._allItems = []; state._loadingMore = true; state._customLoadMore = null;
         hideMainAzBar();
-        if (!list.length) { resultsEl.innerHTML = '<div class="empty">😕 Žádné kolekce v tomto žánru.</div>'; }
-        else {
-            appendCollectionGrid(list, true);
-            if (gid) resultsEl.insertAdjacentHTML('afterbegin', `<div style="grid-column:1/-1;padding:6px 10px;font-size:0.8rem;opacity:0.8;">🎭 Žánr: <b>${_collGenreName(gid)}</b> · ${list.length} kolekcí</div>`);
+        paginationContainer.style.display = 'none';
+        $('mainContent').style.display = 'block';
+        resultsEl.innerHTML = '<div class="loading"><div class="spinner"></div>Načítám kolekce...</div>';
+        window.scrollTo({ top: 0 });
+        loadMoreCollections(true);
+    }
+    window._movieCollCache = window._movieCollCache || new Map();
+    async function _movieCollection(id) {
+        const cache = window._movieCollCache;
+        if (cache.has(id)) return cache.get(id);
+        let col = null;
+        try {
+            const r = await _fetchWithTimeout(`${BASE}/movie/${id}?api_key=${tmdbApiKey}&language=cs-CZ`);
+            const d = await r.json();
+            col = d && d.belongs_to_collection ? d.belongs_to_collection : null;
+        } catch (e) { return undefined; }
+        cache.set(id, col);
+        return col;
+    }
+    function _collWatchedMovieIds() {
+        const ids = new Set();
+        try { Object.keys(state.watched || {}).forEach(k => { if (k.startsWith('movie_')) ids.add(Number(k.slice(6))); }); } catch (e) {}
+        try { if (mySinatorWatchedCache && mySinatorWatchedCache.movies) mySinatorWatchedCache.movies.forEach(i => ids.add(Number(i))); } catch (e) {}
+        ids.delete(NaN);
+        return [...ids].slice(0, 600);
+    }
+    async function loadMoreCollections(first) {
+        const feed = state._collFeed;
+        if (!feed || feed.done || state.view !== 'collections') { state._loadingMore = false; return; }
+        state._loadingMore = true; state._customLoadMore = null;
+        setInfiniteLoading(true);
+        const batch = [];
+        const isAz = feed.sort === 'az' && !feed.gid;
+        const isWatchedMode = feed.sort === 'watched' && !feed.gid;
+        const alive = () => state._collFeed === feed && state.view === 'collections';
+        try {
+            if (isWatchedMode) {
+                // Nejsledovanější = kolekce, ze kterých jsi zhlédl nejvíc filmů (seřazeno celé najednou, pak se stránkuje)
+                if (!feed.queue) {
+                    const ids = _collWatchedMovieIds();
+                    const counts = new Map();
+                    for (let i = 0; i < ids.length; i += 40) {
+                        const cols = await Promise.all(ids.slice(i, i + 40).map(_movieCollection));
+                        cols.forEach(c => { if (c && c.id) { const e = counts.get(c.id) || { c, n: 0 }; e.n++; counts.set(c.id, e); } });
+                        if (!alive()) return;
+                    }
+                    feed.queue = [...counts.values()].sort((x, y) => y.n - x.n).map(e => e.c);
+                }
+                const chunk = feed.queue.splice(0, 12);
+                if (!feed.queue.length) feed.done = true;
+                await Promise.all(chunk.map(_collEnrich));
+                if (!alive()) return;
+                chunk.forEach(c => { if (c.parts && c.parts.length) batch.push(c); });
+            } else {
+                let guard = 0;
+                while (batch.length < 12 && !feed.done && guard++ < (isAz ? 8 : 10)) {
+                    let url, letter = null;
+                    if (isAz) {
+                        if (feed.letterIdx >= _COLL_LETTERS.length) { feed.done = true; break; }
+                        letter = _COLL_LETTERS[feed.letterIdx];
+                        url = `${BASE}/search/collection?api_key=${tmdbApiKey}&language=en-US${tmdbAdult()}&query=${encodeURIComponent(letter)}&page=${feed.page}`;
+                    } else {
+                        if (feed.page > Math.min(feed.totalPages, 500)) { feed.done = true; break; }
+                        const today = new Date().toISOString().slice(0, 10);
+                        const sort = (feed.sort === 'newest' && !feed.gid) ? 'primary_release_date.desc' : 'popularity.desc';
+                        const g = feed.gid ? `&with_genres=${feed.gid}` : '';
+                        url = `${BASE}/discover/movie?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=${sort}${g}&vote_count.gte=${sort.startsWith('primary') ? 30 : 100}&primary_release_date.lte=${today}&page=${feed.page}`;
+                    }
+                    let data = null;
+                    try { data = await (await _fetchWithTimeout(url)).json(); } catch (e) {}
+                    if (!alive()) return;
+                    const results = (data && data.results) || [];
+                    feed.totalPages = (data && data.total_pages) || 1;
+                    let fresh;
+                    if (isAz) {
+                        fresh = results.filter(c => c && c.id && !feed.seen.has(c.id) && _collNorm(c.name).startsWith(letter));
+                    } else {
+                        const cols = await Promise.all(results.map(m => _movieCollection(m.id)));
+                        if (!alive()) return;
+                        fresh = [];
+                        cols.forEach(c => { if (c && c.id && !feed.seen.has(c.id)) { feed.seen.add(c.id); fresh.push({ id: c.id, name: c.name, poster_path: c.poster_path, backdrop_path: c.backdrop_path }); } });
+                    }
+                    fresh.forEach(c => feed.seen.add(c.id));
+                    await Promise.all(fresh.map(_collEnrich));
+                    if (!alive()) return;
+                    fresh.forEach(c => { if (c.parts && c.parts.length) batch.push(c); });
+                    if (feed.page >= Math.min(feed.totalPages, 500) || !results.length) {
+                        if (isAz) { feed.letterIdx++; feed.page = 1; feed.totalPages = 1; } else feed.done = true;
+                    } else feed.page++;
+                }
+            }
+            if (!alive()) return;
+            batch.forEach(_collMetrics);
+            // Pořadí z TMDB (popularita / datum / počet zhlédnutých) se zachová; jen A–Z se řadí v dávce abecedně
+            if (isAz) batch.sort((a, b) => _collClean(a.name).localeCompare(_collClean(b.name), 'cs'));
+            if (first) resultsEl.innerHTML = '';
+            if (batch.length) appendCollectionGrid(batch, false);
+            feed.shown += batch.length;
+            if (first && feed.gid) resultsEl.insertAdjacentHTML('afterbegin', `<div style="grid-column:1/-1;padding:6px 10px;font-size:0.8rem;opacity:0.8;">🎭 Žánr: <b>${_collGenreName(feed.gid)}</b> — další kolekce se dotahují při scrollování</div>`);
+            if (!feed.shown && feed.done) resultsEl.innerHTML = isWatchedMode ? '<div class="empty">😕 Zatím nemáš zhlédnutý žádný film z kolekce.</div>' : '<div class="empty">😕 Žádné kolekce nenalezeny.</div>';
+            else if (!feed.shown && first) resultsEl.innerHTML = '<div class="empty">😕 Zatím nic — scrolluj dál…</div>';
+        } catch (e) {
+            console.error('loadMoreCollections error:', e);
+            if (first && !feed.shown) resultsEl.innerHTML = `<div class="empty" style="text-align:center;">⚠️ Chyba načítání<br><small style="color:#888;font-size:0.75rem;">${e.message}</small></div>`;
+        } finally {
+            if (state._collFeed === feed) {
+                setInfiniteLoading(false);
+                state._loadingMore = false;
+                if (!feed.done && state.view === 'collections' && !state._aiResultsLocked) state._customLoadMore = () => loadMoreCollections(false);
+                if (!feed.done && state.view === 'collections' && !state._aiResultsLocked && document.documentElement.scrollHeight < window.innerHeight + 400) { state._loadingMore = true; setTimeout(() => loadMoreCollections(false), 50); }
+            }
         }
-        if (scrollTop) window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     async function loadCollectionsView(isFirstPage) {
         state._customLoadMore = null; state._releaseTypeBrowse = null;
         if (!tmdbApiKey) { resultsEl.innerHTML = '<div class="empty">⚠️ Nejprve zadejte TMDB API klíč v nastavení!</div>'; state._loadingMore = false; return; }
-        if (!isFirstPage) { state._loadingMore = false; return; } // vše se načítá najednou, řazení/filtr je lokální
-        resultsEl.innerHTML = '<div class="loading"><div class="spinner"></div>Načítám kolekce...</div>'; state._allItems = []; hideMainAzBar();
-        paginationContainer.style.display = 'none';
-        $('mainContent').style.display = 'block';
-        setInfiniteLoading(true);
-        try {
-            if (!window._collViewAll || !window._collViewAll.length) {
-                let ids = [];
-                try { ids = [...new Set(typeof POPULAR_COLLECTION_IDS !== 'undefined' ? POPULAR_COLLECTION_IDS : [])]; } catch(e) {}
-                if (!ids.length) ids = [10, 119, 1241, 2344, 9485, 8945, 86311, 131296, 645, 304378, 2883, 87096, 87359, 8091];
-                const results = await Promise.all(ids.map(id =>
-                    _fetchWithTimeout(`${BASE}/collection/${id}?api_key=${tmdbApiKey}&language=cs-CZ`).then(r => r.json()).catch(() => null)
-                ));
-                window._collViewAll = results.filter(c => c && c.id && c.name);
-            }
-            if (state.view !== 'collections') return; // mezitím přepnuto jinam
-            if (!window._collViewAll.length) { resultsEl.innerHTML = '<div class="empty">😕 Kolekce se nepodařilo načíst.</div>'; return; }
-            renderCollectionsView(false);
-        } catch (e) {
-            console.error('loadCollectionsView error:', e);
-            resultsEl.innerHTML = `<div class="empty" style="text-align:center;">⚠️ Chyba načítání<br><small style="color:#888;font-size:0.75rem;">${e.message}</small></div>`;
-        } finally {
-            setInfiniteLoading(false);
-            state._loadingMore = false;
-        }
+        if (!isFirstPage) { state._loadingMore = false; return; }
+        startCollectionsFeed();
     }
     // Přímé hledání kolekcí na TMDB (cs + en, sloučené bez duplicit)
     async function _searchCollectionsTmdb(term) {
@@ -13672,6 +13759,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         state.view = 'collections'; state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
         state.searchQuery = null; state._aiLastParsed = null; state._customLoadMore = null;
         state._aiResultsLocked = true; // vypne infinite-scroll načítání dalších populárních kolekcí
+        state._collFeed = null;
         document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'collections'));
         const sortBtn = $('globalSortBtn'); if (sortBtn) sortBtn.style.display = 'none';
         try { closeFiltersOverlay(); } catch(e) {}
