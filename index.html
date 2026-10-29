@@ -1489,6 +1489,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <div class="settings-actions">
                     <button class="settings-btn-small show-key-btn apikey-lvl2-btn" onclick="toggleGeminiKeyVisibility()">👁️ Zobrazit</button>
                     <button class="settings-btn-small" onclick="saveGeminiApiKey()">💾 Uložit</button>
+                    <button class="settings-btn-small" id="testGeminiKeyBtn" onclick="testGeminiKey(this)">🧪 Otestovat</button>
                     <button class="settings-btn-small settings-btn-remove apikey-lvl2-btn" style="display:none;" onclick="clearGeminiApiKey()">🗑️ Smazat</button>
                 </div>
                 <div class="settings-status">
@@ -1504,6 +1505,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <div class="settings-actions">
                     <button class="settings-btn-small show-key-btn apikey-lvl2-btn" onclick="toggleGroqKeyVisibility()">👁️ Zobrazit</button>
                     <button class="settings-btn-small" onclick="saveGroqApiKey()">💾 Uložit</button>
+                    <button class="settings-btn-small" id="testGroqKeyBtn" onclick="testGroqKey(this)">🧪 Otestovat</button>
                     <button class="settings-btn-small settings-btn-remove apikey-lvl2-btn" style="display:none;" onclick="clearGroqApiKey()">🗑️ Smazat</button>
                 </div>
                 <div class="settings-status">
@@ -1519,6 +1521,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <div class="settings-actions">
                     <button class="settings-btn-small show-key-btn apikey-lvl2-btn" onclick="toggleOpenRouterKeyVisibility()">👁️ Zobrazit</button>
                     <button class="settings-btn-small" onclick="saveOpenRouterKey()">💾 Uložit</button>
+                    <button class="settings-btn-small" id="testOpenRouterKeyBtn" onclick="testOpenRouterKey(this)">🧪 Otestovat</button>
                     <button class="settings-btn-small settings-btn-remove apikey-lvl2-btn" style="display:none;" onclick="clearOpenRouterKey()">🗑️ Smazat</button>
                 </div>
                 <div class="settings-status">
@@ -7039,6 +7042,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-29', date: '29. 10. 2026', items: [
+            '🧪 Nastavení → AI klíče: u Gemini, Groq i OpenRouter nové tlačítko „Otestovat“ — ověří, jestli klíč opravdu funguje (zkouší zadaný klíč, jinak uložený); výsledek se ukáže u stavu, bez spotřeby tokenů'
+        ] },
         { version: '2026-10-25e', date: '25. 10. 2026', items: [
             '🔄 Histra sync je teď jen „od teď“: z Histry se do Sinatoru nepřidává nic staršího než den prvního spuštění této verze (25. 10. 2026) a ze Sinatoru se do Histry zapisuje jen to, co shlédneš od tohoto dne. Stará historie se nepřenáší ani znovu nedotahuje (konec přidávání už shlédnutých epizod a „znovu“ záznamů)',
         ] },
@@ -10360,6 +10366,56 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         if (openRouterKey && openRouterKey.length >= 20) { dot.className = 'dot online'; text.textContent = 'Aktivní'; }
         else { dot.className = 'dot offline'; text.textContent = 'Nenastaveno'; }
     }
+
+    // ── Test AI klíčů: lehké dotazy bez spotřeby tokenů (výpis modelů / info o klíči) ──
+    async function _aiKeyTest(btn, cfg) {
+        const input = $(cfg.inputId);
+        const key = (input?.value.trim()) || cfg.stored || '';
+        const dot = $(cfg.dotId), text = $(cfg.textId);
+        if (!key) { alert('⚠️ Nejdřív zadej ' + cfg.name + ' API klíč.'); return; }
+        const oldLabel = btn ? btn.textContent : '';
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Testuju…'; }
+        if (dot) dot.className = 'dot';
+        if (text) text.textContent = 'Testuju…';
+        let ok = false, msg = '';
+        try {
+            const res = await _withAiTimeout(fetch(cfg.url(key), { headers: cfg.headers ? cfg.headers(key) : {} }), 15000);
+            if (res.ok) {
+                ok = true; msg = '✅ Funguje';
+                if (cfg.after) { const extra = await cfg.after(res).catch(() => ''); if (extra) msg += ' ' + extra; }
+            } else if (res.status === 429) {
+                ok = true; msg = '⚠️ Klíč platný, ale vyčerpaný limit (429)';
+            } else if (res.status === 400 || res.status === 401 || res.status === 403) {
+                msg = '❌ Neplatný klíč (HTTP ' + res.status + ')';
+            } else {
+                msg = '❌ Chyba služby (HTTP ' + res.status + ')';
+            }
+        } catch (e) {
+            msg = '❌ ' + (String(e?.message || e).includes('timeout') ? 'Vypršel čas, zkus znovu' : 'Síťová chyba / blokováno');
+        }
+        if (dot) dot.className = 'dot ' + (ok ? 'online' : 'offline');
+        if (text) text.textContent = msg;
+        if (btn) { btn.disabled = false; btn.textContent = oldLabel || '🧪 Otestovat'; }
+        setTimeout(() => { try { cfg.restore(); } catch (e) {} }, 8000);
+    }
+    function testGeminiKey(btn) {
+        return _aiKeyTest(btn, { name: 'Gemini', inputId: 'geminiApiKeyInput', stored: geminiApiKey, dotId: 'geminiStatusDot', textId: 'geminiStatusText',
+            url: k => 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1&key=' + encodeURIComponent(k),
+            restore: updateGeminiStatus });
+    }
+    function testGroqKey(btn) {
+        return _aiKeyTest(btn, { name: 'Groq', inputId: 'groqApiKeyInput', stored: groqApiKey, dotId: 'groqStatusDot', textId: 'groqStatusText',
+            url: () => 'https://api.groq.com/openai/v1/models',
+            headers: k => ({ 'Authorization': 'Bearer ' + k }),
+            restore: updateGroqStatus });
+    }
+    function testOpenRouterKey(btn) {
+        return _aiKeyTest(btn, { name: 'OpenRouter', inputId: 'openRouterKeyInput', stored: openRouterKey, dotId: 'openRouterStatusDot', textId: 'openRouterStatusText',
+            url: () => 'https://openrouter.ai/api/v1/key',
+            headers: k => ({ 'Authorization': 'Bearer ' + k }),
+            restore: updateOpenRouterStatus });
+    }
+    window.testGeminiKey = testGeminiKey; window.testGroqKey = testGroqKey; window.testOpenRouterKey = testOpenRouterKey;
     function saveApiKey() {
         const input = $('tmdbApiKeyInput');
         if (input) {
