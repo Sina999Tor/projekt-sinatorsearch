@@ -7046,6 +7046,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-30g', date: '30. 10. 2026', items: [
+            '🔤 Kolekce A → Z: podržením tlačítka „A → Z“ (⊿) se otevře zadání počátečních písmen (1–3, např. A nebo AVA) a zobrazí se jen kolekce, jejichž název tím začíná (česky i anglicky)',
+        ] },
         { version: '2026-10-30e', date: '30. 10. 2026', items: [
             '👆 Podržení prstu na filmu/seriálu (v hlavní mřížce i ve všech seznamech — Oblíbené, Trakt, Histra, Rozkoukané…) už neotevírá systémové okno obrázku (kopírovat / stáhnout…), ale nabídku s akcemi ❤️ Oblíbené, 👁 Shlédnuto 🧩 Sinator menu a (je-li nastavená Histra) 🟣 Histra menu s akcemi Watchlist / Shlédnuto / Do seznamu / Hodnotit. Tlačítka z plakátu zmizela (zelený rámeček shlédnutého zůstává)',
         ] },
@@ -8254,8 +8257,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const dd = $('tabSortDropdown');
         if (state.view === 'collections') {
             const cs = state.collSort || 'popular', cg = state.collGenre || '';
-            dd.innerHTML = COLL_SORT_OPTS.map(o =>
-                `<button class="tab-sort-opt${(cs===o.val && !cg)?' active':''}" onclick="applyCollSort('${o.val}')">${o.label}</button>`
+            dd.innerHTML = COLL_SORT_OPTS.map(o => o.val === 'az'
+                ? `<button class="tab-sort-opt${(cs===o.val && !cg)?' active':''}" data-az-lp="1" title="Podrž pro hledání podle počátečních písmen" onclick="if(window._azLpFired){window._azLpFired=false;return;}applyCollSort('az')">${o.label}${state.collPrefix ? ': ' + String(state.collPrefix).toUpperCase() : ''}</button>`
+                : `<button class="tab-sort-opt${(cs===o.val && !cg)?' active':''}" onclick="applyCollSort('${o.val}')">${o.label}</button>`
             ).join('') + `<button class="tab-sort-opt${cg?' active':''}" onclick="event.stopPropagation();renderCollGenreOptions()">🎭 Žánr${cg ? ': ' + (_collGenreName(cg)) : ' ›'}</button>`;
             return;
         }
@@ -8325,15 +8329,59 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     };
     function _collCloseSortDd() { const dd = $('tabSortDropdown'); if (dd) dd.style.display = 'none'; $('globalSortBtn')?.classList.remove('active'); }
     window.applyCollSort = function(val) {
-        state.collSort = val; state.collGenre = '';
+        state.collSort = val; state.collGenre = ''; state.collPrefix = '';
         _collCloseSortDd(); startCollectionsFeed();
     };
     window.applyCollGenre = function(gid) {
-        state.collGenre = gid || '';
+        state.collGenre = gid || ''; state.collPrefix = '';
         if (gid) state.collSort = 'popular';
         _collCloseSortDd(); startCollectionsFeed();
     };
 
+    // Podržení tlačítka „A → Z“ v ⊿ → dialog pro zadání počátečních písmen (1–3)
+    window.openCollPrefixDialog = function() {
+        try { const dd = $('tabSortDropdown'); if (dd) dd.style.display = 'none'; $('globalSortBtn')?.classList.remove('active'); } catch (e) {}
+        document.getElementById('collPrefixDlg')?.remove();
+        const o = document.createElement('div'); o.id = 'collPrefixDlg';
+        o.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(0,0,0,0.65);display:flex;align-items:flex-end;justify-content:center;-webkit-user-select:none;user-select:none;';
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('');
+        o.innerHTML = `<div style="width:100%;max-width:480px;background:var(--bg-card,#151b2e);border:1px solid var(--border,#2a3350);border-radius:18px 18px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px));box-sizing:border-box;">
+            <div style="font-weight:700;font-size:1.05rem;margin-bottom:10px;">🔤 Kolekce začínající na…</div>
+            <div style="display:flex;gap:8px;margin-bottom:10px;">
+                <input id="collPrefixInput" type="text" maxlength="3" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="např. A nebo AVA" value="${String(state.collPrefix || '').toUpperCase()}" style="flex:1;min-width:0;padding:12px;border-radius:10px;border:1px solid var(--border,#2a3350);background:var(--bg-elevated,#1d2540);color:var(--text,#fff);font-size:1.2rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;-webkit-user-select:text;user-select:text;">
+                <button id="collPrefixGo" type="button" style="padding:0 18px;border-radius:10px;border:none;background:#6090ff;color:#fff;font-weight:700;font-size:1rem;cursor:pointer;">Hledat</button>
+            </div>
+            <div id="collPrefixChips" style="display:flex;flex-wrap:wrap;gap:6px;">${letters.map(l => `<button type="button" data-l="${l}" style="min-width:36px;height:36px;border-radius:8px;border:1px solid var(--border,#2a3350);background:var(--bg-elevated,#1d2540);color:var(--text,#fff);font-weight:700;cursor:pointer;">${l}</button>`).join('')}</div>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+                <button id="collPrefixClear" type="button" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border,#2a3350);background:var(--bg-elevated,#1d2540);color:var(--text,#fff);cursor:pointer;">Zrušit filtr (celé A → Z)</button>
+                <button id="collPrefixClose" type="button" style="padding:12px 18px;border-radius:10px;border:1px solid var(--border,#2a3350);background:transparent;color:var(--text,#fff);cursor:pointer;">✕</button>
+            </div></div>`;
+        document.body.appendChild(o);
+        const inp = o.querySelector('#collPrefixInput');
+        const clean = v => String(v || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase();
+        inp.addEventListener('input', () => { inp.value = clean(inp.value); });
+        const go = () => {
+            const v = clean(inp.value); o.remove();
+            state.collPrefix = v.toLowerCase(); state.collSort = 'az'; state.collGenre = ''; state.collKw = ''; state.collKwLabel = ''; state.collCast = ''; state.collCastLabel = '';
+            startCollectionsFeed();
+        };
+        o.querySelector('#collPrefixGo').onclick = go;
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+        o.querySelector('#collPrefixChips').addEventListener('click', e => { const b = e.target.closest('button[data-l]'); if (b) { inp.value = clean(inp.value + b.dataset.l); } });
+        o.querySelector('#collPrefixClear').onclick = () => { o.remove(); state.collPrefix = ''; state.collSort = 'az'; startCollectionsFeed(); };
+        o.querySelector('#collPrefixClose').onclick = () => o.remove();
+        o.addEventListener('click', e => { if (e.target === o) o.remove(); });
+        setTimeout(() => { try { inp.focus(); inp.select(); } catch (e) {} }, 50);
+    };
+    (function() {
+        let t = null;
+        const start = e => { const b = e.target.closest && e.target.closest('[data-az-lp]'); if (!b) return; clearTimeout(t); t = setTimeout(() => { window._azLpFired = true; setTimeout(() => { window._azLpFired = false; }, 1200); openCollPrefixDialog(); }, 500); };
+        const stop = () => { clearTimeout(t); t = null; };
+        document.addEventListener('touchstart', start, { passive: true, capture: true });
+        document.addEventListener('mousedown', start, true);
+        ['touchend', 'touchcancel', 'touchmove', 'mouseup', 'mouseleave'].forEach(ev => document.addEventListener(ev, stop, { passive: true, capture: true }));
+        document.addEventListener('contextmenu', e => { if (e.target.closest && e.target.closest('[data-az-lp]')) e.preventDefault(); }, true);
+    })();
     window.renderReleaseTypeOptions = function() {
         const dd = $('tabSortDropdown');
         dd.innerHTML = RELEASE_TYPE_OPTS.map(o =>
@@ -11666,7 +11714,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 const isMediaView = ['movies','tv','miniseries','anime'].includes(state.view);
                 const sortBtn = $('globalSortBtn');
                 if (sortBtn) sortBtn.style.display = (isMediaView || state.view === 'collections') ? '' : 'none';
-                state.collSort = 'popular'; state.collGenre = ''; state.collKw = ''; state.collKwLabel = ''; state.collCast = ''; state.collCastLabel = '';
+                state.collSort = 'popular'; state.collGenre = ''; state.collKw = ''; state.collKwLabel = ''; state.collCast = ''; state.collCastLabel = ''; state.collPrefix = '';
                 if (isMediaView) {
                     state.filters.sortBy = 'primary_release_date.desc';
                     const sel = $('sortFilter'); if(sel) sel.value = 'primary_release_date.desc';
@@ -13605,13 +13653,15 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         try {
             const r = await _fetchWithTimeout(`${BASE}/collection/${c.id}?api_key=${tmdbApiKey}&language=cs-CZ`);
             const d = await r.json();
-            if (d && d.id) { c.parts = d.parts || []; if (d.name) c.name = d.name; c.poster_path = d.poster_path || c.poster_path; c.backdrop_path = d.backdrop_path || c.backdrop_path; }
+            if (d && d.id) { c.parts = d.parts || []; if (!c._en) c._en = c.name; if (d.name) c.name = d.name; c.poster_path = d.poster_path || c.poster_path; c.backdrop_path = d.backdrop_path || c.backdrop_path; }
         } catch (e) {}
         return c;
     }
     function startCollectionsFeed() {
         if (state.view !== 'collections') return;
-        state._collFeed = { sort: state.collSort || 'popular', gid: state.collGenre ? Number(state.collGenre) : 0, kw: state.collKw || '', cast: state.collCast || '',
+        if (state.collPrefix && (state.collKw || state.collCast || state.collGenre || (state.collSort && state.collSort !== 'az'))) state.collPrefix = '';
+        if (state.collPrefix) state.collSort = 'az';
+        state._collFeed = { sort: state.collSort || 'popular', gid: state.collGenre ? Number(state.collGenre) : 0, kw: state.collKw || '', cast: state.collCast || '', prefix: state.collPrefix || '',
             seen: new Set(), phase: 'curated', page: 1, totalPages: 1, letterIdx: 0, done: false, shown: 0 };
         state.totalPages = 1; state._allItems = []; state._loadingMore = true; state._customLoadMore = null;
         hideMainAzBar();
@@ -13622,6 +13672,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         loadMoreCollections(true);
     }
     window._movieCollCache = window._movieCollCache || new Map();
+    window._collSeen = window._collSeen || new Map();   // všechny dosud načtené kolekce (pro hledání podle písmen)
     async function _movieCollection(id) {
         const cache = window._movieCollCache;
         if (cache.has(id)) return cache.get(id);
@@ -13651,7 +13702,31 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const isWatchedMode = feed.sort === 'watched' && !feed.gid && !feed.kw && !feed.cast;
         const alive = () => state._collFeed === feed && state.view === 'collections';
         try {
-            if (isWatchedMode) {
+            if (isAz && feed.prefix) {
+                // A–Z podle počátečních písmen (1–3): nejdřív už načtené kolekce, pak hledání na TMDB (cs + en) filtrované na začátek názvu
+                const pfx = _collNorm(feed.prefix);
+                const starts = c => [c.name, c._en].some(n => n && _collNorm(n).startsWith(pfx));
+                if (!feed.pfxInit) {
+                    feed.pfxInit = true; feed.page = 1; feed.totalPages = 1;
+                    window._collSeen.forEach(c => { if (!feed.seen.has(c.id) && c.parts && c.parts.length && starts(c)) { feed.seen.add(c.id); batch.push(c); } });
+                }
+                let g2 = 0;
+                while (batch.length < 12 && !feed.done && g2++ < 6) {
+                    if (feed.page > Math.min(feed.totalPages, 40)) { feed.done = true; break; }
+                    const get = lang => _fetchWithTimeout(`${BASE}/search/collection?api_key=${tmdbApiKey}&language=${lang}${tmdbAdult()}&query=${encodeURIComponent(feed.prefix)}&page=${feed.page}`)
+                        .then(r => r.json()).catch(() => ({}));
+                    const [dcs, den] = await Promise.all([get('cs-CZ'), get('en-US')]);
+                    if (!alive()) return;
+                    feed.totalPages = Math.max(dcs.total_pages || 1, den.total_pages || 1);
+                    const all = [...(dcs.results || []), ...(den.results || [])];
+                    const fresh = [];
+                    all.forEach(c => { if (c && c.id && !feed.seen.has(c.id) && starts(c)) { feed.seen.add(c.id); fresh.push({ id: c.id, name: c.name, poster_path: c.poster_path, backdrop_path: c.backdrop_path }); } });
+                    await Promise.all(fresh.map(_collEnrich));
+                    if (!alive()) return;
+                    fresh.forEach(c => { if (c.parts && c.parts.length) batch.push(c); });
+                    if (!all.length || feed.page >= Math.min(feed.totalPages, 40)) feed.done = true; else feed.page++;
+                }
+            } else if (isWatchedMode) {
                 // Nejsledovanější = kolekce, ze kterých jsi zhlédl nejvíc filmů (seřazeno celé najednou, pak se stránkuje)
                 if (!feed.queue) {
                     const ids = _collWatchedMovieIds();
@@ -13707,14 +13782,15 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 }
             }
             if (!alive()) return;
-            batch.forEach(_collMetrics);
+            batch.forEach(c => { _collMetrics(c); window._collSeen.set(c.id, c); });
             // Pořadí z TMDB (popularita / datum / počet zhlédnutých) se zachová; jen A–Z se řadí v dávce abecedně
             if (isAz) batch.sort((a, b) => _collClean(a.name).localeCompare(_collClean(b.name), 'cs'));
             if (first) resultsEl.innerHTML = '';
             if (batch.length) appendCollectionGrid(batch, false);
             feed.shown += batch.length;
             if (first && (feed.gid || feed.kw || feed.cast)) resultsEl.insertAdjacentHTML('afterbegin', `<div style="grid-column:1/-1;padding:6px 10px;font-size:0.8rem;opacity:0.8;">${feed.cast ? '🎭 Herec: <b>' + (state.collCastLabel || '') + '</b>' : ''}${feed.kw ? '🔎 Téma: <b>' + (state.collKwLabel || '') + '</b>' : ''}${(feed.kw || feed.cast) && feed.gid ? ' · ' : ''}${feed.gid ? '🎬 Žánr: <b>' + _collGenreName(feed.gid) + '</b>' : ''} — další kolekce se dotahují při scrollování</div>`);
-            if (!feed.shown && feed.done) resultsEl.innerHTML = isWatchedMode ? '<div class="empty">😕 Zatím nemáš zhlédnutý žádný film z kolekce.</div>' : '<div class="empty">😕 Žádné kolekce nenalezeny.</div>';
+            if (first && isAz && batch.length) resultsEl.insertAdjacentHTML('afterbegin', `<div style="grid-column:1/-1;padding:6px 10px;font-size:0.8rem;opacity:0.8;">🔤 ${feed.prefix ? 'Začíná na: <b>' + String(feed.prefix).toUpperCase() + '</b>' : 'A → Z'} — podržením tlačítka A → Z (⊿) zadáš počáteční písmena</div>`);
+            if (!feed.shown && feed.done) resultsEl.innerHTML = isWatchedMode ? '<div class="empty">😕 Zatím nemáš zhlédnutý žádný film z kolekce.</div>' : (feed.prefix ? `<div class="empty">😕 Žádná kolekce nezačíná na „${String(feed.prefix).toUpperCase()}“.</div>` : '<div class="empty">😕 Žádné kolekce nenalezeny.</div>');
             else if (!feed.shown && first) resultsEl.innerHTML = '<div class="empty">😕 Zatím nic — scrolluj dál…</div>';
         } catch (e) {
             console.error('loadMoreCollections error:', e);
@@ -13874,7 +13950,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         if (_gm && !_gm.rest) {
             state.view = 'collections'; state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
             state.searchQuery = null; state._aiLastParsed = null; state._customLoadMore = null; state._aiResultsLocked = false;
-            state.collSort = 'popular'; state.collGenre = String(_gm.id); state.collKw = ''; state.collKwLabel = ''; state.collCast = ''; state.collCastLabel = '';
+            state.collSort = 'popular'; state.collGenre = String(_gm.id); state.collKw = ''; state.collKwLabel = ''; state.collCast = ''; state.collCastLabel = ''; state.collPrefix = '';
             document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'collections'));
             const _sb = $('globalSortBtn'); if (_sb) _sb.style.display = '';
             try { closeFiltersOverlay(); } catch(e) {}
