@@ -5257,6 +5257,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     if (!silent && !dry) drop = !confirm(`Histra má ${bulk.size} epizod označených naráz (${bulkInfo.slice(0, 3).map(b => b.show + ' ' + b.count + '×').join(', ')}). Vypadá to na hromadné označení, ne na skutečné sledování.\n\nOK = přidat je do Sinatoru, Zrušit = přeskočit.`);
                     if (drop) {
                         bulkSkipped = bulk.size;
+                        // Přeskočené hromadné označení si zapamatovat → příští sync je znovu nenavrhuje ani nehlásí
+                        if (!dry) { try { bulk.forEach(x => imported.add(`e${x.id}_${x.season}_${x.episode}_${x.watched_at}`)); _store.setItem('sinator_histra_imported_v1', JSON.stringify([...imported].slice(-30000))); } catch (e) {} }
                         for (let i = newEpisodeItems.length - 1; i >= 0; i--) if (bulk.has(newEpisodeItems[i])) newEpisodeItems.splice(i, 1);
                         log.episodes = newEpisodeItems.map(x => ({ tmdb: x.id, season: x.season, number: x.episode, watchedAt: x.watched_at }));
                         newKeys.length = 0;
@@ -7043,6 +7045,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-30b', date: '30. 10. 2026', items: [
+            '🔎 Hledání kolekcí podle žánru: dotaz typu „kolekci animované“, „akční kolekce“ nebo „horor kolekce“ zobrazí kolekce daného žánru (s nekonečným scrollem); „marvel akční“ najde kolekce Marvelu, které mají akční film',
+        ] },
+        { version: '2026-10-30a', date: '30. 10. 2026', items: [
+            '🔄 Sync Histra: hromadně označené epizody (40+ naráz), které sync jednou přeskočí, si aplikace zapamatuje a příště je už znovu nezkouší ani nehlásí',
+            '📦 Kolekce: tlačítko ← Zpět v detailu kolekce, gesto zpět a návrat z filmu zpět do kolekce',
+        ] },
         { version: '2026-10-29f', date: '29. 10. 2026', items: [
             '📦 Kolekce: nové tlačítko ⊿ i v záložce Kolekce — řazení 🔥 Populární, 📅 Nejnovější, 👁 Nejsledovanější (podle počtu filmů, které jsi zhlédl), 🔤 A → Z a 🎭 Žánr (vybereš žánr a zobrazí se jen kolekce s filmy v tomto žánru); seznam je nekonečný u všech řazení — Populární / Nejnovější / Žánr se řadí přímo podle TMDB filmů, Nejsledovanější podle tvých zhlédnutých filmů, A → Z postupně po písmenech',
         ] },
@@ -13737,6 +13746,25 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const n = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         return /\b(kolekc\w*|sbirk\w*|collections?|sagu|sagy|saga)\b/.test(n);
     }
+    // Rozpozná v dotazu český/anglický název žánru; vrátí {id, rest} (rest = zbytek dotazu bez žánru) nebo null
+    const _COLL_GENRE_STEMS = [
+        [28, ['akcni', 'akce', 'action']], [12, ['dobrodruz', 'adventure']], [16, ['animov', 'animak', 'animac', 'kreslen', 'animated', 'animation']],
+        [35, ['komedi', 'comedy', 'veselo']], [80, ['krimi', 'kriminal', 'crime']], [99, ['dokument']], [18, ['drama', 'dramat']],
+        [10751, ['rodinn', 'family', 'pro deti', 'detsk']], [14, ['fantasy', 'fantas']], [36, ['historick', 'history']], [27, ['horor', 'hroziv', 'horror']],
+        [10402, ['hudebn', 'muzikal', 'music']], [9648, ['mysteri', 'tajemn']], [10749, ['romantick', 'romanc', 'romance']],
+        [878, ['scifi', 'sci-fi', 'sci fi', 'science', 'vedeckofantast']], [53, ['thriller', 'napinav']], [10752, ['valecn', 'valka']], [37, ['western']]
+    ];
+    function _collGenreFromTerm(term) {
+        const toks = String(term || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).filter(Boolean);
+        for (let i = 0; i < toks.length; i++) {
+            for (const [id, stems] of _COLL_GENRE_STEMS) {
+                if (stems.some(st => !st.includes(' ') && toks[i].startsWith(st))) {
+                    return { id, rest: toks.filter((_, j) => j !== i).join(' ').trim() };
+                }
+            }
+        }
+        return null;
+    }
     // Vrací true, pokud dotaz obsloužil (zobrazil kolekce); false = pokračovat běžným AI hledáním
     async function runCollectionSearch(query, statusEl) {
         const inCollView = state.view === 'collections';
@@ -13751,9 +13779,27 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             await loadCollectionsView(true);
             return true;
         }
+        // Žánr v dotazu („kolekci animované“, „akční kolekce“) → kolekce daného žánru
+        const _gm = _collGenreFromTerm(term);
+        if (_gm && !_gm.rest) {
+            state.view = 'collections'; state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
+            state.searchQuery = null; state._aiLastParsed = null; state._customLoadMore = null; state._aiResultsLocked = false;
+            state.collSort = 'popular'; state.collGenre = String(_gm.id);
+            document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'collections'));
+            const _sb = $('globalSortBtn'); if (_sb) _sb.style.display = '';
+            try { closeFiltersOverlay(); } catch(e) {}
+            document.getElementById('aiLoadMoreBtn')?.remove();
+            if (statusEl) statusEl.innerHTML = `<span style="font-size:0.7rem;opacity:0.7;">📦 Kolekce žánru: ${_collGenreName(_gm.id)}</span>`;
+            startCollectionsFeed();
+            return true;
+        }
         if (statusEl) statusEl.innerHTML = '<span class="ai-spin">⟳</span> Hledám kolekce...';
         let colls = [];
-        try { colls = term ? await _searchCollectionsTmdb(term) : []; } catch(e) {}
+        try { colls = (_gm ? _gm.rest : term) ? await _searchCollectionsTmdb(_gm ? _gm.rest : term) : []; } catch(e) {}
+        if (_gm && colls.length) { // název + žánr: dotáhnout díly a nechat jen kolekce s filmem daného žánru
+            await Promise.all(colls.slice(0, 20).map(_collEnrich));
+            colls = colls.filter(c => c.parts && c.parts.some(p => (p.genre_ids || []).includes(_gm.id)));
+        }
         if (!colls.length && !inCollView) return false; // nic nenalezeno → zkusit klasické AI hledání
         // Přepnout na záložku Kolekce a zobrazit výsledky
         state.view = 'collections'; state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
