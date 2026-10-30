@@ -7045,6 +7045,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-30c', date: '30. 10. 2026', items: [
+            '🔎 Hledání kolekcí vlastními slovy: na záložce Kolekce (nebo „kolekci …“ v AI hledání) napiš téma, např. „o autech“, „o upírech“, „zombie“ — AI ho převede na klíčová slova TMDB a zobrazí kolekce filmů na dané téma (nekonečný scroll, funguje i řazení ⊿ a žánr)',
+        ] },
         { version: '2026-10-30b', date: '30. 10. 2026', items: [
             '🔎 Hledání kolekcí podle žánru: dotaz typu „kolekci animované“, „akční kolekce“ nebo „horor kolekce“ zobrazí kolekce daného žánru (s nekonečným scrollem); „marvel akční“ najde kolekce Marvelu, které mají akční film',
         ] },
@@ -11656,7 +11659,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 const isMediaView = ['movies','tv','miniseries','anime'].includes(state.view);
                 const sortBtn = $('globalSortBtn');
                 if (sortBtn) sortBtn.style.display = (isMediaView || state.view === 'collections') ? '' : 'none';
-                state.collSort = 'popular'; state.collGenre = '';
+                state.collSort = 'popular'; state.collGenre = ''; state.collKw = ''; state.collKwLabel = '';
                 if (isMediaView) {
                     state.filters.sortBy = 'primary_release_date.desc';
                     const sel = $('sortFilter'); if(sel) sel.value = 'primary_release_date.desc';
@@ -13601,7 +13604,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     }
     function startCollectionsFeed() {
         if (state.view !== 'collections') return;
-        state._collFeed = { sort: state.collSort || 'popular', gid: state.collGenre ? Number(state.collGenre) : 0,
+        state._collFeed = { sort: state.collSort || 'popular', gid: state.collGenre ? Number(state.collGenre) : 0, kw: state.collKw || '',
             seen: new Set(), phase: 'curated', page: 1, totalPages: 1, letterIdx: 0, done: false, shown: 0 };
         state.totalPages = 1; state._allItems = []; state._loadingMore = true; state._customLoadMore = null;
         hideMainAzBar();
@@ -13637,8 +13640,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         state._loadingMore = true; state._customLoadMore = null;
         setInfiniteLoading(true);
         const batch = [];
-        const isAz = feed.sort === 'az' && !feed.gid;
-        const isWatchedMode = feed.sort === 'watched' && !feed.gid;
+        const isAz = feed.sort === 'az' && !feed.gid && !feed.kw;
+        const isWatchedMode = feed.sort === 'watched' && !feed.gid && !feed.kw;
         const alive = () => state._collFeed === feed && state.view === 'collections';
         try {
             if (isWatchedMode) {
@@ -13669,9 +13672,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     } else {
                         if (feed.page > Math.min(feed.totalPages, 500)) { feed.done = true; break; }
                         const today = new Date().toISOString().slice(0, 10);
-                        const sort = (feed.sort === 'newest' && !feed.gid) ? 'primary_release_date.desc' : 'popularity.desc';
-                        const g = feed.gid ? `&with_genres=${feed.gid}` : '';
-                        url = `${BASE}/discover/movie?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=${sort}${g}&vote_count.gte=${sort.startsWith('primary') ? 30 : 100}&primary_release_date.lte=${today}&page=${feed.page}`;
+                        const sort = (feed.sort === 'newest' && !feed.gid) ? 'primary_release_date.desc' : (feed.sort === 'az' && feed.kw && !feed.gid) ? 'original_title.asc' : 'popularity.desc';
+                        const g = (feed.gid ? `&with_genres=${feed.gid}` : '') + (feed.kw ? `&with_keywords=${encodeURIComponent(feed.kw)}` : '');
+                        url = `${BASE}/discover/movie?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=${sort}${g}&vote_count.gte=${feed.kw ? 5 : (sort.startsWith('primary') ? 30 : 100)}&primary_release_date.lte=${today}&page=${feed.page}`;
                     }
                     let data = null;
                     try { data = await (await _fetchWithTimeout(url)).json(); } catch (e) {}
@@ -13703,7 +13706,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             if (first) resultsEl.innerHTML = '';
             if (batch.length) appendCollectionGrid(batch, false);
             feed.shown += batch.length;
-            if (first && feed.gid) resultsEl.insertAdjacentHTML('afterbegin', `<div style="grid-column:1/-1;padding:6px 10px;font-size:0.8rem;opacity:0.8;">🎭 Žánr: <b>${_collGenreName(feed.gid)}</b> — další kolekce se dotahují při scrollování</div>`);
+            if (first && (feed.gid || feed.kw)) resultsEl.insertAdjacentHTML('afterbegin', `<div style="grid-column:1/-1;padding:6px 10px;font-size:0.8rem;opacity:0.8;">${feed.kw ? '🔎 Téma: <b>' + (state.collKwLabel || '') + '</b>' : ''}${feed.kw && feed.gid ? ' · ' : ''}${feed.gid ? '🎭 Žánr: <b>' + _collGenreName(feed.gid) + '</b>' : ''} — další kolekce se dotahují při scrollování</div>`);
             if (!feed.shown && feed.done) resultsEl.innerHTML = isWatchedMode ? '<div class="empty">😕 Zatím nemáš zhlédnutý žádný film z kolekce.</div>' : '<div class="empty">😕 Žádné kolekce nenalezeny.</div>';
             else if (!feed.shown && first) resultsEl.innerHTML = '<div class="empty">😕 Zatím nic — scrolluj dál…</div>';
         } catch (e) {
@@ -13765,6 +13768,43 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         }
         return null;
     }
+    // ── Hledání kolekcí „vlastními slovy“ (o autech, o upírech, zombie…): AI převede popis na anglická TMDB klíčová slova,
+    //    ta se najdou přes /search/keyword a filmy s nimi (discover with_keywords) se převedou na jejich kolekce ──
+    const _COLL_CZ_EN = { auto:'car', aut:'car', autech:'car', upir:'vampire', zombie:'zombie', zombii:'zombie', vlk:'werewolf', vlkodlak:'werewolf', robot:'robot', roboti:'robot', vesmir:'space', kosmick:'space', pirat:'pirate', piratech:'pirate', duch:'ghost', duchove:'ghost', cert:'devil', draci:'dragon', drak:'dragon', zviratech:'animal', zvirata:'animal', pes:'dog', psi:'dog', kocka:'cat', kocky:'cat', skola:'school', skole:'school', vez:'prison', vezeni:'prison', mafie:'mafia', gangster:'gangster', superhrdin:'superhero', superhrdinech:'superhero', cirkus:'circus', hudb:'music', sport:'sport', box:'boxing', fotbal:'soccer', valk:'war', vyprava:'adventure', cas:'time travel', mimozemst:'alien', mimozemsk:'alien', dinosaur:'dinosaur', dinosaurech:'dinosaur', kouzeln:'magic', carodej:'wizard', carodejnic:'witch', vrah:'serial killer', vrazd:'murder', detektiv:'detective', spion:'spy', spionech:'spy', loupez:'heist', lupic:'heist', vanoc:'christmas', apokalyps:'apocalypse', postapokalyp:'post-apocalyptic', vojak:'soldier', policist:'police', policie:'police', lekar:'doctor', zachran:'rescue', lod:'ship', ponork:'submarine', letad:'airplane', vlak:'train', motorka:'motorcycle', motorkar:'motorcycle', zavod:'racing', zavodech:'racing' };
+    async function _collThematicKeywords(term) {
+        const clean = String(term || '').trim();
+        if (!clean) return null;
+        let terms = [];
+        try {
+            if (typeof _zabavaAiCall === 'function') {
+                const out = await _zabavaAiCall(`Uživatel hledá filmové kolekce/série a popsal téma česky: "${clean}". Převeď téma na 2 až 5 anglických klíčových slov, jaké používá databáze TMDB (např. vampire, zombie, car race, street racing, werewolf, serial killer). Jednotné číslo, bez vysvětlování. Odpověz POUZE jako čárkami oddělený seznam anglických slov.`, 0.2, 80);
+                terms = String(out || '').replace(/[\n\r]+/g, ',').split(',').map(t => t.replace(/["'.*]/g, '').trim().toLowerCase()).filter(t => t && t.length < 40).slice(0, 5);
+            }
+        } catch (e) {}
+        if (!terms.length) { // záloha bez AI: slovníček + původní slova
+            const toks = clean.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/\s+/).filter(t => t.length > 2 && !['kolekci','kolekce','serie','filmy','film','jsou','jako','tema'].includes(t));
+            toks.forEach(t => { const k = Object.keys(_COLL_CZ_EN).find(k => t.startsWith(k)); terms.push(k ? _COLL_CZ_EN[k] : t); });
+            terms = [...new Set(terms)].slice(0, 5);
+        }
+        if (!terms.length) return null;
+        const ids = [];
+        const lists = await Promise.all(terms.map(t =>
+            _fetchWithTimeout(`${BASE}/search/keyword?api_key=${tmdbApiKey}&query=${encodeURIComponent(t)}&page=1`).then(r => r.json()).then(d => (d.results || []).slice(0, 2)).catch(() => [])));
+        lists.forEach(l => l.forEach(k => { if (k && k.id && !ids.includes(k.id)) ids.push(k.id); }));
+        if (!ids.length) return null;
+        return { ids: ids.slice(0, 8), label: clean };
+    }
+    function _startCollThemeFeed(th, statusEl) {
+        state.view = 'collections'; state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
+        state.searchQuery = null; state._aiLastParsed = null; state._customLoadMore = null; state._aiResultsLocked = false;
+        state.collSort = 'popular'; state.collGenre = ''; state.collKw = th.ids.join('|'); state.collKwLabel = th.label;
+        document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'collections'));
+        const _sb = $('globalSortBtn'); if (_sb) _sb.style.display = '';
+        try { closeFiltersOverlay(); } catch(e) {}
+        document.getElementById('aiLoadMoreBtn')?.remove();
+        if (statusEl) statusEl.innerHTML = `<span style="font-size:0.7rem;opacity:0.7;">📦 Kolekce na téma: ${th.label}</span>`;
+        startCollectionsFeed();
+    }
     // Vrací true, pokud dotaz obsloužil (zobrazil kolekce); false = pokračovat běžným AI hledáním
     async function runCollectionSearch(query, statusEl) {
         const inCollView = state.view === 'collections';
@@ -13784,7 +13824,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         if (_gm && !_gm.rest) {
             state.view = 'collections'; state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
             state.searchQuery = null; state._aiLastParsed = null; state._customLoadMore = null; state._aiResultsLocked = false;
-            state.collSort = 'popular'; state.collGenre = String(_gm.id);
+            state.collSort = 'popular'; state.collGenre = String(_gm.id); state.collKw = ''; state.collKwLabel = '';
             document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'collections'));
             const _sb = $('globalSortBtn'); if (_sb) _sb.style.display = '';
             try { closeFiltersOverlay(); } catch(e) {}
@@ -13794,11 +13834,20 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             return true;
         }
         if (statusEl) statusEl.innerHTML = '<span class="ai-spin">⟳</span> Hledám kolekce...';
+        const _nt = term.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (!_gm && (/^(o|ohledne|se|s|kde|kolem|ze|na tema|tema|pro|v|ve)\s/.test(_nt) || term.split(/\s+/).length >= 3)) {
+            const th0 = await _collThematicKeywords(term);
+            if (th0) { _startCollThemeFeed(th0, statusEl); return true; }
+        }
         let colls = [];
         try { colls = (_gm ? _gm.rest : term) ? await _searchCollectionsTmdb(_gm ? _gm.rest : term) : []; } catch(e) {}
         if (_gm && colls.length) { // název + žánr: dotáhnout díly a nechat jen kolekce s filmem daného žánru
             await Promise.all(colls.slice(0, 20).map(_collEnrich));
             colls = colls.filter(c => c.parts && c.parts.some(p => (p.genre_ids || []).includes(_gm.id)));
+        }
+        if (!colls.length && !_gm) { // název nenalezen → zkusit téma popsané vlastními slovy
+            const th1 = await _collThematicKeywords(term);
+            if (th1) { _startCollThemeFeed(th1, statusEl); return true; }
         }
         if (!colls.length && !inCollView) return false; // nic nenalezeno → zkusit klasické AI hledání
         // Přepnout na záložku Kolekce a zobrazit výsledky
