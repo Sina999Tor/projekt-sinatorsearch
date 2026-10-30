@@ -52049,5 +52049,194 @@ window.sfFrAuto=async function(id,t){
     });
 })();
 </script>
+<!-- ═══ TV: dlouhý stisk na kanálu → program daného kanálu; zpět (gesto/tlačítko) → zpět na kanály ═══ -->
+<style>
+#tvModal .tv-ch-item { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+#tvModal .tv-ch-item img { pointer-events: none; -webkit-user-drag: none; -webkit-touch-callout: none; }
+</style>
+<script>
+(function () {
+    'use strict';
+    var LP_MS = 450, MOVE_TOL = 12;
+    var timer = null, sx = 0, sy = 0, curTile = null;
+    var swallow = false, swallowTimer = null, releaseTimer = null, lastFire = 0, lastTouch = 0;
+    var origSwitch = window.switchTvTab;
+    if (typeof origSwitch !== 'function') return;
+
+    function $(id) { return document.getElementById(id); }
+    function norm(s) {
+        return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/^\s*[a-z]{2,4}\s*\|\s*/, '').replace(/\s*(hd|fhd|uhd|4k|hevc)\s*$/, '').replace(/[^a-z0-9]/g, '');
+    }
+    function toast(msg) {
+        try {
+            var t = $('tvEpgJumpToast');
+            if (!t) {
+                t = document.createElement('div'); t.id = 'tvEpgJumpToast';
+                t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;border-radius:20px;font-size:0.82rem;z-index:2147483000;pointer-events:none;transition:opacity .3s;max-width:90vw;text-align:center;';
+                document.body.appendChild(t);
+            }
+            t.textContent = msg; t.style.opacity = '1';
+            clearTimeout(t._to); t._to = setTimeout(function () { t.style.opacity = '0'; }, 2400);
+        } catch (e) {}
+    }
+
+    // Přepnutí záložky jakýmkoli jiným způsobem než naším skokem ruší „návrat“
+    window._tvEpgReturn = null;
+    window.switchTvTab = function () { window._tvEpgReturn = null; return origSwitch.apply(this, arguments); };
+
+    function tileFrom(e) {
+        var el = e.target;
+        if (!el || !el.closest) return null;
+        var t = el.closest('#tvModal .tv-ch-item');
+        if (!t) return null;
+        if (el.closest('.tv-ch-alt-btn, .tv-ch-alts, button')) return null;
+        if (t.closest('#tvMgrWrap')) return null;
+        return t;
+    }
+    function scrollerOf(el) {
+        while (el && el !== document.body) {
+            var cs = getComputedStyle(el);
+            if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight) return el;
+            el = el.parentElement;
+        }
+        return null;
+    }
+    function resolveKey(name, all) {
+        if (all[name]) return name;
+        var keys = Object.keys(all); if (!keys.length) return null;
+        var n = norm(name), i;
+        for (i = 0; i < keys.length; i++) if (norm(keys[i]) === n) return keys[i];
+        try {
+            var chs = typeof window._tvBuildAllChannelsForEpg === 'function' ? window._tvBuildAllChannelsForEpg() : [];
+            var ids = {}, has = false;
+            chs.forEach(function (c) { if (c && c.name === name && c.id) { ids[c.id] = 1; has = true; } });
+            if (has) for (i = 0; i < chs.length; i++) { var c = chs[i]; if (c && c.id && ids[c.id] && all[c.name]) return c.name; }
+        } catch (e) {}
+        return null;
+    }
+    function centerBubble(key) {
+        try {
+            var wrap = $('tvEpgChannelBubbles');
+            var idx = (window._epgBubbleNames || []).indexOf(key);
+            var b = wrap && idx >= 0 ? wrap.querySelector('[data-epgch="' + idx + '"]') : null;
+            if (!b) return;
+            var br = b.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+            wrap.scrollLeft += (br.left + br.width / 2) - (wr.left + wr.width / 2);
+        } catch (e) {}
+    }
+    function waitAndSelect(name) {
+        var t0 = Date.now();
+        (function poll() {
+            var list = $('tvProgramList');
+            var loading = !list || /⏳/.test(list.textContent || '');
+            if (loading && Date.now() - t0 < 12000) { setTimeout(poll, 150); return; }
+            var key = resolveKey(name, tvState._epgAllChannels || {});
+            if (key) {
+                try { selectEpgChannel(key); centerBubble(key); } catch (e) {}
+            } else {
+                toast('Program pro „' + (typeof tvDisplayName === 'function' ? tvDisplayName(name) : name) + '“ není k dispozici');
+                try { selectEpgChannel(null); } catch (e) {}
+            }
+        })();
+    }
+
+    function openEpgFor(name, tile) {
+        if (!name) return;
+        var sc = scrollerOf(tile);
+        var opt = document.querySelector('#tvTabDD .tv-dd-opt.active');
+        var tab = (opt && opt.getAttribute('data-value')) || 'channels';
+        var inp = $('tvEpgChannelSearch');
+        var prev = { ch: tvState._epgActiveChannel, date: tvState._epgSelectedDate, q: inp ? inp.value : '' };
+        if (inp) inp.value = '';
+        try { localStorage.setItem('tv_epg_search_query', ''); } catch (e) {}
+        try { tvState._epgSelectedDate = epgStartOfDay(new Date()); } catch (e) {}
+        tvState._epgActiveChannel = name;
+        origSwitch('epg');
+        window._tvEpgReturn = { tab: tab, prev: prev, scrollEl: sc, scrollTop: sc ? sc.scrollTop : 0 };
+        waitAndSelect(name);
+    }
+
+    // Zpět z programu (vyvolaného dlouhým stiskem) → původní záložka kanálů; vrací true, pokud se zpracovalo
+    function epgBack() {
+        var r = window._tvEpgReturn; if (!r) return false;
+        window._tvEpgReturn = null;
+        var wrap = $('tvEpgWrap');
+        if (!wrap || wrap.style.display === 'none') return false;
+        try {
+            var p = r.prev || {};
+            tvState._epgActiveChannel = p.ch || null;
+            try { if (p.ch) localStorage.setItem('tv_epg_active_channel', p.ch); else localStorage.removeItem('tv_epg_active_channel'); } catch (e) {}
+            tvState._epgSelectedDate = p.date;
+            var inp = $('tvEpgChannelSearch'); if (inp) inp.value = p.q || '';
+            try { localStorage.setItem('tv_epg_search_query', p.q || ''); } catch (e) {}
+        } catch (e) {}
+        origSwitch(r.tab);
+        var restore = function () { try { if (r.scrollEl && document.contains(r.scrollEl)) r.scrollEl.scrollTop = r.scrollTop; } catch (e) {} };
+        restore(); requestAnimationFrame(restore); setTimeout(restore, 120); setTimeout(restore, 350);
+        return true;
+    }
+    function patchBack() {
+        var m = window.MODAL_CLOSE_MAP;
+        if (!m || m.__tvEpgPatched) return !!(m && m.__tvEpgPatched);
+        var orig = m.tvModal;
+        m.tvModal = function () { if (!epgBack() && typeof orig === 'function') orig(); };
+        m.__tvEpgPatched = true;
+        return true;
+    }
+    if (!patchBack()) { document.addEventListener('DOMContentLoaded', patchBack); window.addEventListener('load', patchBack); }
+
+    // ── dlouhý stisk ──
+    function cancel() { clearTimeout(timer); timer = null; curTile = null; }
+    function fire(tile) {
+        timer = null;
+        if (!tile || !document.contains(tile)) return;
+        if (Date.now() - lastFire < 1200) return;
+        lastFire = Date.now();
+        swallow = true;
+        clearTimeout(swallowTimer); swallowTimer = setTimeout(function () { swallow = false; }, 2500);
+        try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) {}
+        openEpgFor(tile.getAttribute('title') || '', tile);
+    }
+    function onStart(e) {
+        if (e.type === 'touchstart') lastTouch = Date.now();
+        if (e.type === 'mousedown' && e.button !== 0) return;
+        if (e.touches && e.touches.length !== 1) { cancel(); return; }
+        var tile = tileFrom(e); if (!tile) return;
+        var p = e.touches ? e.touches[0] : e;
+        sx = p.clientX; sy = p.clientY; curTile = tile;
+        clearTimeout(timer); timer = setTimeout(function () { fire(curTile); }, LP_MS);
+    }
+    function onMove(e) {
+        if (!timer) return;
+        var p = e.touches ? e.touches[0] : e; if (!p) return;
+        if (Math.abs(p.clientX - sx) > MOVE_TOL || Math.abs(p.clientY - sy) > MOVE_TOL) cancel();
+    }
+    function onEnd() {
+        cancel();
+        if (swallow) { clearTimeout(releaseTimer); releaseTimer = setTimeout(function () { swallow = false; }, 450); }
+    }
+    document.addEventListener('touchstart', onStart, { passive: true, capture: true });
+    document.addEventListener('touchmove', onMove, { passive: true, capture: true });
+    document.addEventListener('touchend', onEnd, { passive: true, capture: true });
+    document.addEventListener('touchcancel', onEnd, { passive: true, capture: true });
+    document.addEventListener('mousedown', onStart, true);
+    document.addEventListener('mousemove', onMove, true);
+    document.addEventListener('mouseup', onEnd, true);
+    document.addEventListener('scroll', cancel, true);
+    // klik, který následuje po dlouhém stisku, se spolkne (jinak by spustil přehrávání / kliknul do programu)
+    document.addEventListener('click', function (e) {
+        if (swallow) { e.preventDefault(); e.stopImmediatePropagation(); }
+    }, true);
+    // systémová nabídka obrázku (kopírovat / stáhnout / sdílet…) na dlaždicích kanálů se blokuje;
+    // na myši slouží pravé tlačítko jako dlouhý stisk
+    document.addEventListener('contextmenu', function (e) {
+        var t = tileFrom(e); if (!t) return;
+        e.preventDefault(); e.stopPropagation();
+        if (Date.now() - lastTouch > 1500) fire(t);
+    }, true);
+    document.addEventListener('selectstart', function (e) { if (tileFrom(e)) e.preventDefault(); }, true);
+})();
+</script>
 </body>
 </html>
