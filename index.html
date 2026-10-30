@@ -7046,6 +7046,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-30j', date: '30. 10. 2026', items: [
+            '▶️ Nabídka po podržení filmu/seriálu: nové tlačítko „Trailer“ — spustí trailer v malém plovoucím okně přímo v appce (jde přesouvat, ⏭ další video, ✕ zavřít)',
+        ] },
         { version: '2026-10-30i', date: '30. 10. 2026', items: [
             '📅 TV Program: tlačítko „Program“ teď vždy otevře výběr „Vše“ (zruší dřív vybraný kanál i hledání)',
             '📅 TV Program: kanály se vybírají z rozbalovacího seznamu (název kanálu + šipka ▾) místo řady tlačítek vedle sebe; hledání nad ním seznam filtruje',
@@ -52013,6 +52016,10 @@ window.sfFrAuto=async function(id,t){
                 var tmp = document.createElement('button'); tmp.dataset.watched = watched ? '1' : '0';
                 window.toggleWatchedFromCard(m.id, m.type, m.title, m.year, m.poster, tmp);
             } catch (e) { console.warn(e); }
+        });
+        addBtn('▶️', 'Trailer', '', function () {
+            closeSheet();
+            try { if (typeof window.sfTrailer === 'function') window.sfTrailer(m.id, m.type); } catch (e) { console.warn(e); }
         });
         addBtn('🧩', 'Sinator menu (watchlist, hodnocení, seznam…)', '', function () {
             closeSheet();
