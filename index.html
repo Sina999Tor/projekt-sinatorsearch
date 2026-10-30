@@ -52052,6 +52052,8 @@ window.sfFrAuto=async function(id,t){
 <!-- ═══ TV: dlouhý stisk na kanálu → program daného kanálu; zpět (gesto/tlačítko) → zpět na kanály ═══ -->
 <style>
 #tvModal .tv-ch-item { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+#tvModal, #tvModal * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#tvModal input, #tvModal textarea { -webkit-user-select: text; user-select: text; }
 #tvModal .tv-ch-item img { pointer-events: none; -webkit-user-drag: none; -webkit-touch-callout: none; }
 </style>
 <script>
@@ -52196,6 +52198,7 @@ window.sfFrAuto=async function(id,t){
         swallow = true;
         clearTimeout(swallowTimer); swallowTimer = setTimeout(function () { swallow = false; }, 2500);
         try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) {}
+        try { var sel = window.getSelection && window.getSelection(); if (sel && sel.removeAllRanges) sel.removeAllRanges(); } catch (e) {}
         openEpgFor(tile.getAttribute('title') || '', tile);
     }
     function onStart(e) {
@@ -52235,7 +52238,10 @@ window.sfFrAuto=async function(id,t){
         e.preventDefault(); e.stopPropagation();
         if (Date.now() - lastTouch > 1500) fire(t);
     }, true);
-    document.addEventListener('selectstart', function (e) { if (tileFrom(e)) e.preventDefault(); }, true);
+    document.addEventListener('selectstart', function (e) {
+        var el = e.target && (e.target.nodeType === 1 ? e.target : e.target.parentElement);
+        if (el && el.closest && el.closest('#tvModal') && !el.closest('input, textarea')) e.preventDefault();
+    }, true);
 })();
 </script>
 </body>
