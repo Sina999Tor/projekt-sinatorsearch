@@ -7046,6 +7046,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-30i', date: '30. 10. 2026', items: [
+            '📅 TV Program: tlačítko „Program“ teď vždy otevře výběr „Vše“ (zruší dřív vybraný kanál i hledání)',
+            '📅 TV Program: kanály se vybírají z rozbalovacího seznamu (název kanálu + šipka ▾) místo řady tlačítek vedle sebe; hledání nad ním seznam filtruje',
+        ] },
         { version: '2026-10-30h', date: '30. 10. 2026', items: [
             '🔤 Filmy / Seriály: podržením tlačítka „A → Z“ (⊿) zadáš počáteční písmena (1–3) a zobrazí se jen tituly, které tím začínají (nekonečný scroll)',
             '🔤 Kolekce: u normálního A → Z je teď boční lišta s abecedou a oddíly po písmenech; klepnutí na ještě nenačtené písmeno načte kolekce od něj',
@@ -24481,7 +24485,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
     <!-- Program: samostatné velké tlačítko nad nabídkou kanálů -->
     <div class="tv-chrome-item" style="flex-shrink:0;padding:8px 12px 0;background:var(--bg-dark);">
-        <button id="tvTabEpg" onclick="switchTvTab('epg')" style="width:100%;padding:11px 6px;background:transparent;border:1px solid var(--accent);color:var(--accent);font-size:0.9rem;font-weight:700;cursor:pointer;border-radius:10px;">📅 Program</button>
+        <button id="tvTabEpg" onclick="tvOpenEpgFresh()" style="width:100%;padding:11px 6px;background:transparent;border:1px solid var(--accent);color:var(--accent);font-size:0.9rem;font-weight:700;cursor:pointer;border-radius:10px;">📅 Program</button>
     </div>
 
     <!-- Navigace: Kanály / Kanály 2 / Kanály 3 / Kanály 4 (rozvírací nabídka) -->
@@ -24673,7 +24677,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             </div>
         </div>
         <!-- Bubliny kanálů -->
-        <div id="tvEpgChannelBubbles" style="flex-shrink:0;display:flex;gap:6px;padding:7px 10px;overflow-x:auto;overflow-y:hidden;border-bottom:1px solid var(--border);scrollbar-width:none;background:var(--bg-dark);"></div>
+        <div id="tvEpgChannelBubbles" style="flex-shrink:0;padding:7px 10px;border-bottom:1px solid var(--border);background:var(--bg-dark);"></div>
         <!-- Program seznam -->
         <div id="tvProgramList" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;padding:10px 10px 20px;"></div>
     </div>
@@ -43250,34 +43254,46 @@ function renderEpgChannelBubbles(chNames) {
     if(!wrap) return;
     const active = tvState._epgActiveChannel;
 
-    // Ulož jména do globálního pole — bezpečné předávání přes data-idx bez problémů s uvozovkami
+    // Ulož jména do globálního pole — bezpečné předávání přes data-epgch (index)
     window._epgBubbleNames = chNames;
 
-    let html = '<button data-epgch="" style="'
-        + 'flex-shrink:0;padding:4px 11px;border-radius:20px;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;border:1px solid '
-        + (!active ? 'var(--accent);background:var(--accent);color:#fff' : 'var(--border);background:rgba(255,255,255,0.04);color:var(--text-muted)')
-        + ';">Vše</button>';
+    // Případná otevřená nabídka (přesunutá na <body>) by po překreslení osiřela
+    document.querySelectorAll('.tv-dd-menu[data-owner="tvEpgChDD"]').forEach(m => m.remove());
 
+    const esc = t => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const shortName = n => n.replace(/\s*(HD|FHD|4K|hd)$/i,'').trim();
+    const label = active ? '📺 ' + esc(shortName(active)) : '📺 Vše — všechny kanály';
+
+    let opts = '<div class="tv-dd-opt' + (!active ? ' active' : '') + '" data-value="" data-epgch="">📺 Vše — všechny kanály</div>';
     for(let i=0; i<chNames.length; i++) {
-        const name = chNames[i];
-        const isActive = active === name;
-        const short = name.replace(/\s*(HD|FHD|4K|hd)$/i,'').trim();
-        html += '<button data-epgch="' + i + '" style="'
-            + 'flex-shrink:0;padding:4px 11px;border-radius:20px;font-size:0.72rem;font-weight:600;cursor:pointer;white-space:nowrap;border:1px solid '
-            + (isActive ? 'var(--accent);background:var(--accent);color:#fff' : 'var(--border);background:rgba(255,255,255,0.04);color:var(--text-muted)')
-            + ';">' + short + '</button>';
+        opts += '<div class="tv-dd-opt' + (active === chNames[i] ? ' active' : '') + '" data-value="' + i + '" data-epgch="' + i + '">' + esc(shortName(chNames[i])) + '</div>';
     }
-    wrap.innerHTML = html;
-
-    // Event delegation — jeden listener na wrap
-    wrap.onclick = function(e) {
-        const btn = e.target.closest('[data-epgch]');
-        if(!btn) return;
-        const idx = btn.getAttribute('data-epgch');
-        const name = idx === '' ? null : (window._epgBubbleNames || [])[parseInt(idx)];
-        selectEpgChannel(name !== undefined ? name : null);
-    };
+    wrap.innerHTML = '<div class="tv-dd" id="tvEpgChDD" data-handler="_tvEpgDdPick">'
+        + '<button type="button" class="tv-dd-btn" onclick="tvDdToggle(\'tvEpgChDD\')"><span class="tv-dd-btn-label">' + label + '</span><span class="tv-dd-arrow">▾</span></button>'
+        + '<div class="tv-dd-menu" data-owner="tvEpgChDD">' + opts + '</div></div>';
 }
+
+// Výběr kanálu z rozbalovací nabídky Programu ('' = Vše)
+function _tvEpgDdPick(value) {
+    const name = (value === '' || value == null) ? null : (window._epgBubbleNames || [])[parseInt(value)];
+    selectEpgChannel(name !== undefined ? name : null);
+}
+window._tvEpgDdPick = _tvEpgDdPick;
+
+// Tlačítko „Program“: vždy otevře program s výběrem „Vše“ (zruší vybraný kanál i hledání)
+function tvOpenEpgFresh() {
+    tvState._epgActiveChannel = null;
+    try {
+        localStorage.removeItem('tv_epg_active_channel');
+        localStorage.setItem('tv_epg_search_query', '');
+    } catch(e) {}
+    const input = document.getElementById('tvEpgChannelSearch');
+    if(input) input.value = '';
+    const clearBtn = document.getElementById('tvEpgChannelSearchClear');
+    if(clearBtn) clearBtn.style.display = 'none';
+    window.switchTvTab('epg');
+}
+window.tvOpenEpgFresh = tvOpenEpgFresh;
 
 function selectEpgChannel(name) {
     tvState._epgActiveChannel = name;
