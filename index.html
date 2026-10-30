@@ -8356,6 +8356,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <button id="collPrefixClear" type="button" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border,#2a3350);background:var(--bg-elevated,#1d2540);color:var(--text,#fff);cursor:pointer;">Zrušit filtr (celé A → Z)</button>
                 <button id="collPrefixClose" type="button" style="padding:12px 18px;border-radius:10px;border:1px solid var(--border,#2a3350);background:transparent;color:var(--text,#fff);cursor:pointer;">✕</button>
             </div></div>`;
+        o.addEventListener('touchmove', e => { if (e.target.tagName !== 'INPUT') e.preventDefault(); }, { passive: false });
+        o.addEventListener('wheel', e => e.preventDefault(), { passive: false });
         document.body.appendChild(o);
         const inp = o.querySelector('#collPrefixInput');
         const clean = v => String(v || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase();
@@ -51815,8 +51817,8 @@ window.sfFrAuto=async function(id,t){
 .lp-card, .lp-card img, .card img, [onclick*="openDetail"] img { -webkit-touch-callout: none; -webkit-user-drag: none; }
 .lp-card, .lp-card img { -webkit-user-select: none; user-select: none; }
 #cardLpSheet, #cardLpSheet * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
-#cardLpSheet { position: fixed; inset: 0; z-index: 100001; background: rgba(0,0,0,0.6); display: flex; align-items: flex-end; justify-content: center; }
-#cardLpSheet .lp-box { width: 100%; max-width: 480px; background: var(--bg-card, #151b2e); border: 1px solid var(--border, #2a3350); border-radius: 18px 18px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
+#cardLpSheet { overscroll-behavior: contain; touch-action: none; position: fixed; inset: 0; z-index: 100001; background: rgba(0,0,0,0.6); display: flex; align-items: flex-end; justify-content: center; }
+#cardLpSheet .lp-box { touch-action: pan-y; overscroll-behavior: contain; max-height: 88vh; overflow-y: auto; width: 100%; max-width: 480px; background: var(--bg-card, #151b2e); border: 1px solid var(--border, #2a3350); border-radius: 18px 18px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
 #cardLpSheet .lp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 #cardLpSheet .lp-head img { width: 44px; height: 64px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
 #cardLpSheet .lp-title { font-weight: 700; font-size: 1.02rem; line-height: 1.25; }
@@ -51925,6 +51927,10 @@ window.sfFrAuto=async function(id,t){
         o.addEventListener('click', function (e) { if (e.target === o) closeSheet(); });
         o.addEventListener('selectstart', function (e) { e.preventDefault(); });
         o.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+        // Pozadí (stránka pod nabídkou) se při otevřené nabídce neposouvá; posouvat jde jen samotný panel, když se nevejde
+        function lockScroll(e) { if (!(box.scrollHeight > box.clientHeight && box.contains(e.target))) e.preventDefault(); }
+        o.addEventListener('touchmove', lockScroll, { passive: false });
+        o.addEventListener('wheel', lockScroll, { passive: false });
         document.body.appendChild(o);
         try { var sel = window.getSelection && window.getSelection(); if (sel && sel.removeAllRanges) sel.removeAllRanges(); } catch (e) {}
         try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
