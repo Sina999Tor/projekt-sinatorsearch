@@ -7047,7 +7047,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-30e', date: '30. 10. 2026', items: [
-            '👆 Podržení prstu na filmu/seriálu v mřížce už neotevírá systémové okno obrázku (kopírovat / stáhnout…), ale nabídku s akcemi ❤️ Oblíbené, 👁 Shlédnuto 🧩 Sinator menu a (je-li nastavená Histra) 🟣 Histra menu s akcemi Watchlist / Shlédnuto / Do seznamu / Hodnotit. Tlačítka z plakátu zmizela (zelený rámeček shlédnutého zůstává)',
+            '👆 Podržení prstu na filmu/seriálu (v hlavní mřížce i ve všech seznamech — Oblíbené, Trakt, Histra, Rozkoukané…) už neotevírá systémové okno obrázku (kopírovat / stáhnout…), ale nabídku s akcemi ❤️ Oblíbené, 👁 Shlédnuto 🧩 Sinator menu a (je-li nastavená Histra) 🟣 Histra menu s akcemi Watchlist / Shlédnuto / Do seznamu / Hodnotit. Tlačítka z plakátu zmizela (zelený rámeček shlédnutého zůstává)',
         ] },
         { version: '2026-10-30d', date: '30. 10. 2026', items: [
             '🎭 Kolekce herce: na záložce Kolekce napiš jméno herce (např. „Johnny Depp“, „Tom Cruise“) a zobrazí se kolekce, do kterých patří jeho filmy (nekonečný scroll, funguje řazení ⊿ i žánr). Jméno se rozpozná i s překlepem nebo skloňováním',
@@ -51736,8 +51736,8 @@ window.sfFrAuto=async function(id,t){
 
 <style>
 .lp-card .card-media > .card-fav { display: none !important; }
-.lp-card, .lp-card img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-.lp-card img { -webkit-user-drag: none; }
+.lp-card, .lp-card img, .card img, [onclick*="openDetail"] img { -webkit-touch-callout: none; -webkit-user-drag: none; }
+.lp-card, .lp-card img { -webkit-user-select: none; user-select: none; }
 #cardLpSheet, #cardLpSheet * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 #cardLpSheet { position: fixed; inset: 0; z-index: 100001; background: rgba(0,0,0,0.6); display: flex; align-items: flex-end; justify-content: center; }
 #cardLpSheet .lp-box { width: 100%; max-width: 480px; background: var(--bg-card, #151b2e); border: 1px solid var(--border, #2a3350); border-radius: 18px 18px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
@@ -51752,34 +51752,55 @@ window.sfFrAuto=async function(id,t){
 </style>
 <script>
 (function () {
-    var HOLD_MS = 450, passClick = false, openedAt = 0, timer = null, sx = 0, sy = 0, tgt = null;
-    function cardOf(el) { return el && el.closest ? el.closest('.lp-card') : null; }
+    var HOLD_MS = 450, openedAt = 0, timer = null, sx = 0, sy = 0, tgt = null;
+    var SEL = '.card, [onclick*="openDetail"]';
+    function cardOf(el) { try { return el && el.closest ? el.closest(SEL) : null; } catch (e) { return null; } }
+    // Z karty / řádku seznamu vytáhne film či seriál (id, typ, název, rok, plakát); jinak null (herec, kolekce, hudba…)
+    function metaOf(card) {
+        if (!card || card.getAttribute('data-coll-id')) return null;
+        var id = card.getAttribute('data-tmdb-id'), type = card.getAttribute('data-tmdb-type');
+        if (!id || !type) {
+            var oc = card.getAttribute('onclick') || '';
+            var m = /\(\s*(\d+)\s*,\s*['"](movie|tv|show|shows)['"]/.exec(oc);
+            if (!m) return null;
+            id = m[1]; type = m[2];
+        }
+        if (/^(actor|person|director|collection)$/.test(type)) return null;
+        type = (type === 'tv' || type === 'show' || type === 'shows') ? 'tv' : 'movie';
+        id = Number(id); if (!id) return null;
+        var te = card.querySelector('.card-title'), me = card.querySelector('.card-meta span'), im = card.querySelector('img');
+        var title = (te && te.textContent || '').trim();
+        if (!title && im) title = (im.getAttribute('alt') || '').trim();
+        if (!title) title = (card.textContent || '').trim().split('\n')[0].trim().slice(0, 80);
+        var year = me ? (me.textContent || '').replace(/[^0-9]/g, '').slice(0, 4) : '';
+        var poster = '';
+        if (im) { var pm = /\/t\/p\/[^\/]+(\/[^\/?#]+)$/.exec(im.getAttribute('src') || ''); if (pm) poster = pm[1]; }
+        var rt = card.querySelector('.card-rating'); var rating = rt ? parseFloat((rt.textContent || '').replace(/[^0-9.]/g, '')) || 0 : 0;
+        return { id: id, type: type, title: title, year: year, poster: poster, rating: rating, imgSrc: im ? im.src : '' };
+    }
+    var passClick = false;
     function suppressNextClick() {
         function stop(e) { if (passClick || !cardOf(e.target)) return; e.stopPropagation(); e.preventDefault(); }
         document.addEventListener('click', stop, true);
         setTimeout(function () { document.removeEventListener('click', stop, true); }, 700);
     }
-    function fire(b) { passClick = true; try { b.click(); } finally { passClick = false; } }
     function closeSheet() { var o = document.getElementById('cardLpSheet'); if (o) o.remove(); }
+    function st() { try { return (window._siState && window._siState()) || null; } catch (e) { return null; } }
+    function isLiked(id) { var s = st(); try { return !!(s && s.favs && s.favs.some(function (f) { return Number(f.id) === id; })); } catch (e) { return false; } }
+    function isW(m) { try { return typeof window.isWatched === 'function' ? !!window.isWatched(m.id, m.type) : false; } catch (e) { return false; } }
     function open(card) {
-        if (!card || Date.now() - openedAt < 700) return;
+        var m = metaOf(card);
+        if (!m || Date.now() - openedAt < 700) return;
         openedAt = Date.now();
         closeSheet();
-        var st = (window._siState && window._siState()) || null;
-        var id = Number(card.getAttribute('data-tmdb-id')), type = card.getAttribute('data-tmdb-type') || 'movie';
-        var liked = false, watched = card.classList.contains('is-watched');
-        try { liked = !!(st && st.favs && st.favs.some(function (f) { return Number(f.id) === id; })); } catch (e) {}
-        var titleEl = card.querySelector('.card-title'), yearEl = card.querySelector('.card-meta span'), imgEl = card.querySelector('img.card-image');
-        var heart = card.querySelector('.card-media > .card-fav:not(.card-watch-btn):not([style*="left:80px"])');
-        var eye = card.querySelector('.card-media > .card-watch-btn');
-        var puzzle = card.querySelector('.card-media > .card-fav[style*="left:80px"]');
+        var liked = isLiked(m.id), watched = isW(m);
         var o = document.createElement('div'); o.id = 'cardLpSheet';
         var box = document.createElement('div'); box.className = 'lp-box';
         var head = document.createElement('div'); head.className = 'lp-head';
-        if (imgEl) { var im = document.createElement('img'); im.src = imgEl.src; head.appendChild(im); }
+        if (m.imgSrc) { var im = document.createElement('img'); im.src = m.imgSrc; head.appendChild(im); }
         var tx = document.createElement('div');
-        var t1 = document.createElement('div'); t1.className = 'lp-title'; t1.textContent = titleEl ? titleEl.textContent : '';
-        var t2 = document.createElement('div'); t2.className = 'lp-sub'; t2.textContent = (type === 'tv' ? '📺 Seriál' : '🎬 Film') + (yearEl && yearEl.textContent && yearEl.textContent !== '—' ? ' · ' + yearEl.textContent : '');
+        var t1 = document.createElement('div'); t1.className = 'lp-title'; t1.textContent = m.title;
+        var t2 = document.createElement('div'); t2.className = 'lp-sub'; t2.textContent = (m.type === 'tv' ? '📺 Seriál' : '🎬 Film') + (m.year ? ' · ' + m.year : '');
         tx.appendChild(t1); tx.appendChild(t2); head.appendChild(tx); box.appendChild(head);
         function addBtn(ic, label, cls, fn) {
             var b = document.createElement('button'); b.type = 'button'; b.className = 'lp-btn' + (cls ? ' ' + cls : '');
@@ -51788,14 +51809,35 @@ window.sfFrAuto=async function(id,t){
             b.addEventListener('click', function (e) { e.stopPropagation(); fn(); });
             box.appendChild(b); return b;
         }
-        if (heart) addBtn(liked ? '💔' : '❤️', liked ? 'Odebrat z oblíbených' : 'Přidat do oblíbených', liked ? 'on' : '', function () { closeSheet(); fire(heart); });
-        if (eye) addBtn(watched ? '↩️' : '👁️', watched ? 'Zrušit „shlédnuto“' : 'Označit jako shlédnuté', watched ? 'on' : '', function () { closeSheet(); fire(eye); });
-        if (puzzle) addBtn('🧩', 'Sinator menu (watchlist, hodnocení, seznam…)', '', function () { closeSheet(); fire(puzzle); });
+        function syncHeart(now) { // srdíčko na kartě (kde je viditelné) srovnat se stavem
+            card.querySelectorAll('.card-fav:not(.card-watch-btn)').forEach(function (b) {
+                var t = (b.textContent || '').trim();
+                if (t === '❤️' || t === '🤍') { b.textContent = now ? '❤️' : '🤍'; b.classList.toggle('liked', now); }
+            });
+        }
+        addBtn(liked ? '💔' : '❤️', liked ? 'Odebrat z oblíbených' : 'Přidat do oblíbených', liked ? 'on' : '', function () {
+            closeSheet();
+            try {
+                var dummy = document.createElement('span');
+                toggleFav(m.id, m.title, m.year, m.rating, m.type, m.poster, { stopPropagation: function () {}, target: dummy });
+                syncHeart(isLiked(m.id));
+            } catch (e) { console.warn(e); }
+        });
+        addBtn(watched ? '↩️' : '👁️', watched ? 'Zrušit „shlédnuto“' : 'Označit jako shlédnuté', watched ? 'on' : '', function () {
+            closeSheet();
+            try {
+                var tmp = document.createElement('button'); tmp.dataset.watched = watched ? '1' : '0';
+                window.toggleWatchedFromCard(m.id, m.type, m.title, m.year, m.poster, tmp);
+            } catch (e) { console.warn(e); }
+        });
+        addBtn('🧩', 'Sinator menu (watchlist, hodnocení, seznam…)', '', function () {
+            closeSheet();
+            try { window.openCardSinatorMenu(m.id, m.type, (typeof jsq === 'function' ? jsq(m.title) : m.title.replace(/'/g, "\\'")), m.year, m.poster, document.createElement('span')); } catch (e) { console.warn(e); }
+        });
         var hReady = false; try { hReady = typeof window.histraIsReady === 'function' && window.histraIsReady(); } catch (e) {}
         if (hReady) addBtn('🟣', 'Histra menu (watchlist, shlédnuto, seznam…)', '', function () {
-            // podnabídka Histra: stejné akce jako v detailu („🟣 Histra ▾“)
-            var keep = head; box.innerHTML = ''; box.appendChild(keep);
-            function hAct(name) { return function () { closeSheet(); try { if (typeof window[name] === 'function') window[name](id, type); } catch (e) { console.warn(e); } }; }
+            box.innerHTML = ''; box.appendChild(head);
+            function hAct(name) { return function () { closeSheet(); try { if (typeof window[name] === 'function') window[name](m.id, m.type); } catch (e) { console.warn(e); } }; }
             addBtn('🔖', 'Watchlist (přidat / odebrat)', '', hAct('histraWatchlistToggle'));
             addBtn('✅', 'Shlédnuto (Histra + Sinator)', '', hAct('histraMarkWatchedBoth'));
             addBtn('📁', 'Do seznamu…', '', hAct('histraAddToListPicker'));
@@ -51812,15 +51854,17 @@ window.sfFrAuto=async function(id,t){
         try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
         suppressNextClick();
     }
-    // Android/desktop: systémová událost podržení → zablokovat okno obrázku a otevřít vlastní nabídku
-    document.addEventListener('selectstart', function (e) { if (cardOf(e.target) || (e.target.closest && e.target.closest('#cardLpSheet'))) e.preventDefault(); }, true);
+    // Systémová nabídka obrázku (kopírovat / stáhnout / sdílet…) se blokuje na všech kartách a řádcích seznamů;
+    // u filmů a seriálů se místo ní otevře vlastní nabídka.
     document.addEventListener('contextmenu', function (e) {
         var c = cardOf(e.target); if (!c) return;
-        e.preventDefault(); open(c);
+        e.preventDefault();
+        if (metaOf(c)) open(c);
     }, true);
+    document.addEventListener('selectstart', function (e) { var c = cardOf(e.target); if (c && metaOf(c)) e.preventDefault(); }, true);
     // iOS a záloha: vlastní časovač podržení
     document.addEventListener('touchstart', function (e) {
-        var c = cardOf(e.target); if (!c || e.touches.length !== 1) return;
+        var c = cardOf(e.target); if (!c || e.touches.length !== 1 || !metaOf(c)) return;
         tgt = c; sx = e.touches[0].clientX; sy = e.touches[0].clientY;
         clearTimeout(timer); timer = setTimeout(function () { if (tgt) open(tgt); }, HOLD_MS);
     }, { passive: true, capture: true });
