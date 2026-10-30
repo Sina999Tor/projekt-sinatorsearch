@@ -6488,8 +6488,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const menu = document.createElement('div');
         menu.id = 'cardSinatorMenu';
         menu._ownerBtn = btnEl;
-        const left = Math.max(8, Math.min(rect.left, window.innerWidth - 200));
-        menu.style.cssText = `position:fixed;z-index:9999;top:${rect.bottom + 6}px;left:${left}px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 20px rgba(0,0,0,0.5);min-width:180px;`;
+        const _hid = !rect.width && !rect.height;   // tlačítko je skryté (nabídka z podržení karty) → zobrazit uprostřed
+        const left = _hid ? Math.max(8, (window.innerWidth - 200) / 2) : Math.max(8, Math.min(rect.left, window.innerWidth - 200));
+        menu.style.cssText = `position:fixed;z-index:100002;top:${_hid ? Math.round(window.innerHeight * 0.3) : rect.bottom + 6}px;left:${left}px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 20px rgba(0,0,0,0.5);min-width:180px;`;
         const t = title || '';
         menu.innerHTML = `
 <button class="action-btn-modal" style="background:rgba(96,144,255,0.15);border-color:#6090ff;color:#6090ff;" onclick="event.stopPropagation();myBackendAddWatchlist(${id},'${type}','${t}','${year||''}','${poster||''}');document.getElementById('cardSinatorMenu')?.remove();">🔖 Watchlist</button>
@@ -7045,6 +7046,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-30e', date: '30. 10. 2026', items: [
+            '👆 Podržení prstu na filmu/seriálu v mřížce už neotevírá systémové okno obrázku (kopírovat / stáhnout…), ale nabídku s akcemi ❤️ Oblíbené, 👁 Shlédnuto a 🧩 Sinator menu. Tlačítka z plakátu zmizela (zelený rámeček shlédnutého zůstává)',
+        ] },
         { version: '2026-10-30d', date: '30. 10. 2026', items: [
             '🎭 Kolekce herce: na záložce Kolekce napiš jméno herce (např. „Johnny Depp“, „Tom Cruise“) a zobrazí se kolekce, do kterých patří jeho filmy (nekonečný scroll, funguje řazení ⊿ i žánr). Jméno se rozpozná i s překlepem nebo skloňováním',
         ] },
@@ -15095,7 +15099,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         // (poster je velký, rámeček splyne) — proto tam navíc zelená fajka v pravém
         // spodním rohu, jasně viditelná i na velkém plakátu.
         const watchedCheck = (!isActor && watched && cols1) ? `<div class="card-watched-check">✅</div>` : '';
-        return `<div class="card${watched?' is-watched':''}" data-tmdb-id="${it.id}" data-tmdb-type="${mediaType}" onclick="${clickAction}"${cardStyle}><div class="card-media">${img}<div class="card-badge">${isActor?personBadge:(mediaType==='tv'?'📺':'')}</div><button class="card-fav ${liked?'liked':''}" onclick="${favAction}">${liked?'❤️':'🤍'}</button>${watchBtn}${sinatorBtn}${watchedCheck}</div><div class="card-info"><div class="card-title">${title}</div><div class="card-meta"><span>${year||'—'}</span>${!isActor?`<span class="card-rating">★ ${rating}</span>`:''}</div></div></div>`;
+        return `<div class="card${watched?' is-watched':''}${isActor?'':' lp-card'}" data-tmdb-id="${it.id}" data-tmdb-type="${mediaType}" onclick="${clickAction}"${cardStyle}><div class="card-media">${img}<div class="card-badge">${isActor?personBadge:(mediaType==='tv'?'📺':'')}</div><button class="card-fav ${liked?'liked':''}" onclick="${favAction}">${liked?'❤️':'🤍'}</button>${watchBtn}${sinatorBtn}${watchedCheck}</div><div class="card-info"><div class="card-title">${title}</div><div class="card-meta"><span>${year||'—'}</span>${!isActor?`<span class="card-rating">★ ${rating}</span>`:''}</div></div></div>`;
     }
 
     // ── INFINITE SCROLL LISTENER ─────────────────────────────────────────────
@@ -51729,5 +51733,89 @@ window.sfFrAuto=async function(id,t){
 <!-- ═══ /FRANCHISE TRACKER ═══ -->
 <!-- ═══ /SINATOR FEATURES PACK ═══ -->
 
+
+<style>
+.lp-card .card-media > .card-fav { display: none !important; }
+.lp-card, .lp-card img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.lp-card img { -webkit-user-drag: none; }
+#cardLpSheet { position: fixed; inset: 0; z-index: 100001; background: rgba(0,0,0,0.6); display: flex; align-items: flex-end; justify-content: center; }
+#cardLpSheet .lp-box { width: 100%; max-width: 480px; background: var(--bg-card, #151b2e); border: 1px solid var(--border, #2a3350); border-radius: 18px 18px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
+#cardLpSheet .lp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+#cardLpSheet .lp-head img { width: 44px; height: 64px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+#cardLpSheet .lp-title { font-weight: 700; font-size: 1.02rem; line-height: 1.25; }
+#cardLpSheet .lp-sub { opacity: .65; font-size: .8rem; margin-top: 2px; }
+#cardLpSheet .lp-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 14px; margin-top: 8px; border-radius: 12px; border: 1px solid var(--border, #2a3350); background: var(--bg-elevated, #1d2540); color: var(--text, #fff); font-size: 1rem; font-weight: 600; cursor: pointer; text-align: left; }
+#cardLpSheet .lp-btn .lp-ic { font-size: 1.3rem; width: 28px; text-align: center; }
+#cardLpSheet .lp-btn.on { border-color: #1db954; }
+#cardLpSheet .lp-cancel { justify-content: center; opacity: .8; }
+</style>
+<script>
+(function () {
+    var HOLD_MS = 450, passClick = false, openedAt = 0, timer = null, sx = 0, sy = 0, tgt = null;
+    function cardOf(el) { return el && el.closest ? el.closest('.lp-card') : null; }
+    function suppressNextClick() {
+        function stop(e) { if (passClick || !cardOf(e.target)) return; e.stopPropagation(); e.preventDefault(); }
+        document.addEventListener('click', stop, true);
+        setTimeout(function () { document.removeEventListener('click', stop, true); }, 700);
+    }
+    function fire(b) { passClick = true; try { b.click(); } finally { passClick = false; } }
+    function closeSheet() { var o = document.getElementById('cardLpSheet'); if (o) o.remove(); }
+    function open(card) {
+        if (!card || Date.now() - openedAt < 700) return;
+        openedAt = Date.now();
+        closeSheet();
+        var st = (window._siState && window._siState()) || null;
+        var id = Number(card.getAttribute('data-tmdb-id')), type = card.getAttribute('data-tmdb-type') || 'movie';
+        var liked = false, watched = card.classList.contains('is-watched');
+        try { liked = !!(st && st.favs && st.favs.some(function (f) { return Number(f.id) === id; })); } catch (e) {}
+        var titleEl = card.querySelector('.card-title'), yearEl = card.querySelector('.card-meta span'), imgEl = card.querySelector('img.card-image');
+        var heart = card.querySelector('.card-media > .card-fav:not(.card-watch-btn):not([style*="left:80px"])');
+        var eye = card.querySelector('.card-media > .card-watch-btn');
+        var puzzle = card.querySelector('.card-media > .card-fav[style*="left:80px"]');
+        var o = document.createElement('div'); o.id = 'cardLpSheet';
+        var box = document.createElement('div'); box.className = 'lp-box';
+        var head = document.createElement('div'); head.className = 'lp-head';
+        if (imgEl) { var im = document.createElement('img'); im.src = imgEl.src; head.appendChild(im); }
+        var tx = document.createElement('div');
+        var t1 = document.createElement('div'); t1.className = 'lp-title'; t1.textContent = titleEl ? titleEl.textContent : '';
+        var t2 = document.createElement('div'); t2.className = 'lp-sub'; t2.textContent = (type === 'tv' ? '📺 Seriál' : '🎬 Film') + (yearEl && yearEl.textContent && yearEl.textContent !== '—' ? ' · ' + yearEl.textContent : '');
+        tx.appendChild(t1); tx.appendChild(t2); head.appendChild(tx); box.appendChild(head);
+        function addBtn(ic, label, cls, fn) {
+            var b = document.createElement('button'); b.type = 'button'; b.className = 'lp-btn' + (cls ? ' ' + cls : '');
+            b.innerHTML = '<span class="lp-ic"></span><span></span>';
+            b.children[0].textContent = ic; b.children[1].textContent = label;
+            b.addEventListener('click', function (e) { e.stopPropagation(); fn(); });
+            box.appendChild(b); return b;
+        }
+        if (heart) addBtn(liked ? '💔' : '❤️', liked ? 'Odebrat z oblíbených' : 'Přidat do oblíbených', liked ? 'on' : '', function () { closeSheet(); fire(heart); });
+        if (eye) addBtn(watched ? '↩️' : '👁️', watched ? 'Zrušit „shlédnuto“' : 'Označit jako shlédnuté', watched ? 'on' : '', function () { closeSheet(); fire(eye); });
+        if (puzzle) addBtn('🧩', 'Sinator menu (watchlist, hodnocení, seznam…)', '', function () { closeSheet(); fire(puzzle); });
+        addBtn('✕', 'Zavřít', 'lp-cancel', closeSheet);
+        o.appendChild(box);
+        o.addEventListener('click', function (e) { if (e.target === o) closeSheet(); });
+        document.body.appendChild(o);
+        try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
+        suppressNextClick();
+    }
+    // Android/desktop: systémová událost podržení → zablokovat okno obrázku a otevřít vlastní nabídku
+    document.addEventListener('contextmenu', function (e) {
+        var c = cardOf(e.target); if (!c) return;
+        e.preventDefault(); open(c);
+    }, true);
+    // iOS a záloha: vlastní časovač podržení
+    document.addEventListener('touchstart', function (e) {
+        var c = cardOf(e.target); if (!c || e.touches.length !== 1) return;
+        tgt = c; sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+        clearTimeout(timer); timer = setTimeout(function () { if (tgt) open(tgt); }, HOLD_MS);
+    }, { passive: true, capture: true });
+    document.addEventListener('touchmove', function (e) {
+        if (!timer) return; var t = e.touches[0];
+        if (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) { clearTimeout(timer); timer = null; tgt = null; }
+    }, { passive: true, capture: true });
+    ['touchend', 'touchcancel'].forEach(function (ev) {
+        document.addEventListener(ev, function () { clearTimeout(timer); timer = null; tgt = null; }, { passive: true, capture: true });
+    });
+})();
+</script>
 </body>
 </html>
