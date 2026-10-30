@@ -7047,7 +7047,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-10-30e', date: '30. 10. 2026', items: [
-            '👆 Podržení prstu na filmu/seriálu v mřížce už neotevírá systémové okno obrázku (kopírovat / stáhnout…), ale nabídku s akcemi ❤️ Oblíbené, 👁 Shlédnuto a 🧩 Sinator menu. Tlačítka z plakátu zmizela (zelený rámeček shlédnutého zůstává)',
+            '👆 Podržení prstu na filmu/seriálu v mřížce už neotevírá systémové okno obrázku (kopírovat / stáhnout…), ale nabídku s akcemi ❤️ Oblíbené, 👁 Shlédnuto 🧩 Sinator menu a (je-li nastavená Histra) 🟣 Histra menu s akcemi Watchlist / Shlédnuto / Do seznamu / Hodnotit. Tlačítka z plakátu zmizela (zelený rámeček shlédnutého zůstává)',
         ] },
         { version: '2026-10-30d', date: '30. 10. 2026', items: [
             '🎭 Kolekce herce: na záložce Kolekce napiš jméno herce (např. „Johnny Depp“, „Tom Cruise“) a zobrazí se kolekce, do kterých patří jeho filmy (nekonečný scroll, funguje řazení ⊿ i žánr). Jméno se rozpozná i s překlepem nebo skloňováním',
@@ -51790,6 +51790,17 @@ window.sfFrAuto=async function(id,t){
         if (heart) addBtn(liked ? '💔' : '❤️', liked ? 'Odebrat z oblíbených' : 'Přidat do oblíbených', liked ? 'on' : '', function () { closeSheet(); fire(heart); });
         if (eye) addBtn(watched ? '↩️' : '👁️', watched ? 'Zrušit „shlédnuto“' : 'Označit jako shlédnuté', watched ? 'on' : '', function () { closeSheet(); fire(eye); });
         if (puzzle) addBtn('🧩', 'Sinator menu (watchlist, hodnocení, seznam…)', '', function () { closeSheet(); fire(puzzle); });
+        var hReady = false; try { hReady = typeof window.histraIsReady === 'function' && window.histraIsReady(); } catch (e) {}
+        if (hReady) addBtn('🟣', 'Histra menu (watchlist, shlédnuto, seznam…)', '', function () {
+            // podnabídka Histra: stejné akce jako v detailu („🟣 Histra ▾“)
+            var keep = head; box.innerHTML = ''; box.appendChild(keep);
+            function hAct(name) { return function () { closeSheet(); try { if (typeof window[name] === 'function') window[name](id, type); } catch (e) { console.warn(e); } }; }
+            addBtn('🔖', 'Watchlist (přidat / odebrat)', '', hAct('histraWatchlistToggle'));
+            addBtn('✅', 'Shlédnuto (Histra + Sinator)', '', hAct('histraMarkWatchedBoth'));
+            addBtn('📁', 'Do seznamu…', '', hAct('histraAddToListPicker'));
+            addBtn('⭐', 'Hodnotit…', '', hAct('histraRate'));
+            addBtn('←', 'Zpět', 'lp-cancel', function () { openedAt = 0; open(card); });
+        });
         addBtn('✕', 'Zavřít', 'lp-cancel', closeSheet);
         o.appendChild(box);
         o.addEventListener('click', function (e) { if (e.target === o) closeSheet(); });
