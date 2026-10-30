@@ -7045,6 +7045,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-30d', date: '30. 10. 2026', items: [
+            '🎭 Kolekce herce: na záložce Kolekce napiš jméno herce (např. „Johnny Depp“, „Tom Cruise“) a zobrazí se kolekce, do kterých patří jeho filmy (nekonečný scroll, funguje řazení ⊿ i žánr). Jméno se rozpozná i s překlepem nebo skloňováním',
+        ] },
         { version: '2026-10-30c', date: '30. 10. 2026', items: [
             '🔎 Hledání kolekcí vlastními slovy: na záložce Kolekce (nebo „kolekci …“ v AI hledání) napiš téma, např. „o autech“, „o upírech“, „zombie“ — AI ho převede na klíčová slova TMDB a zobrazí kolekce filmů na dané téma (nekonečný scroll, funguje i řazení ⊿ a žánr)',
         ] },
@@ -11659,7 +11662,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 const isMediaView = ['movies','tv','miniseries','anime'].includes(state.view);
                 const sortBtn = $('globalSortBtn');
                 if (sortBtn) sortBtn.style.display = (isMediaView || state.view === 'collections') ? '' : 'none';
-                state.collSort = 'popular'; state.collGenre = ''; state.collKw = ''; state.collKwLabel = '';
+                state.collSort = 'popular'; state.collGenre = ''; state.collKw = ''; state.collKwLabel = ''; state.collCast = ''; state.collCastLabel = '';
                 if (isMediaView) {
                     state.filters.sortBy = 'primary_release_date.desc';
                     const sel = $('sortFilter'); if(sel) sel.value = 'primary_release_date.desc';
@@ -13604,7 +13607,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     }
     function startCollectionsFeed() {
         if (state.view !== 'collections') return;
-        state._collFeed = { sort: state.collSort || 'popular', gid: state.collGenre ? Number(state.collGenre) : 0, kw: state.collKw || '',
+        state._collFeed = { sort: state.collSort || 'popular', gid: state.collGenre ? Number(state.collGenre) : 0, kw: state.collKw || '', cast: state.collCast || '',
             seen: new Set(), phase: 'curated', page: 1, totalPages: 1, letterIdx: 0, done: false, shown: 0 };
         state.totalPages = 1; state._allItems = []; state._loadingMore = true; state._customLoadMore = null;
         hideMainAzBar();
@@ -13640,8 +13643,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         state._loadingMore = true; state._customLoadMore = null;
         setInfiniteLoading(true);
         const batch = [];
-        const isAz = feed.sort === 'az' && !feed.gid && !feed.kw;
-        const isWatchedMode = feed.sort === 'watched' && !feed.gid && !feed.kw;
+        const isAz = feed.sort === 'az' && !feed.gid && !feed.kw && !feed.cast;
+        const isWatchedMode = feed.sort === 'watched' && !feed.gid && !feed.kw && !feed.cast;
         const alive = () => state._collFeed === feed && state.view === 'collections';
         try {
             if (isWatchedMode) {
@@ -13672,9 +13675,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                     } else {
                         if (feed.page > Math.min(feed.totalPages, 500)) { feed.done = true; break; }
                         const today = new Date().toISOString().slice(0, 10);
-                        const sort = (feed.sort === 'newest' && !feed.gid) ? 'primary_release_date.desc' : (feed.sort === 'az' && feed.kw && !feed.gid) ? 'original_title.asc' : 'popularity.desc';
-                        const g = (feed.gid ? `&with_genres=${feed.gid}` : '') + (feed.kw ? `&with_keywords=${encodeURIComponent(feed.kw)}` : '');
-                        url = `${BASE}/discover/movie?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=${sort}${g}&vote_count.gte=${feed.kw ? 5 : (sort.startsWith('primary') ? 30 : 100)}&primary_release_date.lte=${today}&page=${feed.page}`;
+                        const sort = (feed.sort === 'newest' && !feed.gid) ? 'primary_release_date.desc' : (feed.sort === 'az' && (feed.kw || feed.cast) && !feed.gid) ? 'original_title.asc' : 'popularity.desc';
+                        const g = (feed.gid ? `&with_genres=${feed.gid}` : '') + (feed.kw ? `&with_keywords=${encodeURIComponent(feed.kw)}` : '') + (feed.cast ? `&with_cast=${feed.cast}` : '');
+                        url = `${BASE}/discover/movie?api_key=${tmdbApiKey}&language=cs-CZ${tmdbAdult()}&sort_by=${sort}${g}&vote_count.gte=${(feed.kw || feed.cast) ? 5 : (sort.startsWith('primary') ? 30 : 100)}&primary_release_date.lte=${today}&page=${feed.page}`;
                     }
                     let data = null;
                     try { data = await (await _fetchWithTimeout(url)).json(); } catch (e) {}
@@ -13706,7 +13709,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             if (first) resultsEl.innerHTML = '';
             if (batch.length) appendCollectionGrid(batch, false);
             feed.shown += batch.length;
-            if (first && (feed.gid || feed.kw)) resultsEl.insertAdjacentHTML('afterbegin', `<div style="grid-column:1/-1;padding:6px 10px;font-size:0.8rem;opacity:0.8;">${feed.kw ? '🔎 Téma: <b>' + (state.collKwLabel || '') + '</b>' : ''}${feed.kw && feed.gid ? ' · ' : ''}${feed.gid ? '🎭 Žánr: <b>' + _collGenreName(feed.gid) + '</b>' : ''} — další kolekce se dotahují při scrollování</div>`);
+            if (first && (feed.gid || feed.kw || feed.cast)) resultsEl.insertAdjacentHTML('afterbegin', `<div style="grid-column:1/-1;padding:6px 10px;font-size:0.8rem;opacity:0.8;">${feed.cast ? '🎭 Herec: <b>' + (state.collCastLabel || '') + '</b>' : ''}${feed.kw ? '🔎 Téma: <b>' + (state.collKwLabel || '') + '</b>' : ''}${(feed.kw || feed.cast) && feed.gid ? ' · ' : ''}${feed.gid ? '🎬 Žánr: <b>' + _collGenreName(feed.gid) + '</b>' : ''} — další kolekce se dotahují při scrollování</div>`);
             if (!feed.shown && feed.done) resultsEl.innerHTML = isWatchedMode ? '<div class="empty">😕 Zatím nemáš zhlédnutý žádný film z kolekce.</div>' : '<div class="empty">😕 Žádné kolekce nenalezeny.</div>';
             else if (!feed.shown && first) resultsEl.innerHTML = '<div class="empty">😕 Zatím nic — scrolluj dál…</div>';
         } catch (e) {
@@ -13797,12 +13800,55 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     function _startCollThemeFeed(th, statusEl) {
         state.view = 'collections'; state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
         state.searchQuery = null; state._aiLastParsed = null; state._customLoadMore = null; state._aiResultsLocked = false;
-        state.collSort = 'popular'; state.collGenre = ''; state.collKw = th.ids.join('|'); state.collKwLabel = th.label;
+        state.collSort = 'popular'; state.collGenre = ''; state.collKw = th.ids.join('|'); state.collKwLabel = th.label; state.collCast = ''; state.collCastLabel = '';
         document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'collections'));
         const _sb = $('globalSortBtn'); if (_sb) _sb.style.display = '';
         try { closeFiltersOverlay(); } catch(e) {}
         document.getElementById('aiLoadMoreBtn')?.remove();
         if (statusEl) statusEl.innerHTML = `<span style="font-size:0.7rem;opacity:0.7;">📦 Kolekce na téma: ${th.label}</span>`;
+        startCollectionsFeed();
+    }
+    // ── Kolekce herce: jméno v dotazu → TMDB osoba → filmy s ním (discover with_cast) → jejich kolekce ──
+    function _collLev(a, b) {
+        const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+        let prev = Array.from({ length: n + 1 }, (_, j) => j);
+        for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
+        return prev[n];
+    }
+    function _collTokMatch(t, nt) {
+        if (t === nt || _collLev(t, nt) <= (nt.length >= 6 ? 2 : 1)) return true;
+        if (t.startsWith(nt) && t.length - nt.length <= 4) return true;   // skloňování: Deppem, Cruisem
+        if (nt.startsWith(t) && t.length >= 4) return true;
+        return false;
+    }
+    async function _collFindActor(term) {
+        const stop = new Set(['herec', 'herce', 'herci', 'herecky', 'hraje', 'hraji', 'hrajici', 'film', 'filmy', 'filmu', 'od', 'kde', 's', 'se', 'z', 'ze', 've', 'v', 'o', 'a']);
+        const norm = x => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter(Boolean);
+        const toks = norm(term).filter(t => !stop.has(t));
+        if (toks.length < 2 || toks.length > 4) return null;
+        let res = [];
+        try {
+            const r = await _fetchWithTimeout(`${BASE}/search/person?api_key=${tmdbApiKey}&language=cs-CZ&query=${encodeURIComponent(toks.join(' '))}&page=1`);
+            res = (await r.json()).results || [];
+        } catch (e) { return null; }
+        for (const pr of res.slice(0, 5)) {
+            if (!pr || !pr.id || pr.known_for_department && !/Acting|Directing/i.test(pr.known_for_department)) continue;
+            const nt = norm(pr.name);
+            if (nt.length < 2) continue;
+            const allMatch = toks.every(t => nt.some(n => _collTokMatch(t, n)));
+            if (allMatch && (pr.popularity || 0) >= 2) return { id: pr.id, name: pr.name };
+        }
+        return null;
+    }
+    function _startCollCastFeed(pr, statusEl) {
+        state.view = 'collections'; state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
+        state.searchQuery = null; state._aiLastParsed = null; state._customLoadMore = null; state._aiResultsLocked = false;
+        state.collSort = 'popular'; state.collGenre = ''; state.collKw = ''; state.collKwLabel = ''; state.collCast = String(pr.id); state.collCastLabel = pr.name;
+        document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'collections'));
+        const _sb = $('globalSortBtn'); if (_sb) _sb.style.display = '';
+        try { closeFiltersOverlay(); } catch(e) {}
+        document.getElementById('aiLoadMoreBtn')?.remove();
+        if (statusEl) statusEl.innerHTML = `<span style="font-size:0.7rem;opacity:0.7;">🎭 Kolekce s hercem: ${pr.name}</span>`;
         startCollectionsFeed();
     }
     // Vrací true, pokud dotaz obsloužil (zobrazil kolekce); false = pokračovat běžným AI hledáním
@@ -13824,7 +13870,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         if (_gm && !_gm.rest) {
             state.view = 'collections'; state.page = 1; state.totalPages = 1; state._allItems = []; state._loadingMore = false;
             state.searchQuery = null; state._aiLastParsed = null; state._customLoadMore = null; state._aiResultsLocked = false;
-            state.collSort = 'popular'; state.collGenre = String(_gm.id); state.collKw = ''; state.collKwLabel = '';
+            state.collSort = 'popular'; state.collGenre = String(_gm.id); state.collKw = ''; state.collKwLabel = ''; state.collCast = ''; state.collCastLabel = '';
             document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'collections'));
             const _sb = $('globalSortBtn'); if (_sb) _sb.style.display = '';
             try { closeFiltersOverlay(); } catch(e) {}
@@ -13834,6 +13880,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             return true;
         }
         if (statusEl) statusEl.innerHTML = '<span class="ai-spin">⟳</span> Hledám kolekce...';
+        if (!_gm) { const _ac = await _collFindActor(term); if (_ac) { _startCollCastFeed(_ac, statusEl); return true; } }
         const _nt = term.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         if (!_gm && (/^(o|ohledne|se|s|kde|kolem|ze|na tema|tema|pro|v|ve)\s/.test(_nt) || term.split(/\s+/).length >= 3)) {
             const th0 = await _collThematicKeywords(term);
