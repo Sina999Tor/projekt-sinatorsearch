@@ -52757,8 +52757,9 @@ window.sfFrAuto=async function(id,t){
     window.lmToggle = function (p, k) { var P = S.panes[p]; if (P.sel[k]) delete P.sel[k]; else P.sel[k] = 1; paint(p, true); };
     window.lmSelAll = function (p) { var P = S.panes[p]; visibleItems(p).forEach(function (it) { P.sel[keyOf(it)] = 1; }); paint(p, true); };
     window.lmSelNone = function (p) { S.panes[p].sel = {}; paint(p, true); };
-    window.lmNewList = async function (p) {
-        var P = S.panes[p], svc = P.src ? P.src[0] : null;
+    window.lmNewList = async function (p, svcArg) {
+        var P = S.panes[p], svc = svcArg || (P.src ? P.src[0] : null);
+        if (svc === 'f') svc = null;
         if (!svc) { var a = prompt('Kde vytvořit seznam? Napiš S = Sinator, H = Histra'); if (!a) return; svc = /^h/i.test(a.trim()) ? 'h' : 's'; }
         var name = prompt('Název nového seznamu (' + (svc === 's' ? 'Sinator' : 'Histra') + '):'); if (!name || !name.trim()) return; name = name.trim();
         var b = B();
@@ -52766,8 +52767,17 @@ window.sfFrAuto=async function(id,t){
             var key;
             if (svc === 's') { if (!b.myBackendReady()) throw new Error('Sinator není připojený'); var r = await b.myListCreate(name); key = 's:L:' + r.id; }
             else { if (!b.histraReady()) throw new Error('Histra není připojená'); key = 'h:L:' + (await b.histraEnsureList(name)); }
+            // zrcadlení: stejný seznam se automaticky vytvoří i v druhé službě
+            var mirrorMsg = '';
+            try {
+                var oth = svc === 's' ? 'h' : 's', lc = name.toLowerCase();
+                var has = (S.sources[oth] || []).some(function (x) { return x.key.indexOf(':L:') > 0 && baseName(x) === lc; });
+                if (has) mirrorMsg = ' · v druhé službě už existuje';
+                else if (oth === 's') { if (b.myBackendReady()) { await b.myListCreate(name); mirrorMsg = ' · 🔁 i v Sinatoru'; } else mirrorMsg = ' · Sinator není připojený'; }
+                else { if (b.histraReady()) { await b.histraEnsureList(name); mirrorMsg = ' · 🔁 i v Histře'; } else mirrorMsg = ' · Histra není připojená'; }
+            } catch (e2) { mirrorMsg = ' · ❌ druhá služba: ' + (((e2 && e2.message) || e2) + '').slice(0, 50); }
             await loadSources(); S.panes[p].src = key; S.panes[p].filter = '';
-            paint(0); paint(1); await loadPane(p); toast('📁 Seznam „' + name + '“ vytvořen');
+            paint(0); paint(1); await loadPane(p); toast('📁 Seznam „' + name + '“ vytvořen' + mirrorMsg);
         } catch (e) { toast('❌ ' + ((e && e.message) || e)); }
     };
 
@@ -52877,6 +52887,7 @@ window.sfFrAuto=async function(id,t){
             if (!closed) {
                 if (!g.items.length) h += '<div class="lm-gerr">' + esc(g.err || 'žádné seznamy') + '</div>';
                 g.items.forEach(function (it) { h += '<div class="lm-gi' + (it.key === cur ? ' cur' : '') + '" data-key="' + esc(it.key) + '">' + esc(it.name) + (it.key === cur ? ' ✓' : '') + '</div>'; });
+                if (g.id !== 'f') h += '<div class="lm-gi lm-gnew" data-new="' + g.id + '">➕ Vytvořit nový seznam</div>';
             }
         });
         h += '<button class="lm-gx" id="lmPkX">✕ Zavřít</button></div>';
@@ -52884,7 +52895,8 @@ window.sfFrAuto=async function(id,t){
         o.innerHTML = h;
         if (o.firstChild) o.firstChild.scrollTop = st;
         o.querySelectorAll('.lm-gh').forEach(function (e) { e.onclick = function () { var c = collapsedGet(), id = e.getAttribute('data-g'); if (c[id]) delete c[id]; else c[id] = 1; collapsedSet(c); renderPicker(p); }; });
-        o.querySelectorAll('.lm-gi').forEach(function (e) { e.onclick = function () { var k = e.getAttribute('data-key'); lmClosePicker(); window.lmPick(p, k); }; });
+        o.querySelectorAll('.lm-gi[data-key]').forEach(function (e) { e.onclick = function () { var k = e.getAttribute('data-key'); lmClosePicker(); window.lmPick(p, k); }; });
+        o.querySelectorAll('.lm-gnew').forEach(function (e) { e.onclick = function () { var sv = e.getAttribute('data-new'); lmClosePicker(); window.lmNewList(p, sv); }; });
         o.querySelector('#lmPkX').onclick = lmClosePicker;
     }
     window.lmOpenPicker = function (p) {
@@ -53019,6 +53031,7 @@ window.sfFrAuto=async function(id,t){
                 + '#lmPicker .lm-box{background:var(--bg-card,#161b2e);border:1px solid var(--border,#26304d);border-radius:16px;padding:8px;width:100%;max-width:420px;max-height:100%;overflow-y:auto;color:var(--text,#e8ecf8);}'
                 + '#lmPicker .lm-gh{display:flex;justify-content:space-between;align-items:center;padding:12px 10px;margin-top:4px;font-weight:700;background:rgba(56,189,248,0.1);border-radius:10px;cursor:pointer;}#lmPicker .lm-gh small{opacity:.6;font-weight:400;}'
                 + '#lmPicker .lm-gi{padding:11px 14px;border-radius:10px;margin-top:3px;cursor:pointer;font-size:0.9rem;background:var(--bg-elevated,#1b2340);}#lmPicker .lm-gi.cur{border:1px solid #38bdf8;color:#38bdf8;}'
+                + '#lmPicker .lm-gnew{border:1px dashed #38bdf8;color:#38bdf8;background:transparent;text-align:center;}'
                 + '#lmPicker .lm-gerr{padding:8px 14px;font-size:0.8rem;opacity:.65;}#lmPicker .lm-gx{display:block;width:100%;margin-top:8px;padding:10px;background:transparent;border:1px solid var(--border,#26304d);border-radius:10px;color:inherit;cursor:pointer;}'
                 + '@media (orientation:landscape){'
                 + '#listManager{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);}'
