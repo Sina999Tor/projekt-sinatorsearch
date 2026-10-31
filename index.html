@@ -1381,8 +1381,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <div id="simklListTabs" style="display:flex;gap:6px;padding:10px 16px;min-width:max-content;"></div>
             </div>
             <div class="trakt-modal-body" id="simklResultsContainer" style="display:none;"></div>
-            <div id="myBackendListTabsWrap" style="display:none;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);background:var(--bg-card);">
-                <div id="myBackendListTabs" style="display:flex;gap:6px;padding:10px 16px;min-width:max-content;"></div>
+            <div id="myBackendListTabsWrap" style="display:none;border-bottom:1px solid var(--border);background:var(--bg-card);padding:8px 16px;">
+                <button id="myBackendListToggle" onclick="myBackendToggleListDrop()" style="width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid #6090ff;background:rgba(96,144,255,0.12);color:var(--text);cursor:pointer;font-size:0.9rem;text-align:left;"><span>Vyber seznam</span><span>▾</span></button>
+                <div id="myBackendListTabs" style="display:none;flex-direction:column;gap:6px;padding-top:8px;max-height:60vh;overflow-y:auto;"></div>
             </div>
             <div id="myBackendSortBarWrap" style="display:none;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg-card);gap:8px;align-items:center;flex-wrap:wrap;">
                 <select id="myBackendSortSelect" onchange="myBackendApplySort(this.value)" style="background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px;font-size:0.8rem;">
@@ -16235,6 +16236,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         if (btn) {
             const name = btn.textContent.replace(/\s*\(\d+\)\s*$/, '');
             btn.textContent = name + ' (' + count + ')';
+            myBackendSyncListToggle();
         }
     }
 
@@ -16328,6 +16330,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             b.style.borderColor = active ? '#6090ff' : 'var(--border)';
             b.style.color = active ? '#6090ff' : 'var(--text)';
         });
+        if ($('myBackendListTabs')) $('myBackendListTabs').style.display = 'none';
+        myBackendSyncListToggle(tab);
         const c = $('myBackendResultsContainer');
         c.innerHTML = `<div class="empty" style="padding:30px;text-align:center;">Načítám…</div>`;
         const _timeout = (ms) => new Promise((_, rej) => setTimeout(() => rej(new Error('Načítání trvá příliš dlouho (timeout). Zkus to prosím znovu.')), ms));
@@ -16437,6 +16441,20 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         renderMyBackendGrid(items, window._myBackendCurrentEmptyMsg || 'Žádné položky.', window._myBackendActiveTab);
     };
 
+    window.myBackendToggleListDrop = function (force) {
+        const box = $('myBackendListTabs'); if (!box) return;
+        const open = typeof force === 'boolean' ? force : box.style.display === 'none';
+        box.style.display = open ? 'flex' : 'none';
+        myBackendSyncListToggle();
+    };
+    function myBackendSyncListToggle(tab) {
+        const t = $('myBackendListToggle'), box = $('myBackendListTabs'); if (!t || !box) return;
+        const key = window._myBackendActiveTab || tab;
+        const b = key ? box.querySelector('button.ts-list-tab-btn[data-tab="' + key + '"]') : null;
+        const label = b ? b.textContent.trim() : 'Vyber seznam';
+        const open = box.style.display !== 'none';
+        t.innerHTML = '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + label.replace(/</g, '&lt;') + '</span><span>' + (open ? '▴' : '▾') + '</span>';
+    }
     window.myBackendApplyLetterFilter = function(value) {
         window._myBackendCurrentLetterFilter = value;
         const items = myBackendGetSortedFilteredItems();
@@ -16476,11 +16494,12 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const listTabs = lists.map(l => ({ key: `list:${l.id}`, label: `📁 ${l.name} (${l.item_count || 0})`, id: l.id }));
         const smartTabs = smartAll().map(d => ({ key: `smart:${d.id}`, label: `🧠 ${String(d.name).replace(/</g, '&lt;')}`, smartId: d.id }));
         const allTabs = [...staticTabs, ...listTabs, ...smartTabs];
-        $('myBackendListTabs').innerHTML = allTabs.map(t => `<span style="position:relative;display:inline-flex;">
-            <button class="ts-list-tab-btn" data-tab="${t.key}" onclick="renderMyBackendTab('${t.key}')" style="white-space:nowrap;padding:8px ${(t.id || t.smartId) ? '26px' : '14px'} 8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.82rem;">${t.label}</button>
+        $('myBackendListTabs').innerHTML = allTabs.map(t => `<span style="position:relative;display:flex;width:100%;">
+            <button class="ts-list-tab-btn" data-tab="${t.key}" onclick="renderMyBackendTab('${t.key}')" style="width:100%;text-align:left;white-space:normal;padding:10px ${(t.id || t.smartId) ? '34px' : '14px'} 10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.82rem;">${t.label}</button>
             ${(t.id || t.smartId) ? `<button onclick="event.stopPropagation();${t.smartId ? `mySmartDelete('${t.smartId}')` : `myBackendDeleteList('${t.id}')`}" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:rgba(224,122,111,0.25);border:none;color:#e07a6f;font-size:0.7rem;line-height:1;cursor:pointer;">✕</button>` : ''}
-        </span>`).join('') + `<button onclick="myBackendCreateList()" style="white-space:nowrap;padding:8px 14px;border-radius:20px;border:1px dashed #6090ff;background:transparent;color:#6090ff;cursor:pointer;font-size:0.82rem;">➕ Nový seznam</button>`;
+        </span>`).join('') + `<button onclick="myBackendCreateList()" style="width:100%;white-space:nowrap;padding:10px 14px;border-radius:10px;border:1px dashed #6090ff;background:transparent;color:#6090ff;cursor:pointer;font-size:0.82rem;">➕ Nový seznam</button>`;
         $('myBackendListTabsWrap').style.display = 'block';
+        myBackendSyncListToggle(tab);
 
         // Pokud se vracíme na tab, který už máme jednou načtený (a nejde o
         // vynucený refresh), jen ho znovu vykreslíme z cache - bez fetch
