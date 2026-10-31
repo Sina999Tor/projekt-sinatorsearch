@@ -52937,7 +52937,31 @@ window.sfFrAuto=async function(id,t){
         r.addEventListener('selectstart', function (e) { var t = e.target && (e.target.nodeType === 1 ? e.target : e.target.parentElement); if (!(t && t.closest && t.closest('input'))) e.preventDefault(); });
     }
 
-    window.closeListManager = function () { closeSheet(); lmClosePicker(); document.body.classList.remove('lm-open'); if (root) { root.remove(); root = null; } try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {} };
+    // Okna otevřená z detailu (výběr externí appky, přehrávač, galerie…) musí být NAD správcem seznamů
+    var liftObs = null, LIFT_Z = 99999996;
+    function liftMaybe(el) {
+        try {
+            if (!el || el.nodeType !== 1 || el.id === 'listManager' || el.id === 'lmSheet' || el.id === 'lmPicker' || el.id === 'modal') return;
+            var cs = getComputedStyle(el); if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden') return;
+            var z = parseInt(cs.zIndex, 10); if (!isNaN(z) && z >= LIFT_Z) return;
+            var r = el.getBoundingClientRect(); if (r.width < innerWidth * 0.9 || r.height < innerHeight * 0.9) return;
+            el.style.setProperty('z-index', String(LIFT_Z), 'important');
+        } catch (e) {}
+    }
+    function lmStartLift() {
+        lmStopLift();
+        try {
+            liftObs = new MutationObserver(function (muts) {
+                muts.forEach(function (m) {
+                    if (m.type === 'childList') { if (m.target === document.body) m.addedNodes.forEach(liftMaybe); }
+                    else if (m.target.parentNode === document.body) liftMaybe(m.target);
+                });
+            });
+            liftObs.observe(document.body, { childList: true, attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
+        } catch (e) {}
+    }
+    function lmStopLift() { if (liftObs) { try { liftObs.disconnect(); } catch (e) {} liftObs = null; } }
+    window.closeListManager = function () { closeSheet(); lmClosePicker(); lmStopLift(); document.body.classList.remove('lm-open'); if (root) { root.remove(); root = null; } try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {} };
     window.openListManager = async function () {
         if (!B()) { toast('⚠️ Správce seznamů není k dispozici'); return; }
         closeListManager();
@@ -52998,6 +53022,7 @@ window.sfFrAuto=async function(id,t){
             + paneShell(1);
         document.body.appendChild(root);
         document.body.classList.add('lm-open');
+        lmStartLift();
         bindRows(root);
         try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {}
         S.panes.forEach(function (P) { P.items = []; P.sel = {}; P.err = ''; P.filter = ''; });
