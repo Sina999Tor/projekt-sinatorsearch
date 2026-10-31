@@ -52693,22 +52693,41 @@ window.sfFrAuto=async function(id,t){
     // ── Poster / název (donačtení z TMDB na pozadí, když chybí) ──
     function posterUrl(p) { if (!p) return ''; p = String(p); return p.indexOf('http') === 0 ? p : 'https://image.tmdb.org/t/p/w92' + (p[0] === '/' ? p : '/' + p); }
     var enrichQ = [], enrichRun = 0;
+    // České názvy/plakáty z TMDB (cs-CZ) — trvale cachované, ať se každá položka stahuje jen jednou
+    var CS_KEY = 'sinator_lm_cs_v1', csCache = {};
+    try { csCache = JSON.parse(localStorage.getItem(CS_KEY) || '{}') || {}; } catch (e) { csCache = {}; }
+    var csSaveT = null;
+    function csSave() { clearTimeout(csSaveT); csSaveT = setTimeout(function () { try { localStorage.setItem(CS_KEY, JSON.stringify(csCache)); } catch (e) {} }, 800); }
+    function applyCs(x) {
+        var c = csCache[keyOf(x)]; if (!c) return false;
+        if (c[0]) x.title = c[0];
+        if (!x.year && c[1]) x.year = c[1];
+        if (!x.poster && c[2]) x.poster = c[2];
+        return true;
+    }
     function enrich(items) {
-        var k = B() && B().tmdbKey && B().tmdbKey(); if (!k) return;
-        items.forEach(function (it) { var id = keyOf(it); if (!it.poster && !S.posters[id]) { S.posters[id] = 'pending'; enrichQ.push(it); } });
+        var k = B() && B().tmdbKey && B().tmdbKey();
+        items.forEach(function (it) {
+            if (applyCs(it)) return;
+            if (!k) return;
+            var id = keyOf(it); if (S.posters[id] === 'pending') return;
+            S.posters[id] = 'pending'; enrichQ.push(it);
+        });
         pump();
     }
     function pump() {
-        var k = B().tmdbKey();
+        var k = B() && B().tmdbKey && B().tmdbKey(); if (!k) return;
         while (enrichRun < 4 && enrichQ.length) {
             (function (it) {
                 enrichRun++;
                 fetch('https://api.themoviedb.org/3/' + it.type + '/' + it.id + '?api_key=' + k + '&language=cs-CZ')
                     .then(function (r) { return r.json(); })
                     .then(function (d) {
-                        S.posters[keyOf(it)] = (d && d.poster_path) || 'none';
-                        if (d && !it.title) it.title = d.title || d.name || '';
-                        S.panes.forEach(function (p, pi) { p.items.forEach(function (x) { if (keyOf(x) === keyOf(it)) { if (!x.title && it.title) x.title = it.title; if (!x.poster) x.poster = (d && d.poster_path) || ''; } }); });
+                        var id = keyOf(it);
+                        var t = (d && (d.title || d.name)) || '', y = ((d && (d.release_date || d.first_air_date)) || '').slice(0, 4), po = (d && d.poster_path) || '';
+                        S.posters[id] = po || 'none';
+                        if (t || po) { csCache[id] = [t, y, po]; csSave(); }
+                        S.panes.forEach(function (p) { p.items.forEach(function (x) { if (keyOf(x) === id) applyCs(x); }); });
                         paint(0, true); paint(1, true);
                     }).catch(function () { S.posters[keyOf(it)] = 'none'; })
                     .then(function () { enrichRun--; pump(); });
@@ -53076,7 +53095,7 @@ window.sfFrAuto=async function(id,t){
         root = document.createElement('div'); root.id = 'listManager';
         root.innerHTML = '<div class="lm-top"><b>🗂️ Správce seznamů</b><button class="lm-ib" onclick="closeListManager()" style="font-size:1rem;">✕</button></div>'
             + paneShell(0)
-            + '<div class="lm-bar" id="lmBar"><button onclick=\"lmAuto(\'copy\')\">📋 Kopírovat</button><button onclick=\"lmAuto(\'move\')\">✂️ Přesunout</button><button class=\"lm-del\" onclick=\"lmDelete()\">🗑 Smazat</button>'
+            + '<div class="lm-bar" id="lmBar"><button onclick=\"lmAuto(\'copy\')\">Kopírovat</button><button onclick=\"lmAuto(\'move\')\">Přesunout</button><button class=\"lm-del\" onclick=\"lmDelete()\">🗑 Smazat</button>'
             + '<button onclick=\"lmSwap()\">⇅ Prohodit</button><div id=\"lmStatus\"></div></div>'
             + paneShell(1);
         document.body.appendChild(root);
