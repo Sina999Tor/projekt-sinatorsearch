@@ -52828,6 +52828,14 @@ window.sfFrAuto=async function(id,t){
         else await Promise.all([loadPane(to), mode === 'move' ? loadPane(from) : Promise.resolve()]);
         if (mode !== 'move') { F.sel = {}; paint(from, true); }
     };
+    // směr se určí podle toho, ve kterém okně jsou označené položky
+    window.lmAuto = function (mode) {
+        if (S.busy) return;
+        var n0 = selCount(0), n1 = selCount(1);
+        if (!n0 && !n1) { toast('⚠️ Nic není označené'); return; }
+        if (n0 && n1) { toast('⚠️ Označ položky jen v jednom okně'); return; }
+        return n0 ? window.lmTransfer(mode, 0, 1) : window.lmTransfer(mode, 1, 0);
+    };
     window.lmDelete = async function () {
         if (S.busy) return;
         var jobs = [];
@@ -53016,7 +53024,7 @@ window.sfFrAuto=async function(id,t){
                 + '#listManager .lm-empty{text-align:center;opacity:.7;padding:24px 8px;font-size:0.85rem;}'
                 + '#listManager .lm-foot{font-size:0.7rem;opacity:.7;padding:2px 10px 4px;flex-shrink:0;}'
                 + '#listManager .lm-bar{display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:var(--bg-card,#141a30);border-top:1px solid var(--border,#26304d);border-bottom:1px solid var(--border,#26304d);flex-shrink:0;align-items:center;}'
-                + '#listManager .lm-bar button{flex:1 1 30%;background:var(--bg-elevated,#1b2340);color:inherit;border:1px solid var(--border,#26304d);border-radius:10px;padding:8px 4px;font-size:0.78rem;cursor:pointer;}'
+                + '#listManager .lm-bar button{flex:1 1 0;min-width:0;white-space:nowrap;background:var(--bg-elevated,#1b2340);color:inherit;border:1px solid var(--border,#26304d);border-radius:10px;padding:8px 2px;font-size:0.72rem;cursor:pointer;}#listManager #lmStatus:empty{display:none;}'
                 + '#listManager .lm-bar button:disabled{opacity:.4;}#listManager .lm-bar .lm-del{border-color:#ef4444;color:#f87171;}#listManager #lmStatus{flex-basis:100%;font-size:0.72rem;color:#38bdf8;text-align:center;}'
                 + '#listManager,#listManager *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;}'
                 + '#listManager input{-webkit-user-select:text;user-select:text;}'
@@ -53049,8 +53057,8 @@ window.sfFrAuto=async function(id,t){
         root = document.createElement('div'); root.id = 'listManager';
         root.innerHTML = '<div class="lm-top"><b>🗂️ Správce seznamů</b><button class="lm-ib" onclick="closeListManager()" style="font-size:1rem;">✕</button></div>'
             + paneShell(0)
-            + '<div class="lm-bar" id="lmBar"><button onclick="lmTransfer(\'copy\',0,1)">⬇ Kopírovat</button><button onclick="lmTransfer(\'move\',0,1)">⬇ Přesunout</button><button class="lm-del" onclick="lmDelete()">🗑 Smazat</button>'
-            + '<button onclick="lmTransfer(\'copy\',1,0)">⬆ Kopírovat</button><button onclick="lmTransfer(\'move\',1,0)">⬆ Přesunout</button><button onclick="lmSwap()">⇅ Prohodit</button><div id="lmStatus"></div></div>'
+            + '<div class="lm-bar" id="lmBar"><button onclick=\"lmAuto(\'copy\')\">📋 Kopírovat</button><button onclick=\"lmAuto(\'move\')\">✂️ Přesunout</button><button class=\"lm-del\" onclick=\"lmDelete()\">🗑 Smazat</button>'
+            + '<button onclick=\"lmSwap()\">⇅ Prohodit</button><div id=\"lmStatus\"></div></div>'
             + paneShell(1);
         document.body.appendChild(root);
         document.body.classList.add('lm-open');
