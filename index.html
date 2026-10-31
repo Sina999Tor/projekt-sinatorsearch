@@ -1967,6 +1967,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <span class="settings-label">🗂️ Správce seznamů</span>
                 <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">Celoobrazovkové okno se dvěma seznamy pod sebou (jako správce souborů). V každém okně vybereš libovolný seznam nebo watchlist ze Sinatoru i z Histry, označíš si víc položek najednou a můžeš je <b>kopírovat</b>, <b>přesouvat</b> mezi okny nebo <b>mazat</b>.</div>
                 <button class="settings-btn-small" style="width:100%;margin-top:12px;border-color:#34d399;color:#34d399;" onclick="openListManager()">🗂️ Otevřít správce seznamů</button>
+                <label style="display:flex;align-items:center;gap:10px;margin-top:12px;font-size:0.85rem;cursor:pointer;"><input type="checkbox" id="lmHomeBtnChk" onchange="lmSetHomeBtn(this.checked)" style="width:20px;height:20px;flex-shrink:0;"><span>Zobrazit mezi hlavními tlačítky (vedle Wrapped)</span></label>
             </div>
             </div><!-- /swPageExpLists -->
             <div class="sw-page" id="swPageProfile">
@@ -52962,6 +52963,24 @@ window.sfFrAuto=async function(id,t){
     }
     function lmStopLift() { if (liftObs) { try { liftObs.disconnect(); } catch (e) {} liftObs = null; } }
     window.closeListManager = function () { closeSheet(); lmClosePicker(); lmStopLift(); document.body.classList.remove('lm-open'); if (root) { root.remove(); root = null; } try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {} };
+    // ── Tlačítko Správce na domovské obrazovce (vedle Wrapped), zapíná se v Nastavení ──
+    var HB_KEY = 'sinator_lm_home_btn';
+    function hbOn() { try { return localStorage.getItem(HB_KEY) === '1'; } catch (e) { return false; } }
+    function hbApply() {
+        var ex = document.getElementById('btnListManagerHome'), on = hbOn();
+        var chk = document.getElementById('lmHomeBtnChk'); if (chk) chk.checked = on;
+        if (!on) { if (ex) ex.remove(); }
+        else if (!ex) {
+            var z = document.getElementById('btnZabavaToggle'); if (!z) return;
+            z.insertAdjacentHTML('beforebegin', '<button id="btnListManagerHome" class="action-btn icon" onclick="openListManager()" title="Správce seznamů"><span class="btn-icon">🗂️</span><span class="btn-label">Správce</span></button>');
+        }
+        try { if (typeof updateHeaderSpacer === 'function') setTimeout(updateHeaderSpacer, 50); } catch (e) {}
+    }
+    window.lmSetHomeBtn = function (v) { try { localStorage.setItem(HB_KEY, v ? '1' : '0'); } catch (e) {} hbApply(); };
+    hbApply();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hbApply);
+    window.addEventListener('load', hbApply);
+
     window.openListManager = async function () {
         if (!B()) { toast('⚠️ Správce seznamů není k dispozici'); return; }
         closeListManager();
