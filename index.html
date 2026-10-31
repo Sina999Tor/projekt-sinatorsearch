@@ -52586,14 +52586,14 @@ window.sfFrAuto=async function(id,t){
             S.sources.s.push({ key: 's:wl', name: '🔖 Watchlist' });
             try {
                 var r = await b.myListsGet(); var arr = Array.isArray(r) ? r : ((r && r.lists) || []);
-                arr.forEach(function (l) { if (l && l.id != null) S.sources.s.push({ key: 's:L:' + l.id, name: '📁 ' + (l.name || 'Seznam') + (l.item_count != null ? ' (' + l.item_count + ')' : '') }); });
+                arr.forEach(function (l) { if (l && l.id != null) S.sources.s.push({ key: 's:L:' + l.id, raw: l.name || 'Seznam', name: '📁 ' + (l.name || 'Seznam') + (l.item_count != null ? ' (' + l.item_count + ')' : '') }); });
             } catch (e) { S.sources.sErr = (e && e.message) || String(e); }
         } else S.sources.sErr = 'Sinator není připojený';
         if (b && b.histraReady()) {
             S.sources.h.push({ key: 'h:wl', name: '🔖 Watchlist' });
             try {
                 var hl = b.histraUnwrapList(await b.histraApi('/api/v1/lists?limit=200&offset=0'));
-                hl.forEach(function (l) { var id = l && (l.id != null ? l.id : l.list_id); if (id != null) S.sources.h.push({ key: 'h:L:' + id, name: '📁 ' + (l.name || l.title || 'Seznam') }); });
+                hl.forEach(function (l) { var id = l && (l.id != null ? l.id : l.list_id); if (id != null) S.sources.h.push({ key: 'h:L:' + id, raw: l.name || l.title || 'Seznam', name: '📁 ' + (l.name || l.title || 'Seznam') }); });
             } catch (e) { S.sources.hErr = (e && e.message) || String(e); }
         } else S.sources.hErr = 'Histra není připojená';
     }
@@ -52601,6 +52601,19 @@ window.sfFrAuto=async function(id,t){
         var all = S.sources.s.concat(S.sources.h, S.sources.f || []), f = all.filter(function (x) { return x.key === key; })[0];
         return f ? ((key[0] === 's' ? '🟢 Sinator · ' : key[0] === 'h' ? '🟣 Histra · ' : '💾 Lokální · ') + f.name.replace(/ \(\d+\)$/, '')) : '—';
     }
+
+    // ── Protějšek seznamu v druhé službě (Sinator ↔ Histra): watchlist ↔ watchlist, seznam podle stejného názvu ──
+    function baseName(x) { return String(x.raw != null ? x.raw : String(x.name || '').replace(/^📁\s*/, '').replace(/\s*\(\d+\)$/, '')).trim().toLowerCase(); }
+    function mirrorOf(key) {
+        var p = key.split(':'); if (p[0] !== 's' && p[0] !== 'h') return null;
+        var other = p[0] === 's' ? 'h' : 's', wl = other + ':wl', arr = S.sources[other] || [];
+        if (p[1] === 'wl') return arr.some(function (x) { return x.key === wl; }) ? wl : null;
+        var me = (S.sources[p[0]] || []).filter(function (x) { return x.key === key; })[0]; if (!me) return null;
+        var nm = baseName(me);
+        var m = arr.filter(function (x) { return x.key !== wl && baseName(x) === nm; })[0];
+        return m ? m.key : null;
+    }
+    function plain(it) { return { id: it.id, type: it.type, title: it.title, year: it.year, poster: it.poster }; }
 
     function normS(it) { return it && it.id ? { id: Number(it.id), type: nType(it.type), title: it.title || it.name || '', year: it.year || '', poster: it.poster_path || it.poster || '' } : null; }
     async function loadItems(key) {
@@ -52773,8 +52786,12 @@ window.sfFrAuto=async function(id,t){
         if (!items.length) { toast('⚠️ Nejdřív označ položky v ' + (from === 0 ? 'horním' : 'spodním') + ' okně'); return; }
         var verb = mode === 'move' ? 'Přesunout' : 'Kopírovat';
         if (!confirm(verb + ' ' + items.length + ' položek\nz: ' + srcName(F.src) + '\ndo: ' + srcName(T.src) + ' ?')) return;
+        var mF = mirrorOf(F.src), mT = mirrorOf(T.src), doMirror = false;
+        if (mF && mT && mF !== mT && !(mF === T.src && mT === F.src)) {
+            doMirror = confirm('🔁 Provést totéž i v druhé službě?\n' + verb + ' ' + items.length + ' položek\nz: ' + srcName(mF) + '\ndo: ' + srcName(mT) + '\n\nOK = ano, v obou · Zrušit = jen v původních seznamech');
+        }
         var have = {}; T.items.forEach(function (x) { have[keyOf(x)] = 1; });
-        var ok = 0, skip = 0, fail = 0, lastErr = '';
+        var ok = 0, skip = 0, fail = 0, lastErr = '', mok = 0, mfail = 0;
         for (var i = 0; i < items.length; i++) {
             var it = items[i]; setBusy(true, (mode === 'move' ? 'Přesouvám ' : 'Kopíruji ') + (i + 1) + '/' + items.length + '…');
             try {
@@ -52782,10 +52799,22 @@ window.sfFrAuto=async function(id,t){
                 if (mode === 'move') await removeFrom(F.src, it);
             } catch (e) { fail++; lastErr = (e && e.message) || String(e); if (fail >= 5 && !ok) break; }
         }
+        if (doMirror) {
+            var mHave = {}; try { (await loadItems(mT)).forEach(function (x) { mHave[keyOf(x)] = 1; }); } catch (e) {}
+            for (var j = 0; j < items.length; j++) {
+                var mi = plain(items[j]); setBusy(true, '🔁 Druhá služba ' + (j + 1) + '/' + items.length + '…');
+                try {
+                    if (!mHave[keyOf(mi)]) await addTo(mT, mi);
+                    if (mode === 'move') await removeFrom(mF, mi);
+                    mok++;
+                } catch (e) { mfail++; }
+            }
+        }
         setBusy(false, '');
         try { B().favsRefresh(); } catch (e) {}
-        toast((mode === 'move' ? '✂️ Přesunuto ' : '📋 Zkopírováno ') + ok + (skip ? ' · už tam bylo ' + skip : '') + (fail ? ' · ❌ chyb ' + fail + (lastErr ? ' (' + lastErr.slice(0, 50) + ')' : '') : ''));
-        await Promise.all([loadPane(to), mode === 'move' ? loadPane(from) : Promise.resolve()]);
+        toast((mode === 'move' ? '✂️ Přesunuto ' : '📋 Zkopírováno ') + ok + (skip ? ' · už tam bylo ' + skip : '') + (fail ? ' · ❌ chyb ' + fail + (lastErr ? ' (' + lastErr.slice(0, 50) + ')' : '') : '') + (doMirror ? ' · 🔁 druhá služba ' + mok + (mfail ? ' (❌ ' + mfail + ')' : '') : ''));
+        if (doMirror) await Promise.all([loadPane(0), loadPane(1)]);
+        else await Promise.all([loadPane(to), mode === 'move' ? loadPane(from) : Promise.resolve()]);
         if (mode !== 'move') { F.sel = {}; paint(from, true); }
     };
     window.lmDelete = async function () {
@@ -52797,14 +52826,38 @@ window.sfFrAuto=async function(id,t){
         var seen = {}; jobs = jobs.filter(function (j) { var k = S.panes[j.p].src + '|' + keyOf(j.it); if (seen[k]) return false; seen[k] = 1; return true; });
         var txt = [0, 1].map(function (p) { var n = jobs.filter(function (j) { return j.p === p; }).length; return n ? '• ' + srcName(S.panes[p].src) + ': ' + n : ''; }).filter(Boolean).join('\n');
         if (!confirm('🗑 Smazat ' + jobs.length + ' položek ze seznamů?\n' + txt + '\n\n(Smaže se jen ze seznamu, ne z jiných seznamů.)')) return;
-        var ok = 0, fail = 0, lastErr = '';
+        var mJobs = [];
+        var mSrcs = {}; jobs.forEach(function (j) { var m = mirrorOf(S.panes[j.p].src); if (m) (mSrcs[m] = mSrcs[m] || []).push(j.it); });
+        var mKeys = Object.keys(mSrcs);
+        if (mKeys.length) {
+            setBusy(true, '🔁 Hledám položky v druhé službě…');
+            for (var q = 0; q < mKeys.length; q++) {
+                var mk = mKeys[q], exist = {};
+                try { (await loadItems(mk)).forEach(function (x) { exist[keyOf(x)] = 1; }); } catch (e) { continue; }
+                var done = {};
+                mSrcs[mk].forEach(function (it) { var k = keyOf(it), sk = mk + '|' + k; if (exist[k] && !done[k] && !seen[sk]) { done[k] = 1; mJobs.push({ src: mk, it: plain(it) }); } });
+            }
+            setBusy(false, '');
+        }
+        var doMirror = false;
+        if (mJobs.length) {
+            var mtxt = mKeys.map(function (k) { var n = mJobs.filter(function (j) { return j.src === k; }).length; return n ? '• ' + srcName(k) + ': ' + n : ''; }).filter(Boolean).join('\n');
+            doMirror = confirm('🔁 Smazat stejné položky i v druhé službě?\n' + mtxt + '\n\nOK = ano, v obou · Zrušit = jen vybrané');
+        }
+        var ok = 0, fail = 0, lastErr = '', mok = 0, mfail = 0;
         for (var i = 0; i < jobs.length; i++) {
             setBusy(true, 'Mažu ' + (i + 1) + '/' + jobs.length + '…');
             try { await removeFrom(S.panes[jobs[i].p].src, jobs[i].it); ok++; } catch (e) { fail++; lastErr = (e && e.message) || String(e); }
         }
+        if (doMirror) {
+            for (var m = 0; m < mJobs.length; m++) {
+                setBusy(true, '🔁 Druhá služba ' + (m + 1) + '/' + mJobs.length + '…');
+                try { await removeFrom(mJobs[m].src, mJobs[m].it); mok++; } catch (e) { mfail++; }
+            }
+        }
         setBusy(false, '');
         try { B().favsRefresh(); } catch (e) {}
-        toast('🗑 Smazáno ' + ok + (fail ? ' · ❌ chyb ' + fail + (lastErr ? ' (' + lastErr.slice(0, 50) + ')' : '') : ''));
+        toast('🗑 Smazáno ' + ok + (fail ? ' · ❌ chyb ' + fail + (lastErr ? ' (' + lastErr.slice(0, 50) + ')' : '') : '') + (doMirror ? ' · 🔁 druhá služba ' + mok + (mfail ? ' (❌ ' + mfail + ')' : '') : ''));
         await Promise.all([loadPane(0), loadPane(1)]);
     };
 
