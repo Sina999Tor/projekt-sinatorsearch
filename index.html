@@ -7054,6 +7054,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-31b', date: '31. 10. 2026', items: [
+            '🗂️ Správce seznamů: na šířku (na ležato) jsou obě okna vedle sebe na půlky, lišta s tlačítky (Kopírovat / Přesunout / Smazat / Prohodit) je v jedné řadě dole; na výšku zůstávají pod sebou',
+        ] },
         { version: '2026-10-31a', date: '31. 10. 2026', items: [
             '🗂️ Nastavení → 🧪 Experimentální funkce → Správce seznamů: celoobrazovkové okno se dvěma seznamy pod sebou. V obou jde vybrat watchlist nebo libovolný seznam ze Sinatoru i z Histry. Tapnutím označíš víc položek (☑ Vše / ☐ Nic, filtr), pak ⬇/⬆ Kopírovat, ⬇/⬆ Přesunout mezi okny, 🗑 Smazat, ＋ nový seznam a ⇅ prohodit okna. Duplicity v cíli se přeskočí; kopírování/přesun/mazání se dělá přímo ve zvolené službě (bez automatického zrcadlení).',
         ] },
@@ -52802,7 +52805,18 @@ window.sfFrAuto=async function(id,t){
                 + '#listManager .lm-foot{font-size:0.7rem;opacity:.7;padding:2px 10px 4px;flex-shrink:0;}'
                 + '#listManager .lm-bar{display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:var(--bg-card,#141a30);border-top:1px solid var(--border,#26304d);border-bottom:1px solid var(--border,#26304d);flex-shrink:0;align-items:center;}'
                 + '#listManager .lm-bar button{flex:1 1 30%;background:var(--bg-elevated,#1b2340);color:inherit;border:1px solid var(--border,#26304d);border-radius:10px;padding:8px 4px;font-size:0.78rem;cursor:pointer;}'
-                + '#listManager .lm-bar button:disabled{opacity:.4;}#listManager .lm-bar .lm-del{border-color:#ef4444;color:#f87171;}#listManager #lmStatus{flex-basis:100%;font-size:0.72rem;color:#38bdf8;text-align:center;}';
+                + '#listManager .lm-bar button:disabled{opacity:.4;}#listManager .lm-bar .lm-del{border-color:#ef4444;color:#f87171;}#listManager #lmStatus{flex-basis:100%;font-size:0.72rem;color:#38bdf8;text-align:center;}'
+                + '@media (orientation:landscape){'
+                + '#listManager{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);}'
+                + '#listManager .lm-top{grid-column:1 / 3;grid-row:1;padding:4px 10px;}'
+                + '#listManager #lmPane0{grid-column:1;grid-row:2;border-right:1px solid var(--border,#26304d);border-bottom:none;}'
+                + '#listManager #lmPane1{grid-column:2;grid-row:2;border-bottom:none;}'
+                + '#listManager .lm-bar{grid-column:1 / 3;grid-row:3;flex-wrap:nowrap;padding:4px 8px;border-bottom:none;}'
+                + '#listManager .lm-bar button{flex:1 1 0;min-width:0;padding:6px 2px;font-size:0.72rem;white-space:nowrap;}'
+                + '#listManager #lmStatus{flex:0 0 auto;font-size:0.68rem;}'
+                + '#listManager .lm-sel,#listManager .lm-find{padding:5px 8px;}'
+                + '#listManager .lm-ib{padding:5px 8px;}'
+                + '}';
             document.head.appendChild(st);
         }
         root = document.createElement('div'); root.id = 'listManager';
