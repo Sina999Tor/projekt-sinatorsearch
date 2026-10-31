@@ -7054,6 +7054,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-31d', date: '31. 10. 2026', items: [
+            '🗂️ Správce seznamů: výběr seznamu je teď vlastní nabídka, kde klepnutím na nadpis 🟢 Sinator / 🟣 Histra / 💾 Lokální skupinu sbalíš (schováš její seznamy) nebo rozbalíš; sbalení se pamatuje',
+            '🗂️ Správce seznamů: nový zdroj 💾 Lokální → ❤️ Oblíbené (ta v zařízení) — jde z nich i do nich kopírovat, přesouvat a mazat stejně jako mezi seznamy Sinatoru a Histry',
+        ] },
+        { version: '2026-10-31c', date: '31. 10. 2026', items: [
+            '🗂️ Správce seznamů: dlouhý stisk na filmu / seriálu otevře menu — ▶️ Trailer v plovoucím okně (nad správcem) a 📄 Přejít na detail (po zavření detailu se vrátíš do správce). Text v seznamu se už při dlouhém stisku neoznačuje (žádné systémové menu Přeložit / Kopírovat).',
+        ] },
         { version: '2026-10-31b', date: '31. 10. 2026', items: [
             '🗂️ Správce seznamů: na šířku (na ležato) jsou obě okna vedle sebe na půlky, lišta s tlačítky (Kopírovat / Přesunout / Smazat / Prohodit) je v jedné řadě dole; na výšku zůstávají pod sebou',
         ] },
@@ -23603,7 +23610,21 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         myBackendReady, myApi, myListsGet, myListCreate, myListItemsGet,
         histraReady, histraApi, histraUnwrapList, histraFetchAllPaged, histraMapItem,
         histraPostItem, histraEnsureList, histraCacheTouch,
-        tmdbKey: () => tmdbApiKey
+        tmdbKey: () => tmdbApiKey,
+        // lokální oblíbené (state.favs v zařízení)
+        favsGet: () => state.favs || [],
+        favsAdd: (it) => {
+            if (state.favs.some(f => Number(f.id) === Number(it.id))) return false;
+            state.favs.unshift({ id: it.id, title: it.title || '', year: it.year || '', rating: it.rating || 0, type: it.type, poster: it.poster || '' });
+            _store.setItem('sinator_favs', JSON.stringify(state.favs)); try { updateFavBadge(); } catch (e) {}
+            return true;
+        },
+        favsRemove: (it) => {
+            const i = state.favs.findIndex(f => Number(f.id) === Number(it.id));
+            if (i > -1) { state.favs.splice(i, 1); _store.setItem('sinator_favs', JSON.stringify(state.favs)); try { updateFavBadge(); } catch (e) {} }
+            return i > -1;
+        },
+        favsRefresh: () => { try { updateFavBadge(); } catch (e) {} try { renderFavsModal(); } catch (e) {} }
     };
 
 </script>
@@ -52560,7 +52581,7 @@ window.sfFrAuto=async function(id,t){
               sources: { s: [], h: [] }, busy: false, posters: {} };
 
     async function loadSources() {
-        var b = B(); S.sources = { s: [], h: [], sErr: '', hErr: '' };
+        var b = B(); S.sources = { s: [], h: [], f: [{ key: 'f:fav', name: '❤️ Oblíbené' }], sErr: '', hErr: '' };
         if (b && b.myBackendReady()) {
             S.sources.s.push({ key: 's:wl', name: '🔖 Watchlist' });
             try {
@@ -52577,13 +52598,16 @@ window.sfFrAuto=async function(id,t){
         } else S.sources.hErr = 'Histra není připojená';
     }
     function srcName(key) {
-        var all = S.sources.s.concat(S.sources.h), f = all.filter(function (x) { return x.key === key; })[0];
-        return f ? ((key[0] === 's' ? '🟢 Sinator · ' : '🟣 Histra · ') + f.name.replace(/ \(\d+\)$/, '')) : '—';
+        var all = S.sources.s.concat(S.sources.h, S.sources.f || []), f = all.filter(function (x) { return x.key === key; })[0];
+        return f ? ((key[0] === 's' ? '🟢 Sinator · ' : key[0] === 'h' ? '🟣 Histra · ' : '💾 Lokální · ') + f.name.replace(/ \(\d+\)$/, '')) : '—';
     }
 
     function normS(it) { return it && it.id ? { id: Number(it.id), type: nType(it.type), title: it.title || it.name || '', year: it.year || '', poster: it.poster_path || it.poster || '' } : null; }
     async function loadItems(key) {
         var b = B(), parts = key.split(':');
+        if (parts[0] === 'f') {
+            return (b.favsGet() || []).map(function (f) { return f && f.id ? { id: Number(f.id), type: nType(f.type), title: f.title || '', year: f.year || '', poster: f.poster || '', rating: f.rating || 0 } : null; }).filter(Boolean);
+        }
         if (parts[0] === 's') {
             var raw = parts[1] === 'wl' ? await b.myApi('/watchlist') : await b.myListItemsGet(parts[2]);
             raw = Array.isArray(raw) ? raw : ((raw && (raw.items || raw.data)) || []);
@@ -52604,6 +52628,7 @@ window.sfFrAuto=async function(id,t){
     }
     async function addTo(key, it) {
         var b = B(), parts = key.split(':');
+        if (parts[0] === 'f') { b.favsAdd(it); return; }
         if (parts[0] === 's') {
             if (parts[1] === 'wl') return b.myApi('/watchlist', { method: 'POST', body: JSON.stringify({ id: it.id, type: it.type, title: it.title, year: it.year, poster_path: it.poster || null }) });
             if (window._sinListCache) delete window._sinListCache[parts[2]];
@@ -52616,6 +52641,7 @@ window.sfFrAuto=async function(id,t){
     }
     async function removeFrom(key, it) {
         var b = B(), parts = key.split(':');
+        if (parts[0] === 'f') { b.favsRemove(it); return; }
         if (parts[0] === 's') {
             if (parts[1] === 'wl') return b.myApi('/watchlist', { method: 'DELETE', body: JSON.stringify({ id: it.id, type: it.type }) });
             if (window._sinListCache) delete window._sinListCache[parts[2]];
@@ -52674,7 +52700,7 @@ window.sfFrAuto=async function(id,t){
     }
     function paneShell(p) {
         return '<div class="lm-pane" id="lmPane' + p + '">'
-            + '<div class="lm-phead"><select class="lm-sel" id="lmSel' + p + '" onchange="lmPick(' + p + ',this.value)"></select>'
+            + '<div class="lm-phead"><button type="button" class="lm-sel lm-selbtn" id="lmSel' + p + '" onclick="lmOpenPicker(' + p + ')"></button>'
             + '<button class="lm-ib" title="Nový seznam" onclick="lmNewList(' + p + ')">＋</button>'
             + '<button class="lm-ib" title="Obnovit" onclick="lmReload(' + p + ')">↻</button></div>'
             + '<div class="lm-tools"><input class="lm-find" id="lmFind' + p + '" placeholder="🔎 Filtr…" oninput="lmFilter(' + p + ',this.value)">'
@@ -52685,7 +52711,7 @@ window.sfFrAuto=async function(id,t){
     function paint(p, keepScroll) {
         var P = S.panes[p], body = el('lmBody' + p), foot = el('lmFoot' + p), sel = el('lmSel' + p);
         if (!body) return;
-        if (sel && !keepScroll) sel.innerHTML = optionsHtml(P.src);
+        if (sel && !keepScroll) sel.textContent = (P.src ? srcName(P.src) : '— vyber seznam —') + '  ▾';
         var st = body.scrollTop;
         if (!P.src) body.innerHTML = '<div class="lm-empty">Vyber seznam nahoře.</div>';
         else if (P.loading) body.innerHTML = '<div class="lm-empty">⏳ Načítám…</div>';
@@ -52694,7 +52720,7 @@ window.sfFrAuto=async function(id,t){
             var vis = visibleItems(p);
             body.innerHTML = vis.length ? vis.map(function (it) {
                 var k = keyOf(it), on = !!P.sel[k], pu = posterUrl(it.poster || (S.posters[k] && S.posters[k] !== 'pending' && S.posters[k] !== 'none' ? S.posters[k] : ''));
-                return '<div class="lm-row' + (on ? ' on' : '') + '" data-k="' + k + '" onclick="lmToggle(' + p + ',\'' + k + '\')">'
+                return '<div class="lm-row' + (on ? ' on' : '') + '" data-k="' + k + '" data-p="' + p + '">'
                     + '<span class="lm-chk">' + (on ? '✅' : '⬜') + '</span>'
                     + (pu ? '<img class="lm-th" loading="lazy" src="' + esc(pu) + '">' : '<span class="lm-th lm-nth">' + (it.type === 'tv' ? '📺' : '🎬') + '</span>')
                     + '<span class="lm-tx"><b>' + esc(it.title || ('#' + it.id)) + '</b><small>' + (it.type === 'tv' ? '📺 Seriál' : '🎬 Film') + (it.year ? ' · ' + esc(it.year) : '') + '</small></span></div>';
@@ -52757,6 +52783,7 @@ window.sfFrAuto=async function(id,t){
             } catch (e) { fail++; lastErr = (e && e.message) || String(e); if (fail >= 5 && !ok) break; }
         }
         setBusy(false, '');
+        try { B().favsRefresh(); } catch (e) {}
         toast((mode === 'move' ? '✂️ Přesunuto ' : '📋 Zkopírováno ') + ok + (skip ? ' · už tam bylo ' + skip : '') + (fail ? ' · ❌ chyb ' + fail + (lastErr ? ' (' + lastErr.slice(0, 50) + ')' : '') : ''));
         await Promise.all([loadPane(to), mode === 'move' ? loadPane(from) : Promise.resolve()]);
         if (mode !== 'move') { F.sel = {}; paint(from, true); }
@@ -52776,11 +52803,88 @@ window.sfFrAuto=async function(id,t){
             try { await removeFrom(S.panes[jobs[i].p].src, jobs[i].it); ok++; } catch (e) { fail++; lastErr = (e && e.message) || String(e); }
         }
         setBusy(false, '');
+        try { B().favsRefresh(); } catch (e) {}
         toast('🗑 Smazáno ' + ok + (fail ? ' · ❌ chyb ' + fail + (lastErr ? ' (' + lastErr.slice(0, 50) + ')' : '') : ''));
         await Promise.all([loadPane(0), loadPane(1)]);
     };
 
-    window.closeListManager = function () { if (root) { root.remove(); root = null; } try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {} };
+    // ── Výběr seznamu: skupiny Sinator / Histra / Lokální jdou sbalit klepnutím na nadpis ──
+    function collapsedGet() { try { return JSON.parse(localStorage.getItem('sinator_lm_collapsed') || '{}') || {}; } catch (e) { return {}; } }
+    function collapsedSet(o) { try { localStorage.setItem('sinator_lm_collapsed', JSON.stringify(o)); } catch (e) {} }
+    window.lmClosePicker = function () { var o = document.getElementById('lmPicker'); if (o) o.remove(); };
+    function renderPicker(p) {
+        var o = document.getElementById('lmPicker'); if (!o) return;
+        var col = collapsedGet(), cur = S.panes[p].src;
+        var groups = [{ id: 's', label: '🟢 Sinator', items: S.sources.s, err: S.sources.sErr }, { id: 'h', label: '🟣 Histra', items: S.sources.h, err: S.sources.hErr }, { id: 'f', label: '💾 Lokální', items: S.sources.f || [], err: '' }];
+        var h = '<div class="lm-box">';
+        groups.forEach(function (g) {
+            var closed = !!col[g.id];
+            h += '<div class="lm-gh" data-g="' + g.id + '"><span>' + g.label + ' <small>(' + g.items.length + ')</small></span><span>' + (closed ? '▸' : '▾') + '</span></div>';
+            if (!closed) {
+                if (!g.items.length) h += '<div class="lm-gerr">' + esc(g.err || 'žádné seznamy') + '</div>';
+                g.items.forEach(function (it) { h += '<div class="lm-gi' + (it.key === cur ? ' cur' : '') + '" data-key="' + esc(it.key) + '">' + esc(it.name) + (it.key === cur ? ' ✓' : '') + '</div>'; });
+            }
+        });
+        h += '<button class="lm-gx" id="lmPkX">✕ Zavřít</button></div>';
+        var st = o.firstChild ? o.firstChild.scrollTop : 0;
+        o.innerHTML = h;
+        if (o.firstChild) o.firstChild.scrollTop = st;
+        o.querySelectorAll('.lm-gh').forEach(function (e) { e.onclick = function () { var c = collapsedGet(), id = e.getAttribute('data-g'); if (c[id]) delete c[id]; else c[id] = 1; collapsedSet(c); renderPicker(p); }; });
+        o.querySelectorAll('.lm-gi').forEach(function (e) { e.onclick = function () { var k = e.getAttribute('data-key'); lmClosePicker(); window.lmPick(p, k); }; });
+        o.querySelector('#lmPkX').onclick = lmClosePicker;
+    }
+    window.lmOpenPicker = function (p) {
+        lmClosePicker();
+        var o = document.createElement('div'); o.id = 'lmPicker';
+        var opened = Date.now();
+        o.addEventListener('click', function (e) { if (e.target === o && Date.now() - opened > 300) lmClosePicker(); });
+        document.body.appendChild(o);
+        renderPicker(p);
+    };
+
+    // ── Dlouhý stisk na položce: menu (Trailer v plovoucím okně / Detail) ──
+    function closeSheet() { var o = document.getElementById('lmSheet'); if (o) o.remove(); }
+    function itemOf(p, k) { return S.panes[p].items.filter(function (it) { return keyOf(it) === k; })[0] || null; }
+    function openSheet(p, k) {
+        var it = itemOf(p, k); if (!it) return;
+        closeSheet();
+        var o = document.createElement('div'); o.id = 'lmSheet';
+        o.innerHTML = '<div class="lm-box"><div class="lm-st">' + esc(it.title || ('#' + it.id)) + '</div>'
+            + '<div class="lm-ss">' + (it.type === 'tv' ? '📺 Seriál' : '🎬 Film') + (it.year ? ' · ' + esc(it.year) : '') + '</div>'
+            + '<button id="lmSh1">▶️ Trailer (plovoucí okno)</button><button id="lmSh2">📄 Přejít na detail</button><button id="lmSh3">✕ Zavřít</button></div>';
+        var opened = Date.now();
+        o.addEventListener('click', function (e) { if (e.target === o && Date.now() - opened > 600) closeSheet(); });
+        o.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+        document.body.appendChild(o);
+        o.querySelector('#lmSh1').onclick = function () { closeSheet(); try { if (typeof window.sfTrailer === 'function') window.sfTrailer(it.id, it.type); else toast('⚠️ Trailer není k dispozici'); } catch (e) { toast('⚠️ Trailer se nepodařilo spustit'); } };
+        o.querySelector('#lmSh2').onclick = function () { closeSheet(); try { if (typeof window.openDetail === 'function') window.openDetail(it.id, it.type); } catch (e) { toast('⚠️ Detail se nepodařilo otevřít'); } };
+        o.querySelector('#lmSh3').onclick = closeSheet;
+        try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
+    }
+    var lp = { t: null, x: 0, y: 0, fired: 0 };
+    function bindRows(r) {
+        function rowOf(e) { return e.target && e.target.closest ? e.target.closest('.lm-row') : null; }
+        r.addEventListener('pointerdown', function (e) {
+            var row = rowOf(e); if (!row) return;
+            lp.x = e.clientX; lp.y = e.clientY; clearTimeout(lp.t);
+            lp.t = setTimeout(function () { lp.fired = Date.now(); openSheet(+row.getAttribute('data-p'), row.getAttribute('data-k')); }, 480);
+        });
+        r.addEventListener('pointermove', function (e) { if (lp.t && (Math.abs(e.clientX - lp.x) > 10 || Math.abs(e.clientY - lp.y) > 10)) { clearTimeout(lp.t); lp.t = null; } });
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (n) { r.addEventListener(n, function () { clearTimeout(lp.t); lp.t = null; }); });
+        r.addEventListener('click', function (e) {
+            var row = rowOf(e); if (!row) return;
+            if (Date.now() - lp.fired < 800) { e.preventDefault(); return; }   // klik po dlouhém stisku se ignoruje
+            window.lmToggle(+row.getAttribute('data-p'), row.getAttribute('data-k'));
+        });
+        r.addEventListener('contextmenu', function (e) {
+            var t = e.target; if (t && t.closest && t.closest('input')) return;
+            e.preventDefault(); var row = rowOf(e);
+            if (row && Date.now() - lp.fired > 800) { lp.fired = Date.now(); openSheet(+row.getAttribute('data-p'), row.getAttribute('data-k')); }
+        });
+        r.addEventListener('selectstart', function (e) { var t = e.target && (e.target.nodeType === 1 ? e.target : e.target.parentElement); if (!(t && t.closest && t.closest('input'))) e.preventDefault(); });
+    }
+
+    window.closeListManager = function () { closeSheet(); lmClosePicker(); document.body.classList.remove('lm-open'); if (root) { root.remove(); root = null; } try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {} };
     window.openListManager = async function () {
         if (!B()) { toast('⚠️ Správce seznamů není k dispozici'); return; }
         closeListManager();
@@ -52806,6 +52910,19 @@ window.sfFrAuto=async function(id,t){
                 + '#listManager .lm-bar{display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:var(--bg-card,#141a30);border-top:1px solid var(--border,#26304d);border-bottom:1px solid var(--border,#26304d);flex-shrink:0;align-items:center;}'
                 + '#listManager .lm-bar button{flex:1 1 30%;background:var(--bg-elevated,#1b2340);color:inherit;border:1px solid var(--border,#26304d);border-radius:10px;padding:8px 4px;font-size:0.78rem;cursor:pointer;}'
                 + '#listManager .lm-bar button:disabled{opacity:.4;}#listManager .lm-bar .lm-del{border-color:#ef4444;color:#f87171;}#listManager #lmStatus{flex-basis:100%;font-size:0.72rem;color:#38bdf8;text-align:center;}'
+                + '#listManager,#listManager *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;}'
+                + '#listManager input{-webkit-user-select:text;user-select:text;}'
+                + '.sfpl{z-index:100000000 !important;}body.lm-open #modal{z-index:99999995 !important;}'
+                + '#lmSheet{position:fixed;inset:0;z-index:99999993;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;padding:12px;}'
+                + '#lmSheet .lm-box{background:var(--bg-card,#161b2e);border:1px solid var(--border,#26304d);border-radius:16px;padding:12px;width:100%;max-width:340px;}'
+                + '#lmSheet .lm-st{font-weight:700;font-size:0.95rem;margin-bottom:2px;}#lmSheet .lm-ss{font-size:0.75rem;opacity:.65;margin-bottom:10px;}'
+                + '#lmSheet button{display:block;width:100%;text-align:left;background:var(--bg-elevated,#1b2340);color:inherit;border:1px solid var(--border,#26304d);border-radius:10px;padding:11px 12px;margin-top:7px;font-size:0.9rem;cursor:pointer;}'
+                + '#listManager .lm-selbtn{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}'
+                + '#lmPicker{position:fixed;inset:0;z-index:99999994;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;padding:12px;-webkit-user-select:none;user-select:none;}'
+                + '#lmPicker .lm-box{background:var(--bg-card,#161b2e);border:1px solid var(--border,#26304d);border-radius:16px;padding:8px;width:100%;max-width:420px;max-height:100%;overflow-y:auto;color:var(--text,#e8ecf8);}'
+                + '#lmPicker .lm-gh{display:flex;justify-content:space-between;align-items:center;padding:12px 10px;margin-top:4px;font-weight:700;background:rgba(56,189,248,0.1);border-radius:10px;cursor:pointer;}#lmPicker .lm-gh small{opacity:.6;font-weight:400;}'
+                + '#lmPicker .lm-gi{padding:11px 14px;border-radius:10px;margin-top:3px;cursor:pointer;font-size:0.9rem;background:var(--bg-elevated,#1b2340);}#lmPicker .lm-gi.cur{border:1px solid #38bdf8;color:#38bdf8;}'
+                + '#lmPicker .lm-gerr{padding:8px 14px;font-size:0.8rem;opacity:.65;}#lmPicker .lm-gx{display:block;width:100%;margin-top:8px;padding:10px;background:transparent;border:1px solid var(--border,#26304d);border-radius:10px;color:inherit;cursor:pointer;}'
                 + '@media (orientation:landscape){'
                 + '#listManager{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);}'
                 + '#listManager .lm-top{grid-column:1 / 3;grid-row:1;padding:4px 10px;}'
@@ -52826,13 +52943,15 @@ window.sfFrAuto=async function(id,t){
             + '<button onclick="lmTransfer(\'copy\',1,0)">⬆ Kopírovat</button><button onclick="lmTransfer(\'move\',1,0)">⬆ Přesunout</button><button onclick="lmSwap()">⇅ Prohodit</button><div id="lmStatus"></div></div>'
             + paneShell(1);
         document.body.appendChild(root);
+        document.body.classList.add('lm-open');
+        bindRows(root);
         try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {}
         S.panes.forEach(function (P) { P.items = []; P.sel = {}; P.err = ''; P.filter = ''; });
         var last = []; try { last = JSON.parse(localStorage.getItem('sinator_lm_last') || '[]'); } catch (e) {}
         S.panes[0].src = ''; S.panes[1].src = '';
         paint(0); paint(1);
         await loadSources();
-        var all = S.sources.s.concat(S.sources.h).map(function (x) { return x.key; });
+        var all = S.sources.s.concat(S.sources.h, S.sources.f).map(function (x) { return x.key; });
         [0, 1].forEach(function (p) { S.panes[p].src = last[p] && all.indexOf(last[p]) >= 0 ? last[p] : ''; });
         // výchozí: nahoře první seznam Sinatoru, dole první seznam Histry (jsou-li)
         if (!S.panes[0].src && S.sources.s.length) S.panes[0].src = S.sources.s[0].key;
