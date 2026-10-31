@@ -1962,6 +1962,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             })();
             </script>
             </div><!-- /swPageExpCache -->
+            <div class="sw-page" id="swPageExpLists">
+            <div class="settings-section">
+                <span class="settings-label">🗂️ Správce seznamů</span>
+                <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">Celoobrazovkové okno se dvěma seznamy pod sebou (jako správce souborů). V každém okně vybereš libovolný seznam nebo watchlist ze Sinatoru i z Histry, označíš si víc položek najednou a můžeš je <b>kopírovat</b>, <b>přesouvat</b> mezi okny nebo <b>mazat</b>.</div>
+                <button class="settings-btn-small" style="width:100%;margin-top:12px;border-color:#34d399;color:#34d399;" onclick="openListManager()">🗂️ Otevřít správce seznamů</button>
+            </div>
+            </div><!-- /swPageExpLists -->
             <div class="sw-page" id="swPageProfile">
             <div class="settings-section" style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.2);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:var(--gold,#ffd700);">👤 Tvoje jméno / přezdívka</span>
@@ -7047,6 +7054,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-10-31a', date: '31. 10. 2026', items: [
+            '🗂️ Nastavení → 🧪 Experimentální funkce → Správce seznamů: celoobrazovkové okno se dvěma seznamy pod sebou. V obou jde vybrat watchlist nebo libovolný seznam ze Sinatoru i z Histry. Tapnutím označíš víc položek (☑ Vše / ☐ Nic, filtr), pak ⬇/⬆ Kopírovat, ⬇/⬆ Přesunout mezi okny, 🗑 Smazat, ＋ nový seznam a ⇅ prohodit okna. Duplicity v cíli se přeskočí; kopírování/přesun/mazání se dělá přímo ve zvolené službě (bez automatického zrcadlení).',
+        ] },
         { version: '2026-10-30k', date: '30. 10. 2026', items: [
             '📷 Pozvat kamaráda: nové tlačítko „QR kód“ — kamarád ho jen naskenuje. Na výběr 🆕 čistá aplikace, nebo 🔑 s TMDB klíčem (jen Admin level 2 s uloženým klíčem; před zobrazením se zeptá). QR jde uložit jako obrázek.',
         ] },
@@ -23582,6 +23592,15 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         TRAKT_BASE,
         SIMKL_BASE,
         SIMKL_CLIENT_ID
+    };
+
+    // Export pro Správce seznamů (Nastavení → Experimentální funkce): surové volání Sinator backendu a Histry
+    // bez zrcadlení (správce si kopírování / přesun mezi službami řídí sám)
+    window._lmBackend = {
+        myBackendReady, myApi, myListsGet, myListCreate, myListItemsGet,
+        histraReady, histraApi, histraUnwrapList, histraFetchAllPaged, histraMapItem,
+        histraPostItem, histraEnsureList, histraCacheTouch,
+        tmdbKey: () => tmdbApiKey
     };
 
 </script>
@@ -51178,10 +51197,11 @@ window.addEventListener('load', function() {
     security:{icon:'🔐', name:'Heslo a obsah',     sub:'Přístupové heslo, explicitní obsah',       c:'#ff6b6b', node:'swPageSecurity'},
     update:  {icon:'🔄', name:'Aktualizace',       sub:'Kontrola verze a historie změn',           c:'#1db954', node:'swPageUpdate'},
     backup:  {icon:'💾', name:'Záloha dat',        sub:'Export a import',                          c:'#8bc34a', node:'swPageBackup'},
-    experimental:{icon:'🧪', name:'Experimentální funkce', sub:'Vzhled, upozornění, cache', c:'#38bdf8', node:'swPageExperimental', children:['expLook','expNotify','expCache'], pre:function(){ renderSubMenu('experimental'); }},
+    experimental:{icon:'🧪', name:'Experimentální funkce', sub:'Vzhled, upozornění, cache, správce seznamů', c:'#38bdf8', node:'swPageExperimental', children:['expLook','expNotify','expCache','expLists'], pre:function(){ renderSubMenu('experimental'); }},
     expLook:   {icon:'🎨', name:'Vzhled',     sub:'Tlačítka a lišta domovské obrazovky', c:'#f472b6', node:'swPageExpLook',   parent:'experimental', pre:function(){ if(window.homeBtnsRender) window.homeBtnsRender(); }},
     expNotify: {icon:'🔔', name:'Upozornění', sub:'Nové epizody a streamy',              c:'#6090ff', node:'swPageExpNotify', parent:'experimental'},
     expCache:  {icon:'🧹', name:'Cache',      sub:'Smazání dočasných dat v telefonu',    c:'#f5a623', node:'swPageExpCache',  parent:'experimental', pre:function(){ if(window.cacheInfoRefresh) window.cacheInfoRefresh(); }},
+    expLists:  {icon:'🗂️', name:'Správce seznamů', sub:'Kopírování a přesun mezi seznamy Histra / Sinator', c:'#34d399', node:'swPageExpLists', parent:'experimental'},
     admin:   {icon:'🛡️', name:'Admin',             sub:function(){ try{ if(typeof updateAdminStatus==='function') updateAdminStatus(); }catch(e){} var on=false,l2=false; try{ on=localStorage.getItem('sinator_admin_mode')==='1'; l2=on&&localStorage.getItem('sinator_admin_level')==='2'; }catch(e){} return 'Admin: ' + (on ? (l2 ? '✅ Aktivní (level 2)' : '✅ Aktivní') : 'Neaktivní'); }, c:'#ffaa00', node:'settingsTabContentAdmin', pre:function(){ try{ if(typeof updateAdminStatus==='function') updateAdminStatus(); }catch(e){} }}
   };
 
@@ -52521,6 +52541,298 @@ window.sfFrAuto=async function(id,t){
         if (el && el.closest && el.closest('#tvModal') && !el.closest('input, textarea')) e.preventDefault();
     }, true);
 })();
+</script>
+<script id="listManagerScript">
+(function () {
+    'use strict';
+    var B = function () { return window._lmBackend || null; };
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function toast(m) { try { if (typeof _favToast === 'function') return _favToast(m); if (typeof showToast === 'function') return showToast(m); } catch (e) {} try { alert(m); } catch (e) {} }
+    function nType(t) { return (t === 'tv' || t === 'show' || t === 'shows') ? 'tv' : 'movie'; }
+    function keyOf(it) { return nType(it.type) + '_' + Number(it.id); }
+
+    // ── Zdroje: Sinator (watchlist + seznamy) a Histra (watchlist + seznamy) ──
+    // key: 's:wl' | 's:L:<id>' | 'h:wl' | 'h:L:<id>'
+    var S = { panes: [ { src: '', items: [], sel: {}, filter: '', loading: false, err: '' }, { src: '', items: [], sel: {}, filter: '', loading: false, err: '' } ],
+              sources: { s: [], h: [] }, busy: false, posters: {} };
+
+    async function loadSources() {
+        var b = B(); S.sources = { s: [], h: [], sErr: '', hErr: '' };
+        if (b && b.myBackendReady()) {
+            S.sources.s.push({ key: 's:wl', name: '🔖 Watchlist' });
+            try {
+                var r = await b.myListsGet(); var arr = Array.isArray(r) ? r : ((r && r.lists) || []);
+                arr.forEach(function (l) { if (l && l.id != null) S.sources.s.push({ key: 's:L:' + l.id, name: '📁 ' + (l.name || 'Seznam') + (l.item_count != null ? ' (' + l.item_count + ')' : '') }); });
+            } catch (e) { S.sources.sErr = (e && e.message) || String(e); }
+        } else S.sources.sErr = 'Sinator není připojený';
+        if (b && b.histraReady()) {
+            S.sources.h.push({ key: 'h:wl', name: '🔖 Watchlist' });
+            try {
+                var hl = b.histraUnwrapList(await b.histraApi('/api/v1/lists?limit=200&offset=0'));
+                hl.forEach(function (l) { var id = l && (l.id != null ? l.id : l.list_id); if (id != null) S.sources.h.push({ key: 'h:L:' + id, name: '📁 ' + (l.name || l.title || 'Seznam') }); });
+            } catch (e) { S.sources.hErr = (e && e.message) || String(e); }
+        } else S.sources.hErr = 'Histra není připojená';
+    }
+    function srcName(key) {
+        var all = S.sources.s.concat(S.sources.h), f = all.filter(function (x) { return x.key === key; })[0];
+        return f ? ((key[0] === 's' ? '🟢 Sinator · ' : '🟣 Histra · ') + f.name.replace(/ \(\d+\)$/, '')) : '—';
+    }
+
+    function normS(it) { return it && it.id ? { id: Number(it.id), type: nType(it.type), title: it.title || it.name || '', year: it.year || '', poster: it.poster_path || it.poster || '' } : null; }
+    async function loadItems(key) {
+        var b = B(), parts = key.split(':');
+        if (parts[0] === 's') {
+            var raw = parts[1] === 'wl' ? await b.myApi('/watchlist') : await b.myListItemsGet(parts[2]);
+            raw = Array.isArray(raw) ? raw : ((raw && (raw.items || raw.data)) || []);
+            return raw.map(normS).filter(Boolean);
+        }
+        var path = parts[1] === 'wl' ? '/api/v1/watchlist?extended=full&lang=cs-CZ' : '/api/v1/lists/' + parts[2] + '?extended=full&lang=cs-CZ';
+        var entries = await b.histraFetchAllPaged(path, 100, 30, null, true);
+        var out = [];
+        (entries || []).forEach(function (e) {
+            var m = b.histraMapItem(e); if (!m) return;
+            var inner = e.movie || e.show || e.media || e.item || {};
+            var isShow = m.type === 'tv';
+            var mid = e.media_id != null ? e.media_id : (e.mediaId != null ? e.mediaId : (inner.id != null ? inner.id : e.id));
+            out.push({ id: Number(m.id), type: m.type, title: m.title || '', year: m.year || '', poster: m.poster_path || '',
+                       del: mid == null ? { media_type: isShow ? 'show' : 'movie', tmdb: String(m.id) } : { media_type: isShow ? 'show' : 'movie', media_id: mid } });
+        });
+        return out;
+    }
+    async function addTo(key, it) {
+        var b = B(), parts = key.split(':');
+        if (parts[0] === 's') {
+            if (parts[1] === 'wl') return b.myApi('/watchlist', { method: 'POST', body: JSON.stringify({ id: it.id, type: it.type, title: it.title, year: it.year, poster_path: it.poster || null }) });
+            if (window._sinListCache) delete window._sinListCache[parts[2]];
+            return b.myApi('/lists/' + parts[2] + '/items', { method: 'POST', body: JSON.stringify({ id: it.id, type: it.type }) });
+        }
+        var path = parts[1] === 'wl' ? '/api/v1/watchlist' : '/api/v1/lists/' + parts[2] + '/items';
+        var r = await b.histraPostItem(path, it.id, it.type);
+        if (parts[1] !== 'wl') { try { b.histraCacheTouch(parts[2], it.id, it.type, true); } catch (e) {} }
+        return r;
+    }
+    async function removeFrom(key, it) {
+        var b = B(), parts = key.split(':');
+        if (parts[0] === 's') {
+            if (parts[1] === 'wl') return b.myApi('/watchlist', { method: 'DELETE', body: JSON.stringify({ id: it.id, type: it.type }) });
+            if (window._sinListCache) delete window._sinListCache[parts[2]];
+            return b.myApi('/lists/' + parts[2] + '/items', { method: 'DELETE', body: JSON.stringify({ id: it.id, type: it.type }) });
+        }
+        var body = it.del || { tmdb: String(it.id), media_type: it.type === 'tv' ? 'show' : 'movie' };
+        if (parts[1] === 'wl') {
+            try { await b.histraApi('/api/v1/watchlist', { method: 'DELETE', body: { tmdb: String(it.id), media_type: it.type === 'tv' ? 'show' : 'movie' } }); }
+            catch (e) { await b.histraApi('/api/v1/watchlist', { method: 'DELETE', body: { tmdb: String(it.id) } }); }
+            return;
+        }
+        await b.histraApi('/api/v1/lists/' + parts[2] + '/items', { method: 'DELETE', body: body });
+        try { b.histraCacheTouch(parts[2], it.id, it.type, false); } catch (e) {}
+    }
+
+    // ── Poster / název (donačtení z TMDB na pozadí, když chybí) ──
+    function posterUrl(p) { if (!p) return ''; p = String(p); return p.indexOf('http') === 0 ? p : 'https://image.tmdb.org/t/p/w92' + (p[0] === '/' ? p : '/' + p); }
+    var enrichQ = [], enrichRun = 0;
+    function enrich(items) {
+        var k = B() && B().tmdbKey && B().tmdbKey(); if (!k) return;
+        items.forEach(function (it) { var id = keyOf(it); if (!it.poster && !S.posters[id]) { S.posters[id] = 'pending'; enrichQ.push(it); } });
+        pump();
+    }
+    function pump() {
+        var k = B().tmdbKey();
+        while (enrichRun < 4 && enrichQ.length) {
+            (function (it) {
+                enrichRun++;
+                fetch('https://api.themoviedb.org/3/' + it.type + '/' + it.id + '?api_key=' + k + '&language=cs-CZ')
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        S.posters[keyOf(it)] = (d && d.poster_path) || 'none';
+                        if (d && !it.title) it.title = d.title || d.name || '';
+                        S.panes.forEach(function (p, pi) { p.items.forEach(function (x) { if (keyOf(x) === keyOf(it)) { if (!x.title && it.title) x.title = it.title; if (!x.poster) x.poster = (d && d.poster_path) || ''; } }); });
+                        paint(0, true); paint(1, true);
+                    }).catch(function () { S.posters[keyOf(it)] = 'none'; })
+                    .then(function () { enrichRun--; pump(); });
+            })(enrichQ.shift());
+        }
+    }
+
+    // ── UI ──
+    var root = null;
+    function el(id) { return document.getElementById(id); }
+    function selCount(p) { return Object.keys(S.panes[p].sel).length; }
+    function visibleItems(p) {
+        var P = S.panes[p], f = P.filter.trim().toLowerCase();
+        if (!f) return P.items;
+        return P.items.filter(function (it) { return (it.title || '').toLowerCase().indexOf(f) >= 0 || String(it.year).indexOf(f) >= 0; });
+    }
+    function optionsHtml(cur) {
+        function grp(label, arr, err) {
+            return '<optgroup label="' + label + '">' + (arr.length ? arr.map(function (s) { return '<option value="' + esc(s.key) + '"' + (s.key === cur ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') : '<option disabled>' + esc(err || 'žádné seznamy') + '</option>') + '</optgroup>';
+        }
+        return '<option value=""' + (cur ? '' : ' selected') + ' disabled>— vyber seznam —</option>' + grp('🟢 Sinator', S.sources.s, S.sources.sErr) + grp('🟣 Histra', S.sources.h, S.sources.hErr);
+    }
+    function paneShell(p) {
+        return '<div class="lm-pane" id="lmPane' + p + '">'
+            + '<div class="lm-phead"><select class="lm-sel" id="lmSel' + p + '" onchange="lmPick(' + p + ',this.value)"></select>'
+            + '<button class="lm-ib" title="Nový seznam" onclick="lmNewList(' + p + ')">＋</button>'
+            + '<button class="lm-ib" title="Obnovit" onclick="lmReload(' + p + ')">↻</button></div>'
+            + '<div class="lm-tools"><input class="lm-find" id="lmFind' + p + '" placeholder="🔎 Filtr…" oninput="lmFilter(' + p + ',this.value)">'
+            + '<button class="lm-ib" onclick="lmSelAll(' + p + ')">☑ Vše</button><button class="lm-ib" onclick="lmSelNone(' + p + ')">☐ Nic</button></div>'
+            + '<div class="lm-body" id="lmBody' + p + '"></div>'
+            + '<div class="lm-foot" id="lmFoot' + p + '"></div></div>';
+    }
+    function paint(p, keepScroll) {
+        var P = S.panes[p], body = el('lmBody' + p), foot = el('lmFoot' + p), sel = el('lmSel' + p);
+        if (!body) return;
+        if (sel && !keepScroll) sel.innerHTML = optionsHtml(P.src);
+        var st = body.scrollTop;
+        if (!P.src) body.innerHTML = '<div class="lm-empty">Vyber seznam nahoře.</div>';
+        else if (P.loading) body.innerHTML = '<div class="lm-empty">⏳ Načítám…</div>';
+        else if (P.err) body.innerHTML = '<div class="lm-empty" style="color:#f87171;">❌ ' + esc(P.err) + '</div>';
+        else {
+            var vis = visibleItems(p);
+            body.innerHTML = vis.length ? vis.map(function (it) {
+                var k = keyOf(it), on = !!P.sel[k], pu = posterUrl(it.poster || (S.posters[k] && S.posters[k] !== 'pending' && S.posters[k] !== 'none' ? S.posters[k] : ''));
+                return '<div class="lm-row' + (on ? ' on' : '') + '" data-k="' + k + '" onclick="lmToggle(' + p + ',\'' + k + '\')">'
+                    + '<span class="lm-chk">' + (on ? '✅' : '⬜') + '</span>'
+                    + (pu ? '<img class="lm-th" loading="lazy" src="' + esc(pu) + '">' : '<span class="lm-th lm-nth">' + (it.type === 'tv' ? '📺' : '🎬') + '</span>')
+                    + '<span class="lm-tx"><b>' + esc(it.title || ('#' + it.id)) + '</b><small>' + (it.type === 'tv' ? '📺 Seriál' : '🎬 Film') + (it.year ? ' · ' + esc(it.year) : '') + '</small></span></div>';
+            }).join('') : '<div class="lm-empty">' + (P.items.length ? 'Nic neodpovídá filtru.' : 'Seznam je prázdný.') + '</div>';
+            body.scrollTop = st;
+        }
+        if (foot) foot.textContent = P.src ? (selCount(p) + ' vybráno · ' + P.items.length + ' položek') : '';
+    }
+    async function loadPane(p) {
+        var P = S.panes[p]; if (!P.src) { paint(p); return; }
+        var src = P.src; P.loading = true; P.err = ''; P.sel = {}; paint(p);
+        try { var items = await loadItems(src); if (P.src !== src) return; P.items = items; enrich(items); }
+        catch (e) { if (P.src !== src) return; P.items = []; P.err = (e && e.message) || String(e); }
+        P.loading = false; paint(p);
+        try { localStorage.setItem('sinator_lm_last', JSON.stringify([S.panes[0].src, S.panes[1].src])); } catch (e) {}
+    }
+    window.lmPick = function (p, v) { S.panes[p].src = v; S.panes[p].filter = ''; var f = el('lmFind' + p); if (f) f.value = ''; loadPane(p); };
+    window.lmReload = function (p) { loadPane(p); };
+    window.lmFilter = function (p, v) { S.panes[p].filter = v; paint(p, true); };
+    window.lmToggle = function (p, k) { var P = S.panes[p]; if (P.sel[k]) delete P.sel[k]; else P.sel[k] = 1; paint(p, true); };
+    window.lmSelAll = function (p) { var P = S.panes[p]; visibleItems(p).forEach(function (it) { P.sel[keyOf(it)] = 1; }); paint(p, true); };
+    window.lmSelNone = function (p) { S.panes[p].sel = {}; paint(p, true); };
+    window.lmNewList = async function (p) {
+        var P = S.panes[p], svc = P.src ? P.src[0] : null;
+        if (!svc) { var a = prompt('Kde vytvořit seznam? Napiš S = Sinator, H = Histra'); if (!a) return; svc = /^h/i.test(a.trim()) ? 'h' : 's'; }
+        var name = prompt('Název nového seznamu (' + (svc === 's' ? 'Sinator' : 'Histra') + '):'); if (!name || !name.trim()) return; name = name.trim();
+        var b = B();
+        try {
+            var key;
+            if (svc === 's') { if (!b.myBackendReady()) throw new Error('Sinator není připojený'); var r = await b.myListCreate(name); key = 's:L:' + r.id; }
+            else { if (!b.histraReady()) throw new Error('Histra není připojená'); key = 'h:L:' + (await b.histraEnsureList(name)); }
+            await loadSources(); S.panes[p].src = key; S.panes[p].filter = '';
+            paint(0); paint(1); await loadPane(p); toast('📁 Seznam „' + name + '“ vytvořen');
+        } catch (e) { toast('❌ ' + ((e && e.message) || e)); }
+    };
+
+    function setBusy(on, txt) {
+        S.busy = on;
+        var bar = el('lmBar'); if (!bar) return;
+        bar.querySelectorAll('button').forEach(function (b) { b.disabled = on; });
+        var s = el('lmStatus'); if (s) s.textContent = txt || '';
+    }
+    // mode: 'copy' | 'move' ; from → to (index panelu)
+    window.lmTransfer = async function (mode, from, to) {
+        if (S.busy) return;
+        var F = S.panes[from], T = S.panes[to];
+        if (!F.src || !T.src) { toast('⚠️ Vyber seznam v obou oknech'); return; }
+        if (F.src === T.src) { toast('⚠️ Zdroj a cíl jsou stejný seznam'); return; }
+        var items = F.items.filter(function (it) { return F.sel[keyOf(it)]; });
+        if (!items.length) { toast('⚠️ Nejdřív označ položky v ' + (from === 0 ? 'horním' : 'spodním') + ' okně'); return; }
+        var verb = mode === 'move' ? 'Přesunout' : 'Kopírovat';
+        if (!confirm(verb + ' ' + items.length + ' položek\nz: ' + srcName(F.src) + '\ndo: ' + srcName(T.src) + ' ?')) return;
+        var have = {}; T.items.forEach(function (x) { have[keyOf(x)] = 1; });
+        var ok = 0, skip = 0, fail = 0, lastErr = '';
+        for (var i = 0; i < items.length; i++) {
+            var it = items[i]; setBusy(true, (mode === 'move' ? 'Přesouvám ' : 'Kopíruji ') + (i + 1) + '/' + items.length + '…');
+            try {
+                if (have[keyOf(it)]) skip++; else { await addTo(T.src, it); ok++; }
+                if (mode === 'move') await removeFrom(F.src, it);
+            } catch (e) { fail++; lastErr = (e && e.message) || String(e); if (fail >= 5 && !ok) break; }
+        }
+        setBusy(false, '');
+        toast((mode === 'move' ? '✂️ Přesunuto ' : '📋 Zkopírováno ') + ok + (skip ? ' · už tam bylo ' + skip : '') + (fail ? ' · ❌ chyb ' + fail + (lastErr ? ' (' + lastErr.slice(0, 50) + ')' : '') : ''));
+        await Promise.all([loadPane(to), mode === 'move' ? loadPane(from) : Promise.resolve()]);
+        if (mode !== 'move') { F.sel = {}; paint(from, true); }
+    };
+    window.lmDelete = async function () {
+        if (S.busy) return;
+        var jobs = [];
+        [0, 1].forEach(function (p) { var P = S.panes[p]; if (P.src) P.items.forEach(function (it) { if (P.sel[keyOf(it)]) jobs.push({ p: p, it: it }); }); });
+        if (!jobs.length) { toast('⚠️ Nic není označené'); return; }
+        // pokud je stejný seznam otevřen v obou oknech, nemazat dvakrát
+        var seen = {}; jobs = jobs.filter(function (j) { var k = S.panes[j.p].src + '|' + keyOf(j.it); if (seen[k]) return false; seen[k] = 1; return true; });
+        var txt = [0, 1].map(function (p) { var n = jobs.filter(function (j) { return j.p === p; }).length; return n ? '• ' + srcName(S.panes[p].src) + ': ' + n : ''; }).filter(Boolean).join('\n');
+        if (!confirm('🗑 Smazat ' + jobs.length + ' položek ze seznamů?\n' + txt + '\n\n(Smaže se jen ze seznamu, ne z jiných seznamů.)')) return;
+        var ok = 0, fail = 0, lastErr = '';
+        for (var i = 0; i < jobs.length; i++) {
+            setBusy(true, 'Mažu ' + (i + 1) + '/' + jobs.length + '…');
+            try { await removeFrom(S.panes[jobs[i].p].src, jobs[i].it); ok++; } catch (e) { fail++; lastErr = (e && e.message) || String(e); }
+        }
+        setBusy(false, '');
+        toast('🗑 Smazáno ' + ok + (fail ? ' · ❌ chyb ' + fail + (lastErr ? ' (' + lastErr.slice(0, 50) + ')' : '') : ''));
+        await Promise.all([loadPane(0), loadPane(1)]);
+    };
+
+    window.closeListManager = function () { if (root) { root.remove(); root = null; } try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {} };
+    window.openListManager = async function () {
+        if (!B()) { toast('⚠️ Správce seznamů není k dispozici'); return; }
+        closeListManager();
+        if (!document.getElementById('lmStyle')) {
+            var st = document.createElement('style'); st.id = 'lmStyle';
+            st.textContent = '#listManager{position:fixed;inset:0;z-index:99999990;background:var(--bg-dark,#0b1020);display:flex;flex-direction:column;color:var(--text,#e8ecf8);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box;}'
+                + '#listManager .lm-top{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border,#26304d);flex-shrink:0;}'
+                + '#listManager .lm-top b{flex:1;font-size:1rem;}'
+                + '#listManager .lm-pane{flex:1 1 0;min-height:0;display:flex;flex-direction:column;border-bottom:1px solid var(--border,#26304d);}'
+                + '#listManager .lm-phead,#listManager .lm-tools{display:flex;gap:6px;padding:6px 8px 0;align-items:center;flex-shrink:0;}'
+                + '#listManager .lm-sel,#listManager .lm-find{flex:1;min-width:0;background:var(--bg-elevated,#1b2340);color:inherit;border:1px solid var(--border,#26304d);border-radius:10px;padding:8px 10px;font-size:0.85rem;}'
+                + '#listManager .lm-ib{background:var(--bg-elevated,#1b2340);color:inherit;border:1px solid var(--border,#26304d);border-radius:10px;padding:7px 10px;font-size:0.8rem;cursor:pointer;flex-shrink:0;}'
+                + '#listManager .lm-ib:disabled{opacity:.4;}'
+                + '#listManager .lm-body{flex:1;min-height:0;overflow-y:auto;padding:6px 8px;-webkit-overflow-scrolling:touch;}'
+                + '#listManager .lm-row{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:10px;cursor:pointer;border:1px solid transparent;}'
+                + '#listManager .lm-row.on{background:rgba(56,189,248,0.14);border-color:rgba(56,189,248,0.5);}'
+                + '#listManager .lm-chk{font-size:1.05rem;flex-shrink:0;}'
+                + '#listManager .lm-th{width:34px;height:50px;border-radius:5px;object-fit:cover;flex-shrink:0;background:#222;}'
+                + '#listManager .lm-nth{display:flex;align-items:center;justify-content:center;font-size:1.1rem;}'
+                + '#listManager .lm-tx{display:flex;flex-direction:column;min-width:0;}#listManager .lm-tx b{font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}#listManager .lm-tx small{opacity:.65;font-size:0.7rem;}'
+                + '#listManager .lm-empty{text-align:center;opacity:.7;padding:24px 8px;font-size:0.85rem;}'
+                + '#listManager .lm-foot{font-size:0.7rem;opacity:.7;padding:2px 10px 4px;flex-shrink:0;}'
+                + '#listManager .lm-bar{display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:var(--bg-card,#141a30);border-top:1px solid var(--border,#26304d);border-bottom:1px solid var(--border,#26304d);flex-shrink:0;align-items:center;}'
+                + '#listManager .lm-bar button{flex:1 1 30%;background:var(--bg-elevated,#1b2340);color:inherit;border:1px solid var(--border,#26304d);border-radius:10px;padding:8px 4px;font-size:0.78rem;cursor:pointer;}'
+                + '#listManager .lm-bar button:disabled{opacity:.4;}#listManager .lm-bar .lm-del{border-color:#ef4444;color:#f87171;}#listManager #lmStatus{flex-basis:100%;font-size:0.72rem;color:#38bdf8;text-align:center;}';
+            document.head.appendChild(st);
+        }
+        root = document.createElement('div'); root.id = 'listManager';
+        root.innerHTML = '<div class="lm-top"><b>🗂️ Správce seznamů</b><button class="lm-ib" onclick="closeListManager()" style="font-size:1rem;">✕</button></div>'
+            + paneShell(0)
+            + '<div class="lm-bar" id="lmBar"><button onclick="lmTransfer(\'copy\',0,1)">⬇ Kopírovat</button><button onclick="lmTransfer(\'move\',0,1)">⬇ Přesunout</button><button class="lm-del" onclick="lmDelete()">🗑 Smazat</button>'
+            + '<button onclick="lmTransfer(\'copy\',1,0)">⬆ Kopírovat</button><button onclick="lmTransfer(\'move\',1,0)">⬆ Přesunout</button><button onclick="lmSwap()">⇅ Prohodit</button><div id="lmStatus"></div></div>'
+            + paneShell(1);
+        document.body.appendChild(root);
+        try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {}
+        S.panes.forEach(function (P) { P.items = []; P.sel = {}; P.err = ''; P.filter = ''; });
+        var last = []; try { last = JSON.parse(localStorage.getItem('sinator_lm_last') || '[]'); } catch (e) {}
+        S.panes[0].src = ''; S.panes[1].src = '';
+        paint(0); paint(1);
+        await loadSources();
+        var all = S.sources.s.concat(S.sources.h).map(function (x) { return x.key; });
+        [0, 1].forEach(function (p) { S.panes[p].src = last[p] && all.indexOf(last[p]) >= 0 ? last[p] : ''; });
+        // výchozí: nahoře první seznam Sinatoru, dole první seznam Histry (jsou-li)
+        if (!S.panes[0].src && S.sources.s.length) S.panes[0].src = S.sources.s[0].key;
+        if (!S.panes[1].src && S.sources.h.length) S.panes[1].src = S.sources.h[0].key;
+        paint(0); paint(1);
+        loadPane(0); loadPane(1);
+    };
+    window.lmSwap = function () {
+        var a = S.panes[0].src, b = S.panes[1].src; S.panes[0].src = b; S.panes[1].src = a;
+        S.panes[0].filter = S.panes[1].filter = ''; ['lmFind0', 'lmFind1'].forEach(function (i) { var f = el(i); if (f) f.value = ''; });
+        paint(0); paint(1); loadPane(0); loadPane(1);
+    };
+})();
+
 </script>
 </body>
 </html>
