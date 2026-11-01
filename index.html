@@ -7244,6 +7244,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-01', date: '1. 11. 2026', items: [
+            '🔀 Správce seznamů: ve výběru seznamu je nová volba Rozdíl: Sinator vs Histra — ukáže seznamy, které jsou jen v jedné službě; u každého je tlačítko ➜ Sync (zapíše seznam i s položkami do druhé služby) a 🗑 (smaže ho). Když jsou seznamy v obou stejné, zobrazí se 0',
             '🌐 Nastavení → Vzhled → Jazyk: přepínač 🇨🇿 Čeština / 🇸🇰 Slovenčina — celá aplikace se přeloží do slovenčiny a z TMDB se načtou slovenské názvy filmů a seriálů, popisy i žánry (když slovenský překlad chybí, použije se český text). Po přepnutí se appka znovu načte. Ve slovenštině je tlačítko pro zkopírování nepřeložených textů, ať jde překlad doladit',
             '⚙️ Správce seznamů: vedle nadpisu je ozubené kolečko — vybereš 1 (horní seznam), 2 (spodní seznam) nebo 3 (nový seznam). Seznam 1/2 se otevře na celou obrazovku: mazání jedné či více označených položek, ✏️ přejmenování seznamu, 🗑 smazání seznamu, filtr a Vše / Nic',
             '💾 Řazení seznamů: v editoru seznamu vybereš A → Z, Z → A, Poslední přidané (nejnovější nahoře) nebo Rok (nejnovější → nejstarší); po uložení 💾 se řazení pamatuje a platí všude — ve správci, v Sinatoru i v Histře',
@@ -53162,6 +53163,8 @@ window.sfFrAuto=async function(id,t){
                 if (g.id !== 'f') h += '<div class="lm-gi lm-gnew" data-new="' + g.id + '">➕ Vytvořit nový seznam</div>';
             }
         });
+        var dn = diffLists().length;
+        h += '<div class="lm-gi lm-gdiff" id="lmPkDiff">🔀 Rozdíl: Sinator vs Histra (' + dn + ')</div>';
         h += '<button class="lm-gx" id="lmPkX">✕ Zavřít</button></div>';
         var st = o.firstChild ? o.firstChild.scrollTop : 0;
         o.innerHTML = h;
@@ -53169,6 +53172,7 @@ window.sfFrAuto=async function(id,t){
         o.querySelectorAll('.lm-gh').forEach(function (e) { e.onclick = function () { var c = collapsedGet(), id = e.getAttribute('data-g'); if (c[id]) delete c[id]; else c[id] = 1; collapsedSet(c); renderPicker(p); }; });
         o.querySelectorAll('.lm-gi[data-key]').forEach(function (e) { e.onclick = function () { var k = e.getAttribute('data-key'); lmClosePicker(); window.lmPick(p, k); }; });
         o.querySelectorAll('.lm-gnew').forEach(function (e) { e.onclick = function () { var sv = e.getAttribute('data-new'); lmClosePicker(); window.lmNewList(p, sv); }; });
+        o.querySelector('#lmPkDiff').onclick = function () { lmClosePicker(); window.lmDiffOpen(); };
         o.querySelector('#lmPkX').onclick = lmClosePicker;
     }
     window.lmOpenPicker = function (p) {
@@ -53246,7 +53250,7 @@ window.sfFrAuto=async function(id,t){
         } catch (e) {}
     }
     function lmStopLift() { if (liftObs) { try { liftObs.disconnect(); } catch (e) {} liftObs = null; } }
-    window.closeListManager = function () { closeSheet(); lmClosePicker(); lmStopLift(); edClose(); closeLmGear(); document.body.classList.remove('lm-open'); if (root) { root.remove(); root = null; } try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {} };
+    window.closeListManager = function () { closeSheet(); lmClosePicker(); lmStopLift(); edClose(); closeLmGear(); dfClose(); document.body.classList.remove('lm-open'); if (root) { root.remove(); root = null; } try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {} };
     // ── Tlačítko Správce na domovské obrazovce (vedle Wrapped), zapíná se v Nastavení ──
     var HB_KEY = 'sinator_lm_home_btn';
     function hbOn() { try { return localStorage.getItem(HB_KEY) === '1'; } catch (e) { return false; } }
@@ -53303,6 +53307,7 @@ window.sfFrAuto=async function(id,t){
                 + '#lmPicker .lm-box{background:var(--bg-card,#161b2e);border:1px solid var(--border,#26304d);border-radius:16px;padding:8px;width:100%;max-width:420px;max-height:100%;overflow-y:auto;color:var(--text,#e8ecf8);}'
                 + '#lmPicker .lm-gh{display:flex;justify-content:space-between;align-items:center;padding:12px 10px;margin-top:4px;font-weight:700;background:rgba(56,189,248,0.1);border-radius:10px;cursor:pointer;}#lmPicker .lm-gh small{opacity:.6;font-weight:400;}'
                 + '#lmPicker .lm-gi{padding:11px 14px;border-radius:10px;margin-top:3px;cursor:pointer;font-size:0.9rem;background:var(--bg-elevated,#1b2340);}#lmPicker .lm-gi.cur{border:1px solid #38bdf8;color:#38bdf8;}'
+                + '#lmPicker .lm-gdiff{border:1px solid #a78bfa;color:#c4b5fd;background:transparent;text-align:center;margin-top:6px;}'
                 + '#lmPicker .lm-gnew{border:1px dashed #38bdf8;color:#38bdf8;background:transparent;text-align:center;}'
                 + '#lmPicker .lm-gerr{padding:8px 14px;font-size:0.8rem;opacity:.65;}#lmPicker .lm-gx{display:block;width:100%;margin-top:8px;padding:10px;background:transparent;border:1px solid var(--border,#26304d);border-radius:10px;color:inherit;cursor:pointer;}'
                 + '@media (orientation:landscape){'
@@ -53537,6 +53542,85 @@ window.sfFrAuto=async function(id,t){
         await loadSources(); paint(0); paint(1);
         await Promise.all([loadPane(0), loadPane(1)]);
     };
+
+    // ══ 🔀 Rozdíl Sinator vs Histra: seznamy, které jsou jen v jedné službě ══
+    function diffLists() {
+        var sM = {}, hM = {}, out = [];
+        (S.sources.s || []).forEach(function (x) { if (x.key.indexOf(':L:') > 0) sM[baseName(x)] = x; });
+        (S.sources.h || []).forEach(function (x) { if (x.key.indexOf(':L:') > 0) hM[baseName(x)] = x; });
+        Object.keys(sM).forEach(function (k) { if (!hM[k]) out.push({ x: sM[k], from: 's' }); });
+        Object.keys(hM).forEach(function (k) { if (!sM[k]) out.push({ x: hM[k], from: 'h' }); });
+        return out;
+    }
+    var DF = { open: false, busy: false, msg: '' };
+    function dfClose() { var o = document.getElementById('lmDiff'); if (o) o.remove(); DF.open = false; }
+    function dfCss() {
+        if (document.getElementById('lmDiffCss')) return;
+        var st = document.createElement('style'); st.id = 'lmDiffCss';
+        st.textContent = '#lmDiff{position:fixed;inset:0;z-index:99999994;background:var(--bg-dark,#0b1020);display:flex;flex-direction:column;color:var(--text,#e8ecf8);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box;}'
+            + '#lmDiff .df-top{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border,#26304d);}'
+            + '#lmDiff .df-top b{flex:1;min-width:0;font-size:0.95rem;}'
+            + '#lmDiff .df-b{background:var(--bg-elevated,#1b2340);color:inherit;border:1px solid var(--border,#26304d);border-radius:10px;padding:10px 12px;font-size:0.82rem;cursor:pointer;white-space:nowrap;}'
+            + '#lmDiff .df-b:disabled{opacity:.4;}#lmDiff .df-b.red{border-color:#ef4444;color:#f87171;}#lmDiff .df-b.go{border-color:#38bdf8;color:#38bdf8;}'
+            + '#lmDiff .df-body{flex:1;overflow-y:auto;padding:10px;}'
+            + '#lmDiff .df-row{display:flex;align-items:center;gap:8px;background:var(--bg-card,#141b34);border:1px solid var(--border,#26304d);border-radius:12px;padding:10px;margin-bottom:8px;}'
+            + '#lmDiff .df-n{flex:1;min-width:0;display:flex;flex-direction:column;}#lmDiff .df-n b{font-size:0.95rem;word-break:break-word;}#lmDiff .df-n small{opacity:.7;}'
+            + '#lmDiff .df-empty{text-align:center;padding:50px 10px;}#lmDiff .df-empty .z{font-size:3rem;font-weight:800;opacity:.85;}'
+            + '#lmDiff .df-st{padding:6px 12px;font-size:0.8rem;color:#38bdf8;min-height:1.2em;}';
+        document.head.appendChild(st);
+    }
+    function dfPaint() {
+        var o = document.getElementById('lmDiff'); if (!o) return;
+        var d = diffLists(), body = o.querySelector('.df-body');
+        o.querySelector('.df-st').textContent = DF.msg || '';
+        if (!d.length) { body.innerHTML = '<div class="df-empty"><div class="z">0</div><div>Seznamy jsou v Sinatoru i v Histře stejné ✅</div></div>'; return; }
+        body.innerHTML = d.map(function (r, i) {
+            var inS = r.from === 's';
+            return '<div class="df-row"><span style="font-size:1.4rem;">' + (inS ? '🟢' : '🟣') + '</span>'
+                + '<div class="df-n"><b>' + esc(r.x.name) + '</b><small>jen v ' + (inS ? 'Sinatoru' : 'Histře') + '</small></div>'
+                + '<button class="df-b go" data-a="sync" data-i="' + i + '"' + (DF.busy ? ' disabled' : '') + '>➜ Sync</button>'
+                + '<button class="df-b red" data-a="del" data-i="' + i + '"' + (DF.busy ? ' disabled' : '') + '>🗑</button></div>';
+        }).join('');
+    }
+    window.lmDiffOpen = function () {
+        dfClose(); dfCss(); DF.open = true; DF.msg = '';
+        var o = document.createElement('div'); o.id = 'lmDiff';
+        o.innerHTML = '<div class="df-top"><button class="df-b" onclick="lmDiffClose()">← Zpět</button><b>🔀 Rozdíl: Sinator vs Histra</b></div><div class="df-st"></div><div class="df-body"></div>';
+        document.body.appendChild(o);
+        o.querySelector('.df-body').onclick = function (e) {
+            var b = e.target.closest ? e.target.closest('button[data-a]') : null; if (!b || b.disabled || DF.busy) return;
+            var r = diffLists()[+b.getAttribute('data-i')]; if (!r) return;
+            if (b.getAttribute('data-a') === 'sync') dfSync(r); else dfDelete(r);
+        };
+        dfPaint();
+    };
+    window.lmDiffClose = function () { dfClose(); };
+    async function dfRefresh() { await loadSources(); dfPaint(); paint(0); paint(1); await Promise.all([loadPane(0), loadPane(1)]); }
+    async function dfSync(r) {
+        var key = r.x.key, pa = key.split(':'), name = r.x.raw != null ? r.x.raw : r.x.name, to = pa[0] === 's' ? 'Histry' : 'Sinatoru';
+        DF.busy = true; DF.msg = '⏳ Načítám „' + name + '“…'; dfPaint();
+        try {
+            var b = B(), items = await loadItems(key), nk;
+            if (pa[0] === 's') { var hid = await b.histraEnsureList(name); nk = 'h:L:' + hid; }
+            else { var nr = await b.myListCreate(name); nk = 's:L:' + nr.id; }
+            for (var i = 0; i < items.length; i++) { DF.msg = '➜ ' + to + ': ' + (i + 1) + '/' + items.length; dfPaint(); await addTo(nk, plain(items[i])); }
+            DF.msg = '✅ „' + name + '“ zapsán do ' + to + ' (' + items.length + ' položek)';
+        } catch (e) { DF.msg = '❌ ' + (((e && e.message) || e) + '').slice(0, 80); }
+        DF.busy = false;
+        await dfRefresh();
+    }
+    async function dfDelete(r) {
+        var key = r.x.key, name = r.x.raw != null ? r.x.raw : r.x.name, where = key.charAt(0) === 's' ? 'Sinatoru' : 'Histře';
+        if (!confirm('🗑 Smazat seznam „' + name + '“ (jen v ' + where + ') i s obsahem?\n\nTuto akci nelze vrátit.')) return;
+        DF.busy = true; DF.msg = '🗑 Mažu…'; dfPaint();
+        try {
+            await deleteList(key);
+            S.panes.forEach(function (Q) { if (Q.src === key) { Q.src = null; Q.items = []; Q.sel = {}; } });
+            DF.msg = '🗑 „' + name + '“ smazán';
+        } catch (e) { DF.msg = '❌ ' + (((e && e.message) || e) + '').slice(0, 80); }
+        DF.busy = false;
+        await dfRefresh();
+    }
 
     window.lmSwap = function () {
         var a = S.panes[0].src, b = S.panes[1].src; S.panes[0].src = b; S.panes[1].src = a;
