@@ -7243,6 +7243,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-01b', date: '1. 11. 2026', items: [
+            '😴 Online rádia: nové tlačítko 😴 vedle ✕ — časovač vypnutí (5 / 15 / 30 / 60 min) nebo vypnutí v přesný čas (např. 23:30). Chytrý spánek (zapnutý ve výchozím stavu): posledních 45 s se hlasitost plynule ztlumí a když rádio sám zastavíš nebo pozastavíš, časovač se zruší. Zbývající čas je vidět na tlačítku 😴',
+        ]},
         { version: '2026-11-01', date: '1. 11. 2026', items: [
             '📻 Online rádia: nahoře je mini přehrávač (⏮ ▶/⏸ ⏹ ⏭ + stavový řádek „Připojuji… / Hraje / Nefunguje“); streamy se vyhledávají přes radio-browser.info jako ověřené HTTPS (starší http adresy v appce nešly přehrát), když jeden stream selže, zkusí se automaticky další a při chybě už přehrávač nezůstane viset. Přibyly stanice (ČRo Plus, Proglas, Jemné, Anténa Rock, Lumen), ovládání funguje i z uzamčené obrazovky',
             '🔀 Správce seznamů: ve výběru seznamu je nová volba Rozdíl: Sinator vs Histra — ukáže seznamy, které jsou jen v jedné službě; u každého je tlačítko ➜ Sync (zapíše seznam i s položkami do druhé služby) a 🗑 (smaže ho). Když jsou seznamy v obou stejné, zobrazí se 0',
@@ -24010,6 +24013,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <div class="radio-modal-header">
             <h3>📻 Online rádia</h3>
             <div style="display:flex;gap:8px;align-items:center;">
+<button id="radioSleepBtn" onclick="radioSleepTogglePanel()" title="Časovač vypnutí / chytrý spánek" style="background:none;border:1px solid var(--border);color:var(--text);min-width:30px;height:30px;padding:0 8px;border-radius:15px;cursor:pointer;font-size:0.8rem;">😴</button>
 <button onclick="closeRadioModal()" style="background:none;border:1px solid var(--border);color:var(--text);width:30px;height:30px;border-radius:50%;cursor:pointer;">✕</button>
             </div>
         </div>
@@ -24022,6 +24026,22 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             </div>
             <div class="rp-st"><span id="radioStatusIcon">⏹</span><span class="radio-now-playing-name" id="radioNowName">Vyber stanici</span></div>
             <button id="radioAltBtn" style="display:none"></button>
+        </div>
+        <div id="radioSleepPanel" style="display:none;padding:10px 12px;border-bottom:1px solid var(--border,#26304d);background:rgba(255,255,255,0.03);font-size:0.85rem;">
+            <div id="radioSleepStat" style="font-weight:700;color:var(--gold,#ffd700);min-height:1.3em;margin-bottom:6px;">Časovač není nastaven</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+                <button class="rs-b" onclick="radioSleepStart(5)">5 min</button>
+                <button class="rs-b" onclick="radioSleepStart(15)">15 min</button>
+                <button class="rs-b" onclick="radioSleepStart(30)">30 min</button>
+                <button class="rs-b" onclick="radioSleepStart(60)">60 min</button>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;">
+                <span>Vypnout v</span>
+                <input type="time" id="radioSleepTime" style="background:var(--bg-elevated,#1b2340);color:var(--text,#fff);border:1px solid var(--border,#26304d);border-radius:8px;padding:6px 8px;font-size:0.9rem;">
+                <button class="rs-b rs-go" onclick="radioSleepAtTime()">Nastavit</button>
+                <button class="rs-b" onclick="radioSleepCancel()">Zrušit</button>
+            </div>
+            <label style="display:flex;gap:6px;align-items:flex-start;cursor:pointer;"><input type="checkbox" id="radioSleepSmart" onchange="radioSleepSetSmart(this.checked)" style="margin-top:3px;"><span>🧠 Chytrý spánek — posledních 45 s plynule ztlumí hlasitost; když rádio ručně zastavíš nebo pozastavíš, časovač se zruší</span></label>
         </div>
         <audio id="radioAudio" preload="none"></audio>
         <div class="radio-source-tabs" id="radioSourceTabs">
@@ -44505,9 +44525,80 @@ function stopRadio() {
     const audio = document.getElementById('radioAudio');
     radioState.token++;
     audio.onerror = null; audio.onpause = null; audio.onwaiting = null; audio.onplaying = null;
-    audio.pause(); audio.removeAttribute('src'); audio.load();
+    audio.pause(); audio.removeAttribute('src'); audio.load(); try { audio.volume = 1; } catch (e) {}
     radioState.current = null; radioState.playR = null; radioState.status = 'idle'; _radioUi();
 }
+
+// -- 😴 ČASOVAČ VYPNUTÍ + CHYTRÝ SPÁNEK ------------------------------------------
+const radioSleep = { end: 0, timer: null, armed: false, fading: false, smart: true };
+const RS_FADE_MS = 45000;
+try { radioSleep.smart = (localStorage.getItem('sinator_radio_smart_sleep') !== '0'); } catch (e) {}
+(function () {
+    if (document.getElementById('rsCss')) return;
+    const st = document.createElement('style'); st.id = 'rsCss';
+    st.textContent = '.rs-b{background:var(--bg-elevated,#1b2340);color:var(--text,#fff);border:1px solid var(--border,#26304d);border-radius:10px;padding:7px 12px;font-size:0.85rem;cursor:pointer;}'
+        + '.rs-b.rs-go{background:#e11d48;border-color:#e11d48;color:#fff;font-weight:700;}'
+        + '#radioSleepBtn.on{background:#e11d48 !important;border-color:#e11d48 !important;color:#fff !important;}';
+    document.head.appendChild(st);
+})();
+function _rsFmt(ms) { const s = Math.max(0, Math.round(ms / 1000)), m = Math.floor(s / 60); return m + ':' + ('0' + (s % 60)).slice(-2); }
+function _rsUi() {
+    const stat = document.getElementById('radioSleepStat'), btn = document.getElementById('radioSleepBtn'), chk = document.getElementById('radioSleepSmart');
+    if (chk) chk.checked = radioSleep.smart;
+    if (!btn) return;
+    if (radioSleep.end) {
+        const left = radioSleep.end - Date.now();
+        const at = new Date(radioSleep.end).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+        btn.textContent = '😴 ' + _rsFmt(left); btn.classList.add('on');
+        if (stat) stat.textContent = 'Vypnutí za ' + _rsFmt(left) + ' (v ' + at + ')' + (radioSleep.fading ? ' — ztlumuji…' : '');
+    } else {
+        btn.textContent = '😴'; btn.classList.remove('on');
+        if (stat && !radioSleep._msg) stat.textContent = 'Časovač není nastaven';
+    }
+}
+function _rsRestoreVol() { const a = document.getElementById('radioAudio'); try { if (a) a.volume = 1; } catch (e) {} }
+function radioSleepTogglePanel() {
+    const p = document.getElementById('radioSleepPanel'); if (!p) return;
+    p.style.display = p.style.display === 'none' ? 'block' : 'none'; _rsUi();
+}
+function radioSleepCancel(msg) {
+    radioSleep.end = 0; radioSleep.armed = false; radioSleep.fading = false;
+    clearInterval(radioSleep.timer); radioSleep.timer = null; _rsRestoreVol();
+    const stat = document.getElementById('radioSleepStat');
+    radioSleep._msg = msg || '';
+    if (stat) stat.textContent = msg || 'Časovač není nastaven';
+    _rsUi();
+}
+function radioSleepStart(minutes) { _radioSleepSetEnd(Date.now() + minutes * 60000); }
+function _radioSleepSetEnd(ts) {
+    radioSleep._msg = ''; radioSleep.end = ts; radioSleep.fading = false; _rsRestoreVol();
+    radioSleep.armed = (radioState.status === 'playing' || radioState.status === 'buffering' || radioState.status === 'connecting');
+    clearInterval(radioSleep.timer); radioSleep.timer = setInterval(_radioSleepTick, 1000);
+    _radioSleepTick();
+}
+function radioSleepAtTime() {
+    const v = (document.getElementById('radioSleepTime') || {}).value || '';
+    const m = v.match(/^(\d{1,2}):(\d{2})/); if (!m) { const stat = document.getElementById('radioSleepStat'); if (stat) stat.textContent = 'Zadej čas vypnutí'; return; }
+    const d = new Date(); d.setHours(+m[1], +m[2], 0, 0);
+    if (d.getTime() <= Date.now() + 1000) d.setDate(d.getDate() + 1);
+    _radioSleepSetEnd(d.getTime());
+}
+function radioSleepSetSmart(on) { radioSleep.smart = !!on; try { localStorage.setItem('sinator_radio_smart_sleep', on ? '1' : '0'); } catch (e) {} if (!on) { radioSleep.fading = false; _rsRestoreVol(); } }
+function _radioSleepTick() {
+    if (!radioSleep.end) return;
+    const left = radioSleep.end - Date.now(), st = radioState.status;
+    if (left <= 0) { stopRadio(); _rsRestoreVol(); radioSleepCancel('Rádio vypnuto 😴'); return; }
+    const playing = (st === 'playing' || st === 'buffering' || st === 'connecting');
+    if (playing) radioSleep.armed = true;
+    // chytrý spánek: ruční pauza/stop = zrušit časovač
+    if (radioSleep.smart && radioSleep.armed && (st === 'idle' || st === 'paused')) { radioSleepCancel('Přehrávání zastaveno — časovač zrušen'); return; }
+    const audio = document.getElementById('radioAudio');
+    if (radioSleep.smart && left <= RS_FADE_MS && audio && !audio.paused) {
+        radioSleep.fading = true; try { audio.volume = Math.max(0, Math.min(1, left / RS_FADE_MS)); } catch (e) {}
+    }
+    _rsUi();
+}
+document.addEventListener('visibilitychange', function () { if (radioSleep.end) _radioSleepTick(); });
 
 // -- IVYSÍLÁNÍ ČT ----------------------------------------------------------------
 
