@@ -7244,7 +7244,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-01g', date: '1. 11. 2026', items: [
-            '🎧 TV / Rádio: nová položka Audioknihy / E-knihy — otevře AB Community (v2.abcommunity.eu)',
+            '🎧 TV / Rádio: nová položka Audioknihy / E-knihy — otevře AB Community (v2.abcommunity.eu); zobrazuje se jen při přihlášeném Admin level 2',
         ]},
         { version: '2026-11-01f', date: '1. 11. 2026', items: [
             '⏭ Online rádia: když stanice nehraje (chyba nebo timeout), aplikace automaticky přeskočí na další funkční rádio ve stejném seznamu a směru (přeskakuje stanice označené jako nefunkční, max. 12 pokusů v řadě) a krátce to oznámí',
@@ -24134,7 +24134,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             <span style="font-size:1.6rem;">🎦</span>
             <div><div style="color:var(--gold);font-weight:700;">Kino</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Program kin a rezervace vstupenek</div></div>
         </button>
-        <button onclick="window.open('https://v2.abcommunity.eu/','_blank','noopener')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+        <button id="tvRadioAbcBtn" style="display:none;" onclick="if(window._isAdminLevel2&&window._isAdminLevel2())window.open('https://v2.abcommunity.eu/','_blank','noopener')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎧</span>
             <div><div style="color:#a78bfa;font-weight:700;">Audioknihy / E-knihy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">AB Community — poslech a čtení knih ↗</div></div>
         </button>
@@ -48579,6 +48579,8 @@ function updateAdminStatus() {
   // Sekce "Správa IPTV kanálů" — vidí jen Admin level 2
   const tvChAdminBox = document.getElementById('tvChannelAdminSettingsBox');
   if (tvChAdminBox) tvChAdminBox.style.display = isLvl2 ? 'block' : 'none';
+  // Audioknihy / E-knihy (menu TV / Rádio) — jen Admin level 2
+  const abcBtn = document.getElementById('tvRadioAbcBtn'); if (abcBtn) abcBtn.style.display = isLvl2 ? '' : 'none';
 }
 
 // ---- Přepínač "Povolit označování TV kanálů jako nefunkčních" (Admin level 2, sdíleno přes Firebase) ----
