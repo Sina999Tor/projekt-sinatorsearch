@@ -2,6 +2,183 @@
 <!-- BUILD: 2026-10-01T17:05:00Z -->
 <html lang="cs">
 <head>
+    <script id="sinI18n">
+(function () {
+  var LANG = 'cs';
+  try { LANG = localStorage.getItem('sinator_lang') === 'sk' ? 'sk' : 'cs'; } catch (e) {}
+  window.SIN_LANG = LANG;
+  window.sinLang = function () { return LANG; };
+  window.sinSetLang = function (l) {
+    try { localStorage.setItem('sinator_lang', l === 'sk' ? 'sk' : 'cs'); } catch (e) {}
+    // cache s metadaty v původním jazyce → smazat, ať se načtou znovu v novém jazyce
+    ['sinator_backend_meta_cache_v1', 'sinator_backend_ep_title_cache_v1', 'sinator_genre_cache', 'sinator_detail_extras', 'sinator_trailers_cache_v1'].forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+    try { location.reload(); } catch (e) {}
+  };
+  window.sinLangRefreshUI = function () {
+    var a = document.getElementById('langBtnCs'), b = document.getElementById('langBtnSk');
+    [[a, 'cs'], [b, 'sk']].forEach(function (p) {
+      if (!p[0]) return; var on = LANG === p[1];
+      p[0].style.borderColor = on ? '#38bdf8' : ''; p[0].style.color = on ? '#38bdf8' : ''; p[0].style.fontWeight = on ? '700' : '';
+    });
+    var m = document.getElementById('langMissingBtn');
+    if (m) { var n = (window.sinMissingList ? window.sinMissingList() : []).length; m.style.display = LANG === 'sk' ? '' : 'none'; m.textContent = '📋 Zkopírovat nepřeložené texty (' + n + ')'; }
+  };
+  if (LANG !== 'sk') { document.addEventListener('DOMContentLoaded', function () { window.sinLangRefreshUI(); }); return; }
+
+  // ═══ SLOVENČINA ═══
+  document.documentElement.lang = 'sk';
+  var DICT = "se=sa|ve=vo|ze=zo|ke=ku|nebo=alebo|pro=pre|při=pri|jako=ako|také=tiež|jsou=sú|jsem=som|jsi=si|jste=ste|jen=len|ještě=ešte|již=už|aby=aby|pokud=ak|protože=pretože|pak=potom|přes=cez|kvůli=kvôli|během=počas|mezi=medzi|když=keď|kde=kde|proč=prečo|jak=ako|tak=tak|kdo=kto|co=čo|něco=niečo|někdo=niekto|někdy=niekedy|nikdy=nikdy|vždy=vždy|stále=stále|zatím=zatiaľ|znovu=znova|zase=zasa|teď=teraz|nyní=teraz|dnes=dnes|včera=včera|zítra=zajtra|dříve=predtým|později=neskôr|hned=hneď|tady=tu|tam=tam|sem=sem|vedle=vedľa|nahoru=hore|nahoře=hore|dole=dole|dolů=dole|vpravo=vpravo|úplně=úplne|navíc=navyše|více=viac|víc=viac|méně=menej|málo=málo|mnoho=veľa|hodně=veľa|přesně=presne|například=napríklad|např=napr|případně=prípadne|zároveň=zároveň|najednou=naraz|jednou=raz|dvakrát=dvakrát|opravdu=naozaj|prosím=prosím|díky=vďaka|ano=áno|nic=nič|žádný=žiadny|žádná=žiadna|žádné=žiadne|žádní=žiadni|všechno=všetko|vše=všetko|všechny=všetky|všechna=všetky|všech=všetkých|všichni=všetci|všude=všade|jiný=iný|jiné=iné|jiná=iná|jiných=iných|jinou=inú|jinak=inak|stejný=rovnaký|stejné=rovnaké|stejná=rovnaká|stejným=rovnakým|stejně=rovnako|každý=každý|každé=každé|každého=každého|každém=každom|celý=celý|celé=celé|celá=celá|celou=celú|celého=celého|celkem=spolu|první=prvý|druhý=druhý|druhé=druhé|druhá=druhá|třetí=tretí|poslední=posledné|posledních=posledných|další=ďalšie|dalších=ďalších|dalším=ďalším|dalšího=ďalšieho|nový=nový|nové=nové|nová=nová|nového=nového|novou=novú|nových=nových|nejnovější=najnovšie|nejnověji=najnovšie|starší=starší|starších=starších|nejstarší=najstaršie|velký=veľký|velká=veľká|velké=veľké|dlouhý=dlhý|krátké=krátke|rychlý=rýchly|rychlé=rýchle|správně=správne|správná=správna|špatně=zle|možná=možno|lze=možno|nelze=nemožno|není=nie je|nejsou=nie sú|nejsi=nie si|nebyl=nebol|bylo=bolo|byl=bol|byla=bola|byly=boli|být=byť|bude=bude|může=môže|můžeš=môžeš|můžete=môžete|mohly=mohli|musí=musí|muset=musieť|mít=mať|mám=mám|máš=máš|mají=majú|nemá=nemá|nemáš=nemáš|chci=chcem|chceš=chceš|chcete=chcete|chce=chce|měl=mal|jde=ide|nejde=nejde|funguje=funguje|existuje=existuje|neexistuje=neexistuje|zůstane=zostane|zůstanou=zostanú|zůstává=zostáva|zůstaly=zostali|vypadá=vyzerá|patří=patrí|nachází=nachádza|stačí=stačí|vidět=vidieť|viděl=videl|vidí=vidí|uvidíš=uvidíš|uvidí=uvidí|ví=vie|umí=vie|zjistit=zistiť|zjišťuji=zisťujem|získat=získať|dostaneš=dostaneš|dostává=dostáva|filtr=filter|filtry=filtre|seznam=zoznam|seznamy=zoznamy|seznamu=zoznamu|seznamů=zoznamov|seznamech=zoznamoch|seznamem=zoznamom|klíč=kľúč|klíče=kľúče|klíčů=kľúčov|klíčem=kľúčom|klíčová=kľúčové|název=názov|názvu=názvu|názvy=názvy|názvů=názvov|názvem=názvom|načítám=načítavam|načítání=načítanie|načíst=načítať|načteno=načítané|načtení=načítanie|hodnocení=hodnotenie|hodnocené=hodnotené|hodnocením=hodnotením|nastavení=nastavenia|nastavená=nastavená|nastavený=nastavený|nastav=nastav|podle=podľa|dle=podľa|historie=história|historii=histórii|historický=historický|historické=historické|nepodařilo=nepodarilo|nezdařilo=nepodarilo|nepovedlo=nepodarilo|nepodařila=nepodarila|zpět=späť|zpátky=späť|zpětně=spätne|chyba=chyba|chybu=chybu|chyby=chyby|chybí=chýba|selhalo=zlyhalo|selhal=zlyhal|zatím=zatiaľ|filmů=filmov|shlédnuté=pozreté|shlédnuto=pozreté|shlédnutých=pozretých|shlédnutí=pozretie|shlédnutý=pozretý|zhlédnutí=pozretie|zhlédnuto=pozreté|zhlédnuté=pozreté|zhlédnutý=pozretý|neshlédnuté=nepozreté|ke shlédnutí=na pozretie|ke zhlédnutí=na pozretie|aplikace=aplikácia|aplikaci=aplikácii|aplikaci=aplikácii|kolekce=kolekcie|kolekci=kolekcii|kolekcí=kolekcií|smazat=zmazať|smaže=zmaže|smazáno=zmazané|smazán=zmazaný|smazání=zmazanie|mažu=mažem|mazat=mazať|mazání=mazanie|maže=maže|komedie=komédie|hledání=hľadanie|hledám=hľadám|hledat=hľadať|hledá=hľadá|hledej=hľadaj|hledaný=hľadaný|hledáno=hľadané|vyhledávání=vyhľadávanie|vyhledat=vyhľadať|vyhledej=vyhľadaj|vyhledá=vyhľadá|vyhledání=vyhľadanie|vyhledávám=vyhľadávam|otevřít=otvoriť|otevře=otvorí|otevřeš=otvoríš|otevření=otvorenie|otevírám=otváram|otevři=otvor|otevřeného=otvoreného|neotevřel=neotvoril|děti=deti|dětí=detí|tituly=tituly|titulů=titulov|titulku=titulku|titulků=titulkov|titulcích=titulkoch|výsledky=výsledky|výsledků=výsledkov|výsledek=výsledok|výsledcích=výsledkoch|nejlepší=najlepšie|nejlépe=najlepšie|epizody=epizódy|epizod=epizód|epizoda=epizóda|epizodou=epizódou|epizodu=epizódu|epizodě=epizóde|seriálů=seriálov|přidat=pridať|přidáno=pridané|přidána=pridaná|přidal=pridal|přidá=pridá|přidej=pridaj|přidejte=pridajte|přidané=pridané|nepřidáno=nepridané|přístup=prístup|přístupu=prístupu|přístupové=prístupové|zkus=skús|zkuste=skúste|zkusit=skúsiť|oblíbené=obľúbené|oblíbených=obľúbených|oblíbený=obľúbený|jméno=meno|jména=mená|sledování=sledovanie|sledované=sledované|sledovat=sledovať|sledováno=sledované|tlačítko=tlačidlo|tlačítka=tlačidlá|tlačítek=tlačidiel|tlačítkem=tlačidlom|tlačítky=tlačidlami|položek=položiek|před=pred|externí=externé|ostatní=ostatné|přehrát=prehrať|přehrávání=prehrávanie|přehrání=prehratie|zobrazit=zobraziť|zobrazení=zobrazenie|zobrazené=zobrazené|zobrazuje=zobrazuje|zobrazíš=zobrazíš|žádost=žiadosť|žádosti=žiadosti|zadejte=zadajte|zadej=zadaj|zadat=zadať|zadání=zadanie|zadaný=zadaný|zadané=zadané|zadáš=zadáš|zadáním=zadaním|zadávat=zadávať|nejdřív=najskôr|nejprve=najprv|rozkoukané=rozpozerané|rozkoukaných=rozpozeraných|rozkoukaný=rozpozeraný|rozkoukanost=rozpozeranosť|dokoukané=dopozerané|doporučení=odporúčania|doporučuji=odporúčam|doporuč=odporuč|doporučit=odporučiť|doporučeno=odporučené|doporučené=odporúčané|nedoporučuj=neodporúčaj|doporučuji=odporúčam|kanálů=kanálov|kanálu=kanála|uživatel=používateľ|uživatele=používateľa|uživatelé=používatelia|uživateli=používateľovi|uživatelů=používateľov|uživatelské=používateľské|uživatelských=používateľských|instalace=inštalácia|instalaci=inštalácii|nenalezeny=nenájdené|nenalezeno=nenájdené|nenalezena=nenájdená|nalezeno=nájdené|nalezena=nájdená|nalezen=nájdený|nalezené=nájdené|uprostřed=uprostred|výchozí=predvolené|které=ktoré|který=ktorý|kterých=ktorých|kterou=ktorú|zdroje=zdroje|zdrojů=zdrojov|žánry=žánre|žánr=žáner|žánru=žánru|žánrů=žánrov|žánrech=žánroch|uložit=uložiť|uložen=uložený|uložené=uložené|uložený=uložený|uloženo=uložené|ulož=ulož|ukládá=ukladá|ukládání=ukladanie|neukládá=neukladá|datum=dátum|zavřít=zatvoriť|zavření=zatvorenie|složky=priečinky|složku=priečinok|složka=priečinok|složek=priečinkov|složkách=priečinkoch|archiv=archív|přímo=priamo|přímé=priame|místo=miesto|místě=mieste|místa=miesta|může=môže|zařízení=zariadenie|herce=herca|herců=hercov|okně=okne|okna=okná|oken=okien|tvé=tvoje|tvůj=tvoj|tvého=tvojho|řazení=radenie|řazeno=radené|právě=práve|vydání=vydanie|vyšlo=vyšlo|vyšly=vyšli|odebrat=odobrať|odebráno=odobrané|odebrání=odobratie|odebere=odoberie|odebrán=odobraný|správce=správca|správcem=správcom|správa=správa|správy=správy|přezdívka=prezývka|přezdívku=prezývku|přezdívky=prezývky|označit=označiť|označené=označené|označeno=označené|označ=označ|označení=označenie|označování=označovanie|odznačit=odznačiť|odznačeno=odznačené|odznačení=odznačenie|upozornění=upozornenia|série=série|sérii=sérii|službě=službe|služeb=služieb|pořad=program|pořady=programy|pořadů=programov|pořadu=programu|aktuální=aktuálne|aktuálně=aktuálne|kinech=kinách|opravdu=naozaj|vypnout=vypnúť|vypnuto=vypnuté|vypnuté=vypnuté|vypnutá=vypnutá|spuštění=spustenie|záznamů=záznamov|vytvořit=vytvoriť|vytvoří=vytvorí|vytvořen=vytvorený|vytvořeno=vytvorené|klepnutím=ťuknutím|klepnutí=ťuknutie|klepni=ťukni|akční=akčné|sezóny=série|sezóna=séria|sezónu=sériu|sezóně=sérii|sezona=séria|sezon=sérií|sezón=sérií|propojení=prepojenie|výše=vyššie|země=krajiny|zemí=krajín|zemi=krajine|prohlížeči=prehliadači|prohlížeč=prehliadač|prohlížeče=prehliadača|původní=pôvodné|nefunkční=nefunkčné|nefunkčních=nefunkčných|den=deň|dny=dni|dne=dňa|děj=dej|děje=deja|díly=diely|díl=diel|dílů=dielov|dílu=dielu|můj=môj|vzhled=vzhľad|vzhledy=vzhľady|vzhledu=vzhľadu|synchronizace=synchronizácia|dispozici=dispozícii|pořadí=poradie|předchozí=predchádzajúce|kategorie=kategórie|kategorii=kategóriu|pohádky=rozprávky|pohádka=rozprávka|pohádkový=rozprávkový|pohádek=rozprávok|zeptej=opýtaj|appce=appke|řady=rady|pár=pár|tenhle=tento|tuhle=túto|tohle=toto|téhle=tejto|výběr=výber|výběry=výbery|vybrané=vybrané|vybráno=vybrané|vybereš=vyberieš|vybere=vyberie|vybírá=vyberá|vybraný=vybraný|záloha=záloha|zálohu=zálohu|zálohy=zálohy|ručně=ručne|ruční=ručné|přesunout=presunúť|přesunuto=presunuté|přesouvat=presúvať|přesun=presun|stáhnout=stiahnuť|stahuji=sťahujem|stáhne=stiahne|animované=animované|přihlášení=prihlásenie|přihlásit=prihlásiť|přihlaste=prihláste|přihlašovací=prihlasovací|horní=horné|změny=zmeny|změnit=zmeniť|změn=zmien|režim=režim|vysílání=vysielanie|neznámá=neznáma|neznámé=neznáme|neznámý=neznámy|vrátit=vrátiť|kriminální=kriminálne|druhé=druhé|použít=použiť|použij=použi|použije=použije|použití=použitie|použit=použitý|používat=používať|používá=používa|katalog=katalóg|odebrání=odobratie|pak=potom|připojit=pripojiť|vložit=vložiť|vlož=vlož|vložte=vložte|připojení=pripojenie|kontrolu=kontrolu|kontroluji=kontrolujem|odhlásit=odhlásiť|odhlášeno=odhlásené|pouze=iba|přehled=prehľad|přehledy=prehľady|zrušit=zrušiť|zrušeno=zrušené|níže=nižšie|neplatný=neplatný|najít=nájsť|sám=sám|rodinné=rodinné|rodinný=rodinný|pokračovat=pokračovať|pokračuje=pokračuje|soubor=súbor|souborů=súborov|tipů=tipov|dostupný=dostupný|dostupné=dostupné|dostupná=dostupná|dostupnost=dostupnosť|dostupnosti=dostupnosti|přeložit=preložiť|překlad=preklad|překladu=prekladu|překládám=prekladám|čistá=čistá|síťová=sieťová|krok=krok|platný=platný|živě=naživo|živé=živé|živá=živá|pozadí=pozadie|vyplň=vyplň|lokální=lokálne|lokálních=lokálnych|zdarma=zadarmo|lišty=lišty|akce=akcie|hlavní=hlavné|schovat=schovať|schová=schová|obrazovce=obrazovke|dotaz=dotaz|dotazu=dotazu|dotazy=dotazy|dotazů=dotazov|aktivní=aktívne|chvíli=chvíľu|ověřit=overiť|ověřuji=overujem|ověřuje=overuje|neověřuje=neoveruje|hlasové=hlasové|příroda=príroda|znaků=znakov|existující=existujúci|klikněte=kliknite|písma=písma|písmo=písmo|písmen=písmen|písmene=písmena|písmena=písmená|písmenech=písmenách|příště=nabudúce|dobrodružství=dobrodružstvo|obrázek=obrázok|obrázků=obrázkov|beze=bez|podržením=podržaním|vypršel=vypršal|odpovědi=odpovede|odpověď=odpoveď|něj=neho|vyžadovat=vyžadovať|vyžaduje=vyžaduje|neodpovídá=nezodpovedá|neodpovídají=nezodpovedajú|odpovídající=zodpovedajúce|zapnout=zapnúť|zapnuto=zapnuté|zapnuté=zapnuté|zkopírovat=skopírovať|zkopírován=skopírovaný|zkopírováno=skopírované|zkopíruj=skopíruj|zkopírujte=skopírujte|zkopíruje=skopíruje|kopírovat=kopírovať|kopírování=kopírovanie|věk=vek|režie=réžia|běh=beh|televize=televízia|televizní=televízne|typem=typom|režiséři=režiséri|režisér=režisér|obsahu=obsahu|obsahem=obsahom|kompletní=kompletné|verze=verzia|verzi=verziu|sbalení=zbalenie|opraveno=opravené|hudební=hudobné|nálada=nálada|náladu=náladu|oficiální=oficiálne|přejít=prejsť|obnovit=obnoviť|běží=beží|hlasů=hlasov|vlastního=vlastného|začíná=začína|hraje=hrá|velikost=veľkosť|běžný=bežný|potřebuješ=potrebuješ|číslo=číslo|kalendář=kalendár|originální=originálne|žebříčky=rebríčky|abecedně=abecedne|vracím=vraciam|připojený=pripojený|návrat=návrat|schválení=schválenie|sdílet=zdieľať|zprávy=správy|zpráva=správa|zprávu=správu|pozitivní=pozitívne|kdokoli=ktokoľvek|ukazuje=ukazuje|aktualizuji=aktualizujem|aktualizace=aktualizácia|aktualizaci=aktualizáciu|aktualizována=aktualizovaná|slovenská=slovenská|kamarád=kamarát|kamaráda=kamaráta|rovnou=rovno|zkontroluj=skontroluj|zkontrolovat=skontrolovať|zkušební=skúšobný|válka=vojna|války=vojny|válečné=vojnové|válečný=vojnový|shody=zhody|shoda=zhoda|sekce=sekcie|sekci=sekcii|generování=generovanie|sdílená=zdieľaná|sdílené=zdieľané|knihovna=knižnica|knihovnu=knižnicu|automaticky=automaticky|objeví=objaví|připojeno=pripojené|nech=nechaj|připravené=pripravené|platí=platí|odkaz=odkaz|odkazu=odkazu|odkazem=odkazom|odkazy=odkazy|tyto=tieto|přesný=presný|porovnání=porovnanie|konkrétní=konkrétne|tohoto=tohto|změnit=zmeniť|šipka=šípka|průměr=priemer|stránka=stránka|stránku=stránku|stránky=stránky|stránkami=stránkami|plovoucí=plávajúce|plovoucím=plávajúcom|položka=položka|položku=položku|položky=položky|skladby=skladby|první=prvý|přečíst=prečítať|přepsat=prepísať|výběry=výbery|města=mestá|odznak=odznak|mřížce=mriežke|mřížka=mriežka|umělce=umelca|databáze=databáza|databázemi=databázami|textem=textom|dospělí=dospelí|dospělé=dospelé|funkce=funkcie|funkci=funkciu|ukončit=ukončiť|ukončeno=ukončené|dálku=diaľku|dekády=dekády|léta=leta|alternativní=alternatívne|odemkne=odomkne|nahráno=nahrané|nahrát=nahrať|nahrávám=nahrávam|připojen=pripojený|biografie=biografie|dramata=drámy|drama=dráma|zbytek=zvyšok|tělo=telo|dob=dôb|startu=štartu|streamovací=streamovacie|tipech=tipoch|synchronizovat=synchronizovať|koupě=kúpa|navíc=navyše|provést=vykonať|schránky=schránky|svět=svet|pozici=pozícii|konci=konci|česky=po česky|účtů=účtov|nejsledovanější=najsledovanejšie|zrušeno=zrušené|zpravodajství=spravodajstvo|propojený=prepojený|záhada=záhada|sjednocený=zjednotený|doplněk=doplnok|dokumentů=dokumentov|nedostupná=nedostupná|nedostupný=nedostupný|kultovní=kultové|cestování=cestovanie|věda=veda|vědy=vedy|odeslání=odoslanie|motivy=motívy|otestovat=otestovať|zvlášť=zvlášť|základ=základ|odpovídající=zodpovedajúce|tématu=téme|shrnutí=zhrnutie|kině=kine|zpěvák=spevák|adresu=adresu|informace=informácie|skupina=skupina|jednou=raz|samo=samo|potřeba=potreba|oznámení=oznámenie|probouzí=prebúdza|navazuje=nadväzuje|pošli=pošli|přeskočeno=preskočené|spustit=spustiť|větve=vetvy|přepínač=prepínač|přepínačem=prepínačom|počet=počet|vkusu=vkusu|vrať=vráť|zapsat=zapísať|barvy=farby|barev=farieb|barevné=farebné|barva=farba|barvu=farbu|světlý=svetlý|volání=volanie|schválit=schváliť|nechat=nechať|upravit=upraviť|čárkou=čiarkou|odvysílané=odvysielané|fakta=fakty|autorizaci=autorizáciu|této=tejto|parta=partia|doplněno=doplnené|ploše=ploche|připojená=pripojená|zrcadlí=zrkadlí|zrcadlení=zrkadlenie|bere=berie|nejvíc=najviac|explicitní=explicitné|filmech=filmoch|heslem=heslom|nebyl=nebol|shlédnutý=pozretý|doplní=doplní|karet=kariet|obrazovky=obrazovky|doplnění=doplnenie|začátek=začiatok|příliš=príliš|půjčení=požičanie|odemčení=odomknutie|věty=vety|napříč=naprieč|různé=rôzne|různých=rôznych|obecně=všeobecne|vyčistit=vyčistiť|růžové=ružové|zahradě=záhrade|poznámky=poznámky|přechod=prechod|překrývá=prekrýva|potitulkové=postitulkové|scény=scény|zamítnuta=zamietnutá|přežití=prežitie|údaje=údaje|komunitní=komunitné|tmavý=tmavý|umělá=umelá|inteligence=inteligencia|vězení=väzenie|obsahovat=obsahovať|muže=muža|pustit=pustiť|spodní=spodné|soutěžní=súťažné|obecná=všeobecná|čarodějnice=čarodejnice|důležité=dôležité|výhradně=výhradne|nabídni=ponúkni|vrací=vracia|totéž=to isté|konec=koniec|úmrtí=úmrtie|příběh=príbeh|cíl=cieľ|hlídá=stráži|galerie=galéria|galerii=galérii|září=september|tři=tri|dělí=delí|rozřazení=rozdelenie|streamů=streamov|obrázků=obrázkov|syrová=surová|procházet=prechádzať|podejte=podajte|přáteli=priateľmi|nevyplněno=nevyplnené|digitálně=digitálne|ležící=ležiace|spící=spiace|jména=mená|posunout=posunúť|časem=časom|soutěž=súťaž|schválen=schválený|vyprávěj=rozprávaj|odstraněn=odstránený|pozvat=pozvať|nadpřirozeno=nadprirodzené|přenosu=prenosu|nezobrazí=nezobrazí|navržené=navrhnuté|nerozhodně=nerozhodne|počátečního=počiatočného|datech=dátach|vzdělávací=vzdelávacie|nejmenší=najmenšie|tečky=bodky|řad=radov|ráno=ráno|explicitně=explicitne|zmiňuje=spomína|stiskni=stlač|dobrodružný=dobrodružný|měsíců=mesiacov|hrají=hrajú|požádá=požiada|viset=visieť|kouzelná=kúzelná|školka=škôlka|zapsáno=zapísané|filmová=filmová|dej=daj|skrytá=skrytá|začátku=začiatku|zmizí=zmizne|doplňuji=dopĺňam|mylně=mylne|vypadá=vyzerá|podezřele=podozrivo|skládám=skladám|překrývání=prekrývanie|křížků=krížikov|vrchní=vrchný|záložce=záložke|součástí=súčasťou|ignoruje=ignoruje|rozbalení=rozbalenie|neznámo=neznáme|nemusí=nemusí|dnešní=dnešný|jakéhokoli=akéhokoľvek|souběžně=súbežne|nepodporuje=nepodporuje|nesahá=nesiaha|založí=založí|dnešek=dnešok|nejčastější=najčastejšie|superhrdinové=superhrdinovia|integrace=integrácia|přejmenovat=premenovať|přejmenování=premenovanie|sérii=sériu|pusť=pusti|klonové=klonové|zvolené=zvolené|národnost=národnosť|národnosti=národnosti|roli=úlohe|počkej=počkaj|záhady=záhady|původu=pôvodu|staříci=starci|prstem=prstom|jezdec=jazdec|skupině=skupine|nemocnice=nemocnica|zapamatuje=zapamätá|exportovat=exportovať|spouštím=spúšťam|kliknout=kliknúť|nepoužitelnou=nepoužiteľnú|nadiktování=nadiktovanie|pokročilé=pokročilé|plánováno=plánované|skrýt=skryť|očekávané=očakávané|alespoň=aspoň|výraz=výraz|experimentální=experimentálne|životopisné=životopisné|společné=spoločné|společně=spoločne|odmítl=odmietol|počáteční=počiatočné|tím=tým|nekonečný=nekonečný|dlaždice=dlaždice|statistiky=štatistiky|odůvodnění=odôvodnenie|resetovat=resetovať|odstín=odtieň|paměti=pamäti|připojené=pripojené|brzy=čoskoro|dočasně=dočasne|uložených=uložených|recenze=recenzie|včetně=vrátane|průvodce=sprievodca|přepočítat=prepočítať|smích=smiech|šířku=šírku|roztříděné=roztriedené|odstranit=odstrániť|udělit=udeliť|veřejné=verejné|hromadně=hromadne|nesprávné=nesprávne|povolit=povoliť|napiš=napíš|češtiny=češtiny|časové=časové|lidé=ľudia|anonymní=anonymné|oddělené=oddelené|regionální=regionálne|závěrečná=záverečná|šifrovaného=šifrovaného|přizpůsobí=prispôsobí|nabídce=ponuke|nabídka=ponuka|nabídku=ponuku|daleká=ďaleká|kvalitní=kvalitné|reálném=reálnom|pamatuje=pamätá|požádat=požiadať|odeslat=odoslať|slovenština=slovenčina|psaní=písanie|tedy=teda|přibylo=pribudlo|lety=rokmi|výrobě=výrobe|neaktivní=neaktívne|posílá=posiela|počítám=počítam|tvář=tvár|známý=známy|jestli=či|reálně=reálne|ukončeno=ukončené|vytvořit nový seznam=vytvoriť nový zoznam|nový seznam=nový zoznam|nové seznamy=nové zoznamy|správce seznamů=správca zoznamov|vlastní vzhled=vlastný vzhľad|vlastní seznam=vlastný zoznam|vlastní=vlastné|téma a barvy=téma a farby|tmavý / světlý režim, barvy=tmavý / svetlý režim, farby|ikony tlačítek=ikony tlačidiel|kde se to dá sledovat=kde sa to dá pozerať|streamovací služby v detailu=streamovacie služby v detaile|detailu=detaile|detail=detail|úprava=úprava|upravit seznam=upraviť zoznam|přejmenovat=premenovať|smazat seznam=zmazať zoznam|smazat vybrané=zmazať vybrané|poslední přidané=posledné pridané|nejnovější nahoře=najnovšie hore|rok: nejnovější → nejstarší=rok: najnovší → najstarší|výchozí pořadí=predvolené poradie|zpět na=späť na|načítám…=načítavam…|nenalezeno nic=nič sa nenašlo|nic nenalezeno=nič sa nenašlo|nic není=nič nie je|není označené=nie je označené|seznam je prázdný=zoznam je prázdny|nic neodpovídá filtru=nič nezodpovedá filtru|vybráno=vybraných|položek=položiek|dnes večer=dnes večer|co dnes=čo dnes|top tipy=top tipy|živá tv=živá tv|hudba=hudba|hledat=hľadať|filtry=filtre|oblíbené=obľúbené|složky=priečinky|zábava=zábava|nastavení=nastavenia|vzhled=vzhľad|jazyk=jazyk|filmy=filmy|seriály=seriály|seriál=seriál|film=film|hodnocení=hodnotenie|premiéra=premiéra|trailer=trailer|přehrát v externí aplikaci=prehrať v externej aplikácii|herci a režie=herci a réžia|podobné tituly=podobné tituly|fyzické médium=fyzické médium|doporučit=odporučiť|galerie=galéria|shlédnuto=pozreté|zhlédnuto=pozreté|označit jako shlédnuté=označiť ako pozreté|přidat do seznamu=pridať do zoznamu|přidat do=pridať do|odebrat ze seznamu=odobrať zo zoznamu|zavřít=zatvoriť|zrušit=zrušiť|potvrdit=potvrdiť|potvrdit=potvrdiť|ok=ok|ne=nie|určitě=určite|opravdu smazat=naozaj zmazať|tuto akci nelze vrátit=túto akciu nemožno vrátiť|nepodařilo se načíst=nepodarilo sa načítať|zkus to znovu=skús to znova|zkusit znovu=skúsiť znova|žádné výsledky=žiadne výsledky|žádné položky=žiadne položky|hledat film=hľadať film|hledat seriál=hľadať seriál|hledat herce=hľadať herca|titulky=titulky|dabing=dabing|český dabing=český dabing|slovenský dabing=slovenský dabing|podobné=podobné|hraje=hrá|režie=réžia|délka=dĺžka|délku=dĺžku|země původu=krajina pôvodu|rok vydání=rok vydania|popis=popis|obsazení=obsadenie|obsazení=obsadenie|tvůrci=tvorcovia|scénář=scenár|hudba=hudba|kamera=kamera|střih=strih|hodnocení csfd=hodnotenie čsfd|vyber=vyber|vybrat=vybrať|výběr=výber|všechny=všetky|nic=nič|invertovat=invertovať|zobrazit vše=zobraziť všetko|zobrazit více=zobraziť viac|zobrazit méně=zobraziť menej|načíst další=načítať ďalšie|načíst více=načítať viac|dokončit=dokončiť|dokončeno=dokončené|hotovo=hotovo|probíhá=prebieha|čekejte=čakajte|čekám=čakám|počkejte=počkajte|prosím čekejte=prosím čakajte|odeslat=odoslať|odesláno=odoslané|stáhnout=stiahnuť|stahování=sťahovanie|nahrát=nahrať|nahráno=nahrané|import=import|export=export|záloha a obnova=záloha a obnova|obnovit ze zálohy=obnoviť zo zálohy|vytvořit zálohu=vytvoriť zálohu|smazat vše=zmazať všetko|resetovat nastavení=resetovať nastavenia|výchozí nastavení=predvolené nastavenia|výchozí=predvolené|zapnuto=zapnuté|vypnuto=vypnuté|zap=zap|vyp=vyp|povoleno=povolené|zakázáno=zakázané|povolit=povoliť|zakázat=zakázať|aktivní=aktívne|neaktivní=neaktívne|přihlášen=prihlásený|odhlášen=odhlásený|přihlásit se=prihlásiť sa|odhlásit se=odhlásiť sa|registrace=registrácia|registrovat=registrovať|heslo=heslo|jméno=meno|e-mail=e-mail|přezdívka=prezývka|zapamatovat=zapamätať|zapomenuté heslo=zabudnuté heslo";
+  var W = Object.create(null), PH = [];
+  DICT.split('|').forEach(function (pair) {
+    var i = pair.indexOf('='); if (i < 1) return;
+    var k = pair.slice(0, i).trim().toLowerCase(), v = pair.slice(i + 1).trim(); if (!k || !v) return;
+    if (/\s/.test(k)) PH.push([k, v]); else W[k] = v;
+  });
+  PH.sort(function (a, b) { return b[0].length - a[0].length; });
+  function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  var PHR = PH.map(function (p) { return [new RegExp('(?<![\\p{L}\\p{N}])' + esc(p[0]) + '(?![\\p{L}\\p{N}])', 'giu'), p[1]]; });
+  function caseLike(src, rep) {
+    if (src.length > 1 && src === src.toUpperCase() && src !== src.toLowerCase()) return rep.toUpperCase();
+    var c = src.charAt(0);
+    if (c !== c.toLowerCase() && c === c.toUpperCase()) return rep.charAt(0).toUpperCase() + rep.slice(1);
+    return rep;
+  }
+  var CACHE = new Map();
+  var MISS = [];
+  try { MISS = JSON.parse(localStorage.getItem('sinator_sk_missing') || '[]') || []; } catch (e) { MISS = []; }
+  var missSet = new Set(MISS), missT = null;
+  function logMiss(s) {
+    var t = s.trim(); if (t.length < 3 || t.length > 120 || missSet.has(t) || missSet.size >= 600) return;
+    missSet.add(t); clearTimeout(missT);
+    missT = setTimeout(function () { try { localStorage.setItem('sinator_sk_missing', JSON.stringify(Array.from(missSet))); } catch (e) {} }, 1500);
+  }
+  window.sinMissingList = function () { return Array.from(missSet); };
+  window.sinCopyMissing = function () {
+    var txt = Array.from(missSet).join('\n');
+    try { navigator.clipboard.writeText(txt).then(function () { if (window.showToast) showToast('📋 Zkopírováno ' + missSet.size + ' textů'); }); } catch (e) {}
+  };
+  function tr(s) {
+    if (!s || !/\p{L}/u.test(s)) return s;
+    var c = CACHE.get(s); if (c !== undefined) return c;
+    var out = s;
+    if (!/:\/\/|[{}<>]|^\s*[\w.\-]+@/.test(s)) {
+      PHR.forEach(function (p) { out = out.replace(p[0], function (m) { return caseLike(m, p[1]); }); });
+      out = out.replace(/[\p{L}]+/gu, function (w) {
+        var lw = w.toLowerCase(), r = W[lw];
+        if (r === undefined) {
+          var m = lw.match(/^(.{3,})(ování|ání|ení|ění)$/);
+          if (m) r = m[1] + (m[2] === 'ování' ? 'ovanie' : m[2] === 'ání' ? 'anie' : 'enie'); else return w;
+        }
+        return caseLike(w, r);
+      });
+    }
+    if (CACHE.size > 20000) CACHE.clear();
+    CACHE.set(s, out);
+    if (/[ěřů]/i.test(out)) logMiss(s);
+    return out;
+  }
+  window.sinTr = tr;
+  var SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, NOSCRIPT: 1, CODE: 1, PRE: 1, INPUT: 0 };
+  var done = new WeakMap();
+  function tText(n) {
+    var d = n.data; if (done.get(n) === d) return;
+    var o = tr(d); if (o !== d) n.data = o; done.set(n, n.data);
+  }
+  var ATTR = ['placeholder', 'title', 'aria-label', 'alt'];
+  function tAttrs(el) {
+    for (var i = 0; i < ATTR.length; i++) {
+      var v = el.getAttribute && el.getAttribute(ATTR[i]);
+      if (v) { var o = tr(v); if (o !== v) el.setAttribute(ATTR[i], o); }
+    }
+  }
+  function walk(root) {
+    if (!root) return;
+    if (root.nodeType === 3) { var p = root.parentNode; if (p && !SKIP[p.nodeName] && !(p.closest && p.closest('[data-notr]'))) tText(root); return; }
+    if (root.nodeType !== 1 || SKIP[root.nodeName]) return;
+    if (root.closest && root.closest('[data-notr]')) return;
+    tAttrs(root);
+    var tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+      acceptNode: function (n) { return (n.nodeType === 1 && (SKIP[n.nodeName] || n.hasAttribute('data-notr'))) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; }
+    });
+    var n; while ((n = tw.nextNode())) { if (n.nodeType === 3) tText(n); else tAttrs(n); }
+  }
+  var pending = new Set(), raf = 0;
+  function flush() { raf = 0; var arr = Array.from(pending); pending.clear(); arr.forEach(walk); try { document.title = tr(document.title); } catch (e) {} }
+  function queue(n) { pending.add(n); if (!raf) raf = requestAnimationFrame(flush); }
+  function start() {
+    walk(document.body); document.title = tr(document.title);
+    new MutationObserver(function (muts) {
+      muts.forEach(function (m) {
+        if (m.type === 'childList') m.addedNodes.forEach(queue);
+        else if (m.type === 'characterData') queue(m.target);
+        else if (m.type === 'attributes') queue(m.target);
+      });
+    }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTR });
+    window.sinLangRefreshUI();
+  }
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+  document.addEventListener('DOMContentLoaded', function () { walk(document.body); window.sinLangRefreshUI(); });
+  window.addEventListener('load', function () { walk(document.body); });
+
+  // alert / confirm / prompt
+  ['alert', 'confirm'].forEach(function (f) { var o = window[f].bind(window); window[f] = function (m) { return o(tr(String(m == null ? '' : m))); }; });
+  var _pr = window.prompt.bind(window); window.prompt = function (m, d) { return _pr(tr(String(m == null ? '' : m)), d); };
+
+  // formátování data/čísel
+  function loc(a) { return a === 'cs-CZ' || a === 'cs' ? 'sk-SK' : a; }
+  ['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString'].forEach(function (f) {
+    var o = Date.prototype[f]; Date.prototype[f] = function (l, opt) { return o.call(this, loc(l), opt); };
+  });
+  var _ns = Number.prototype.toLocaleString; Number.prototype.toLocaleString = function (l, opt) { return _ns.call(this, loc(l), opt); };
+
+  // ═══ TMDB: slovenské metadáta (s českým záložním textem, když slovenský překlad chybí) ═══
+  var _fetch = window.fetch.bind(window);
+  var csCacheF = new Map();
+  function needsFb(o) {
+    if (!o || typeof o !== 'object') return false;
+    if ('overview' in o && !o.overview) return true;
+    if (o.title !== undefined && o.title === o.original_title && o.original_language && o.original_language !== 'sk') return true;
+    if (o.name !== undefined && o.name === o.original_name && o.original_language && o.original_language !== 'sk') return true;
+    var arrs = ['results', 'episodes', 'seasons'];
+    for (var i = 0; i < arrs.length; i++) { var a = o[arrs[i]]; if (Array.isArray(a) && a.some(function (x) { return x && typeof x === 'object' && needsFb(x); })) return true; }
+    return false;
+  }
+  function mergeFb(sk, cs) {
+    if (!sk || !cs || typeof sk !== 'object' || typeof cs !== 'object') return;
+    ['overview', 'tagline'].forEach(function (k) { if (k in sk && !sk[k] && cs[k]) sk[k] = cs[k]; });
+    if (sk.title !== undefined && sk.title === sk.original_title && sk.original_language !== 'sk' && cs.title && cs.title !== cs.original_title) sk.title = cs.title;
+    if (sk.name !== undefined && sk.name === sk.original_name && sk.original_language !== 'sk' && cs.name && cs.name !== cs.original_name) sk.name = cs.name;
+    ['results', 'episodes', 'seasons'].forEach(function (k) {
+      if (!Array.isArray(sk[k]) || !Array.isArray(cs[k])) return;
+      var m = new Map(); cs[k].forEach(function (x) { if (x && x.id != null) m.set(x.id, x); });
+      sk[k].forEach(function (x) { if (x && typeof x === 'object' && x.id != null && m.has(x.id)) mergeFb(x, m.get(x.id)); });
+    });
+  }
+  window.fetch = function (input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (/api\.themoviedb\.org\/3\//.test(url) && /language=cs-CZ/.test(url)) {
+      var skUrl = url.replace(/language=cs-CZ/g, 'language=sk-SK').replace(/include_image_language=cs,/g, 'include_image_language=sk,cs,').replace(/(watch_region|region)=CZ/g, '$1=SK');
+      var csUrl = url;
+      return _fetch(skUrl, init).then(function (res) {
+        if (!res.ok) return res;
+        return res.clone().json().then(function (d) {
+          var fin = function (data) {
+            try { if (/\/watch\/providers/.test(skUrl) && data && data.results && data.results.SK) data.results.CZ = data.results.SK; } catch (e) {}
+            return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          };
+          if (!needsFb(d)) return fin(d);
+          var p = csCacheF.get(csUrl);
+          if (!p) { p = _fetch(csUrl, init).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }); csCacheF.set(csUrl, p); if (csCacheF.size > 300) csCacheF.delete(csCacheF.keys().next().value); }
+          return p.then(function (cs) { mergeFb(d, cs); return fin(d); });
+        }).catch(function () { return res; });
+      });
+    }
+    if (typeof url === 'string' && /lang=cs-CZ/.test(url) && !/themoviedb/.test(url) && typeof input === 'string') { input = input.replace(/lang=cs-CZ/g, 'lang=sk-SK'); }
+    return _fetch(input, init);
+  };
+})();
+
+</script>
     <script>
     // ── TEST: běžný uživatel (Admin level 2) ─────────────────────────────────
     // Když je zapnuto, appka vidí jen TMDB klíč (+ přístup/identitu zařízení, aby nezamkla admina).
@@ -1784,6 +1961,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     </label>
                 </div>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Zobrazí v detailu filmu/seriálu, na kterých službách (Netflix, HBO Max…) je dostupný (zdroj: JustWatch)</div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section">
+                <span class="settings-label">🌐 Jazyk</span>
+                <div style="display:flex;gap:8px;margin-top:10px;" data-notr>
+                    <button id="langBtnCs" class="settings-full-btn" style="flex:1;margin:0;" onclick="sinSetLang('cs')">🇨🇿 Čeština</button>
+                    <button id="langBtnSk" class="settings-full-btn" style="flex:1;margin:0;" onclick="sinSetLang('sk')">🇸🇰 Slovenčina</button>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Slovenčina přeloží celou aplikaci a z TMDB načte slovenské názvy a popisy (když chybí, použije se český text). Po přepnutí se aplikace znovu načte.</div>
+                <button id="langMissingBtn" class="settings-full-btn" style="display:none;margin-top:8px;" onclick="sinCopyMissing()" data-notr>📋 Zkopírovat nepřeložené texty</button>
             </div>
             <div class="settings-divider"></div>
             <button class="settings-full-btn" onclick="toggleFullscreen()" id="settingsFullscreenBtn">📺 Fullscreen (vypnuto)</button>
@@ -51294,6 +51481,7 @@ window.addEventListener('load', function() {
       {key:'lkCustom', icon:'🖌️', name:'Vlastní vzhled',   c:'#ec4899', sub:'Písma, barvy, uložené vzhledy', els:[{id:'customLookRoot'}], pre:function(){ if(window.renderCustomLookUI) window.renderCustomLookUI(); }},
       {key:'lkIcons',  icon:'🎨', name:'Ikony',            c:'#e879f9', sub:'Barevné ikony tlačítek', els:[{label:'Ikony'}]},
       {key:'lkWatch',  icon:'📺', name:'Kde se to dá sledovat', c:'#c084fc', sub:'Streamovací služby v detailu', els:[{label:'Kde se to dá sledovat'}]},
+      {key:'lkLang',   icon:'🌐', name:'Jazyk',            c:'#38bdf8', sub:function(){ return (window.sinLang && window.sinLang()==='sk') ? '🇸🇰 Slovenčina' : '🇨🇿 Čeština'; }, els:[{label:'Jazyk'}]},
       {key:'lkFull',   icon:'⛶',  name:'Fullscreen',       c:'#a78bfa', sub:function(){ var m=_t('settingsFullscreenBtn','').match(/\(([^)]+)\)/); return m ? m[1].charAt(0).toUpperCase()+m[1].slice(1) : 'Celá obrazovka'; }, els:[{id:'settingsFullscreenBtn'}]}]},
     admin:{container:'settingsTabContentAdmin', kids:[
       {key:'adAccess', icon:'🛡️', name:'Admin přístup',           c:'#ffaa00', sub:function(){ var on=false; try{ on=localStorage.getItem('sinator_admin_mode')==='1'; }catch(e){} return on?'✅ Aktivní':'Neaktivní'; }, els:[{label:'Admin přístup'}]},
@@ -52719,7 +52907,7 @@ window.sfFrAuto=async function(id,t){
     function posterUrl(p) { if (!p) return ''; p = String(p); return p.indexOf('http') === 0 ? p : 'https://image.tmdb.org/t/p/w92' + (p[0] === '/' ? p : '/' + p); }
     var enrichQ = [], enrichRun = 0;
     // České názvy/plakáty z TMDB (cs-CZ) — trvale cachované, ať se každá položka stahuje jen jednou
-    var CS_KEY = 'sinator_lm_cs_v1', csCache = {};
+    var CS_KEY = 'sinator_lm_cs_v1' + (window.SIN_LANG === 'sk' ? '_sk' : ''), csCache = {};
     try { csCache = JSON.parse(localStorage.getItem(CS_KEY) || '{}') || {}; } catch (e) { csCache = {}; }
     var csSaveT = null;
     function csSave() { clearTimeout(csSaveT); csSaveT = setTimeout(function () { try { localStorage.setItem(CS_KEY, JSON.stringify(csCache)); } catch (e) {} }, 800); }
