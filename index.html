@@ -7243,6 +7243,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-01e', date: '1. 11. 2026', items: [
+            '⭐ Online rádia: nový seznam Oblíbené (první v nabídce seznamů); na jakékoli stanici podrž prst a vyskočí nabídka Přidat do oblíbených / Odebrat z oblíbených (funguje i u stanic z Žánrů). Oblíbené stanice mají v ostatních seznamech malou ⭐',
+        ]},
         { version: '2026-11-01d', date: '1. 11. 2026', items: [
             '🎼 Online rádia: nová nabídka „Žánry“ (vedle seznamu a 🌐 Webu) — kategorie jako v jiných přehrávačích (Rock/Metal, Elektronická, Dekády, Džez/Blues, Latino, Lounge/Relax, Regionální, Vánoční…); po klepnutí na žánr se načtou nejpopulárnější funkční stanice z radio-browser.info, přepínač země 🌍 Svět / 🇨🇿 CZ / 🇸🇰 SK nahoře v nabídce',
         ]},
@@ -44385,6 +44388,7 @@ const RADIOS_WORLD = [
     { name:'Jazz24',          genre:'Jazz',          emoji:'🎷', q:'Jazz24',       tk:['jazz24'],      stream:'' },
 ];
 const RADIO_LISTS = {
+    fav:   { label: '⭐ Oblíbené',   cc: '',   items: [] },
     cz:    { label: '🇨🇿 Česko',     cc: 'CZ', items: RADIOS_CZ },
     sk:    { label: '🇸🇰 Slovensko', cc: 'SK', items: RADIOS_SK },
     pl:    { label: '🇵🇱 Polsko',    cc: 'PL', items: RADIOS_PL },
@@ -44430,7 +44434,7 @@ async function radioResolve(r, country, force) {
     const urls = [];
     const add = u => { if (!u || urls.indexOf(u) >= 0) return; if (location.protocol === 'https:' && !/^https:/i.test(u)) return; urls.push(u); };
     try {
-        const list = await _rbFetch('/json/stations/search?name=' + encodeURIComponent(r.q || r.name) + ((RADIO_LISTS[country] || {}).cc ? '&countrycode=' + RADIO_LISTS[country].cc : '') + '&hidebroken=true&order=clickcount&reverse=true&limit=25');
+        const list = await _rbFetch('/json/stations/search?name=' + encodeURIComponent(r.q || r.name) + (((r.cc !== undefined ? r.cc : (RADIO_LISTS[country] || {}).cc)) ? '&countrycode=' + (r.cc !== undefined ? r.cc : RADIO_LISTS[country].cc) : '') + '&hidebroken=true&order=clickcount&reverse=true&limit=25');
         const words = x => _rbNorm(x).split(/[^a-z0-9]+/).filter(Boolean);
         const ok = list.filter(st => {
             if (st.lastcheckok === 0) return false;
@@ -44458,23 +44462,25 @@ function _rpCss() {
         + '.rsb-btn{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:4px;background:var(--bg-elevated,#1b2340);color:var(--text,#fff);border:1px solid var(--border,#26304d);border-radius:12px;padding:9px 8px;font-size:0.8rem;font-weight:600;cursor:pointer;}.rsb-btn span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
         + '.rsb-btn.open{border-color:#e11d48;}.rsb-btn.open .rsb-arr{transform:rotate(180deg);}.rsb-arr{transition:transform .15s;opacity:.8;}'
         + '.rsb-menu{flex:0 0 auto !important;box-sizing:border-box;padding:6px 12px 8px;border-bottom:1px solid var(--border,#26304d);background:var(--bg-card,#141a33);max-height:48vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}.rsb-bar,.rp-mini{flex-shrink:0;}'
-        + '.rsb-opt{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 12px;margin:3px 0;border-radius:10px;background:var(--bg-elevated,#1b2340);color:var(--text,#fff);text-decoration:none;font-size:0.92rem;cursor:pointer;border:1px solid transparent;}'
-        + '.rsb-opt.sel{border-color:#e11d48;}.rsb-meta{opacity:.7;font-size:0.8rem;}.rsb-hint{font-size:0.75rem;opacity:.65;padding:4px 4px 2px;}'
+        + '.rsb-opt{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 12px;margin:3px 0;border-radius:10px;background:var(--bg-elevated,#1b2340);color:var(--text,#fff);text-decoration:none;font-size:15px;line-height:20px;cursor:pointer;border:1px solid transparent;}'
+        + '.rsb-opt.sel{border-color:#e11d48;}.rsb-meta{opacity:.7;font-size:13px;}.rsb-hint{font-size:12px;opacity:.65;padding:4px 4px 2px;}'
         + '#radioGrid{flex:1 1 0 !important;min-height:0 !important;overflow-y:auto !important;display:flex !important;flex-wrap:wrap !important;align-content:flex-start !important;align-items:flex-start !important;gap:7px !important;padding:8px 10px !important;grid-template-columns:none !important;grid-template-rows:none !important;}'
         + '#radioGrid .radio-item{flex:0 0 calc((100% - 14px) / 3) !important;width:calc((100% - 14px) / 3) !important;height:auto !important;min-height:54px !important;max-height:none !important;aspect-ratio:auto !important;padding:9px 5px !important;margin:0 !important;border-radius:12px !important;display:flex !important;flex-direction:column !important;align-items:center !important;justify-content:center !important;text-align:center !important;gap:2px !important;overflow:hidden !important;box-sizing:border-box !important;}'
         + '@media (min-width:600px){#radioGrid .radio-item{flex-basis:calc((100% - 21px) / 4) !important;width:calc((100% - 21px) / 4) !important;}}'
         + '@media (min-width:900px){#radioGrid .radio-item{flex-basis:calc((100% - 35px) / 6) !important;width:calc((100% - 35px) / 6) !important;}}'
         + '#radioGrid .radio-item-emoji{display:none !important;}'
+        + '#radioGrid .radio-item{position:relative !important;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}'
+        + '.rp-star{position:absolute;top:3px;right:5px;font-size:10px;line-height:1;}'
         + '#radioGrid .radio-item-name{font-size:13px !important;line-height:16px !important;font-weight:700 !important;margin:0 !important;word-break:break-word;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;}'
         + '#radioGrid .radio-item-genre{font-size:9.5px !important;line-height:12px !important;margin:0 !important;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}'
         + '#radioGrid .radio-item-live{font-size:9.5px !important;line-height:12px !important;margin:0 !important;position:static !important;}'
         + '.rsb-menu:has(.rsb-gcols){max-height:56vh;}'
-        + '.rsb-scope{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 2px 8px;font-size:0.8rem;opacity:.95;}'
-        + '.rsb-chip{padding:5px 10px;border-radius:14px;background:var(--bg-elevated,#1b2340);border:1px solid var(--border,#26304d);cursor:pointer;}.rsb-chip.sel{border-color:#e11d48;background:#e11d48;color:#fff;}'
-        + '.rsb-gcols{column-count:2;column-gap:8px;}'
-        + '.rsb-g{break-inside:avoid;border-radius:18px;padding:8px 6px;margin-bottom:8px;color:var(--text,#fff);}'
-        + '.rsb-gt{font-size:0.95rem;padding:6px 8px 4px;font-weight:500;}.rsb-gt.tap{cursor:pointer;padding:8px;}'
-        + '.rsb-gi{font-size:0.88rem;padding:8px 8px;opacity:.9;cursor:pointer;border-radius:8px;}.rsb-gi:active{background:rgba(255,255,255,0.12);}';
+        + '.rsb-scope{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 2px 8px;font-size:13px;opacity:.95;}'
+        + '.rsb-chip{padding:5px 11px;border-radius:14px;font-size:13px;line-height:18px;background:var(--bg-elevated,#1b2340);border:1px solid var(--border,#26304d);cursor:pointer;}.rsb-chip.sel{border-color:#e11d48;background:#e11d48;color:#fff;}'
+        + '.rsb-gcols{column-count:2;column-gap:8px;}.rsb-gcols *{text-transform:none !important;letter-spacing:normal !important;}'
+        + '.rsb-g{break-inside:avoid;border-radius:16px;padding:8px 4px;margin-bottom:8px;overflow:hidden;min-width:0;border:1px solid rgba(255,255,255,0.07);}'
+        + '.rsb-gt{font-size:15px !important;line-height:19px !important;padding:6px 9px 5px;font-weight:700 !important;overflow-wrap:anywhere;word-break:break-word;}.rsb-gt.tap{cursor:pointer;padding:9px;}'
+        + '.rsb-gi{font-size:14px !important;line-height:18px !important;padding:9px 9px;color:#ececee !important;font-weight:400 !important;cursor:pointer;border-radius:8px;overflow-wrap:anywhere;word-break:break-word;}.rsb-gi:active{background:rgba(255,255,255,0.14);}';
     document.head.appendChild(st);
 }
 function _radioUi() {
@@ -44503,6 +44509,59 @@ function _radioUi() {
         }
     } catch (e) {}
 }
+
+// -- ⭐ OBLÍBENÁ RÁDIA (dlouhé podržení na stanici = přidat / odebrat) -------------
+function _radioFavRead() { try { const a = JSON.parse(localStorage.getItem('sinator_radio_favs') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function _radioFavWrite(a) { try { localStorage.setItem('sinator_radio_favs', JSON.stringify(a)); } catch (e) {} }
+function radioFavKey(r) { return (r.src || radioState.country) + '|' + r.name; }
+function radioFavLoad() { RADIO_LISTS.fav.items = _radioFavRead(); if (radioState.country === 'fav') RADIOS = RADIO_LISTS.fav.items; }
+function radioIsFav(r) { const k = radioFavKey(r); return RADIO_LISTS.fav.items.some(f => radioFavKey(f) === k); }
+function radioFavToggle(i) {
+    const r = RADIOS[i]; if (!r) return;
+    const k = radioFavKey(r), arr = _radioFavRead(), pos = arr.findIndex(f => radioFavKey(f) === k);
+    const playingName = (radioState.playR && radioState.playCountry === 'fav') ? radioState.playR.name : null;
+    if (pos >= 0) arr.splice(pos, 1);
+    else {
+        const src = r.src || radioState.country, L = RADIO_LISTS[src];
+        arr.push({ name: r.name, genre: r.genre, emoji: r.emoji, q: r.q, tk: r.tk || [], no: r.no || [], stream: r.stream || '', urls: r.urls || null, cc: (r.cc !== undefined ? r.cc : (L ? L.cc : '')), src: src });
+    }
+    _radioFavWrite(arr); radioFavLoad();
+    if (radioState.country === 'fav') {
+        if (playingName) { const ni = RADIOS.findIndex(x => x.name === playingName); if (ni >= 0) { radioState.playIdx = ni; radioState.current = ni; } else { radioState.playCountry = 'fav~'; radioState.current = null; } }
+        else radioState.current = null;
+    }
+    renderRadioGrid();
+    const m = document.getElementById('radioMenu'); if (m && m.dataset.open === 'list') { m.dataset.open = ''; radioMenuToggle('list'); }
+}
+function radioFavPopupClose() { const o = document.getElementById('rpFavOv'); if (o) o.remove(); }
+function radioFavPopup(i) {
+    const r = RADIOS[i]; if (!r) return;
+    radioFavPopupClose();
+    const fav = radioIsFav(r), o = document.createElement('div'); o.id = 'rpFavOv';
+    o.style.cssText = 'position:fixed;inset:0;z-index:100060;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;padding:14px;';
+    o.onclick = function (e) { if (e.target === o) radioFavPopupClose(); };
+    const nm = String(r.name).replace(/</g, '&lt;');
+    o.innerHTML = '<div style="width:100%;max-width:420px;background:#2f2f31;color:#f2f2f2;border-radius:24px;padding:18px 16px 12px;">'
+        + '<div style="font-size:1.05rem;font-weight:600;padding:2px 6px 2px;">' + nm + '</div><div style="font-size:0.8rem;opacity:.65;padding:0 6px 10px;">' + String(r.genre || '').replace(/</g, '&lt;') + '</div>'
+        + '<div class="rsb-opt" onclick="radioFavToggle(' + i + ');radioFavPopupClose();" style="font-size:1rem;">' + (fav ? '💔 Odebrat z oblíbených' : '⭐ Přidat do oblíbených') + '</div>'
+        + '<div class="rsb-opt" onclick="radioFavPopupClose()" style="font-size:1rem;opacity:.8;">Zrušit</div></div>';
+    document.body.appendChild(o);
+    try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
+}
+function _radioBindLongPress() {
+    document.querySelectorAll('#radioGrid .radio-item').forEach(function (el, i) {
+        let t = null, sx = 0, sy = 0;
+        const clear = function () { if (t) { clearTimeout(t); t = null; } };
+        const start = function (x, y) { clear(); sx = x; sy = y; t = setTimeout(function () { t = null; window._rpLpAt = Date.now(); radioFavPopup(i); }, 550); };
+        el.addEventListener('touchstart', function (e) { const p = e.touches[0]; start(p.clientX, p.clientY); }, { passive: true });
+        el.addEventListener('touchmove', function (e) { const p = e.touches[0]; if (Math.abs(p.clientX - sx) > 10 || Math.abs(p.clientY - sy) > 10) clear(); }, { passive: true });
+        ['touchend', 'touchcancel'].forEach(function (ev) { el.addEventListener(ev, clear, { passive: true }); });
+        el.addEventListener('mousedown', function (e) { if (e.button === 0) start(e.clientX, e.clientY); });
+        ['mouseup', 'mouseleave'].forEach(function (ev) { el.addEventListener(ev, clear); });
+        el.addEventListener('contextmenu', function (e) { e.preventDefault(); clear(); window._rpLpAt = Date.now(); radioFavPopup(i); });
+    });
+}
+radioFavLoad();
 
 // -- ŽÁNRY (kategorie) — stanice podle tagu z radio-browser.info ------------------
 const RADIO_GENRES = [["Country/Bluegrass", "#2f3138", [["Bluegrass", "bluegrass"], ["Country", "country"]]], ["Dětská", "#2d2a2a", "kids"], ["Disco/Funk", "#352b29", [["Disco", "disco"], ["Funk", "funk"]]], ["Džez/Blues", "#363638", [["Blues", "blues"], ["Džez", "jazz"], ["Smooth Jazz", "smooth jazz"], ["Swing", "swing"]]], ["Folk", "#262b3a", [["Keltská", "celtic"], ["World", "world music"], ["Folk", "folk"]]], ["Dekády", "#35293a", [["2010s", "2010s"], ["Čtyřicátky", "40s"], ["Devadesátky", "90s"], ["Milénium", "2000s"], ["Osmdesátky", "80s"], ["Padesátky", "50s"], ["Sedmdesátky", "70s"], ["Šedesátky", "60s"]]], ["Eklektické/Sofistikovaná", "#2c2838", [["Eklektické", "eclectic"], ["Sofistikovaná", "easy listening"]]], ["Elektronická", "#26262b", [["Drum and Bass", "drum and bass"], ["Dubstep", "dubstep"], ["EDM", "edm"], ["Electro", "electro"], ["Hardstyle", "hardstyle"], ["House", "house"], ["Progresivní", "progressive"], ["Techno", "techno"], ["Trance", "trance"], ["UK Garage", "uk garage"]]], ["Humor", "#2b2840", "humor"], ["Latino", "#2b3538", [["Bachata", "bachata"], ["Cubaton", "cubaton"], ["Flamengo", "flamenco"], ["Latin Pop", "latin pop"], ["Merengue", "merengue"], ["Reggaeton", "reggaeton"], ["Salsa", "salsa"], ["Tango", "tango"], ["Tropical", "tropical"]]], ["Lounge/Relax", "#392d2c", [["Ambientní", "ambient"], ["Chillout", "chillout"], ["Lounge", "lounge"], ["Relax", "relax"]]], ["Milostná/Balady", "#2e3a2f", [["Balady", "ballads"], ["Milostná", "love songs"]]], ["Náboženské", "#3a2d2d", [["Catholic", "catholic"], ["Gospel", "gospel"], ["Islámská", "islamic"], ["Judaismus", "jewish"], ["Křesťanská", "christian"], ["Křesťanská hudba", "christian music"], ["Pravoslaví", "orthodox"], ["Protestantismus", "protestant"]]], ["Oldies/Hity", "#282a3d", [["Hity", "hits"], ["Oldies", "oldies"]]], ["Populární muzika", "#2c363b", [["J-Pop", "j-pop"], ["K-Pop", "k-pop"], ["Mainstream", "mainstream"], ["Pop", "pop"], ["Schlager", "schlager"]]], ["Reggae/Dancehall", "#38302e", [["Dancehall", "dancehall"], ["Reggae", "reggae"]]], ["Regionální", "#282a3d", [["Africká", "african"], ["Albanian", "albanian"], ["Arabeska", "arabesk"], ["Arabská", "arabic"], ["Asijská", "asian"], ["Bossa Nova", "bossa nova"], ["Brazilská", "brazilian"], ["Čínská", "chinese"], ["Entexna", "entexna"], ["Ex-Yu", "ex-yu"], ["Francouzská", "french"], ["Holandská", "dutch"], ["Italská", "italian"], ["Karibská", "caribbean"], ["Laika", "laika"], ["Maďarská", "hungarian"], ["Malayalam", "malayalam"], ["Mexická", "mexican"], ["Německá", "german"], ["Nouvelle Chanson", "chanson"], ["Orientální", "oriental"], ["Perská", "persian"], ["Polská", "polish"], ["Portuguese", "portuguese"], ["Punjabi", "punjabi"], ["Rumunská", "romanian"], ["Ruská", "russian"], ["Russian Chanson", "russian chanson"], ["Řecká", "greek"], ["Sertanejo", "sertanejo"], ["Soca", "soca"], ["Španělská", "spanish"], ["Tamilská", "tamil"], ["Telugu", "telugu"], ["Turecká", "turkish"], ["Ukrajinská", "ukrainian"]]], ["Rock/Metal", "#33282a", [["Alternativní Rock", "alternative rock"], ["Gothic", "gothic"], ["Grunge", "grunge"], ["Hard Rock", "hard rock"], ["Indie Rock", "indie rock"], ["Klasický Rock", "classic rock"], ["Metal", "metal"], ["Pop-Rock", "pop rock"], ["Progresivní Rock", "progressive rock"], ["Punk", "punk"], ["Rock", "rock"], ["Rock n Roll", "rock and roll"], ["Rockabilly", "rockabilly"]]], ["Soul/R&B/Hip Hop", "#3a382e", [["Hip Hop", "hip hop"], ["R&B", "rnb"], ["Soul", "soul"]]], ["Sport", "#352828", "sport"], ["Studentská", "#2b3538", "college"], ["Taneční/Cvičení", "#2e3a2f", [["Cvičení", "workout"], ["Kizomba", "kizomba"], ["Taneční", "dance"]]], ["Tematické", "#3a2d2d", [["Artist", "artist"], ["Bollywood", "bollywood"], ["Eurovize", "eurovision"], ["Soundtrack", "soundtrack"]]], ["Vánoční", "#2c3639", "christmas"], ["Vážná hudba", "#392b2a", "classical"], ["Zprávy/Mluvené slovo", "#2a2c3b", "news"]];
@@ -44542,12 +44601,15 @@ async function radioGenreLoad(tag, name) {
 function _radioGenreMenuHtml() {
     const chip = (v, l) => '<span class="rsb-chip' + (radioGenreScope === v ? ' sel' : '') + '" onclick="radioGenreSetScope(\'' + v + '\')">' + l + '</span>';
     let h = '<div class="rsb-scope"><span>Země:</span>' + chip('', '🌍 Svět') + chip('CZ', '🇨🇿 CZ') + chip('SK', '🇸🇰 SK') + '</div><div class="rsb-gcols">';
-    RADIO_GENRES.forEach(g => {
+    const PAL = [['#34363a', '#d0d4da'], ['#40322a', '#e8c39d'], ['#2b3345', '#aec5ee'], ['#2c3e33', '#aedab6'], ['#3b2f40', '#dbb7e4'], ['#27393c', '#a3d9dc'], ['#402c31', '#eeaab6'], ['#3a3a2b', '#dedb9e'], ['#3b3835', '#dcd4c8']];
+    const nb = t => String(t).replace(/\//g, '/\u200b');
+    RADIO_GENRES.forEach((g, gi) => {
+        const pc = PAL[gi % PAL.length];
         const jt = x => String(x).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         if (typeof g[2] === 'string') {
-            h += '<div class="rsb-g" style="background:' + g[1] + '"><div class="rsb-gt tap" onclick="radioGenreLoad(\'' + jt(g[2]) + '\',\'' + jt(g[0]) + '\')">' + g[0] + '</div></div>';
+            h += '<div class="rsb-g" style="background:' + pc[0] + '"><div class="rsb-gt tap" style="color:' + pc[1] + ' !important" onclick="radioGenreLoad(\'' + jt(g[2]) + '\',\'' + jt(g[0]) + '\')">' + nb(g[0]) + '</div></div>';
         } else {
-            h += '<div class="rsb-g" style="background:' + g[1] + '"><div class="rsb-gt">' + g[0] + '</div>' + g[2].map(it => '<div class="rsb-gi" onclick="radioGenreLoad(\'' + jt(it[1]) + '\',\'' + jt(it[0]) + '\')">' + it[0] + '</div>').join('') + '</div>';
+            h += '<div class="rsb-g" style="background:' + pc[0] + '"><div class="rsb-gt" style="color:' + pc[1] + ' !important">' + nb(g[0]) + '</div>' + g[2].map(it => '<div class="rsb-gi" onclick="radioGenreLoad(\'' + jt(it[1]) + '\',\'' + jt(it[0]) + '\')">' + nb(it[0]) + '</div>').join('') + '</div>';
         }
     });
     return h + '</div>';
@@ -44601,12 +44663,18 @@ function radioMenuToggle(which) {
 function renderRadioGrid() {
     const grid = document.getElementById('radioGrid');
     if (!grid) return;
+    if (!RADIOS.length) {
+        grid.innerHTML = '<div style="width:100%;text-align:center;padding:26px 14px;opacity:.75;font-size:14px;line-height:1.5;">' + (radioState.country === 'fav' ? '⭐ Zatím žádná oblíbená rádia.<br>Podrž prst na stanici v jakémkoli seznamu a přidej ji do oblíbených.' : 'Žádné stanice.') + '</div>';
+        _radioUi(); return;
+    }
     grid.innerHTML = RADIOS.map((r, i) => `
         <div class="radio-item${radioState.current === i ? ' playing' : ''}" id="radio-item-${i}" onclick="playRadio(${i})">
+            ${radioIsFav(r) && radioState.country !== 'fav' ? '<span class="rp-star">⭐</span>' : ''}
             <div class="radio-item-emoji">${r.emoji}</div>
             <div class="radio-item-name">${r.name}</div>
             <div class="radio-item-genre">${r.genre}</div>
         </div>`).join('');
+    _radioBindLongPress();
     _radioUi();
 }
 
@@ -44665,6 +44733,7 @@ async function radioStart(idx, force) {
 }
 
 function playRadio(idx) {
+    if (Date.now() - (window._rpLpAt || 0) < 700) return;
     if (radioState.current === idx && (radioState.status === 'playing' || radioState.status === 'connecting' || radioState.status === 'buffering')) { stopRadio(); return; }
     radioStart(idx, false);
 }
