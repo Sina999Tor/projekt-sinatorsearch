@@ -7243,8 +7243,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-01d', date: '1. 11. 2026', items: [
+            '🎼 Online rádia: nová nabídka „Žánry“ (vedle seznamu a 🌐 Webu) — kategorie jako v jiných přehrávačích (Rock/Metal, Elektronická, Dekády, Džez/Blues, Latino, Lounge/Relax, Regionální, Vánoční…); po klepnutí na žánr se načtou nejpopulárnější funkční stanice z radio-browser.info, přepínač země 🌍 Svět / 🇨🇿 CZ / 🇸🇰 SK nahoře v nabídce',
+        ]},
+        { version: '2026-11-01c', date: '1. 11. 2026', items: [
+            '📻 Online rádia: výběr seznamu už není řada záložek, ale rozbalovací nabídka ▾ (🇨🇿 Česko, 🇸🇰 Slovensko, 🇵🇱 Polsko, 🇩🇪 Německo, 🇬🇧 Británie, 🌍 Chill & svět) — vybraný seznam se pamatuje; vedle je nabídka 🌐 Web se všemi externími zdroji (FMstream CZ/SK, MyOnlineRadio, Play.cz…). Mřížka stanic je menší (víc rádií na obrazovce) a přibylo přes 30 nových stanic (ČRo Jazz/Wave/D-dur/Pohoda, Hitrádio Orion/Magic, Rádio Devín, Patria, Twist, SomaFM, Radio Paradise a další)',
+        ]},
         { version: '2026-11-01b', date: '1. 11. 2026', items: [
-            '😴 Online rádia: nové tlačítko 😴 vedle ✕ — časovač vypnutí (5 / 15 / 30 / 60 min) nebo vypnutí v přesný čas (např. 23:30). Chytrý spánek (zapnutý ve výchozím stavu): posledních 45 s se hlasitost plynule ztlumí a když rádio sám zastavíš nebo pozastavíš, časovač se zruší. Zbývající čas je vidět na tlačítku 😴',
+            '😴 Online rádia: tlačítko 😴 vedle ✕ otevře časovač vypnutí — kolečka Hodiny / Minuty a VYBER; ⚙️ přepíná „Po uplynutí zadaného času“ / „V konkrétním čase“ a zapíná postupné snižování hlasitosti (chytrý spánek: posledních 45 s ztlumí, při ručním zastavení rádia se časovač zruší). Zbývající čas je vidět na tlačítku 😴',
         ]},
         { version: '2026-11-01', date: '1. 11. 2026', items: [
             '📻 Online rádia: nahoře je mini přehrávač (⏮ ▶/⏸ ⏹ ⏭ + stavový řádek „Připojuji… / Hraje / Nefunguje“); streamy se vyhledávají přes radio-browser.info jako ověřené HTTPS (starší http adresy v appce nešly přehrát), když jeden stream selže, zkusí se automaticky další a při chybě už přehrávač nezůstane viset. Přibyly stanice (ČRo Plus, Proglas, Jemné, Anténa Rock, Lumen), ovládání funguje i z uzamčené obrazovky',
@@ -24013,7 +24019,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <div class="radio-modal-header">
             <h3>📻 Online rádia</h3>
             <div style="display:flex;gap:8px;align-items:center;">
-<button id="radioSleepBtn" onclick="radioSleepTogglePanel()" title="Časovač vypnutí / chytrý spánek" style="background:none;border:1px solid var(--border);color:var(--text);min-width:30px;height:30px;padding:0 8px;border-radius:15px;cursor:pointer;font-size:0.8rem;">😴</button>
+<button id="radioSleepBtn" onclick="radioSleepOpen()" title="Časovač vypnutí / chytrý spánek" style="background:none;border:1px solid var(--border);color:var(--text);min-width:30px;height:30px;padding:0 8px;border-radius:15px;cursor:pointer;font-size:0.8rem;">😴</button>
 <button onclick="closeRadioModal()" style="background:none;border:1px solid var(--border);color:var(--text);width:30px;height:30px;border-radius:50%;cursor:pointer;">✕</button>
             </div>
         </div>
@@ -24027,39 +24033,13 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             <div class="rp-st"><span id="radioStatusIcon">⏹</span><span class="radio-now-playing-name" id="radioNowName">Vyber stanici</span></div>
             <button id="radioAltBtn" style="display:none"></button>
         </div>
-        <div id="radioSleepPanel" style="display:none;padding:10px 12px;border-bottom:1px solid var(--border,#26304d);background:rgba(255,255,255,0.03);font-size:0.85rem;">
-            <div id="radioSleepStat" style="font-weight:700;color:var(--gold,#ffd700);min-height:1.3em;margin-bottom:6px;">Časovač není nastaven</div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
-                <button class="rs-b" onclick="radioSleepStart(5)">5 min</button>
-                <button class="rs-b" onclick="radioSleepStart(15)">15 min</button>
-                <button class="rs-b" onclick="radioSleepStart(30)">30 min</button>
-                <button class="rs-b" onclick="radioSleepStart(60)">60 min</button>
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;">
-                <span>Vypnout v</span>
-                <input type="time" id="radioSleepTime" style="background:var(--bg-elevated,#1b2340);color:var(--text,#fff);border:1px solid var(--border,#26304d);border-radius:8px;padding:6px 8px;font-size:0.9rem;">
-                <button class="rs-b rs-go" onclick="radioSleepAtTime()">Nastavit</button>
-                <button class="rs-b" onclick="radioSleepCancel()">Zrušit</button>
-            </div>
-            <label style="display:flex;gap:6px;align-items:flex-start;cursor:pointer;"><input type="checkbox" id="radioSleepSmart" onchange="radioSleepSetSmart(this.checked)" style="margin-top:3px;"><span>🧠 Chytrý spánek — posledních 45 s plynule ztlumí hlasitost; když rádio ručně zastavíš nebo pozastavíš, časovač se zruší</span></label>
-        </div>
         <audio id="radioAudio" preload="none"></audio>
-        <div class="radio-source-tabs" id="radioSourceTabs">
-            <span class="radio-source-tab active" onclick="switchRadioCountry('cz')">🇨🇿 CZ</span>
-            <span class="radio-source-tab" onclick="switchRadioCountry('sk')">🇸🇰 SK</span>
-            <a class="radio-source-tab" href="http://nossl.fmstream.org/index.php?c=CZE&o=top" target="_blank">📻 FMstream CZ ↗</a>
-            <a class="radio-source-tab" href="http://nossl.fmstream.org/index.php?c=SVK&o=top" target="_blank">📻 FMstream SK ↗</a>
-            <a class="radio-source-tab" href="https://myonlineradio.cz/online-radia/2" target="_blank">MyOnlineRadio ↗</a>
-            <a class="radio-source-tab" href="http://nossl.fmstream.org/index.php?c=CZE&o=top" target="_blank">FMstream CZ ↗</a>
-            <a class="radio-source-tab" href="http://nossl.fmstream.org/index.php?c=SVK&o=top" target="_blank">FMstream SK ↗</a>
-            <a class="radio-source-tab" href="https://ceskaradiaonline.cz/" target="_blank">ČeskáRádiaOnline ↗</a>
-            <a class="radio-source-tab" href="https://www.play.cz/" target="_blank">Play.cz ↗</a>
-            <a class="radio-source-tab" href="https://www.radiaonline.org/" target="_blank">RádiaOnline ↗</a>
-            <a class="radio-source-tab" href="https://radia-online.com/" target="_blank">Radia-online ↗</a>
-            <a class="radio-source-tab" href="https://radia.cz/radia" target="_blank">Radia.cz ↗</a>
-            <a class="radio-source-tab" href="https://www.radia.sk/radia" target="_blank">Radia.sk ↗</a>
-            <a class="radio-source-tab" href="https://megaradio.cz/" target="_blank">MegaRadio ↗</a>
+        <div class="rsb-bar" id="radioSourceTabs">
+            <button class="rsb-btn" id="rsbListBtn" onclick="radioMenuToggle('list')"><span id="rsbListLabel">🇨🇿 Česko</span><span class="rsb-arr">▾</span></button>
+            <button class="rsb-btn" id="rsbGenreBtn" onclick="radioMenuToggle('genre')"><span id="rsbGenreLabel">🎼 Žánry</span><span class="rsb-arr">▾</span></button>
+            <button class="rsb-btn" id="rsbWebBtn" onclick="radioMenuToggle('web')"><span>🌐 Web</span><span class="rsb-arr">▾</span></button>
         </div>
+        <div class="rsb-menu" id="radioMenu" style="display:none"></div>
         <div class="radio-grid" id="radioGrid"></div>
     </div>
 </div>
@@ -44323,6 +44303,20 @@ const RADIOS_CZ = [
     { name:'Radio 1',         genre:'Alternativa',   emoji:'🌀', q:'Radio 1',      tk:['radio','1'],         stream:'https://icecast.actve.net/radio1-128' },
     { name:'Expres FM',       genre:'Pop',           emoji:'⚡', q:'Expres',       tk:['expres'],            stream:'https://icecast2.play.cz/expres128.mp3' },
     { name:'Radio Proglas',   genre:'Kultura / Duchovno', emoji:'🕊️', q:'Proglas', tk:['proglas'],           stream:'https://mp3.proglas.cz/proglas128.mp3' },
+    { name:'ČRo Jazz',       genre:'Jazz',          emoji:'🎷', q:'Jazz',         tk:['jazz'],              stream:'https://rozhlas.stream/jazz-high.mp3' },
+    { name:'ČRo Wave',        genre:'Alternativa',   emoji:'🌊', q:'Wave',         tk:['wave'],              stream:'https://rozhlas.stream/wave-high.mp3' },
+    { name:'ČRo D-dur',       genre:'Klasika',       emoji:'🎻', q:'D-dur',        tk:['dur'],               stream:'https://rozhlas.stream/ddur-high.mp3' },
+    { name:'ČRo Pohoda',      genre:'Pohoda / Mix',  emoji:'☀️', q:'Pohoda',       tk:['pohoda'],            stream:'https://rozhlas.stream/pohoda-high.mp3' },
+    { name:'ČRo Junior',      genre:'Pro děti',      emoji:'🧸', q:'Junior',       tk:['junior'],            stream:'' },
+    { name:'Hitrádio Orion',  genre:'Pop / Hity',    emoji:'🌟', q:'Orion',        tk:['orion'],             stream:'' },
+    { name:'Hitrádio Magic',  genre:'Pop / Oldies',  emoji:'✨', q:'Magic',        tk:['magic'],             stream:'' },
+    { name:'Hitrádio FM Plus',genre:'Pop / Hity',    emoji:'➕', q:'FM Plus',      tk:['plus'],              stream:'' },
+    { name:'Radio Haná',      genre:'Morava',        emoji:'🌾', q:'Hana',         tk:['hana'],              stream:'' },
+    { name:'Radio Dechovka',  genre:'Dechovka',      emoji:'🎺', q:'Dechovka',     tk:['dechovka'],          stream:'' },
+    { name:'Radio Černá Hora',genre:'Pop / Folk',    emoji:'⛰️', q:'Cerna Hora',   tk:['cerna','hora'],      stream:'' },
+    { name:'Classic Praha',   genre:'Klasika',       emoji:'🎼', q:'Classic',      tk:['classic'],           stream:'' },
+    { name:'Rádio Golem',     genre:'Alternativa',   emoji:'🗿', q:'Golem',        tk:['golem'],             stream:'' },
+    { name:'Radio Petrov',    genre:'Morava / Pop',  emoji:'🏞️', q:'Petrov',       tk:['petrov'],            stream:'' },
 ];
 
 const RADIOS_SK = [
@@ -44339,6 +44333,76 @@ const RADIOS_SK = [
     { name:'Jemné',           genre:'Soft / Relax',  emoji:'🌸', q:'Jemne',        tk:['jemne'],       stream:'' },
     { name:'Anténa Rock',     genre:'Rock',          emoji:'🤘', q:'Antena Rock',  tk:['antena','rock'], stream:'' },
     { name:'Rádio Lumen',     genre:'Duchovno',      emoji:'🕯️', q:'Lumen',        tk:['lumen'],       stream:'' },
+    { name:'Rádio Devín',     genre:'Kultúra',       emoji:'🎼', q:'Devin',        tk:['devin'],       stream:'https://stream.srr.sk/devin_128.mp3' },
+    { name:'Rádio Patria',    genre:'Národnosti',    emoji:'🌍', q:'Patria',       tk:['patria'],      stream:'' },
+    { name:'Rádio Litera',    genre:'Literatúra',    emoji:'📚', q:'Litera',       tk:['litera'],      stream:'' },
+    { name:'Rádio Head',      genre:'Alternatíva',   emoji:'🎧', q:'Radio Head',   tk:['head'],        stream:'' },
+    { name:'Rádio Twist',     genre:'Pop / Hity',    emoji:'🌀', q:'Twist',        tk:['twist'],       stream:'' },
+    { name:'Rádio Melody',    genre:'Šlágre',        emoji:'🎶', q:'Melody',       tk:['melody'],      stream:'' },
+    { name:'Rádio Okey',      genre:'Pop',           emoji:'👌', q:'Okey',         tk:['okey'],        stream:'' },
+    { name:'Rádio Kiss SK',   genre:'Pop / Dance',   emoji:'💋', q:'Kiss',         tk:['kiss'],        stream:'' },
+];
+
+// Seznamy stanic (výběr přes rozbalovací nabídku) — cc = země pro radio-browser ('' = celý svět)
+const RADIOS_PL = [
+    { name:'RMF FM',          genre:'Pop / Hity',    emoji:'🎵', q:'RMF FM',       tk:['rmf','fm'],    stream:'' },
+    { name:'Radio ZET',       genre:'Pop / Zprávy',  emoji:'⚡', q:'Zet',          tk:['zet'],         stream:'' },
+    { name:'Radio Eska',      genre:'Pop / Hity',    emoji:'🎤', q:'Eska',         tk:['eska'],        stream:'' },
+    { name:'Antyradio',       genre:'Rock',          emoji:'🤘', q:'Antyradio',    tk:['antyradio'],   stream:'' },
+    { name:'Polskie Radio Trójka', genre:'Kultura / Hudba', emoji:'3️⃣', q:'Trojka', tk:['trojka'],      stream:'' },
+    { name:'VOX FM',          genre:'Pop / Dance',   emoji:'🔊', q:'VOX FM',       tk:['vox'],         stream:'' },
+    { name:'Radio WAWA',      genre:'Pop',           emoji:'🌟', q:'Wawa',         tk:['wawa'],        stream:'' },
+    { name:'Chillizet',       genre:'Chill',         emoji:'🧊', q:'Chillizet',    tk:['chillizet'],   stream:'' },
+];
+const RADIOS_DE = [
+    { name:'Antenne Bayern',  genre:'Pop / Rock',    emoji:'🥨', q:'Antenne Bayern', tk:['antenne','bayern'], stream:'https://stream.antenne.de/antenne' },
+    { name:'Rock Antenne',    genre:'Rock',          emoji:'🎸', q:'Rock Antenne', tk:['rock','antenne'], stream:'' },
+    { name:'Bayern 3',        genre:'Pop',           emoji:'🏔️', q:'Bayern 3',     tk:['bayern','3'],  stream:'' },
+    { name:'SWR3',            genre:'Pop / Rock',    emoji:'📻', q:'SWR3',         tk:['swr3'],        stream:'' },
+    { name:'1LIVE',           genre:'Pop / Hity',    emoji:'1️⃣', q:'1LIVE',        tk:['1live'],       stream:'' },
+    { name:'Radio Bob',       genre:'Rock',          emoji:'🤟', q:'Radio Bob',    tk:['bob'],         stream:'' },
+    { name:'Deutschlandfunk', genre:'Zprávy / Kultura', emoji:'📰', q:'Deutschlandfunk', tk:['deutschlandfunk'], stream:'' },
+    { name:'WDR 2',           genre:'Pop / Zprávy',  emoji:'🎙️', q:'WDR 2',        tk:['wdr','2'],     stream:'' },
+];
+const RADIOS_GB = [
+    { name:'BBC Radio 1',     genre:'Pop / Dance',   emoji:'1️⃣', q:'BBC Radio 1',  tk:['bbc','radio','1'], no:['xtra','dance','relax','anthems'], stream:'' },
+    { name:'BBC Radio 2',     genre:'Pop / Mix',     emoji:'2️⃣', q:'BBC Radio 2',  tk:['bbc','radio','2'], stream:'' },
+    { name:'BBC Radio 6 Music', genre:'Alternativa', emoji:'6️⃣', q:'BBC 6 Music',  tk:['bbc','6','music'], stream:'' },
+    { name:'BBC World Service', genre:'Zprávy',      emoji:'🌐', q:'BBC World Service', tk:['bbc','world','service'], stream:'' },
+    { name:'Classic FM',      genre:'Klasika',       emoji:'🎻', q:'Classic FM',   tk:['classic','fm'], stream:'' },
+    { name:'Absolute Radio',  genre:'Rock / Pop',    emoji:'🎸', q:'Absolute Radio', tk:['absolute','radio'], no:['80s','90s','60s','70s','00s','classic'], stream:'' },
+    { name:'Capital FM',      genre:'Pop / Hity',    emoji:'🏙️', q:'Capital',      tk:['capital'],     stream:'' },
+    { name:'LBC',             genre:'Talk',          emoji:'🗣️', q:'LBC',          tk:['lbc'],         stream:'' },
+];
+const RADIOS_WORLD = [
+    { name:'SomaFM Groove Salad', genre:'Chill / Ambient', emoji:'🥗', q:'Groove Salad', tk:['groove','salad'], stream:'https://ice1.somafm.com/groovesalad-128-mp3' },
+    { name:'SomaFM Drone Zone',   genre:'Ambient',     emoji:'🌌', q:'Drone Zone',   tk:['drone','zone'],  stream:'https://ice1.somafm.com/dronezone-128-mp3' },
+    { name:'SomaFM Secret Agent', genre:'Lounge',      emoji:'🕵️', q:'Secret Agent', tk:['secret','agent'], stream:'https://ice1.somafm.com/secretagent-128-mp3' },
+    { name:'Radio Paradise',  genre:'Eclectic',      emoji:'🌴', q:'Radio Paradise', tk:['paradise'],  stream:'https://stream.radioparadise.com/mp3-128' },
+    { name:'RP Mellow Mix',   genre:'Mellow',        emoji:'🌅', q:'Radio Paradise Mellow', tk:['paradise','mellow'], stream:'https://stream.radioparadise.com/mellow-128' },
+    { name:'Chillhop',        genre:'Lo-fi / Chill', emoji:'☕', q:'Chillhop',     tk:['chillhop'],    stream:'https://streams.fluxfm.de/Chillhop/mp3-128/' },
+    { name:'KEXP',            genre:'Indie / Alt',   emoji:'🎧', q:'KEXP',         tk:['kexp'],        stream:'https://kexp.streamguys1.com/kexp160.aac' },
+    { name:'Jazz24',          genre:'Jazz',          emoji:'🎷', q:'Jazz24',       tk:['jazz24'],      stream:'' },
+];
+const RADIO_LISTS = {
+    cz:    { label: '🇨🇿 Česko',     cc: 'CZ', items: RADIOS_CZ },
+    sk:    { label: '🇸🇰 Slovensko', cc: 'SK', items: RADIOS_SK },
+    pl:    { label: '🇵🇱 Polsko',    cc: 'PL', items: RADIOS_PL },
+    de:    { label: '🇩🇪 Německo',   cc: 'DE', items: RADIOS_DE },
+    gb:    { label: '🇬🇧 Británie',  cc: 'GB', items: RADIOS_GB },
+    world: { label: '🌍 Chill & svět', cc: '',  items: RADIOS_WORLD },
+};
+const RADIO_WEB = [
+    { n: 'FMstream CZ', u: 'http://nossl.fmstream.org/index.php?c=CZE&o=top' },
+    { n: 'FMstream SK', u: 'http://nossl.fmstream.org/index.php?c=SVK&o=top' },
+    { n: 'MyOnlineRadio', u: 'https://myonlineradio.cz/online-radia/2' },
+    { n: 'ČeskáRádiaOnline', u: 'https://ceskaradiaonline.cz/' },
+    { n: 'Play.cz', u: 'https://www.play.cz/' },
+    { n: 'RádiaOnline', u: 'https://www.radiaonline.org/' },
+    { n: 'Radia-online', u: 'https://radia-online.com/' },
+    { n: 'Radia.cz', u: 'https://radia.cz/radia' },
+    { n: 'Radia.sk', u: 'https://www.radia.sk/radia' },
+    { n: 'MegaRadio', u: 'https://megaradio.cz/' },
 ];
 let RADIOS = RADIOS_CZ;
 let radioState = { current: null, country: 'cz', status: 'idle', token: 0, retries: 0 };
@@ -44360,12 +44424,13 @@ function _radioCacheSet(c) { try { localStorage.setItem('sinator_radio_urls_v2',
 
 // Vrátí seznam kandidátních streamů (HTTPS, ověřené radio-browserem) + vestavěný záložní stream
 async function radioResolve(r, country, force) {
+    if (r.urls && r.urls.length) return r.urls;
     const key = country + '|' + r.name, cache = _radioCacheGet(), now = Date.now();
     if (!force && cache[key] && now - cache[key].t < 24 * 3600 * 1000 && cache[key].urls.length) return cache[key].urls;
     const urls = [];
     const add = u => { if (!u || urls.indexOf(u) >= 0) return; if (location.protocol === 'https:' && !/^https:/i.test(u)) return; urls.push(u); };
     try {
-        const list = await _rbFetch('/json/stations/search?name=' + encodeURIComponent(r.q || r.name) + '&countrycode=' + country.toUpperCase() + '&hidebroken=true&order=clickcount&reverse=true&limit=25');
+        const list = await _rbFetch('/json/stations/search?name=' + encodeURIComponent(r.q || r.name) + ((RADIO_LISTS[country] || {}).cc ? '&countrycode=' + RADIO_LISTS[country].cc : '') + '&hidebroken=true&order=clickcount&reverse=true&limit=25');
         const words = x => _rbNorm(x).split(/[^a-z0-9]+/).filter(Boolean);
         const ok = list.filter(st => {
             if (st.lastcheckok === 0) return false;
@@ -44388,7 +44453,26 @@ function _rpCss() {
         + '.rp-ctl button{background:var(--bg-elevated,#1b2340);color:var(--text,#fff);border:1px solid var(--border,#26304d);border-radius:10px;min-width:44px;height:36px;font-size:1.05rem;cursor:pointer;}'
         + '.rp-ctl button.rp-main{min-width:64px;background:#e11d48;border-color:#e11d48;color:#fff;font-weight:700;}'
         + '.rp-st{display:flex;align-items:center;gap:8px;font-size:0.85rem;min-height:1.4em;}.rp-st span:last-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
-        + '.radio-item.rp-bad{opacity:.55;}';
+        + '.radio-item.rp-bad{opacity:.55;}'
+        + '.rsb-bar{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border,#26304d);}'
+        + '.rsb-btn{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:4px;background:var(--bg-elevated,#1b2340);color:var(--text,#fff);border:1px solid var(--border,#26304d);border-radius:12px;padding:9px 8px;font-size:0.8rem;font-weight:600;cursor:pointer;}.rsb-btn span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+        + '.rsb-btn.open{border-color:#e11d48;}.rsb-btn.open .rsb-arr{transform:rotate(180deg);}.rsb-arr{transition:transform .15s;opacity:.8;}'
+        + '.rsb-menu{padding:6px 12px 8px;border-bottom:1px solid var(--border,#26304d);background:rgba(255,255,255,0.03);max-height:42vh;overflow-y:auto;}'
+        + '.rsb-opt{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 12px;margin:3px 0;border-radius:10px;background:var(--bg-elevated,#1b2340);color:var(--text,#fff);text-decoration:none;font-size:0.92rem;cursor:pointer;border:1px solid transparent;}'
+        + '.rsb-opt.sel{border-color:#e11d48;}.rsb-meta{opacity:.7;font-size:0.8rem;}.rsb-hint{font-size:0.75rem;opacity:.65;padding:4px 4px 2px;}'
+        + '#radioGrid{display:grid !important;grid-template-columns:repeat(auto-fill,minmax(98px,1fr)) !important;gap:7px !important;padding:8px 10px !important;align-content:start;}'
+        + '#radioGrid .radio-item{padding:8px 4px !important;min-height:0 !important;border-radius:12px !important;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:2px;}'
+        + '#radioGrid .radio-item-emoji{font-size:1.45rem !important;margin:0 !important;line-height:1.1;}'
+        + '#radioGrid .radio-item-name{font-size:0.74rem !important;line-height:1.15 !important;word-break:break-word;}'
+        + '#radioGrid .radio-item-genre{font-size:0.6rem !important;line-height:1.1 !important;opacity:.75;}'
+        + '#radioGrid .radio-item-live{font-size:0.6rem !important;}'
+        + '.rsb-menu:has(.rsb-gcols){max-height:60vh;}'
+        + '.rsb-scope{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 2px 8px;font-size:0.8rem;opacity:.95;}'
+        + '.rsb-chip{padding:5px 10px;border-radius:14px;background:var(--bg-elevated,#1b2340);border:1px solid var(--border,#26304d);cursor:pointer;}.rsb-chip.sel{border-color:#e11d48;background:#e11d48;color:#fff;}'
+        + '.rsb-gcols{column-count:2;column-gap:8px;}'
+        + '.rsb-g{break-inside:avoid;border-radius:18px;padding:8px 6px;margin-bottom:8px;color:var(--text,#fff);}'
+        + '.rsb-gt{font-size:0.95rem;padding:6px 8px 4px;font-weight:500;}.rsb-gt.tap{cursor:pointer;padding:8px;}'
+        + '.rsb-gi{font-size:0.88rem;padding:8px 8px;opacity:.9;cursor:pointer;border-radius:8px;}.rsb-gi:active{background:rgba(255,255,255,0.12);}';
     document.head.appendChild(st);
 }
 function _radioUi() {
@@ -44418,22 +44502,98 @@ function _radioUi() {
     } catch (e) {}
 }
 
+// -- ŽÁNRY (kategorie) — stanice podle tagu z radio-browser.info ------------------
+const RADIO_GENRES = [["Country/Bluegrass", "#2f3138", [["Bluegrass", "bluegrass"], ["Country", "country"]]], ["Dětská", "#2d2a2a", "kids"], ["Disco/Funk", "#352b29", [["Disco", "disco"], ["Funk", "funk"]]], ["Džez/Blues", "#363638", [["Blues", "blues"], ["Džez", "jazz"], ["Smooth Jazz", "smooth jazz"], ["Swing", "swing"]]], ["Folk", "#262b3a", [["Keltská", "celtic"], ["World", "world music"], ["Folk", "folk"]]], ["Dekády", "#35293a", [["2010s", "2010s"], ["Čtyřicátky", "40s"], ["Devadesátky", "90s"], ["Milénium", "2000s"], ["Osmdesátky", "80s"], ["Padesátky", "50s"], ["Sedmdesátky", "70s"], ["Šedesátky", "60s"]]], ["Eklektické/Sofistikovaná", "#2c2838", [["Eklektické", "eclectic"], ["Sofistikovaná", "easy listening"]]], ["Elektronická", "#26262b", [["Drum and Bass", "drum and bass"], ["Dubstep", "dubstep"], ["EDM", "edm"], ["Electro", "electro"], ["Hardstyle", "hardstyle"], ["House", "house"], ["Progresivní", "progressive"], ["Techno", "techno"], ["Trance", "trance"], ["UK Garage", "uk garage"]]], ["Humor", "#2b2840", "humor"], ["Latino", "#2b3538", [["Bachata", "bachata"], ["Cubaton", "cubaton"], ["Flamengo", "flamenco"], ["Latin Pop", "latin pop"], ["Merengue", "merengue"], ["Reggaeton", "reggaeton"], ["Salsa", "salsa"], ["Tango", "tango"], ["Tropical", "tropical"]]], ["Lounge/Relax", "#392d2c", [["Ambientní", "ambient"], ["Chillout", "chillout"], ["Lounge", "lounge"], ["Relax", "relax"]]], ["Milostná/Balady", "#2e3a2f", [["Balady", "ballads"], ["Milostná", "love songs"]]], ["Náboženské", "#3a2d2d", [["Catholic", "catholic"], ["Gospel", "gospel"], ["Islámská", "islamic"], ["Judaismus", "jewish"], ["Křesťanská", "christian"], ["Křesťanská hudba", "christian music"], ["Pravoslaví", "orthodox"], ["Protestantismus", "protestant"]]], ["Oldies/Hity", "#282a3d", [["Hity", "hits"], ["Oldies", "oldies"]]], ["Populární muzika", "#2c363b", [["J-Pop", "j-pop"], ["K-Pop", "k-pop"], ["Mainstream", "mainstream"], ["Pop", "pop"], ["Schlager", "schlager"]]], ["Reggae/Dancehall", "#38302e", [["Dancehall", "dancehall"], ["Reggae", "reggae"]]], ["Regionální", "#282a3d", [["Africká", "african"], ["Albanian", "albanian"], ["Arabeska", "arabesk"], ["Arabská", "arabic"], ["Asijská", "asian"], ["Bossa Nova", "bossa nova"], ["Brazilská", "brazilian"], ["Čínská", "chinese"], ["Entexna", "entexna"], ["Ex-Yu", "ex-yu"], ["Francouzská", "french"], ["Holandská", "dutch"], ["Italská", "italian"], ["Karibská", "caribbean"], ["Laika", "laika"], ["Maďarská", "hungarian"], ["Malayalam", "malayalam"], ["Mexická", "mexican"], ["Německá", "german"], ["Nouvelle Chanson", "chanson"], ["Orientální", "oriental"], ["Perská", "persian"], ["Polská", "polish"], ["Portuguese", "portuguese"], ["Punjabi", "punjabi"], ["Rumunská", "romanian"], ["Ruská", "russian"], ["Russian Chanson", "russian chanson"], ["Řecká", "greek"], ["Sertanejo", "sertanejo"], ["Soca", "soca"], ["Španělská", "spanish"], ["Tamilská", "tamil"], ["Telugu", "telugu"], ["Turecká", "turkish"], ["Ukrajinská", "ukrainian"]]], ["Rock/Metal", "#33282a", [["Alternativní Rock", "alternative rock"], ["Gothic", "gothic"], ["Grunge", "grunge"], ["Hard Rock", "hard rock"], ["Indie Rock", "indie rock"], ["Klasický Rock", "classic rock"], ["Metal", "metal"], ["Pop-Rock", "pop rock"], ["Progresivní Rock", "progressive rock"], ["Punk", "punk"], ["Rock", "rock"], ["Rock n Roll", "rock and roll"], ["Rockabilly", "rockabilly"]]], ["Soul/R&B/Hip Hop", "#3a382e", [["Hip Hop", "hip hop"], ["R&B", "rnb"], ["Soul", "soul"]]], ["Sport", "#352828", "sport"], ["Studentská", "#2b3538", "college"], ["Taneční/Cvičení", "#2e3a2f", [["Cvičení", "workout"], ["Kizomba", "kizomba"], ["Taneční", "dance"]]], ["Tematické", "#3a2d2d", [["Artist", "artist"], ["Bollywood", "bollywood"], ["Eurovize", "eurovision"], ["Soundtrack", "soundtrack"]]], ["Vánoční", "#2c3639", "christmas"], ["Vážná hudba", "#392b2a", "classical"], ["Zprávy/Mluvené slovo", "#2a2c3b", "news"]];
+let radioGenreScope = ''; try { radioGenreScope = localStorage.getItem('sinator_radio_genre_scope') || ''; } catch (e) {}
+function radioGenreSetScope(sc) {
+    radioGenreScope = sc; try { localStorage.setItem('sinator_radio_genre_scope', sc); } catch (e) {}
+    if (radioState.genreTag && radioState.country === 'genre') { radioGenreLoad(radioState.genreTag, radioState.genreName); }
+    else { const m = document.getElementById('radioMenu'); if (m && m.dataset.open === 'genre') { m.dataset.open = ''; radioMenuToggle('genre'); } }
+}
+async function radioGenreLoad(tag, name) {
+    radioMenuClose();
+    radioState.genreTag = tag; radioState.genreName = name;
+    const gl = document.getElementById('rsbGenreLabel'); if (gl) gl.textContent = '🎼 ' + name;
+    const grid = document.getElementById('radioGrid');
+    if (grid) grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px;opacity:.7;">Hledám stanice — ' + name + '…</div>';
+    let items = [];
+    try {
+        const list = await _rbFetch('/json/stations/search?tag=' + encodeURIComponent(tag) + '&tagExact=true' + (radioGenreScope ? '&countrycode=' + radioGenreScope : '') + '&hidebroken=true&order=clickcount&reverse=true&limit=80');
+        const seen = {};
+        list.forEach(st => {
+            if (st.lastcheckok === 0) return;
+            const nm = String(st.name || '').replace(/\s+/g, ' ').trim(); if (!nm) return;
+            const key = _rbNorm(nm).replace(/[^a-z0-9]/g, ''); if (!key || seen[key]) return;
+            const urls = []; [st.url_resolved, st.url].forEach(u => { if (u && urls.indexOf(u) < 0 && (location.protocol !== 'https:' || /^https:/i.test(u))) urls.push(u); });
+            if (!urls.length) return;
+            seen[key] = 1;
+            items.push({ name: nm.length > 30 ? nm.slice(0, 29) + '…' : nm, genre: name + (st.countrycode ? ' · ' + st.countrycode : ''), emoji: '📻', q: nm, tk: [], urls: urls, _hls: !!st.hls });
+        });
+        items.sort((a, b) => (a._hls ? 1 : 0) - (b._hls ? 1 : 0));
+        items = items.slice(0, 48);
+    } catch (e) { items = []; }
+    RADIO_LISTS.genre = { label: '🎼 ' + name, cc: '', items: items };
+    if (radioState.playCountry === 'genre') radioState.playCountry = 'genre~'; // jiný žánr = jiné pozice v mřížce
+    switchRadioCountry('genre');
+    if (!items.length && grid) { const g2 = document.getElementById('radioGrid'); if (g2) g2.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px;opacity:.75;">Nic nenalezeno 😕<br>Zkus v nabídce žánrů přepnout zemi na 🌍 Svět.</div>'; }
+}
+function _radioGenreMenuHtml() {
+    const chip = (v, l) => '<span class="rsb-chip' + (radioGenreScope === v ? ' sel' : '') + '" onclick="radioGenreSetScope(\'' + v + '\')">' + l + '</span>';
+    let h = '<div class="rsb-scope"><span>Země:</span>' + chip('', '🌍 Svět') + chip('CZ', '🇨🇿 CZ') + chip('SK', '🇸🇰 SK') + '</div><div class="rsb-gcols">';
+    RADIO_GENRES.forEach(g => {
+        const jt = x => String(x).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        if (typeof g[2] === 'string') {
+            h += '<div class="rsb-g" style="background:' + g[1] + '"><div class="rsb-gt tap" onclick="radioGenreLoad(\'' + jt(g[2]) + '\',\'' + jt(g[0]) + '\')">' + g[0] + '</div></div>';
+        } else {
+            h += '<div class="rsb-g" style="background:' + g[1] + '"><div class="rsb-gt">' + g[0] + '</div>' + g[2].map(it => '<div class="rsb-gi" onclick="radioGenreLoad(\'' + jt(it[1]) + '\',\'' + jt(it[0]) + '\')">' + it[0] + '</div>').join('') + '</div>';
+        }
+    });
+    return h + '</div>';
+}
+
 function switchRadioCountry(country) {
-    RADIOS = country === 'sk' ? RADIOS_SK : RADIOS_CZ;
+    if (!RADIO_LISTS[country]) country = 'cz';
+    RADIOS = RADIO_LISTS[country].items;
     radioState.country = country;
-    document.querySelectorAll('.radio-source-tab').forEach(t => t.classList.remove('active'));
-    const tabs = document.querySelectorAll('.radio-source-tab');
-    tabs[country === 'sk' ? 1 : 0].classList.add('active');
-    // přehrávání jiné země nechám běžet; označení v mřížce jen u stejné země
+    if (country !== 'genre') {
+        radioState.listKey = country; radioState.genreTag = null;
+        try { localStorage.setItem('sinator_radio_list', country); } catch (e) {}
+        const lab = document.getElementById('rsbListLabel'); if (lab) lab.textContent = RADIO_LISTS[country].label;
+        const gl = document.getElementById('rsbGenreLabel'); if (gl) gl.textContent = '🎼 Žánry';
+    }
+    // přehrávání jiného seznamu nechám běžet; označení v mřížce jen u stejného seznamu
     if (radioState.playCountry && radioState.playCountry !== country) radioState.current = null;
     else if (radioState.playCountry === country) radioState.current = radioState.playIdx;
+    radioMenuClose();
     renderRadioGrid();
 }
 
-function setRadioSource(src) {
-    document.querySelectorAll('.radio-source-tab').forEach(t => t.classList.remove('active'));
-    const tab = document.querySelector(`.radio-source-tab[onclick*="${src}"]`);
-    if(tab) tab.classList.add('active');
+function setRadioSource(src) { /* zachováno kvůli kompatibilitě — zdroje jsou nově v nabídce 🌐 Web */ }
+
+function radioMenuClose() {
+    const m = document.getElementById('radioMenu'); if (m) { m.style.display = 'none'; m.dataset.open = ''; }
+    document.querySelectorAll('.rsb-btn').forEach(b => b.classList.remove('open'));
+}
+function radioMenuToggle(which) {
+    const m = document.getElementById('radioMenu'); if (!m) return;
+    if (m.dataset.open === which) { radioMenuClose(); return; }
+    radioMenuClose();
+    if (which === 'list') {
+        m.innerHTML = Object.keys(RADIO_LISTS).filter(k => k !== 'genre').map(k => {
+            const L = RADIO_LISTS[k], cur = radioState.country === k;
+            const playing = radioState.playCountry === k && (radioState.status === 'playing' || radioState.status === 'buffering' || radioState.status === 'connecting');
+            return '<div class="rsb-opt' + (cur ? ' sel' : '') + '" onclick="switchRadioCountry(\'' + k + '\')"><span>' + L.label + '</span><span class="rsb-meta">' + (playing ? '🔊 ' : '') + L.items.length + (cur ? ' ✓' : '') + '</span></div>';
+        }).join('');
+        document.getElementById('rsbListBtn').classList.add('open');
+    } else if (which === 'genre') {
+        m.innerHTML = _radioGenreMenuHtml();
+        document.getElementById('rsbGenreBtn').classList.add('open');
+    } else {
+        m.innerHTML = '<div class="rsb-hint">Další zdroje rádií na webu (otevře se v prohlížeči)</div>' + RADIO_WEB.map(w =>
+            '<a class="rsb-opt" href="' + w.u + '" target="_blank" rel="noopener" onclick="radioMenuClose()"><span>' + w.n + '</span><span class="rsb-meta">↗</span></a>').join('');
+        document.getElementById('rsbWebBtn').classList.add('open');
+    }
+    m.dataset.open = which; m.style.display = 'block';
 }
 
 function renderRadioGrid() {
@@ -44450,7 +44610,8 @@ function renderRadioGrid() {
 
 function openRadioModal() {
     _rpCss();
-    renderRadioGrid();
+    let _sv = 'cz'; try { _sv = localStorage.getItem('sinator_radio_list') || 'cz'; } catch (e) {}
+    if (RADIO_LISTS[_sv] && _sv !== 'genre' && radioState.country !== _sv && radioState.country !== 'genre') { switchRadioCountry(_sv); } else { const lab = document.getElementById('rsbListLabel'); if (lab) lab.textContent = RADIO_LISTS[radioState.listKey || _sv].label; radioMenuClose(); renderRadioGrid(); }
     document.getElementById('radioModal').classList.add('open');
 }
 
@@ -44530,68 +44691,149 @@ function stopRadio() {
 }
 
 // -- 😴 ČASOVAČ VYPNUTÍ + CHYTRÝ SPÁNEK ------------------------------------------
-const radioSleep = { end: 0, timer: null, armed: false, fading: false, smart: true };
-const RS_FADE_MS = 45000;
-try { radioSleep.smart = (localStorage.getItem('sinator_radio_smart_sleep') !== '0'); } catch (e) {}
+const radioSleep = { end: 0, timer: null, armed: false, fading: false, smart: true, mode: 'dur', dur: 5, _h: null, _m: null };
+const RS_FADE_MS = 45000, RS_ROW = 56;
+try {
+    radioSleep.smart = (localStorage.getItem('sinator_radio_smart_sleep') !== '0');
+    radioSleep.mode = (localStorage.getItem('sinator_radio_sleep_mode') === 'clock') ? 'clock' : 'dur';
+    radioSleep.dur = parseInt(localStorage.getItem('sinator_radio_sleep_dur'), 10) || 5;
+} catch (e) {}
 (function () {
     if (document.getElementById('rsCss')) return;
     const st = document.createElement('style'); st.id = 'rsCss';
-    st.textContent = '.rs-b{background:var(--bg-elevated,#1b2340);color:var(--text,#fff);border:1px solid var(--border,#26304d);border-radius:10px;padding:7px 12px;font-size:0.85rem;cursor:pointer;}'
-        + '.rs-b.rs-go{background:#e11d48;border-color:#e11d48;color:#fff;font-weight:700;}'
-        + '#radioSleepBtn.on{background:#e11d48 !important;border-color:#e11d48 !important;color:#fff !important;}';
+    st.textContent = '#radioSleepBtn.on{background:#e11d48 !important;border-color:#e11d48 !important;color:#fff !important;}'
+        + '#rsOv{position:fixed;inset:0;z-index:100050;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;}'
+        + '.rs-dlg{width:100%;max-width:380px;background:#2f2f31;color:#f2f2f2;border-radius:28px;padding:24px 22px 18px;box-shadow:0 10px 40px rgba(0,0,0,.6);font-family:inherit;}'
+        + '.rs-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}.rs-h h3{margin:0;font-size:1.35rem;font-weight:500;}'
+        + '.rs-gear{width:46px;height:46px;border-radius:50%;border:none;background:#444447;color:#fff;font-size:1.3rem;cursor:pointer;}'
+        + '.rs-box{background:#38383b;border-radius:16px;padding:14px 16px;margin-bottom:12px;}'
+        + '.rs-box h4{margin:0 0 8px;font-size:1.05rem;font-weight:500;}'
+        + '.rs-opt{display:flex;align-items:center;gap:14px;padding:10px 0;font-size:1.05rem;cursor:pointer;}'
+        + '.rs-rd{width:26px;height:26px;border-radius:50%;border:3px solid #f2f2f2;box-sizing:border-box;display:grid;place-items:center;flex:none;}'
+        + '.rs-rd.on::after{content:"";width:12px;height:12px;border-radius:50%;background:#f2f2f2;}'
+        + '.rs-prem{border:1.5px solid #5a4a7a;border-radius:16px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:1.05rem;cursor:pointer;}'
+        + '.rs-sw{width:46px;height:26px;border-radius:13px;background:#6b6b6e;position:relative;flex:none;transition:.15s;}.rs-sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#ddd;transition:.15s;}'
+        + '.rs-sw.on{background:#e11d48;}.rs-sw.on::after{left:23px;background:#fff;}'
+        + '.rs-sub{font-size:0.75rem;color:#a9a9ad;margin-top:2px;}'
+        + '.rs-act{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}.rs-act button{background:none;border:none;color:#fff;font-size:1.05rem;font-weight:500;padding:10px 12px;cursor:pointer;letter-spacing:.3px;}'
+        + '.rs-act button.rs-cancel{color:#ff8aa0;margin-right:auto;}'
+        + '.rs-live{background:#38383b;border-radius:12px;padding:10px 14px;margin-bottom:10px;font-size:0.95rem;color:#ffd84a;font-weight:600;}'
+        + '.rs-cols{display:flex;text-align:center;font-size:1.15rem;margin-top:6px;}.rs-cols>div{flex:1;}'
+        + '.rs-wrap{position:relative;display:flex;margin-top:4px;}.rs-wrap>div.rs-wc{flex:1;position:relative;}'
+        + '.rs-whl{height:' + (RS_ROW * 3) + 'px;overflow-y:scroll;scroll-snap-type:y mandatory;scroll-padding-top:' + RS_ROW + 'px;scrollbar-width:none;padding:' + RS_ROW + 'px 0;box-sizing:border-box;-webkit-overflow-scrolling:touch;}'
+        + '.rs-whl::-webkit-scrollbar{display:none;}'
+        + '.rs-it{height:' + RS_ROW + 'px;line-height:' + RS_ROW + 'px;text-align:center;scroll-snap-align:start;font-size:1.3rem;color:#7d7d82;}.rs-it.sel{color:#fff;font-size:1.45rem;}'
+        + '.rs-line{position:absolute;left:0;right:0;height:3px;background:#e8e8e8;pointer-events:none;border-radius:2px;}';
     document.head.appendChild(st);
 })();
 function _rsFmt(ms) { const s = Math.max(0, Math.round(ms / 1000)), m = Math.floor(s / 60); return m + ':' + ('0' + (s % 60)).slice(-2); }
+function _rsStatusText() {
+    const left = radioSleep.end - Date.now();
+    const at = new Date(radioSleep.end).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+    return 'Vypnutí za ' + _rsFmt(left) + ' (v ' + at + ')' + (radioSleep.fading ? ' — ztlumuji…' : '');
+}
 function _rsUi() {
-    const stat = document.getElementById('radioSleepStat'), btn = document.getElementById('radioSleepBtn'), chk = document.getElementById('radioSleepSmart');
-    if (chk) chk.checked = radioSleep.smart;
-    if (!btn) return;
-    if (radioSleep.end) {
-        const left = radioSleep.end - Date.now();
-        const at = new Date(radioSleep.end).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
-        btn.textContent = '😴 ' + _rsFmt(left); btn.classList.add('on');
-        if (stat) stat.textContent = 'Vypnutí za ' + _rsFmt(left) + ' (v ' + at + ')' + (radioSleep.fading ? ' — ztlumuji…' : '');
-    } else {
-        btn.textContent = '😴'; btn.classList.remove('on');
-        if (stat && !radioSleep._msg) stat.textContent = 'Časovač není nastaven';
-    }
+    const btn = document.getElementById('radioSleepBtn'), live = document.getElementById('rsLive');
+    if (btn) { if (radioSleep.end) { btn.textContent = '😴 ' + _rsFmt(radioSleep.end - Date.now()); btn.classList.add('on'); } else { btn.textContent = '😴'; btn.classList.remove('on'); } }
+    if (live && radioSleep.end) live.textContent = _rsStatusText();
 }
 function _rsRestoreVol() { const a = document.getElementById('radioAudio'); try { if (a) a.volume = 1; } catch (e) {} }
-function radioSleepTogglePanel() {
-    const p = document.getElementById('radioSleepPanel'); if (!p) return;
-    p.style.display = p.style.display === 'none' ? 'block' : 'none'; _rsUi();
+function _rsClose() { const o = document.getElementById('rsOv'); if (o) o.remove(); }
+function _rsOverlay(inner) {
+    let o = document.getElementById('rsOv');
+    if (!o) { o = document.createElement('div'); o.id = 'rsOv'; o.onclick = function (e) { if (e.target === o) { _rsReadWheels(); _rsClose(); } }; document.body.appendChild(o); }
+    o.innerHTML = '<div class="rs-dlg">' + inner + '</div>'; return o;
 }
-function radioSleepCancel(msg) {
+function _rsReadWheels() {
+    const h = document.getElementById('rsWh'), m = document.getElementById('rsWm');
+    if (h) radioSleep._h = Math.round(h.scrollTop / RS_ROW);
+    if (m) radioSleep._m = Math.round(m.scrollTop / RS_ROW);
+}
+function _rsWheel(id, max, val) {
+    let items = ''; for (let i = 0; i <= max; i++) items += '<div class="rs-it">' + i + '</div>';
+    return '<div class="rs-wc"><div class="rs-whl" id="' + id + '" data-val="' + val + '">' + items + '</div></div>';
+}
+function _rsInitWheel(id) {
+    const el = document.getElementById(id); if (!el) return;
+    const paint = function () { const i = Math.round(el.scrollTop / RS_ROW); Array.prototype.forEach.call(el.children, function (c, k) { c.classList.toggle('sel', k === i); }); };
+    el.scrollTop = (+el.dataset.val || 0) * RS_ROW; paint();
+    let raf = 0; el.addEventListener('scroll', function () { cancelAnimationFrame(raf); raf = requestAnimationFrame(paint); });
+}
+function radioSleepOpen() {
+    if (radioSleep._h == null || radioSleep._m == null) _rsDefaults();
+    const active = !!radioSleep.end;
+    const clock = radioSleep.mode === 'clock';
+    _rsOverlay(
+        '<div class="rs-h"><h3>Nastavit časovač</h3><button class="rs-gear" onclick="radioSleepSettings()" title="Nastavení">⚙️</button></div>'
+        + (active ? '<div class="rs-live" id="rsLive"></div>' : '')
+        + '<div class="rs-sub" style="text-align:center;">' + (clock ? 'Vypnout v (hodina : minuta)' : 'Vypnout za') + '</div>'
+        + '<div class="rs-cols"><div>Hodiny</div><div>Minuty</div></div>'
+        + '<div class="rs-wrap">' + _rsWheel('rsWh', 23, radioSleep._h) + _rsWheel('rsWm', 59, radioSleep._m)
+        + '<div class="rs-line" style="top:' + RS_ROW + 'px"></div><div class="rs-line" style="top:' + (RS_ROW * 2) + 'px"></div></div>'
+        + '<div class="rs-act">' + (active ? '<button class="rs-cancel" onclick="radioSleepCancel();_rsClose();">ZRUŠIT</button>' : '') + '<button onclick="radioSleepPick()">VYBER</button></div>'
+    );
+    _rsInitWheel('rsWh'); _rsInitWheel('rsWm'); _rsUi();
+}
+function _rsDefaults() {
+    if (radioSleep.mode === 'clock') { const d = new Date(Date.now() + 30 * 60000); radioSleep._h = d.getHours(); radioSleep._m = d.getMinutes(); }
+    else { radioSleep._h = Math.floor(radioSleep.dur / 60) % 24; radioSleep._m = radioSleep.dur % 60; }
+}
+function radioSleepSettings() {
+    _rsReadWheels();
+    const clock = radioSleep.mode === 'clock';
+    _rsOverlay(
+        '<div class="rs-h"><h3>Nastavení</h3></div>'
+        + '<div class="rs-box"><h4>Nastavit časovač</h4>'
+        + '<div class="rs-opt" onclick="_rsSetMode(\'dur\')"><span class="rs-rd' + (!clock ? ' on' : '') + '"></span>Po uplynutí zadaného času</div>'
+        + '<div class="rs-opt" onclick="_rsSetMode(\'clock\')"><span class="rs-rd' + (clock ? ' on' : '') + '"></span>V konkrétním čase</div></div>'
+        + '<div class="rs-prem" onclick="_rsToggleSmart()"><div>🧠 Postupné snižování hlasitosti<div class="rs-sub">Chytrý spánek: posledních 45 s ztlumí a při ručním zastavení rádia se časovač zruší</div></div><span class="rs-sw' + (radioSleep.smart ? ' on' : '') + '" id="rsSw"></span></div>'
+        + '<div class="rs-act"><button onclick="_rsSettingsSave()">ULOŽIT</button></div>'
+    );
+}
+function _rsSetMode(m) {
+    if (radioSleep.mode === m) return;
+    radioSleep.mode = m; radioSleep._h = radioSleep._m = null; _rsDefaults();
+    const rd = document.querySelectorAll('.rs-rd'); if (rd.length === 2) { rd[0].classList.toggle('on', m === 'dur'); rd[1].classList.toggle('on', m === 'clock'); }
+}
+function _rsToggleSmart() { radioSleep.smart = !radioSleep.smart; const sw = document.getElementById('rsSw'); if (sw) sw.classList.toggle('on', radioSleep.smart); }
+function _rsSettingsSave() {
+    try { localStorage.setItem('sinator_radio_smart_sleep', radioSleep.smart ? '1' : '0'); localStorage.setItem('sinator_radio_sleep_mode', radioSleep.mode); } catch (e) {}
+    if (!radioSleep.smart) { radioSleep.fading = false; _rsRestoreVol(); }
+    radioSleepOpen();
+}
+function radioSleepPick() {
+    _rsReadWheels();
+    const h = radioSleep._h || 0, m = radioSleep._m || 0;
+    if (radioSleep.mode === 'clock') {
+        const d = new Date(); d.setHours(h, m, 0, 0);
+        if (d.getTime() <= Date.now() + 1000) d.setDate(d.getDate() + 1);
+        _radioSleepSetEnd(d.getTime());
+    } else {
+        const total = h * 60 + m;
+        if (total < 1) return;
+        radioSleep.dur = total; try { localStorage.setItem('sinator_radio_sleep_dur', String(total)); } catch (e) {}
+        _radioSleepSetEnd(Date.now() + total * 60000);
+    }
+    _rsClose();
+}
+function radioSleepCancel() {
     radioSleep.end = 0; radioSleep.armed = false; radioSleep.fading = false;
-    clearInterval(radioSleep.timer); radioSleep.timer = null; _rsRestoreVol();
-    const stat = document.getElementById('radioSleepStat');
-    radioSleep._msg = msg || '';
-    if (stat) stat.textContent = msg || 'Časovač není nastaven';
-    _rsUi();
+    clearInterval(radioSleep.timer); radioSleep.timer = null; _rsRestoreVol(); _rsUi();
 }
-function radioSleepStart(minutes) { _radioSleepSetEnd(Date.now() + minutes * 60000); }
 function _radioSleepSetEnd(ts) {
-    radioSleep._msg = ''; radioSleep.end = ts; radioSleep.fading = false; _rsRestoreVol();
+    radioSleep.end = ts; radioSleep.fading = false; _rsRestoreVol();
     radioSleep.armed = (radioState.status === 'playing' || radioState.status === 'buffering' || radioState.status === 'connecting');
     clearInterval(radioSleep.timer); radioSleep.timer = setInterval(_radioSleepTick, 1000);
     _radioSleepTick();
 }
-function radioSleepAtTime() {
-    const v = (document.getElementById('radioSleepTime') || {}).value || '';
-    const m = v.match(/^(\d{1,2}):(\d{2})/); if (!m) { const stat = document.getElementById('radioSleepStat'); if (stat) stat.textContent = 'Zadej čas vypnutí'; return; }
-    const d = new Date(); d.setHours(+m[1], +m[2], 0, 0);
-    if (d.getTime() <= Date.now() + 1000) d.setDate(d.getDate() + 1);
-    _radioSleepSetEnd(d.getTime());
-}
-function radioSleepSetSmart(on) { radioSleep.smart = !!on; try { localStorage.setItem('sinator_radio_smart_sleep', on ? '1' : '0'); } catch (e) {} if (!on) { radioSleep.fading = false; _rsRestoreVol(); } }
 function _radioSleepTick() {
     if (!radioSleep.end) return;
     const left = radioSleep.end - Date.now(), st = radioState.status;
-    if (left <= 0) { stopRadio(); _rsRestoreVol(); radioSleepCancel('Rádio vypnuto 😴'); return; }
+    if (left <= 0) { stopRadio(); radioSleepCancel(); return; }
     const playing = (st === 'playing' || st === 'buffering' || st === 'connecting');
     if (playing) radioSleep.armed = true;
     // chytrý spánek: ruční pauza/stop = zrušit časovač
-    if (radioSleep.smart && radioSleep.armed && (st === 'idle' || st === 'paused')) { radioSleepCancel('Přehrávání zastaveno — časovač zrušen'); return; }
+    if (radioSleep.smart && radioSleep.armed && (st === 'idle' || st === 'paused')) { radioSleepCancel(); return; }
     const audio = document.getElementById('radioAudio');
     if (radioSleep.smart && left <= RS_FADE_MS && audio && !audio.paused) {
         radioSleep.fading = true; try { audio.volume = Math.max(0, Math.min(1, left / RS_FADE_MS)); } catch (e) {}
