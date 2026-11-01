@@ -7243,6 +7243,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-01', date: '1. 11. 2026', items: [
+            '🌐 Nastavení → Vzhled → Jazyk: přepínač 🇨🇿 Čeština / 🇸🇰 Slovenčina — celá aplikace se přeloží do slovenčiny a z TMDB se načtou slovenské názvy filmů a seriálů, popisy i žánry (když slovenský překlad chybí, použije se český text). Po přepnutí se appka znovu načte. Ve slovenštině je tlačítko pro zkopírování nepřeložených textů, ať jde překlad doladit',
+            '⚙️ Správce seznamů: vedle nadpisu je ozubené kolečko — vybereš 1 (horní seznam), 2 (spodní seznam) nebo 3 (nový seznam). Seznam 1/2 se otevře na celou obrazovku: mazání jedné či více označených položek, ✏️ přejmenování seznamu, 🗑 smazání seznamu, filtr a Vše / Nic',
+            '💾 Řazení seznamů: v editoru seznamu vybereš A → Z, Z → A, Poslední přidané (nejnovější nahoře) nebo Rok (nejnovější → nejstarší); po uložení 💾 se řazení pamatuje a platí všude — ve správci, v Sinatoru i v Histře',
+            '🔁 Sinator ↔ Histra: kopírování, přesun i mazání položek se vždy zeptá, jestli to provést i ve stejně pojmenovaném seznamu druhé služby; nový seznam se vytvoří v obou službách automaticky; přejmenování, smazání seznamu i uložené řazení se taky zeptají na druhou službu',
+            '🗂️ Správce seznamů: dole je jedna řada tlačítek Kopírovat / Přesunout / Smazat / Prohodit — směr se určí podle toho, ve kterém okně máš označené položky (označ jen v jednom okně)',
+            '🗂️ Správce seznamů: české názvy a roky z TMDB (dřív zůstávaly anglické názvy nebo čísla), ➕ Vytvořit nový seznam ve výběru seznamu u každé služby, zakázané označování textu, okna otevřená z detailu (např. výběr externí aplikace) se zobrazí nad správcem',
+            '🗂️ Nastavení → Správce seznamů: nová volba „Zobrazit mezi hlavními tlačítky“ přidá tlačítko Správce na domovskou obrazovku vedle Wrapped',
+            '🧩 Sinator: výběr seznamu je rozbalovací nabídka se seznamy pod sebou (místo řady vedle sebe); mazání seznamu z této nabídky zrušeno — maže se jen ve správci seznamů',
+        ] },
         { version: '2026-10-31d', date: '31. 10. 2026', items: [
             '🗂️ Správce seznamů: výběr seznamu je teď vlastní nabídka, kde klepnutím na nadpis 🟢 Sinator / 🟣 Histra / 💾 Lokální skupinu sbalíš (schováš její seznamy) nebo rozbalíš; sbalení se pamatuje',
             '🗂️ Správce seznamů: nový zdroj 💾 Lokální → ❤️ Oblíbené (ta v zařízení) — jde z nich i do nich kopírovat, přesouvat a mazat stejně jako mezi seznamy Sinatoru a Histry',
