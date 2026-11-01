@@ -3535,11 +3535,11 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         _hToast('✅ Shlédnuté aktualizovány (' + Object.keys(idx.movies).length + ' filmů, ' + Object.keys(idx.shows).length + ' seriálů)');
     };
     setTimeout(() => { try { histraRefreshWatchedIndex(false); } catch (e) {} }, 8000);
-    window.histraOpenWatchlist = function() { histraLoadItems('Watchlist', () => histraFetchAllPaged('/api/v1/watchlist?extended=full&lang=cs-CZ', 100, 30)); };
+    window.histraOpenWatchlist = function() { histraLoadItems('Watchlist', async () => sinSortItems(await histraFetchAllPaged('/api/v1/watchlist?extended=full&lang=cs-CZ', 100, 30), sinListSortGet('h:wl'))); };
     window.histraOpenList = function(i) {
         const l = (window._histraLists || [])[i]; if (!l) return;
         const id = l.id ?? l.list_id;
-        histraLoadItems(l.name || l.title || 'Seznam', () => histraFetchAllPaged(`/api/v1/lists/${id}?extended=full&lang=cs-CZ`, 100, 30, null, true));
+        histraLoadItems(l.name || l.title || 'Seznam', async () => sinSortItems(await histraFetchAllPaged(`/api/v1/lists/${id}?extended=full&lang=cs-CZ`, 100, 30, null, true), sinListSortGet('h:L:' + id)));
     };
     window._histraSaveScroll = function() {
         const v = state._histraView, b = $('histraListsBody');
@@ -16375,6 +16375,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             // později doběhlý fetch mohl přepsat čerstvě smazaný stav zpátky.
             if (_loadSeq !== window._myBackendLoadSeq) return;
             if (tab === 'ratings-movies' || tab === 'ratings-shows') items = items.slice().sort((a, b) => _ratedTs(b) - _ratedTs(a));   // nejnovější hodnocení nahoře
+            try { const _sk = tab === 'watchlist' ? 's:wl' : (tab.startsWith('list:') ? 's:L:' + tab.slice(5) : ''); const _sm = _sk ? sinListSortGet(_sk) : ''; if (_sm) items = sinSortItems(items, _sm); } catch (e) {}
             window._myBackendCurrentItems = items;
             window._myBackendCurrentItemsTab = tab;
             window._myBackendCurrentEmptyMsg = emptyMsg;
@@ -16424,6 +16425,29 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         else if (sortMode === 'alpha_desc') items.sort((a, b) => (b.title || '').localeCompare(a.title || '', 'cs'));
         return items;
     }
+
+    // ── Uložené řazení seznamů (💾 ve Správci seznamů → platí všude: správce, Sinator, Histra) ──
+    window.sinListSortAll = function () { try { return JSON.parse(localStorage.getItem('sinator_list_sort_v1') || '{}') || {}; } catch (e) { return {}; } };
+    window.sinListSortGet = function (key) { return (window.sinListSortAll()[key]) || ''; };
+    window.sinListSortSet = function (key, mode) {
+        const a = window.sinListSortAll(); if (mode) a[key] = mode; else delete a[key];
+        try { localStorage.setItem('sinator_list_sort_v1', JSON.stringify(a)); } catch (e) {}
+    };
+    function _sinInner(it) { return it.movie || it.show || it.media || it.item || {}; }
+    function _sinTitle(it) { const n = _sinInner(it); return String(it.title || it.name || n.title || n.name || '').trim(); }
+    function _sinYear(it) { const n = _sinInner(it); const y = parseInt(it.year || n.year || String(it.release_date || it.first_air_date || n.release_date || n.first_air_date || '').slice(0, 4), 10); return isNaN(y) ? 0 : y; }
+    function _sinAdded(it) { let v = it.added != null ? it.added : (it.added_at || it.addedAt || it.listed_at || it.listedAt || it.created_at || it.createdAt || it.ts || 0); if (typeof v === 'string') v = Date.parse(v) || 0; return Number(v) || 0; }
+    // mode: az | za | added (nejnovější nahoře) | year (nejnovější → nejstarší); prázdné = beze změny
+    window.sinSortItems = function (items, mode) {
+        if (!mode || !Array.isArray(items)) return items;
+        const d = items.map((it, i) => ({ it, i, t: _sinTitle(it), y: _sinYear(it), a: _sinAdded(it) }));
+        const cT = (a, b) => a.t.localeCompare(b.t, 'cs');
+        if (mode === 'az') d.sort((a, b) => cT(a, b) || a.i - b.i);
+        else if (mode === 'za') d.sort((a, b) => cT(b, a) || a.i - b.i);
+        else if (mode === 'year') d.sort((a, b) => (b.y - a.y) || cT(a, b) || a.i - b.i);
+        else if (mode === 'added') d.sort((a, b) => (a.a && b.a && a.a !== b.a) ? b.a - a.a : b.i - a.i);
+        return d.map(x => x.it);
+    };
 
     window.myBackendApplySort = function() {
         const items = myBackendGetSortedFilteredItems();
@@ -16495,8 +16519,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const smartTabs = smartAll().map(d => ({ key: `smart:${d.id}`, label: `🧠 ${String(d.name).replace(/</g, '&lt;')}`, smartId: d.id }));
         const allTabs = [...staticTabs, ...listTabs, ...smartTabs];
         $('myBackendListTabs').innerHTML = allTabs.map(t => `<span style="position:relative;display:flex;width:100%;">
-            <button class="ts-list-tab-btn" data-tab="${t.key}" onclick="renderMyBackendTab('${t.key}')" style="width:100%;text-align:left;white-space:normal;padding:10px ${(t.id || t.smartId) ? '34px' : '14px'} 10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.82rem;">${t.label}</button>
-            ${(t.id || t.smartId) ? `<button onclick="event.stopPropagation();${t.smartId ? `mySmartDelete('${t.smartId}')` : `myBackendDeleteList('${t.id}')`}" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:rgba(224,122,111,0.25);border:none;color:#e07a6f;font-size:0.7rem;line-height:1;cursor:pointer;">✕</button>` : ''}
+            <button class="ts-list-tab-btn" data-tab="${t.key}" onclick="renderMyBackendTab('${t.key}')" style="width:100%;text-align:left;white-space:normal;padding:10px ${t.smartId ? '34px' : '14px'} 10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.82rem;">${t.label}</button>
+            ${t.smartId ? `<button onclick="event.stopPropagation();mySmartDelete('${t.smartId}')" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:rgba(224,122,111,0.25);border:none;color:#e07a6f;font-size:0.7rem;line-height:1;cursor:pointer;">✕</button>` : ''}
         </span>`).join('') + `<button onclick="myBackendCreateList()" style="width:100%;white-space:nowrap;padding:10px 14px;border-radius:10px;border:1px dashed #6090ff;background:transparent;color:#6090ff;cursor:pointer;font-size:0.82rem;">➕ Nový seznam</button>`;
         $('myBackendListTabsWrap').style.display = 'block';
         myBackendSyncListToggle(tab);
@@ -52635,7 +52659,8 @@ window.sfFrAuto=async function(id,t){
     }
     function plain(it) { return { id: it.id, type: it.type, title: it.title, year: it.year, poster: it.poster }; }
 
-    function normS(it) { return it && it.id ? { id: Number(it.id), type: nType(it.type), title: it.title || it.name || '', year: it.year || '', poster: it.poster_path || it.poster || '' } : null; }
+    function tsOf(o) { var v = o.added_at || o.addedAt || o.listed_at || o.listedAt || o.created_at || o.createdAt || o.ts || 0; if (typeof v === 'string') v = Date.parse(v) || 0; return Number(v) || 0; }
+    function normS(it) { return it && it.id ? { id: Number(it.id), type: nType(it.type), title: it.title || it.name || '', year: it.year || '', poster: it.poster_path || it.poster || '', added: tsOf(it) } : null; }
     async function loadItems(key) {
         var b = B(), parts = key.split(':');
         if (parts[0] === 'f') {
@@ -52654,7 +52679,7 @@ window.sfFrAuto=async function(id,t){
             var inner = e.movie || e.show || e.media || e.item || {};
             var isShow = m.type === 'tv';
             var mid = e.media_id != null ? e.media_id : (e.mediaId != null ? e.mediaId : (inner.id != null ? inner.id : e.id));
-            out.push({ id: Number(m.id), type: m.type, title: m.title || '', year: m.year || '', poster: m.poster_path || '',
+            out.push({ id: Number(m.id), type: m.type, title: m.title || '', year: m.year || '', poster: m.poster_path || '', added: tsOf(e),
                        del: mid == null ? { media_type: isShow ? 'show' : 'movie', tmdb: String(m.id) } : { media_type: isShow ? 'show' : 'movie', media_id: mid } });
         });
         return out;
@@ -52739,10 +52764,11 @@ window.sfFrAuto=async function(id,t){
     var root = null;
     function el(id) { return document.getElementById(id); }
     function selCount(p) { return Object.keys(S.panes[p].sel).length; }
+    function paneMode(p) { var P = S.panes[p]; return (P.sortPreview && P.sortPreview.key === P.src) ? P.sortPreview.mode : (P.src ? window.sinListSortGet(P.src) : ''); }
     function visibleItems(p) {
         var P = S.panes[p], f = P.filter.trim().toLowerCase();
-        if (!f) return P.items;
-        return P.items.filter(function (it) { return (it.title || '').toLowerCase().indexOf(f) >= 0 || String(it.year).indexOf(f) >= 0; });
+        if (!f) return window.sinSortItems(P.items, paneMode(p));
+        return window.sinSortItems(P.items, paneMode(p)).filter(function (it) { return (it.title || '').toLowerCase().indexOf(f) >= 0 || String(it.year).indexOf(f) >= 0; });
     }
     function optionsHtml(cur) {
         function grp(label, arr, err) {
@@ -53144,8 +53170,8 @@ window.sfFrAuto=async function(id,t){
     }
     function edVisible() {
         var P = S.panes[ED.p], f = (ED.filter || '').trim().toLowerCase();
-        if (!f) return P.items;
-        return P.items.filter(function (it) { return (it.title || '').toLowerCase().indexOf(f) >= 0 || String(it.year).indexOf(f) >= 0; });
+        if (!f) return window.sinSortItems(P.items, paneMode(ED.p));
+        return window.sinSortItems(P.items, paneMode(ED.p)).filter(function (it) { return (it.title || '').toLowerCase().indexOf(f) >= 0 || String(it.year).indexOf(f) >= 0; });
     }
     function edPaint() {
         var o = document.getElementById('lmEdit'); if (!o || ED.p < 0) return;
@@ -53153,6 +53179,8 @@ window.sfFrAuto=async function(id,t){
         o.querySelector('.ed-title').textContent = srcName(P.src);
         var n = selCount(ED.p);
         o.querySelector('.ed-cnt').textContent = n + ' vybráno · ' + P.items.length + ' položek';
+        var sv = o.querySelector('.ed-save'), dirty = !!(P.sortPreview && P.sortPreview.key === P.src && P.sortPreview.mode !== window.sinListSortGet(P.src));
+        if (sv) { sv.textContent = dirty ? '💾 Uložit' : '💾'; sv.style.borderColor = dirty ? '#38bdf8' : ''; sv.style.color = dirty ? '#38bdf8' : ''; }
         var del = o.querySelector('.ed-delsel'); del.textContent = '🗑 Smazat vybrané' + (n ? ' (' + n + ')' : ''); del.disabled = !n;
         if (P.loading) body.innerHTML = '<div class="lm-empty">⏳ Načítám…</div>';
         else if (P.err) body.innerHTML = '<div class="lm-empty" style="color:#f87171;">❌ ' + esc(P.err) + '</div>';
@@ -53168,8 +53196,19 @@ window.sfFrAuto=async function(id,t){
             body.scrollTop = st;
         }
     }
-    function edClose() { var o = document.getElementById('lmEdit'); if (o) o.remove(); ED.p = -1; ED.filter = ''; }
+    function edClose() { var o = document.getElementById('lmEdit'), q = ED.p; if (o) o.remove(); ED.p = -1; ED.filter = ''; if (q >= 0 && S.panes[q]) { S.panes[q].sortPreview = null; try { paint(q, true); } catch (e) {} } }
     window.lmEdClose = function () { edClose(); };
+    window.lmEdSort = function (v) { var P = S.panes[ED.p]; P.sortPreview = { key: P.src, mode: v }; paint(ED.p, true); };
+    window.lmEdSaveSort = function () {
+        var p = ED.p, P = S.panes[p]; if (!P.src) return;
+        var mode = paneMode(p);
+        window.sinListSortSet(P.src, mode);
+        var m = mirrorOf(P.src), msg = '';
+        if (m && confirm('🔁 Uložit stejné řazení i pro seznam v druhé službě?\n' + srcName(m) + '\n\nOK = ano, v obou · Zrušit = jen tady')) { window.sinListSortSet(m, mode); msg = ' · 🔁 i v druhé službě'; }
+        P.sortPreview = null;
+        toast('💾 Řazení uloženo' + msg);
+        paint(0, true); paint(1, true);
+    };
     window.lmEdAll = function () { var P = S.panes[ED.p]; edVisible().forEach(function (it) { P.sel[keyOf(it)] = 1; }); paint(ED.p, true); };
     window.lmEdNone = function () { S.panes[ED.p].sel = {}; paint(ED.p, true); };
     window.lmEdFilter = function (v) { ED.filter = v; edPaint(); };
@@ -53183,6 +53222,7 @@ window.sfFrAuto=async function(id,t){
         var o = document.createElement('div'); o.id = 'lmEdit';
         o.innerHTML = '<div class="ed-top"><button class="ed-b" style="flex:0 0 auto;padding:8px 12px;" onclick="lmEdClose()">← Zpět</button><b class="ed-title"></b></div>'
             + '<div class="ed-row"><button class="ed-b" onclick="lmEdRename()"' + (isL ? '' : ' disabled') + '>✏️ Přejmenovat</button><button class="ed-b red" onclick="lmEdDeleteList()"' + (isL ? '' : ' disabled') + '>🗑 Smazat seznam</button></div>'
+            + '<div class="ed-row"><select class="ed-find ed-sort" onchange="lmEdSort(this.value)"><option value="">↕ Výchozí pořadí</option><option value="az">🔤 A → Z</option><option value="za">🔤 Z → A</option><option value="added">🕒 Poslední přidané (nejnovější nahoře)</option><option value="year">📅 Rok: nejnovější → nejstarší</option></select><button class="ed-b ed-save" style="flex:0 0 auto;padding:10px 14px;" onclick="lmEdSaveSort()" title="Uložit řazení">💾</button></div>'
             + '<div class="ed-row"><input class="ed-find" placeholder="🔎 Filtr…" oninput="lmEdFilter(this.value)"><button class="ed-b" style="flex:0 0 auto;padding:10px 12px;" onclick="lmEdAll()">☑ Vše</button><button class="ed-b" style="flex:0 0 auto;padding:10px 12px;" onclick="lmEdNone()">☐ Nic</button></div>'
             + '<div class="ed-row" style="padding-bottom:4px;opacity:.75;font-size:0.8rem;"><span class="ed-cnt"></span></div>'
             + '<div class="ed-body"></div>'
@@ -53194,6 +53234,7 @@ window.sfFrAuto=async function(id,t){
             if (PP.sel[k]) delete PP.sel[k]; else PP.sel[k] = 1;
             paint(ED.p, true);
         };
+        o.querySelector('.ed-sort').value = paneMode(p);
         edPaint();
     };
     window.lmGear = function () {
