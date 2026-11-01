@@ -7243,6 +7243,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-01g', date: '1. 11. 2026', items: [
+            '🎧 TV / Rádio: nová položka Audioknihy / E-knihy — otevře AB Community (v2.abcommunity.eu)',
+        ]},
+        { version: '2026-11-01f', date: '1. 11. 2026', items: [
+            '⏭ Online rádia: když stanice nehraje (chyba nebo timeout), aplikace automaticky přeskočí na další funkční rádio ve stejném seznamu a směru (přeskakuje stanice označené jako nefunkční, max. 12 pokusů v řadě) a krátce to oznámí',
+        ]},
         { version: '2026-11-01e', date: '1. 11. 2026', items: [
             '⭐ Online rádia: nový seznam Oblíbené (první v nabídce seznamů); na jakékoli stanici podrž prst a vyskočí nabídka Přidat do oblíbených / Odebrat z oblíbených (funguje i u stanic z Žánrů). Oblíbené stanice mají v ostatních seznamech malou ⭐',
         ]},
@@ -24127,6 +24133,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         <button onclick="pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, function(){ openKinoModal(''); })" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
             <span style="font-size:1.6rem;">🎦</span>
             <div><div style="color:var(--gold);font-weight:700;">Kino</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Program kin a rezervace vstupenek</div></div>
+        </button>
+        <button onclick="window.open('https://v2.abcommunity.eu/','_blank','noopener')" class="menu-row-btn" onmouseover="this.style.borderColor='rgba(255,255,255,0.25)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:1.6rem;">🎧</span>
+            <div><div style="color:#a78bfa;font-weight:700;">Audioknihy / E-knihy</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">AB Community — poslech a čtení knih ↗</div></div>
         </button>
     </div>
 </div>
@@ -44704,6 +44714,24 @@ function _radioTry(audio, url, token) {
     });
 }
 
+// Automatické přeskočení na další funkční stanici při chybě (max. 12 pokusů v řadě)
+function _radioAutoSkip(fromIdx) {
+    const n = RADIOS.length;
+    if (n < 2 || radioState.country !== radioState.playCountry) return false;
+    radioState.skipCount = (radioState.skipCount || 0) + 1;
+    if (radioState.skipCount > Math.min(n - 1, 12)) { radioState.skipCount = 0; return false; }
+    const dir = radioState.dir || 1, failed = RADIOS[fromIdx];
+    for (let k = 1; k < n; k++) {
+        const j = (((fromIdx + dir * k) % n) + n) % n;
+        if (!RADIOS[j]._bad) {
+            try { if (typeof showToast === 'function') showToast('⏭ ' + (failed ? failed.name : 'Stanice') + ' nehraje — zkouším ' + RADIOS[j].name); } catch (e) {}
+            radioStart(j, false);
+            return true;
+        }
+    }
+    radioState.skipCount = 0; return false;
+}
+
 async function radioStart(idx, force) {
     const r = RADIOS[idx]; if (!r) return;
     const audio = document.getElementById('radioAudio');
@@ -44718,8 +44746,8 @@ async function radioStart(idx, force) {
         const ok = await _radioTry(audio, u, token);
         if (token !== radioState.token) return;
         if (ok) {
-            r._bad = false; radioState.status = 'playing'; radioState.retries = 0; _radioUi();
-            audio.onerror = () => { if (token !== radioState.token) return; if (radioState.retries++ < 2) radioStart(idx, true); else { radioState.status = 'error'; _radioUi(); } };
+            r._bad = false; radioState.status = 'playing'; radioState.retries = 0; radioState.skipCount = 0; _radioUi();
+            audio.onerror = () => { if (token !== radioState.token) return; if (radioState.retries++ < 2) radioStart(idx, true); else { radioState.status = 'error'; _radioUi(); _radioAutoSkip(idx); } };
             audio.onwaiting = () => { if (token === radioState.token && radioState.status === 'playing') { radioState.status = 'buffering'; _radioUi(); } };
             audio.onplaying = () => { if (token === radioState.token) { radioState.status = 'playing'; _radioUi(); } };
             audio.onpause = () => { if (token === radioState.token && !audio.ended && radioState.status === 'playing') { radioState.status = 'paused'; _radioUi(); } };
@@ -44728,13 +44756,16 @@ async function radioStart(idx, force) {
     }
     // všechno selhalo → zkusit znovu bez cache (jednou), jinak chyba
     if (!force) { const c = _radioCacheGet(); delete c[radioState.country + '|' + r.name]; _radioCacheSet(c); return radioStart(idx, true); }
+    if (token !== radioState.token) return;
     audio.pause(); audio.removeAttribute('src');
     r._bad = true; radioState.status = 'error'; _radioUi();
+    _radioAutoSkip(idx);
 }
 
 function playRadio(idx) {
     if (Date.now() - (window._rpLpAt || 0) < 700) return;
     if (radioState.current === idx && (radioState.status === 'playing' || radioState.status === 'connecting' || radioState.status === 'buffering')) { stopRadio(); return; }
+    radioState.skipCount = 0; radioState.dir = 1;
     radioStart(idx, false);
 }
 function radioToggle() {
@@ -44742,11 +44773,12 @@ function radioToggle() {
     if (st === 'playing' || st === 'buffering') { audio.pause(); radioState.status = 'paused'; _radioUi(); }
     else if (st === 'connecting') { stopRadio(); }
     else if (st === 'paused' && audio.src) { audio.play().then(() => { radioState.status = 'playing'; _radioUi(); }).catch(() => radioStart(radioState.current, true)); }
-    else radioStart(radioState.current != null ? radioState.current : 0, false);
+    else { radioState.skipCount = 0; radioStart(radioState.current != null ? radioState.current : 0, false); }
 }
 function radioStep(d) {
     const n = RADIOS.length; if (!n) return;
     const cur = radioState.current != null ? radioState.current : (d > 0 ? -1 : 0);
+    radioState.skipCount = 0; radioState.dir = d > 0 ? 1 : -1;
     radioStart((cur + d + n) % n, false);
 }
 function radioNext() { radioStep(1); }
