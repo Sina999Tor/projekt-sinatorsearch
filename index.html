@@ -52780,6 +52780,7 @@ window.sfFrAuto=async function(id,t){
             body.scrollTop = st;
         }
         if (foot) foot.textContent = P.src ? (selCount(p) + ' vybráno · ' + P.items.length + ' položek') : '';
+        if (ED.p === p) edPaint();
     }
     async function loadPane(p) {
         var P = S.panes[p]; if (!P.src) { paint(p); return; }
@@ -52874,10 +52875,11 @@ window.sfFrAuto=async function(id,t){
         if (n0 && n1) { toast('⚠️ Označ položky jen v jednom okně'); return; }
         return n0 ? window.lmTransfer(mode, 0, 1) : window.lmTransfer(mode, 1, 0);
     };
-    window.lmDelete = async function () {
+    window.lmDelete = async function (only) {
         if (S.busy) return;
+        if (typeof only !== 'number') only = null;
         var jobs = [];
-        [0, 1].forEach(function (p) { var P = S.panes[p]; if (P.src) P.items.forEach(function (it) { if (P.sel[keyOf(it)]) jobs.push({ p: p, it: it }); }); });
+        [0, 1].forEach(function (p) { if (only !== null && p !== only) return; var P = S.panes[p]; if (P.src) P.items.forEach(function (it) { if (P.sel[keyOf(it)]) jobs.push({ p: p, it: it }); }); });
         if (!jobs.length) { toast('⚠️ Nic není označené'); return; }
         // pokud je stejný seznam otevřen v obou oknech, nemazat dvakrát
         var seen = {}; jobs = jobs.filter(function (j) { var k = S.panes[j.p].src + '|' + keyOf(j.it); if (seen[k]) return false; seen[k] = 1; return true; });
@@ -53020,7 +53022,7 @@ window.sfFrAuto=async function(id,t){
         } catch (e) {}
     }
     function lmStopLift() { if (liftObs) { try { liftObs.disconnect(); } catch (e) {} liftObs = null; } }
-    window.closeListManager = function () { closeSheet(); lmClosePicker(); lmStopLift(); document.body.classList.remove('lm-open'); if (root) { root.remove(); root = null; } try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {} };
+    window.closeListManager = function () { closeSheet(); lmClosePicker(); lmStopLift(); edClose(); closeLmGear(); document.body.classList.remove('lm-open'); if (root) { root.remove(); root = null; } try { if (window.updatePwaBtn) window.updatePwaBtn(); } catch (e) {} };
     // ── Tlačítko Správce na domovské obrazovce (vedle Wrapped), zapíná se v Nastavení ──
     var HB_KEY = 'sinator_lm_home_btn';
     function hbOn() { try { return localStorage.getItem(HB_KEY) === '1'; } catch (e) { return false; } }
@@ -53093,7 +53095,7 @@ window.sfFrAuto=async function(id,t){
             document.head.appendChild(st);
         }
         root = document.createElement('div'); root.id = 'listManager';
-        root.innerHTML = '<div class="lm-top"><b>🗂️ Správce seznamů</b><button class="lm-ib" onclick="closeListManager()" style="font-size:1rem;">✕</button></div>'
+        root.innerHTML = '<div class="lm-top"><b style="flex:0 1 auto;">🗂️ Správce seznamů</b><button class="lm-ib" onclick="lmGear()" title="Upravit seznam" style="font-size:1rem;">⚙️</button><span style="flex:1"></span><button class="lm-ib" onclick="closeListManager()" style="font-size:1rem;">✕</button></div>'
             + paneShell(0)
             + '<div class="lm-bar" id="lmBar"><button onclick=\"lmAuto(\'copy\')\">Kopírovat</button><button onclick=\"lmAuto(\'move\')\">Přesunout</button><button class=\"lm-del\" onclick=\"lmDelete()\">🗑 Smazat</button>'
             + '<button onclick=\"lmSwap()\">⇅ Prohodit</button><div id=\"lmStatus\"></div></div>'
@@ -53116,6 +53118,187 @@ window.sfFrAuto=async function(id,t){
         paint(0); paint(1);
         loadPane(0); loadPane(1);
     };
+    // ══ ⚙️ Úprava seznamu: malé okno (1 horní / 2 spodní / 3 nový) + celoobrazovkový editor ══
+    var ED = { p: -1, filter: '' };
+    function closeLmGear() { var g = document.getElementById('lmGear'); if (g) g.remove(); }
+    function edCss() {
+        if (document.getElementById('lmEditCss')) return;
+        var st = document.createElement('style'); st.id = 'lmEditCss';
+        st.textContent = '#lmEdit{position:fixed;inset:0;z-index:99999994;background:var(--bg-dark,#0b1020);display:flex;flex-direction:column;color:var(--text,#e8ecf8);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box;}'
+            + '#lmEdit .ed-top{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border,#26304d);flex-shrink:0;}'
+            + '#lmEdit .ed-top b{flex:1;min-width:0;font-size:0.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+            + '#lmEdit .ed-row{display:flex;gap:6px;padding:8px 10px 0;flex-shrink:0;}'
+            + '#lmEdit .ed-b{flex:1;min-width:0;background:var(--bg-elevated,#1b2340);color:inherit;border:1px solid var(--border,#26304d);border-radius:10px;padding:10px 6px;font-size:0.82rem;cursor:pointer;white-space:nowrap;}'
+            + '#lmEdit .ed-b:disabled{opacity:.4;}'
+            + '#lmEdit .ed-b.red{border-color:#ef4444;color:#f87171;}'
+            + '#lmEdit .ed-find{flex:1;min-width:0;background:var(--bg-elevated,#1b2340);color:inherit;border:1px solid var(--border,#26304d);border-radius:10px;padding:10px;font-size:0.85rem;}'
+            + '#lmEdit .ed-body{flex:1;min-height:0;overflow-y:auto;padding:8px 10px;-webkit-overflow-scrolling:touch;}'
+            + '#lmEdit .lm-row{display:flex;align-items:center;gap:10px;padding:6px;border-radius:10px;cursor:pointer;border:1px solid transparent;}'
+            + '#lmEdit .lm-row.on{background:rgba(56,189,248,0.14);border-color:rgba(56,189,248,0.5);}'
+            + '#lmEdit .lm-chk{font-size:1.2rem;flex-shrink:0;}'
+            + '#lmEdit .lm-th{width:44px;height:64px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#1b2340;display:flex;align-items:center;justify-content:center;}'
+            + '#lmEdit .lm-tx{display:flex;flex-direction:column;min-width:0;}#lmEdit .lm-tx b{font-size:0.95rem;}#lmEdit .lm-tx small{opacity:.7;}'
+            + '#lmEdit .lm-empty{padding:30px 10px;text-align:center;opacity:.7;}'
+            + '#lmEdit .ed-foot{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--border,#26304d);flex-shrink:0;}';
+        document.head.appendChild(st);
+    }
+    function edVisible() {
+        var P = S.panes[ED.p], f = (ED.filter || '').trim().toLowerCase();
+        if (!f) return P.items;
+        return P.items.filter(function (it) { return (it.title || '').toLowerCase().indexOf(f) >= 0 || String(it.year).indexOf(f) >= 0; });
+    }
+    function edPaint() {
+        var o = document.getElementById('lmEdit'); if (!o || ED.p < 0) return;
+        var P = S.panes[ED.p], body = o.querySelector('.ed-body'), st = body.scrollTop;
+        o.querySelector('.ed-title').textContent = srcName(P.src);
+        var n = selCount(ED.p);
+        o.querySelector('.ed-cnt').textContent = n + ' vybráno · ' + P.items.length + ' položek';
+        var del = o.querySelector('.ed-delsel'); del.textContent = '🗑 Smazat vybrané' + (n ? ' (' + n + ')' : ''); del.disabled = !n;
+        if (P.loading) body.innerHTML = '<div class="lm-empty">⏳ Načítám…</div>';
+        else if (P.err) body.innerHTML = '<div class="lm-empty" style="color:#f87171;">❌ ' + esc(P.err) + '</div>';
+        else {
+            var vis = edVisible();
+            body.innerHTML = vis.length ? vis.map(function (it) {
+                var k = keyOf(it), on = !!P.sel[k], pu = posterUrl(it.poster || (S.posters[k] && S.posters[k] !== 'pending' && S.posters[k] !== 'none' ? S.posters[k] : ''));
+                return '<div class="lm-row' + (on ? ' on' : '') + '" data-k="' + k + '">'
+                    + '<span class="lm-chk">' + (on ? '✅' : '⬜') + '</span>'
+                    + (pu ? '<img class="lm-th" loading="lazy" src="' + esc(pu) + '">' : '<span class="lm-th">' + (it.type === 'tv' ? '📺' : '🎬') + '</span>')
+                    + '<span class="lm-tx"><b>' + esc(it.title || ('#' + it.id)) + '</b><small>' + (it.type === 'tv' ? '📺 Seriál' : '🎬 Film') + (it.year ? ' · ' + esc(it.year) : '') + '</small></span></div>';
+            }).join('') : '<div class="lm-empty">' + (P.items.length ? 'Nic neodpovídá filtru.' : 'Seznam je prázdný.') + '</div>';
+            body.scrollTop = st;
+        }
+    }
+    function edClose() { var o = document.getElementById('lmEdit'); if (o) o.remove(); ED.p = -1; ED.filter = ''; }
+    window.lmEdClose = function () { edClose(); };
+    window.lmEdAll = function () { var P = S.panes[ED.p]; edVisible().forEach(function (it) { P.sel[keyOf(it)] = 1; }); paint(ED.p, true); };
+    window.lmEdNone = function () { S.panes[ED.p].sel = {}; paint(ED.p, true); };
+    window.lmEdFilter = function (v) { ED.filter = v; edPaint(); };
+    window.lmEdDelSel = function () { window.lmDelete(ED.p); };
+    window.lmEditOpen = function (p) {
+        var P = S.panes[p];
+        if (!P.src) { toast('⚠️ ' + (p === 0 ? 'Horní' : 'Spodní') + ' okno nemá vybraný seznam'); return; }
+        closeLmGear(); edClose(); edCss();
+        ED.p = p; ED.filter = '';
+        var isL = P.src.split(':')[1] === 'L';
+        var o = document.createElement('div'); o.id = 'lmEdit';
+        o.innerHTML = '<div class="ed-top"><button class="ed-b" style="flex:0 0 auto;padding:8px 12px;" onclick="lmEdClose()">← Zpět</button><b class="ed-title"></b></div>'
+            + '<div class="ed-row"><button class="ed-b" onclick="lmEdRename()"' + (isL ? '' : ' disabled') + '>✏️ Přejmenovat</button><button class="ed-b red" onclick="lmEdDeleteList()"' + (isL ? '' : ' disabled') + '>🗑 Smazat seznam</button></div>'
+            + '<div class="ed-row"><input class="ed-find" placeholder="🔎 Filtr…" oninput="lmEdFilter(this.value)"><button class="ed-b" style="flex:0 0 auto;padding:10px 12px;" onclick="lmEdAll()">☑ Vše</button><button class="ed-b" style="flex:0 0 auto;padding:10px 12px;" onclick="lmEdNone()">☐ Nic</button></div>'
+            + '<div class="ed-row" style="padding-bottom:4px;opacity:.75;font-size:0.8rem;"><span class="ed-cnt"></span></div>'
+            + '<div class="ed-body"></div>'
+            + '<div class="ed-foot"><button class="ed-b red ed-delsel" onclick="lmEdDelSel()" disabled>🗑 Smazat vybrané</button></div>';
+        document.body.appendChild(o);
+        o.querySelector('.ed-body').onclick = function (e) {
+            var r = e.target.closest ? e.target.closest('.lm-row') : null; if (!r) return;
+            var k = r.getAttribute('data-k'), PP = S.panes[ED.p];
+            if (PP.sel[k]) delete PP.sel[k]; else PP.sel[k] = 1;
+            paint(ED.p, true);
+        };
+        edPaint();
+    };
+    window.lmGear = function () {
+        closeLmGear();
+        var o = document.createElement('div'); o.id = 'lmGear';
+        o.style.cssText = 'position:fixed;inset:0;z-index:99999994;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px;';
+        function opt(n, label, sub, dis) {
+            return '<button data-n="' + n + '"' + (dis ? ' disabled' : '') + ' style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin-top:8px;padding:10px 12px;border-radius:12px;border:1px solid var(--border,#26304d);background:var(--bg-elevated,#1b2340);color:inherit;cursor:pointer;' + (dis ? 'opacity:.4;' : '') + '">'
+                + '<span style="font-size:1.4rem;font-weight:800;color:#38bdf8;width:22px;text-align:center;">' + n + '</span><span style="min-width:0;"><b style="display:block;">' + label + '</b><small style="opacity:.7;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + sub + '</small></span></button>';
+        }
+        var s0 = S.panes[0].src, s1 = S.panes[1].src;
+        o.innerHTML = '<div style="background:var(--bg-card,#141b34);border:1px solid var(--border,#26304d);border-radius:16px;padding:16px;width:100%;max-width:340px;">'
+            + '<div style="font-weight:700;font-size:1rem;">⚙️ Upravit seznam</div><div style="opacity:.7;font-size:0.8rem;margin-top:2px;">Vyber číslo:</div>'
+            + opt(1, 'Horní seznam', s0 ? esc(srcName(s0)) : 'není vybraný', !s0)
+            + opt(2, 'Spodní seznam', s1 ? esc(srcName(s1)) : 'není vybraný', !s1)
+            + opt(3, '➕ Nový seznam', 'vytvoří se v Sinatoru i v Histře', false)
+            + '<button data-n="0" style="width:100%;margin-top:12px;padding:10px;border-radius:12px;border:1px solid var(--border,#26304d);background:transparent;color:inherit;cursor:pointer;">✕ Zavřít</button></div>';
+        o.onclick = function (e) {
+            if (e.target === o) { closeLmGear(); return; }
+            var b = e.target.closest ? e.target.closest('button[data-n]') : null; if (!b || b.disabled) return;
+            var n = b.getAttribute('data-n');
+            if (n === '1') window.lmEditOpen(0); else if (n === '2') window.lmEditOpen(1);
+            else if (n === '3') { closeLmGear(); window.lmNewList(0, 's'); }
+            else closeLmGear();
+        };
+        document.body.appendChild(o);
+    };
+
+    async function deleteList(key) {
+        var b = B(), pa = key.split(':');
+        if (pa[0] === 's') await b.myApi('/lists/' + pa[2], { method: 'DELETE' });
+        else await b.histraApi('/api/v1/lists/' + pa[2], { method: 'DELETE' });
+        try { if (window._sinListCache) window._sinListCache = {}; } catch (e) {}
+    }
+    async function renameList(key, nn) {
+        var b = B(), pa = key.split(':'), id = pa[2], svc = pa[0];
+        if (svc === 'h') {
+            var methods = ['PATCH', 'PUT'];
+            for (var i = 0; i < methods.length; i++) {
+                try {
+                    await b.histraApi('/api/v1/lists/' + id, { method: methods[i], body: { name: nn } });
+                    await loadSources();
+                    var me = (S.sources.h || []).filter(function (x) { return x.key === key; })[0];
+                    if (me && baseName(me) === nn.toLowerCase()) return key;
+                } catch (e) {}
+            }
+        }
+        // záloha: nový seznam → přenos položek → smazání starého (jen když se vše povedlo)
+        var items = await loadItems(key), nk;
+        if (svc === 's') { var r = await b.myListCreate(nn); nk = 's:L:' + r.id; }
+        else { var hid = await b.histraEnsureList(nn); nk = 'h:L:' + hid; }
+        for (var j = 0; j < items.length; j++) { setBusy(true, '✏️ Přenáším ' + (j + 1) + '/' + items.length + '…'); await addTo(nk, plain(items[j])); }
+        await deleteList(key);
+        return nk;
+    }
+    function remapSrc(oldKey, newKey) { S.panes.forEach(function (P) { if (P.src === oldKey) P.src = newKey; }); }
+    function nameTaken(svc, nn) { return (S.sources[svc] || []).some(function (x) { return x.key.indexOf(':L:') > 0 && baseName(x) === nn.toLowerCase(); }); }
+
+    window.lmEdRename = async function () {
+        if (S.busy) return;
+        var p = ED.p, key = S.panes[p].src, pa = key.split(':'); if (pa[1] !== 'L') return;
+        var me = (S.sources[pa[0]] || []).filter(function (x) { return x.key === key; })[0]; if (!me) return;
+        var old = me.raw != null ? me.raw : srcName(key);
+        var nn = prompt('Nový název seznamu:', old); if (!nn || !nn.trim() || nn.trim() === old) return; nn = nn.trim();
+        if (nn.toLowerCase() !== old.toLowerCase() && nameTaken(pa[0], nn)) { toast('⚠️ Seznam s názvem „' + nn + '“ už existuje'); return; }
+        var m = mirrorOf(key), doM = false;
+        if (m && m.split(':')[1] === 'L') doM = confirm('🔁 Přejmenovat i v druhé službě?\n' + srcName(m) + '\n→ „' + nn + '“\n\nOK = ano, v obou · Zrušit = jen tady');
+        var msg = '';
+        try {
+            setBusy(true, '✏️ Přejmenovávám…');
+            var nk = await renameList(key, nn); remapSrc(key, nk);
+            if (doM) {
+                try {
+                    if (nameTaken(m[0], nn)) msg = ' · v druhé službě už název existuje';
+                    else { var mk = await renameList(m, nn); remapSrc(m, mk); msg = ' · 🔁 i v druhé službě'; }
+                } catch (e2) { msg = ' · ❌ druhá služba: ' + (((e2 && e2.message) || e2) + '').slice(0, 50); }
+            }
+            toast('✏️ Přejmenováno na „' + nn + '“' + msg);
+        } catch (e) { toast('❌ ' + (((e && e.message) || e) + '').slice(0, 80)); }
+        setBusy(false, '');
+        await loadSources(); paint(0); paint(1);
+        await Promise.all([loadPane(0), loadPane(1)]);
+    };
+    window.lmEdDeleteList = async function () {
+        if (S.busy) return;
+        var p = ED.p, P = S.panes[p], key = P.src, pa = key.split(':'); if (pa[1] !== 'L') return;
+        if (!confirm('🗑 Smazat celý seznam i s obsahem?\n' + srcName(key) + ' (' + P.items.length + ' položek)\n\nTuto akci nelze vrátit.')) return;
+        var m = mirrorOf(key), doM = false;
+        if (m && m.split(':')[1] === 'L') doM = confirm('🔁 Smazat i seznam v druhé službě?\n' + srcName(m) + '\n\nOK = ano, v obou · Zrušit = jen tady');
+        var msg = '';
+        try {
+            setBusy(true, '🗑 Mažu seznam…');
+            await deleteList(key); S.panes.forEach(function (Q) { if (Q.src === key) { Q.src = null; Q.items = []; Q.sel = {}; } });
+            if (doM) {
+                try { await deleteList(m); S.panes.forEach(function (Q) { if (Q.src === m) { Q.src = null; Q.items = []; Q.sel = {}; } }); msg = ' · 🔁 i v druhé službě'; }
+                catch (e2) { msg = ' · ❌ druhá služba: ' + (((e2 && e2.message) || e2) + '').slice(0, 50); }
+            }
+            toast('🗑 Seznam smazán' + msg);
+            edClose();
+        } catch (e) { toast('❌ ' + (((e && e.message) || e) + '').slice(0, 80)); }
+        setBusy(false, '');
+        await loadSources(); paint(0); paint(1);
+        await Promise.all([loadPane(0), loadPane(1)]);
+    };
+
     window.lmSwap = function () {
         var a = S.panes[0].src, b = S.panes[1].src; S.panes[0].src = b; S.panes[1].src = a;
         S.panes[0].filter = S.panes[1].filter = ''; ['lmFind0', 'lmFind1'].forEach(function (i) { var f = el(i); if (f) f.value = ''; });
