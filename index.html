@@ -7244,6 +7244,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-01', date: '1. 11. 2026', items: [
+            '📻 Online rádia: nahoře je mini přehrávač (⏮ ▶/⏸ ⏹ ⏭ + stavový řádek „Připojuji… / Hraje / Nefunguje“); streamy se vyhledávají přes radio-browser.info jako ověřené HTTPS (starší http adresy v appce nešly přehrát), když jeden stream selže, zkusí se automaticky další a při chybě už přehrávač nezůstane viset. Přibyly stanice (ČRo Plus, Proglas, Jemné, Anténa Rock, Lumen), ovládání funguje i z uzamčené obrazovky',
             '🔀 Správce seznamů: ve výběru seznamu je nová volba Rozdíl: Sinator vs Histra — ukáže seznamy, které jsou jen v jedné službě; u každého je tlačítko ➜ Sync (zapíše seznam i s položkami do druhé služby) a 🗑 (smaže ho). Když jsou seznamy v obou stejné, zobrazí se 0',
             '🌐 Nastavení → Vzhled → Jazyk: přepínač 🇨🇿 Čeština / 🇸🇰 Slovenčina — celá aplikace se přeloží do slovenčiny a z TMDB se načtou slovenské názvy filmů a seriálů, popisy i žánry (když slovenský překlad chybí, použije se český text). Po přepnutí se appka znovu načte. Ve slovenštině je tlačítko pro zkopírování nepřeložených textů, ať jde překlad doladit',
             '⚙️ Správce seznamů: vedle nadpisu je ozubené kolečko — vybereš 1 (horní seznam), 2 (spodní seznam) nebo 3 (nový seznam). Seznam 1/2 se otevře na celou obrazovku: mazání jedné či více označených položek, ✏️ přejmenování seznamu, 🗑 smazání seznamu, filtr a Vše / Nic',
@@ -24012,11 +24013,15 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 <button onclick="closeRadioModal()" style="background:none;border:1px solid var(--border);color:var(--text);width:30px;height:30px;border-radius:50%;cursor:pointer;">✕</button>
             </div>
         </div>
-        <div class="radio-now-playing" id="radioNowPlaying">
-            <span style="font-size:1.2rem;" id="radioStatusIcon">🔴</span>
-            <span class="radio-now-playing-name" id="radioNowName">—</span>
-            <button id="radioAltBtn" onclick="tryNextStream()" style="display:none;background:rgba(255,165,0,0.2);border:1px solid orange;color:orange;padding:4px 10px;border-radius:6px;font-size:0.78rem;cursor:pointer;white-space:nowrap;">🔄 Jiný zdroj</button>
-            <button class="radio-btn-stop" onclick="stopRadio()">⏹ Stop</button>
+        <div class="rp-mini" id="radioNowPlaying">
+            <div class="rp-ctl">
+                <button onclick="radioPrev()" title="Předchozí stanice">⏮</button>
+                <button id="radioPlayBtn" class="rp-main" onclick="radioToggle()" title="Přehrát / pauza">▶</button>
+                <button onclick="stopRadio()" title="Stop">⏹</button>
+                <button onclick="radioNext()" title="Další stanice">⏭</button>
+            </div>
+            <div class="rp-st"><span id="radioStatusIcon">⏹</span><span class="radio-now-playing-name" id="radioNowName">Vyber stanici</span></div>
+            <button id="radioAltBtn" style="display:none"></button>
         </div>
         <audio id="radioAudio" preload="none"></audio>
         <div class="radio-source-tabs" id="radioSourceTabs">
@@ -44274,62 +44279,134 @@ function toggleCollFav(id, name, poster, e) {
 }
 
 // -- RADIO ---------------------------------------------------------------------
+// Stanice se hledají přes radio-browser.info (HTTPS streamy, ověřené jako funkční); když jeden stream nejde,
+// automaticky se zkusí další. Mini přehrávač: ⏮ ▶/⏸ ⏹ ⏭ + stavový řádek.
 const RADIOS_CZ = [
-    { name:'Evropa 2',       genre:'Pop / Hity',    emoji:'🎵', stream:'http://ice1.abradio.cz/e2128.mp3' },
-    { name:'Frekvence 1',    genre:'Pop / Hity',    emoji:'🎶', stream:'http://ice1.abradio.cz/f1128.mp3' },
-    { name:'Rádio Impuls',   genre:'Česká hudba',   emoji:'🇨🇿', stream:'http://icecast5.play.cz/impuls128.mp3' },
-    { name:'Radio Kiss',     genre:'Pop / Dance',   emoji:'💋', stream:'http://icecast7.play.cz/kiss128.mp3' },
-    { name:'Rádio Blaník',   genre:'Oldies / ČR',   emoji:'🏰', stream:'http://ice.abradio.cz/blanikfm128.mp3' },
-    { name:'Rádio Beat',     genre:'Classic Rock',  emoji:'🎸', stream:'http://icecast7.play.cz/beat128.mp3' },
-    { name:'Country Radio',  genre:'Country',       emoji:'🤠', stream:'http://icecast6.play.cz/country128.mp3' },
-    { name:'ČRo Radiožurnál',genre:'Zprávy',        emoji:'📰', stream:'http://icecast10.play.cz/radiozurnal128.mp3' },
-    { name:'ČRo Dvojka',     genre:'Zábava / Talk', emoji:'2️⃣', stream:'http://icecast10.play.cz/dvojka128.mp3' },
-    { name:'ČRo Vltava',     genre:'Kultura',       emoji:'🎭', stream:'http://icecast10.play.cz/vltava128.mp3' },
-    { name:'Rock Radio',     genre:'Rock',          emoji:'🤘', stream:'http://ice.abradio.cz/sumava128.mp3' },
-    { name:'Rádio Bonton',   genre:'Nostalgie',     emoji:'🎙️', stream:'http://icecast7.play.cz/bonton128.mp3' },
-    { name:'Fajn Radio',     genre:'Nové hity',     emoji:'😎', stream:'http://ice.abradio.cz/fajn128.mp3' },
-    { name:'Rádio Čas',      genre:'Morava',        emoji:'⏰', stream:'http://stream.casradio.cz/cas128.mp3' },
-    { name:'Dance Radio',    genre:'Dance / EDM',   emoji:'🕺', stream:'http://icecast7.play.cz/dance128.mp3' },
-    { name:'Rádio Humor',    genre:'Humor',         emoji:'😂', stream:'http://mp3stream4.abradio.cz/humor128.mp3' },
-    { name:'Rádio SPIN',     genre:'Hip-hop / Rap', emoji:'🎤', stream:'http://icecast7.play.cz/spin128.mp3' },
-    { name:'Radio 1',        genre:'Alternativa',   emoji:'🌀', stream:'http://icecast.actve.net/radio1-128' },
-    { name:'Expres FM',      genre:'Pop',           emoji:'⚡', stream:'http://icecast5.play.cz/expres128.mp3' },
-    { name:'Signál Rádio',   genre:'České melodie', emoji:'📡', stream:'http://icecast7.play.cz/signal128.mp3' },
+    { name:'Evropa 2',        genre:'Pop / Hity',    emoji:'🎵', q:'Evropa 2',     tk:['evropa','2'],        stream:'https://ice.abradio.cz/europa2-128.mp3' },
+    { name:'Frekvence 1',     genre:'Pop / Hity',    emoji:'🎶', q:'Frekvence 1',  tk:['frekvence','1'],     stream:'https://ice.abradio.cz/frekvence1-128.mp3' },
+    { name:'Rádio Impuls',    genre:'Česká hudba',   emoji:'🇨🇿', q:'Impuls',       tk:['impuls'],            stream:'https://icecast2.play.cz/impuls128.mp3' },
+    { name:'Radio Kiss',      genre:'Pop / Dance',   emoji:'💋', q:'Kiss',         tk:['kiss'],              stream:'https://icecast2.play.cz/kiss128.mp3' },
+    { name:'Rádio Blaník',    genre:'Oldies / ČR',   emoji:'🏰', q:'Blanik',       tk:['blanik'],            stream:'https://ice.abradio.cz/blanikfm128.mp3' },
+    { name:'Rádio Beat',      genre:'Classic Rock',  emoji:'🎸', q:'Beat',         tk:['beat'],              stream:'https://icecast2.play.cz/beat128.mp3' },
+    { name:'Country Radio',   genre:'Country',       emoji:'🤠', q:'Country Radio',tk:['country'],           stream:'https://icecast2.play.cz/country128.mp3' },
+    { name:'ČRo Radiožurnál', genre:'Zprávy',        emoji:'📰', q:'Radiožurnál',  tk:['radiozurnal'],       stream:'https://rozhlas.stream/radiozurnal-high.mp3' },
+    { name:'ČRo Dvojka',      genre:'Zábava / Talk', emoji:'2️⃣', q:'Dvojka',       tk:['dvojka'],            stream:'https://rozhlas.stream/dvojka-high.mp3' },
+    { name:'ČRo Vltava',      genre:'Kultura',       emoji:'🎭', q:'Vltava',       tk:['vltava'],            stream:'https://rozhlas.stream/vltava-high.mp3' },
+    { name:'ČRo Plus',        genre:'Zprávy / Talk', emoji:'🗞️', q:'ČRo Plus',     tk:['plus'],              stream:'https://rozhlas.stream/plus-high.mp3' },
+    { name:'Rock Radio',      genre:'Rock',          emoji:'🤘', q:'Rock Radio',   tk:['rock','radio'],      stream:'https://ice.abradio.cz/sumava128.mp3' },
+    { name:'Rádio Bonton',    genre:'Nostalgie',     emoji:'🎙️', q:'Bonton',       tk:['bonton'],            stream:'https://icecast2.play.cz/bonton128.mp3' },
+    { name:'Fajn Radio',      genre:'Nové hity',     emoji:'😎', q:'Fajn',         tk:['fajn'],              stream:'https://ice.abradio.cz/fajn128.mp3' },
+    { name:'Rádio Čas',       genre:'Morava',        emoji:'⏰', q:'Radio Cas',    tk:['cas'],               stream:'https://stream.casradio.cz/cas128.mp3' },
+    { name:'Dance Radio',     genre:'Dance / EDM',   emoji:'🕺', q:'Dance Radio',  tk:['dance'],             stream:'https://icecast2.play.cz/dance128.mp3' },
+    { name:'Rádio Humor',     genre:'Humor',         emoji:'😂', q:'Humor',        tk:['humor'],             stream:'https://mp3stream4.abradio.cz/humor128.mp3' },
+    { name:'Rádio SPIN',      genre:'Hip-hop / Rap', emoji:'🎤', q:'Spin',         tk:['spin'],              stream:'https://icecast2.play.cz/spin128.mp3' },
+    { name:'Radio 1',         genre:'Alternativa',   emoji:'🌀', q:'Radio 1',      tk:['radio','1'],         stream:'https://icecast.actve.net/radio1-128' },
+    { name:'Expres FM',       genre:'Pop',           emoji:'⚡', q:'Expres',       tk:['expres'],            stream:'https://icecast2.play.cz/expres128.mp3' },
+    { name:'Radio Proglas',   genre:'Kultura / Duchovno', emoji:'🕊️', q:'Proglas', tk:['proglas'],           stream:'https://mp3.proglas.cz/proglas128.mp3' },
 ];
 
 const RADIOS_SK = [
-    { name:'Fun Radio',       genre:'Pop / Hity',    emoji:'🎵', stream:'http://stream.funradio.sk:8000/fun128.mp3' },
-    { name:'Fun Radio Dance', genre:'Dance / EDM',   emoji:'🕺', stream:'http://stream.funradio.sk:8000/dance128.mp3' },
-    { name:'Rádio Slovensko', genre:'Správy / Mix',  emoji:'🇸🇰', stream:'http://live.slovakradio.sk:8000/Slovensko_128.mp3' },
-    { name:'Rádio FM',        genre:'Alternatíva',   emoji:'🌀', stream:'http://live.slovakradio.sk:8000/FM_128.mp3' },
-    { name:'Rádio Regina',    genre:'Kultúra',       emoji:'🎭', stream:'http://live.slovakradio.sk:8000/Regina_BB_128.mp3' },
-    { name:'Európa 2 SK',     genre:'Pop / Dance',   emoji:'🎤', stream:'http://ice1.abradio.cz/e2sk128.mp3' },
-    { name:'Rock Radio SK',   genre:'Rock',          emoji:'🎸', stream:'http://stream.rockradio.sk/rockradio128.mp3' },
-    { name:'Best FM',         genre:'Pop',           emoji:'✨', stream:'http://stream.bestfm.sk/bestfm128.mp3' },
-    { name:'Rádio Vlna',      genre:'Pop / Oldies',  emoji:'🌊', stream:'http://stream.radiovlna.sk/vlna128.mp3' },
-    { name:'Rádio Expres',    genre:'Pop / Správy',  emoji:'⚡', stream:'http://stream.radiotv.sk/expres128.mp3' },
+    { name:'Fun Radio',       genre:'Pop / Hity',    emoji:'🎵', q:'Fun Radio',    tk:['fun','radio'], no:['dance'], stream:'https://stream.funradio.sk:8000/fun128.mp3' },
+    { name:'Fun Radio Dance', genre:'Dance / EDM',   emoji:'🕺', q:'Fun Radio Dance', tk:['fun','radio','dance'], stream:'https://stream.funradio.sk:8000/dance128.mp3' },
+    { name:'Rádio Slovensko', genre:'Správy / Mix',  emoji:'🇸🇰', q:'Slovensko',    tk:['slovensko'],   stream:'https://stream.srr.sk/slovensko_128.mp3' },
+    { name:'Rádio FM',        genre:'Alternatíva',   emoji:'🌀', q:'Radio FM',     tk:['fm'],          stream:'https://stream.srr.sk/fm_128.mp3' },
+    { name:'Rádio Regina',    genre:'Kultúra',       emoji:'🎭', q:'Regina',       tk:['regina'],      stream:'https://stream.srr.sk/regina_128.mp3' },
+    { name:'Európa 2 SK',     genre:'Pop / Dance',   emoji:'🎤', q:'Europa 2',     tk:['europa','2'],  stream:'https://ice.abradio.cz/e2sk128.mp3' },
+    { name:'Rock FM',         genre:'Rock',          emoji:'🎸', q:'Rock FM',      tk:['rock','fm'],   stream:'https://stream.rockfm.sk/rockfm128.mp3' },
+    { name:'Best FM',         genre:'Pop',           emoji:'✨', q:'Best FM',      tk:['best','fm'],   stream:'https://stream.bestfm.sk/bestfm128.mp3' },
+    { name:'Rádio Vlna',      genre:'Pop / Oldies',  emoji:'🌊', q:'Vlna',         tk:['vlna'],        stream:'https://stream.radiovlna.sk/vlna128.mp3' },
+    { name:'Rádio Expres',    genre:'Pop / Správy',  emoji:'⚡', q:'Expres',       tk:['expres'],      stream:'https://stream.expres.sk/expres128.mp3' },
+    { name:'Jemné',           genre:'Soft / Relax',  emoji:'🌸', q:'Jemne',        tk:['jemne'],       stream:'' },
+    { name:'Anténa Rock',     genre:'Rock',          emoji:'🤘', q:'Antena Rock',  tk:['antena','rock'], stream:'' },
+    { name:'Rádio Lumen',     genre:'Duchovno',      emoji:'🕯️', q:'Lumen',        tk:['lumen'],       stream:'' },
 ];
 let RADIOS = RADIOS_CZ;
-let radioState = { current: null, country: 'cz' };
+let radioState = { current: null, country: 'cz', status: 'idle', token: 0, retries: 0 };
 
-function switchRadioStream(idx) {
-    const r = RADIOS[idx];
-    if (!r || !r.streams || r.streams.length <= 1) return;
-    r._streamIdx = (r._streamIdx + 1) % r.streams.length;
-    r.stream = r.streams[r._streamIdx];
-    playRadio(idx);
-    // Update tlačítka
-    const btn = document.getElementById(`radioSwitchBtn_${idx}`);
-    if (btn) btn.textContent = `🔄 Zdroj ${r._streamIdx + 1}/${r.streams.length}`;
+const RB_HOSTS = ['https://de1.api.radio-browser.info', 'https://de2.api.radio-browser.info', 'https://fi1.api.radio-browser.info', 'https://nl1.api.radio-browser.info', 'https://at1.api.radio-browser.info'];
+function _rbNorm(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+async function _rbFetch(path) {
+    for (const base of RB_HOSTS) {
+        try {
+            const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 6000);
+            const r = await fetch(base + path, { signal: ctrl.signal }); clearTimeout(t);
+            if (r.ok) return await r.json();
+        } catch (e) {}
+    }
+    throw new Error('radio-browser nedostupný');
+}
+function _radioCacheGet() { try { return JSON.parse(localStorage.getItem('sinator_radio_urls_v2') || '{}') || {}; } catch (e) { return {}; } }
+function _radioCacheSet(c) { try { localStorage.setItem('sinator_radio_urls_v2', JSON.stringify(c)); } catch (e) {} }
+
+// Vrátí seznam kandidátních streamů (HTTPS, ověřené radio-browserem) + vestavěný záložní stream
+async function radioResolve(r, country, force) {
+    const key = country + '|' + r.name, cache = _radioCacheGet(), now = Date.now();
+    if (!force && cache[key] && now - cache[key].t < 24 * 3600 * 1000 && cache[key].urls.length) return cache[key].urls;
+    const urls = [];
+    const add = u => { if (!u || urls.indexOf(u) >= 0) return; if (location.protocol === 'https:' && !/^https:/i.test(u)) return; urls.push(u); };
+    try {
+        const list = await _rbFetch('/json/stations/search?name=' + encodeURIComponent(r.q || r.name) + '&countrycode=' + country.toUpperCase() + '&hidebroken=true&order=clickcount&reverse=true&limit=25');
+        const words = x => _rbNorm(x).split(/[^a-z0-9]+/).filter(Boolean);
+        const ok = list.filter(st => {
+            if (st.lastcheckok === 0) return false;
+            const w = words(st.name);
+            return (r.tk || []).every(t => w.indexOf(t) >= 0) && !(r.no || []).some(t => w.indexOf(t) >= 0);
+        });
+        ok.sort((a, b) => ((a.hls ? 1 : 0) - (b.hls ? 1 : 0)));
+        ok.slice(0, 6).forEach(st => { add(st.url_resolved); add(st.url); });
+    } catch (e) {}
+    if (r.stream) add(r.stream.replace(/^http:/i, 'https:'));
+    if (urls.length) { cache[key] = { t: now, urls: urls.slice(0, 8) }; _radioCacheSet(cache); }
+    return urls;
+}
+
+function _rpCss() {
+    if (document.getElementById('rpMiniCss')) return;
+    const st = document.createElement('style'); st.id = 'rpMiniCss';
+    st.textContent = '.rp-mini{display:flex;flex-direction:column;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border,#26304d);background:rgba(255,255,255,0.03);}'
+        + '.rp-ctl{display:flex;gap:8px;justify-content:center;align-items:center;}'
+        + '.rp-ctl button{background:var(--bg-elevated,#1b2340);color:var(--text,#fff);border:1px solid var(--border,#26304d);border-radius:10px;min-width:44px;height:36px;font-size:1.05rem;cursor:pointer;}'
+        + '.rp-ctl button.rp-main{min-width:64px;background:#e11d48;border-color:#e11d48;color:#fff;font-weight:700;}'
+        + '.rp-st{display:flex;align-items:center;gap:8px;font-size:0.85rem;min-height:1.4em;}.rp-st span:last-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+        + '.radio-item.rp-bad{opacity:.55;}';
+    document.head.appendChild(st);
+}
+function _radioUi() {
+    const st = radioState.status, r = (st !== 'idle' && radioState.playR) ? radioState.playR : null;
+    const icon = document.getElementById('radioStatusIcon'), name = document.getElementById('radioNowName'), pb = document.getElementById('radioPlayBtn');
+    const map = { idle: ['⏹', 'Vyber stanici'], connecting: ['⏳', 'Připojuji…'], playing: ['▶️', 'Hraje'], paused: ['⏸', 'Pozastaveno'], buffering: ['⏳', 'Načítám…'], error: ['❌', 'Nefunguje — zkus další ⏭'] };
+    const m = map[st] || map.idle;
+    if (icon) icon.textContent = m[0];
+    if (name) name.textContent = r ? (r.name + ' — ' + (st === 'playing' ? r.genre : m[1])) : m[1];
+    if (pb) pb.textContent = (st === 'playing' || st === 'connecting' || st === 'buffering') ? '⏸' : '▶';
+    const tgl = document.getElementById('btnRadioToggle'); if (tgl) tgl.classList.toggle('active', st === 'playing' || st === 'connecting' || st === 'buffering' || st === 'paused');
+    document.querySelectorAll('#radioGrid .radio-item').forEach((el, i) => {
+        const cur = radioState.current === i;
+        el.classList.toggle('playing', cur && st !== 'error');
+        el.classList.toggle('rp-bad', !!(RADIOS[i] && RADIOS[i]._bad));
+        let live = el.querySelector('.radio-item-live');
+        if (cur && (st === 'playing' || st === 'buffering' || st === 'connecting')) { if (!live) { live = document.createElement('div'); live.className = 'radio-item-live'; el.appendChild(live); } live.textContent = st === 'playing' ? '● ŽIVĚ' : '⏳'; }
+        else if (live) live.remove();
+    });
+    try {
+        if ('mediaSession' in navigator && r) {
+            navigator.mediaSession.metadata = new MediaMetadata({ title: r.name, artist: r.genre, album: 'Online rádia' });
+            navigator.mediaSession.setActionHandler('play', radioToggle); navigator.mediaSession.setActionHandler('pause', radioToggle);
+            navigator.mediaSession.setActionHandler('previoustrack', radioPrev); navigator.mediaSession.setActionHandler('nexttrack', radioNext);
+            navigator.mediaSession.setActionHandler('stop', stopRadio);
+        }
+    } catch (e) {}
 }
 
 function switchRadioCountry(country) {
     RADIOS = country === 'sk' ? RADIOS_SK : RADIOS_CZ;
     radioState.country = country;
-    radioState.current = null;
     document.querySelectorAll('.radio-source-tab').forEach(t => t.classList.remove('active'));
     const tabs = document.querySelectorAll('.radio-source-tab');
     tabs[country === 'sk' ? 1 : 0].classList.add('active');
+    // přehrávání jiné země nechám běžet; označení v mřížce jen u stejné země
+    if (radioState.playCountry && radioState.playCountry !== country) radioState.current = null;
+    else if (radioState.playCountry === country) radioState.current = radioState.playIdx;
     renderRadioGrid();
 }
 
@@ -44347,11 +44424,12 @@ function renderRadioGrid() {
             <div class="radio-item-emoji">${r.emoji}</div>
             <div class="radio-item-name">${r.name}</div>
             <div class="radio-item-genre">${r.genre}</div>
-            ${radioState.current === i ? '<div class="radio-item-live">● ZIVE</div>' : ''}
         </div>`).join('');
+    _radioUi();
 }
 
 function openRadioModal() {
+    _rpCss();
     renderRadioGrid();
     document.getElementById('radioModal').classList.add('open');
 }
@@ -44362,94 +44440,73 @@ function closeRadioModal() {
     if(stack.length > 0) { var p = stack.pop(); p.openFn(); }
 }
 
-function playRadio(idx, streamIdx = 0) {
-    const r = RADIOS[idx];
-    const audio = document.getElementById('radioAudio');
-    const nowPlaying = document.getElementById('radioNowPlaying');
-    const nowName = document.getElementById('radioNowName');
-
-    // Zastav předchozí
-    audio.pause();
-    audio.src = '';
-
-    if(radioState.current === idx && streamIdx === 0) {
-        // Druhý klik = stop
-        radioState.current = null;
-        nowPlaying.classList.remove('active');
-        document.getElementById('btnRadioToggle').classList.remove('active');
-        openRadioModal();
-        return;
-    }
-
-    const streams = r.streams || [r.stream];
-    const url = streams[streamIdx] || streams[0];
-    radioState.current = idx;
-    radioState.streamIdx = streamIdx;
-
-    audio.src = url;
-    audio.play().catch(() => {
-        // Selhalo — zkusit záložní
-        const next = streamIdx + 1;
-        if (next < streams.length) {
-            playRadio(idx, next);
-        } else {
-            // Žádný stream nefunguje — zobrazit chybu s tlačítkem
-            showRadioError(idx, r.name);
-        }
+// Zkusí jeden stream: true = hraje, false = chyba / timeout
+function _radioTry(audio, url, token) {
+    return new Promise(resolve => {
+        let done = false;
+        const fin = v => { if (done) return; done = true; clearTimeout(tm); audio.removeEventListener('playing', onOk); audio.removeEventListener('error', onErr); resolve(v); };
+        const onOk = () => fin(true), onErr = () => fin(false);
+        const tm = setTimeout(() => fin(false), 9000);
+        audio.addEventListener('playing', onOk); audio.addEventListener('error', onErr);
+        try { audio.src = url; const pr = audio.play(); if (pr && pr.catch) pr.catch(() => fin(false)); } catch (e) { fin(false); }
+        if (token !== radioState.token) fin(false);
     });
-
-    audio.onerror = () => {
-        const next = streamIdx + 1;
-        if (next < streams.length) {
-            playRadio(idx, next);
-        } else {
-            showRadioError(idx, r.name);
-        }
-    };
-
-    nowName.textContent = r.name + ' — ' + r.genre;
-    nowPlaying.classList.add('active');
-    document.getElementById('btnRadioToggle').classList.add('active');
-    openRadioModal(); // refresh grid
 }
 
-function showRadioError(idx, name) {
-    const nowName = document.getElementById('radioNowName');
-    const icon = document.getElementById('radioStatusIcon');
-    const altBtn = document.getElementById('radioAltBtn');
-    const nowPlaying = document.getElementById('radioNowPlaying');
-    if (nowPlaying) nowPlaying.classList.add('active');
-    if (nowName) nowName.textContent = `⚠️ ${name} — nelze přehrát`;
-    if (icon) icon.textContent = '⚠️';
-    if (altBtn) {
-        const r = RADIOS[idx];
-        const streams = r.streams || [r.stream];
-        const nextIdx = (radioState.streamIdx || 0) + 1;
-        if (nextIdx < streams.length) {
-            altBtn.style.display = 'inline-block';
-            altBtn.onclick = () => { altBtn.style.display = 'none'; playRadio(idx, nextIdx); };
-        } else {
-            altBtn.style.display = 'none';
+async function radioStart(idx, force) {
+    const r = RADIOS[idx]; if (!r) return;
+    const audio = document.getElementById('radioAudio');
+    const token = ++radioState.token;
+    radioState.current = idx; radioState.playIdx = idx; radioState.playCountry = radioState.country; radioState.playR = r;
+    audio.onerror = null; audio.pause(); audio.removeAttribute('src'); audio.load();
+    radioState.status = 'connecting'; _radioUi();
+    let urls = await radioResolve(r, radioState.country, force);
+    if (token !== radioState.token) return;
+    for (const u of urls) {
+        if (token !== radioState.token) return;
+        const ok = await _radioTry(audio, u, token);
+        if (token !== radioState.token) return;
+        if (ok) {
+            r._bad = false; radioState.status = 'playing'; radioState.retries = 0; _radioUi();
+            audio.onerror = () => { if (token !== radioState.token) return; if (radioState.retries++ < 2) radioStart(idx, true); else { radioState.status = 'error'; _radioUi(); } };
+            audio.onwaiting = () => { if (token === radioState.token && radioState.status === 'playing') { radioState.status = 'buffering'; _radioUi(); } };
+            audio.onplaying = () => { if (token === radioState.token) { radioState.status = 'playing'; _radioUi(); } };
+            audio.onpause = () => { if (token === radioState.token && !audio.ended && radioState.status === 'playing') { radioState.status = 'paused'; _radioUi(); } };
+            return;
         }
     }
+    // všechno selhalo → zkusit znovu bez cache (jednou), jinak chyba
+    if (!force) { const c = _radioCacheGet(); delete c[radioState.country + '|' + r.name]; _radioCacheSet(c); return radioStart(idx, true); }
+    audio.pause(); audio.removeAttribute('src');
+    r._bad = true; radioState.status = 'error'; _radioUi();
 }
 
-function tryNextStream() {
-    const idx = radioState.current;
-    if (idx == null) return;
-    const r = RADIOS[idx];
-    const streams = r.streams || [r.stream];
-    const next = ((radioState.streamIdx || 0) + 1) % streams.length;
-    playRadio(idx, next);
+function playRadio(idx) {
+    if (radioState.current === idx && (radioState.status === 'playing' || radioState.status === 'connecting' || radioState.status === 'buffering')) { stopRadio(); return; }
+    radioStart(idx, false);
 }
+function radioToggle() {
+    const audio = document.getElementById('radioAudio'), st = radioState.status;
+    if (st === 'playing' || st === 'buffering') { audio.pause(); radioState.status = 'paused'; _radioUi(); }
+    else if (st === 'connecting') { stopRadio(); }
+    else if (st === 'paused' && audio.src) { audio.play().then(() => { radioState.status = 'playing'; _radioUi(); }).catch(() => radioStart(radioState.current, true)); }
+    else radioStart(radioState.current != null ? radioState.current : 0, false);
+}
+function radioStep(d) {
+    const n = RADIOS.length; if (!n) return;
+    const cur = radioState.current != null ? radioState.current : (d > 0 ? -1 : 0);
+    radioStart((cur + d + n) % n, false);
+}
+function radioNext() { radioStep(1); }
+function radioPrev() { radioStep(-1); }
+function tryNextStream() { radioNext(); }
 
 function stopRadio() {
     const audio = document.getElementById('radioAudio');
-    audio.pause(); audio.src = '';
-    radioState.current = null;
-    document.getElementById('radioNowPlaying').classList.remove('active');
-    document.getElementById('btnRadioToggle').classList.remove('active');
-    openRadioModal();
+    radioState.token++;
+    audio.onerror = null; audio.onpause = null; audio.onwaiting = null; audio.onplaying = null;
+    audio.pause(); audio.removeAttribute('src'); audio.load();
+    radioState.current = null; radioState.playR = null; radioState.status = 'idle'; _radioUi();
 }
 
 // -- IVYSÍLÁNÍ ČT ----------------------------------------------------------------
