@@ -818,7 +818,7 @@ body.nm #logoContainer.logo-mini .logo-icon{
 }
 body.nm.hb-logo-hide #logoContainer.logo-mini{ display:block !important; }
 body.nm #nmSidebar{
-    display:block; position:fixed; left:0; bottom:0; top:var(--nm-top,64px); width:74px; z-index:900;
+    display:block; position:fixed; left:0; bottom:0; top:var(--nm-top,64px); width:74px; z-index:140;
     box-sizing:border-box; padding:8px 5px calc(8px + env(safe-area-inset-bottom,0px)) 5px;
     overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch;
     background:var(--bg-card,#10141f); border-right:1px solid var(--border,#333);
@@ -4161,18 +4161,30 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             ['DELETE ' + cont + '?tmdb', () => histraApi(cont + '?tmdb=' + encodeURIComponent(tid), { method: 'DELETE' })],
             ['POST /scrobble/continue/remove', () => histraApi(cont + '/remove', { method: 'POST', body: { [key]: { tmdb: tid }, tmdb: tid } })]
         ]);
-        const errs = []; let done = false;
-        for (const [label, run] of attempts) {
+        const hideLocal = () => { try { const m = JSON.parse(_store.getItem('sinator_histra_hide_progress') || '{}'); m[want + '_' + id] = Date.now(); _store.setItem('sinator_histra_hide_progress', JSON.stringify(m)); } catch (e) {} };
+        const errs = []; let done = false, localOnly = false;
+        if (!ent) {
+            // Položka není v „continue“ seznamu Histry — v Rozkoukaných je jen kvůli částečně shlédnutým epizodám v historii,
+            // takže v Histře není co mazat. Skryjeme ji jen v appce.
+            hideLocal(); done = true; localOnly = true;
+        }
+        if (ent && tv) {
+            const sn = ent.season ?? (ent.episode && ent.episode.season), nn = ent.number ?? ent.episode_number ?? (ent.episode && (ent.episode.number ?? ent.episode.episode));
+            if (sn != null && nn != null) attempts.unshift(['POST /scrobble clear + episode', () => histraApi('/api/v1/scrobble', { method: 'POST', body: { action: 'clear', show: { tmdb: tid }, episode: { season: Number(sn), number: Number(nn) } } })]);
+        }
+        for (const [label, run] of (done ? [] : attempts)) {
             try {
                 await run();
                 if (!(await stillThere())) { done = true; break; }
                 errs.push(label + ': OK, ale položka zůstala');
             } catch (e) { errs.push(label + ': ' + _hErr(e)); }
         }
+        if (!done && ent) { hideLocal(); done = true; localOnly = true; }
         if (done) {
             const v = state._histraView;
             if (v && v.kind === 'items' && /^Rozkoukan/.test(v.title || '')) v.items = v.items.filter(x => !(Number(x.id) === Number(id) && x.type === want));
-            _hToast('🗑️ Odebráno z rozkoukaných (Histra)');
+            _hToast(localOnly ? '🗑️ Skryto z Rozkoukaných (jen v appce — Histra mazání neumí; seriál se vrátí, až shlédneš další epizodu)' : '🗑️ Odebráno z rozkoukaných (Histra)');
+            if (localOnly) console.warn('histraClearProgress (jen lokálně):', errs);
         } else {
             console.warn('histraClearProgress:', errs);
             let dbg = ''; try { dbg = '\n\nZáznam z Histry: ' + (ent ? JSON.stringify(ent).slice(0, 400) : '(nenalezen v /continue)'); } catch (e) {}
@@ -5159,6 +5171,17 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     if (done.size) for (let i = out.length - 1; i >= 0; i--) if (done.has(Number(out[i].id))) out.splice(i, 1);
                 } catch (e) { console.warn('complete shows:', e); }
             }
+            // ručně skryté z Rozkoukaných (jen v appce) — u seriálu se vrátí, jakmile přibude nově shlédnutá epizoda
+            try {
+                const hm = JSON.parse(_store.getItem('sinator_histra_hide_progress') || '{}');
+                for (let i = out.length - 1; i >= 0; i--) {
+                    const t = hm[out[i].type + '_' + out[i].id]; if (!t) continue;
+                    const w = out[i]._w;
+                    if (w && w > 1e11 && w > t) { delete hm[out[i].type + '_' + out[i].id]; continue; }
+                    out.splice(i, 1);
+                }
+                _store.setItem('sinator_histra_hide_progress', JSON.stringify(hm));
+            } catch (e) {}
             return out;
         }, x => x);
     };
@@ -7361,6 +7384,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             'Zeptej se AI je i v detailu hudebního interpreta (písně, alba, kariéra, zajímavosti)',
             'AI odpovědi mají klikatelné odkazy: jména filmů, seriálů, herců a režisérů otevřou detail v appce (okno chatu se schová, vrátíš se přes tlačítko 🤖 vpravo)',
             'Zeptej se AI je i v nabídce po dlouhém podržení karty filmu / seriálu',
+            '🔧 Histra → Odebrat z rozkoukaných: Histra mazání rozkoukaných přes API neumí (u seriálů v Rozkoukaných jen kvůli částečně shlédnutým epizodám není co mazat), proto se položka skryje v appce; seriál se v Rozkoukaných znovu objeví, jakmile shlédneš novou epizodu',
             '🔧 Histra → Odebrat z rozkoukaných: zkouší víc způsobů mazání a ověří, že položka opravdu zmizela; při chybě ukáže skutečný důvod místo zavádějící hlášky o CORS',
             'Tlačítko se zobrazí jen když je připojená AI (Gemini, Groq nebo OpenRouter klíč v Nastavení → AI klíče)',
         ]},
