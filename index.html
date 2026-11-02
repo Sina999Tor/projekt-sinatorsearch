@@ -7311,6 +7311,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         { version: '2026-11-02b', date: '2. 11. 2026', items: [
             '🤖 Zeptej se AI: v detailu filmu, seriálu, herce i režiséra je nové tlačítko, které otevře plovoucí okno s AI chatem — zeptáš se na děj, jak to dopadne, zajímavosti, u herců na počet filmů, nejoblíbenější filmy a cokoli dalšího. Okno jde posouvat za hlavičku, rozhovor se pamatuje pro každý titul',
             'Zeptej se AI je i v detailu hudebního interpreta (písně, alba, kariéra, zajímavosti)',
+            'AI odpovědi mají klikatelné odkazy: jména filmů, seriálů, herců a režisérů otevřou detail v appce (okno chatu se schová, vrátíš se přes tlačítko 🤖 vpravo)',
             'Tlačítko se zobrazí jen když je připojená AI (Gemini, Groq nebo OpenRouter klíč v Nastavení → AI klíče)',
         ]},
         { version: '2026-11-02', date: '2. 11. 2026', items: [
@@ -54389,7 +54390,32 @@ window.sfFrAuto=async function(id,t){
   function connected(){ return !!(K('sinator_gemini_api_key')||K('sinator_groq_api_key')||K('sinator_openrouter_key').length>=20); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function sk(){ try{ return window.sinLang&&window.sinLang()==='sk'; }catch(e){ return false; } }
-  function md(t){ return esc(t).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/^\s*[-*•]\s+/gm,'• ').replace(/\n/g,'<br>'); }
+  function md(t){
+    var ic={film:'🎬',serial:'📺',osoba:'👤'};
+    return esc(t).replace(/\[\[(film|serial|osoba)\|([^\]|]+?)(?:\|(\d{4}))?\]\]/gi,function(m,ty,n,y){ ty=ty.toLowerCase(); return '<a href="#" data-ai-t="'+ty+'" data-ai-n="'+n+'" data-ai-y="'+(y||'')+'">'+ic[ty]+' '+n+(y?' ('+y+')':'')+'</a>'; })
+      .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/^\s*[-*•]\s+/gm,'• ').replace(/\n/g,'<br>'); }
+  async function openRef(ty,n,y){
+    var key=window._siGetKey&&window._siGetKey(); if(!key){ alert('Chybí TMDB API klíč.'); return; }
+    var base=(window._siGetBase&&window._siGetBase())||'https://api.themoviedb.org/3', lang=sk()?'sk-SK':'cs-CZ';
+    async function find(ep,yr){
+      var u=base+'/search/'+ep+'?api_key='+key+'&language='+lang+'&query='+encodeURIComponent(n)+(yr&&ep!=='person'?(ep==='tv'?'&first_air_date_year=':'&year=')+yr:'');
+      var j=await (await fetch(u)).json(); return (j.results||[]);
+    }
+    var ep=ty==='osoba'?'person':ty==='serial'?'tv':'movie', res=[];
+    try{
+      res=await find(ep,y); if(!res.length&&y) res=await find(ep,'');
+      if(!res.length&&ep!=='person'){ ep=ep==='tv'?'movie':'tv'; res=await find(ep,y); if(!res.length&&y) res=await find(ep,''); }
+    }catch(e){}
+    if(!res.length){ alert('„'+n+'“ se v databázi nepodařilo najít.'); return; }
+    var id=res[0].id, p=document.getElementById('aiAskPanel'), fab=document.getElementById('aiAskFab');
+    if(p) p.style.display='none'; if(fab) fab.style.display='flex';
+    var mm=document.getElementById('modal'); if(mm) mm.style.zIndex='9999';
+    try{
+      if(ep==='person'){ if(typeof openPersonDetail==='function') openPersonDetail(id); }
+      else if(window._siOpenDetail) window._siOpenDetail(id,ep);
+      else if(typeof openDetail==='function') openDetail(id,ep);
+    }catch(e){ alert('Detail se nepodařilo otevřít.'); }
+  }
 
   async function oai(url,key,model,msgs,hdrs){
     var ac=new AbortController(), tm=setTimeout(function(){ac.abort();},45000);
@@ -54420,7 +54446,7 @@ window.sfFrAuto=async function(id,t){
   function panel(){
     var p=document.getElementById('aiAskPanel'); if(p) return p;
     p=document.createElement('div'); p.id='aiAskPanel';
-    p.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;top:14%;max-width:560px;margin:0 auto;z-index:4600;display:none;flex-direction:column;background:var(--bg-card,#10141f);border:1px solid #a78bfa;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.7);overflow:hidden;';
+    p.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;top:14%;max-width:560px;margin:0 auto;z-index:10000;display:none;flex-direction:column;background:var(--bg-card,#10141f);border:1px solid #a78bfa;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.7);overflow:hidden;';
     p.innerHTML='<div id="aiAskHead" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(167,139,250,.15);border-bottom:1px solid var(--border,#333);cursor:move;touch-action:none;user-select:none;">'
       +'<span style="font-size:1.1rem;">🤖</span><span id="aiAskTitle" style="flex:1;min-width:0;font-weight:700;font-size:.9rem;color:var(--text,#fff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>'
       +'<button id="aiAskClear" title="Nový rozhovor" style="background:none;border:none;color:var(--text-muted,#aaa);font-size:1rem;cursor:pointer;padding:4px 6px;">🗑️</button>'
@@ -54431,7 +54457,14 @@ window.sfFrAuto=async function(id,t){
       +'<textarea id="aiAskInput" rows="1" placeholder="Zeptej se na cokoli…" style="flex:1;resize:none;max-height:90px;padding:10px 12px;border-radius:12px;border:1px solid var(--border,#333);background:var(--bg-elevated,#1c1c1c);color:var(--text,#fff);font-size:16px;outline:none;font-family:inherit;"></textarea>'
       +'<button id="aiAskSend" style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;border:none;background:#8b5cf6;color:#fff;font-size:1.2rem;cursor:pointer;">➤</button></div>';
     document.body.appendChild(p);
-    document.getElementById('aiAskClose').onclick=function(){ p.style.display='none'; };
+    var stl=document.createElement('style'); stl.textContent='#aiAskPanel,#aiAskPanel *{font-family:Inter,sans-serif !important;font-weight:400 !important;letter-spacing:normal !important;text-transform:none !important;-webkit-text-fill-color:currentColor !important;}#aiAskPanel #aiAskMsgs{font-size:.88rem !important;color:#e5e7eb !important;}#aiAskPanel #aiAskMsgs div{font-size:.88rem !important;line-height:1.5 !important;color:inherit !important;}#aiAskPanel #aiAskMsgs .aiu{color:#fff !important;}#aiAskPanel #aiAskMsgs .aie{color:#ff8a8a !important;}#aiAskPanel #aiAskTitle{font-weight:700 !important;font-size:.9rem !important;}#aiAskPanel b{font-weight:700 !important;}#aiAskPanel #aiAskMsgs a{color:#c4b5fd !important;text-decoration:underline !important;font-weight:700 !important;}#aiAskPanel #aiAskInput{font-size:16px !important;color:#fff !important;}#aiAskPanel #aiAskChips button{font-size:.75rem !important;}';
+    document.head.appendChild(stl);
+    var fab=document.createElement('button'); fab.id='aiAskFab'; fab.type='button'; fab.textContent='🤖'; fab.title='Zpět do AI chatu';
+    fab.style.cssText='display:none;position:fixed;right:12px;bottom:90px;width:52px;height:52px;border-radius:50%;border:2px solid #a78bfa;background:#2a2150;color:#fff;font-size:1.5rem;align-items:center;justify-content:center;z-index:10001;box-shadow:0 4px 16px rgba(0,0,0,.6);cursor:pointer;';
+    fab.onclick=function(){ fab.style.display='none'; p.style.display='flex'; render(); };
+    document.body.appendChild(fab);
+    document.getElementById('aiAskMsgs').addEventListener('click',function(e){ var a=e.target.closest&&e.target.closest('a[data-ai-t]'); if(!a) return; e.preventDefault(); openRef(a.dataset.aiT,a.dataset.aiN,a.dataset.aiY); });
+    document.getElementById('aiAskClose').onclick=function(){ p.style.display='none'; fab.style.display='none'; };
     document.getElementById('aiAskClear').onclick=function(){ if(cur){ convs[cur.key]=[]; render(); } };
     document.getElementById('aiAskSend').onclick=function(){ send(); };
     var inp=document.getElementById('aiAskInput');
@@ -54453,7 +54486,7 @@ window.sfFrAuto=async function(id,t){
     if(!c.length) h='<div style="color:var(--text-muted,#aaa);text-align:center;margin:10px 0;">Zeptej se na cokoli k „'+esc(cur.title)+'“ — děj, konec, obsazení, filmografii, zajímavosti…<br><span style="font-size:.72rem;opacity:.8;">AI může dělat chyby, důležité údaje si ověř.</span></div>';
     c.forEach(function(m){
       var u=m.role==='user';
-      h+='<div style="display:flex;justify-content:'+(u?'flex-end':'flex-start')+';margin:6px 0;"><div style="max-width:88%;padding:8px 12px;border-radius:14px;'+(u?'background:#8b5cf6;color:#fff;':'background:var(--bg-elevated,#1c1c1c);border:1px solid var(--border,#333);')+(m.err?'color:#ff8a8a;':'')+'">'+(u?esc(m.content):md(m.content))+'</div></div>';
+      h+='<div style="display:flex;justify-content:'+(u?'flex-end':'flex-start')+';margin:6px 0;"><div style="max-width:88%;padding:8px 12px;border-radius:14px;'+(u?'background:#8b5cf6;':'background:var(--bg-elevated,#1c1c1c);border:1px solid var(--border,#333);')+'" class="'+(u?'aiu':m.err?'aie':'')+'">'+(u?esc(m.content):md(m.content))+'</div></div>';
     });
     if(busy) h+='<div style="color:var(--text-muted,#aaa);margin:6px 0;">⟳ AI přemýšlí…</div>';
     box.innerHTML=h; box.scrollTop=box.scrollHeight;
@@ -54466,7 +54499,7 @@ window.sfFrAuto=async function(id,t){
     var inp=document.getElementById('aiAskInput'), q=(txt!=null?txt:inp.value).trim(); if(!q) return;
     inp.value=''; inp.style.height='auto';
     var c=convs[cur.key]=convs[cur.key]||[]; c.push({role:'user',content:q}); busy=true; render();
-    var sys='Jsi filmový, seriálový a hudební expert v aplikaci Sinator. Uživatel se ptá na: '+cur.label+' „'+cur.title+'“. Odpovídej '+(sk()?'slovensky':'česky')+', stručně a věcně (zhruba do 8 vět, pokud uživatel nechce víc). Nevymýšlej si — když si nejsi jistý, řekni to. Spoilery (konec, zvraty) uváděj jen když se na ně uživatel výslovně ptá. Níže je kontext z aplikace (TMDB), může být neúplný:\n'+cur.ctx;
+    var sys='Jsi filmový, seriálový a hudební expert v aplikaci Sinator. Uživatel se ptá na: '+cur.label+' „'+cur.title+'“. Odpovídej '+(sk()?'slovensky':'česky')+', stručně a věcně (zhruba do 8 vět, pokud uživatel nechce víc). Nevymýšlej si — když si nejsi jistý, řekni to. Spoilery (konec, zvraty) uváděj jen když se na ně uživatel výslovně ptá. Když zmiňuješ konkrétní film, seriál nebo osobu (herec, režisér…), zapiš je jako odkaz přesně v tomto tvaru: [[film|Název|rok]], [[serial|Název|rok]] nebo [[osoba|Jméno Příjmení]] (rok vynech, pokud ho neznáš; v odkazu nepoužívej další uvozovky ani tučné písmo). Právě zobrazený titul/osobu odkazem neoznačuj. Níže je kontext z aplikace (TMDB), může být neúplný:\n'+cur.ctx;
     var msgs=[{role:'system',content:sys}].concat(c.filter(function(m){return !m.err;}).slice(-14).map(function(m){return {role:m.role,content:m.content};}));
     try{ var a=await ask(msgs); c.push({role:'assistant',content:a.trim()}); }
     catch(e){ c.push({role:'assistant',content:'⚠️ AI se nepodařilo zavolat: '+e.message,err:true}); }
@@ -54478,7 +54511,7 @@ window.sfFrAuto=async function(id,t){
       var mc=document.getElementById('musicResultsContainer'), mh=mc&&mc.querySelector('h2'); if(!mh) return;
       var mt=(mh.textContent||'').trim(), mctx=(mc.innerText||'').replace(/[ \t]+/g,' ').replace(/\n\s*\n+/g,'\n').trim().slice(0,3000);
       cur={key:'music|'+mt,title:mt,kind:'music',label:'hudební interpret (kapela / zpěvák / skladatel)',ctx:mctx};
-      var mp=panel(); mp.style.display='flex';
+      var mp=panel(); mp.style.display='flex'; var fb2=document.getElementById('aiAskFab'); if(fb2) fb2.style.display='none';
       document.getElementById('aiAskTitle').textContent='Zeptej se AI — '+mt;
       render(); return;
     }
@@ -54488,7 +54521,7 @@ window.sfFrAuto=async function(id,t){
     var title=(h.textContent||'').trim(), ctx=(mb.innerText||'').replace(/[ \t]+/g,' ').replace(/\n\s*\n+/g,'\n').trim().slice(0,3000);
     var key=kind+'|'+(top.type||'')+'|'+(top.id||'')+'|'+title;
     cur={key:key,title:title,kind:kind,label:label,ctx:ctx};
-    var p=panel(); p.style.display='flex';
+    var p=panel(); p.style.display='flex'; var fb=document.getElementById('aiAskFab'); if(fb) fb.style.display='none';
     document.getElementById('aiAskTitle').textContent='Zeptej se AI — '+title;
     render(); setTimeout(function(){ var i=document.getElementById('aiAskInput'); if(i&&!/Android|iPhone|iPad/i.test(navigator.userAgent)) i.focus(); },50);
   };
