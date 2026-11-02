@@ -7312,6 +7312,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             '🤖 Zeptej se AI: v detailu filmu, seriálu, herce i režiséra je nové tlačítko, které otevře plovoucí okno s AI chatem — zeptáš se na děj, jak to dopadne, zajímavosti, u herců na počet filmů, nejoblíbenější filmy a cokoli dalšího. Okno jde posouvat za hlavičku, rozhovor se pamatuje pro každý titul',
             'Zeptej se AI je i v detailu hudebního interpreta (písně, alba, kariéra, zajímavosti)',
             'AI odpovědi mají klikatelné odkazy: jména filmů, seriálů, herců a režisérů otevřou detail v appce (okno chatu se schová, vrátíš se přes tlačítko 🤖 vpravo)',
+            'Zeptej se AI je i v nabídce po dlouhém podržení karty filmu / seriálu',
             'Tlačítko se zobrazí jen když je připojená AI (Gemini, Groq nebo OpenRouter klíč v Nastavení → AI klíče)',
         ]},
         { version: '2026-11-02', date: '2. 11. 2026', items: [
@@ -53258,6 +53259,11 @@ window.sfFrAuto=async function(id,t){
             closeSheet();
             try { if (typeof window.sfTrailer === 'function') window.sfTrailer(m.id, m.type); } catch (e) { console.warn(e); }
         });
+        var aiOk = false; try { aiOk = typeof window.aiAskConnected === 'function' && window.aiAskConnected(); } catch (e) {}
+        if (aiOk) addBtn('🤖', 'Zeptej se AI', '', function () {
+            closeSheet();
+            try { window.aiAskForTitle(m.id, m.type, m.title, m.year); } catch (e) { console.warn(e); }
+        });
         addBtn('🧩', 'Sinator menu (watchlist, hodnocení, seznam…)', '', function () {
             closeSheet();
             try { window.openCardSinatorMenu(m.id, m.type, (typeof jsq === 'function' ? jsq(m.title) : m.title.replace(/'/g, "\\'")), m.year, m.poster, document.createElement('span')); } catch (e) { console.warn(e); }
@@ -54506,6 +54512,21 @@ window.sfFrAuto=async function(id,t){
     busy=false; render();
   }
 
+  window.aiAskConnected=connected;
+  window.aiAskForTitle=async function(id,type,title,year){
+    type=type==='tv'?'tv':'movie';
+    var key=window._siGetKey&&window._siGetKey(), base=(window._siGetBase&&window._siGetBase())||'https://api.themoviedb.org/3', ctx='Název: '+title+(year?' ('+year+')':'');
+    try{
+      var j=await (await fetch(base+'/'+type+'/'+id+'?api_key='+key+'&language='+(sk()?'sk-SK':'cs-CZ')+'&append_to_response=credits')).json(), cr=j.credits||{};
+      var dir=(cr.crew||[]).filter(function(c){return c.job==='Director';}).map(function(c){return c.name;}).slice(0,3).join(', ');
+      var cast=(cr.cast||[]).slice(0,10).map(function(c){return c.name+(c.character?' ('+c.character+')':'');}).join(', ');
+      ctx+='\nPůvodní název: '+(j.original_title||j.original_name||'')+'\nŽánry: '+(j.genres||[]).map(function(g){return g.name;}).join(', ')+'\nHodnocení TMDB: '+j.vote_average
+        +(j.runtime?'\nStopáž: '+j.runtime+' min':'')+(type==='tv'?'\nSérií: '+j.number_of_seasons+', epizod: '+j.number_of_episodes:'')+'\nPopis: '+(j.overview||'')+(dir?'\nRežie: '+dir:'')+(cast?'\nHrají: '+cast:'');
+    }catch(e){}
+    cur={key:'title|'+type+'|'+id+'|'+title,title:title,kind:'title',label:type==='tv'?'seriál':'film',ctx:ctx};
+    var p=panel(); p.style.display='flex'; var fb=document.getElementById('aiAskFab'); if(fb) fb.style.display='none';
+    document.getElementById('aiAskTitle').textContent='Zeptej se AI — '+title; render();
+  };
   window.aiAskOpen=function(src){
     if(src==='music'){
       var mc=document.getElementById('musicResultsContainer'), mh=mc&&mc.querySelector('h2'); if(!mh) return;
