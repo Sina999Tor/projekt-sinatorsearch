@@ -3073,6 +3073,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         // instrukce v UI u tlačítka "Synchronizovat nyní"). Žádné CORS, token se
         // nikdy neposílá přes cizí server. Pokud endpoint není nasazený, rychle
         // selže (retries:1, 404) a jde se na přímé volání.
+        let _proxyErr = null, _proxy404 = false;
         if (myBackendReady()) {
             try {
                 const res = await fetchWithRetry(
@@ -3082,10 +3083,11 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 );
                 if (res.status !== 404) {
                     const body = await parseBody(res);
-                    if (!res.ok) throw new Error((body && (body.error || body.message)) || `HTTP ${res.status}`);
+                    if (!res.ok) { const he = new Error(((body && (body.error || body.message)) || 'chyba') + ` (HTTP ${res.status})`); he._http = true; throw he; }
                     return body;
                 }
-            } catch (e) { /* proxy není nasazená nebo selhala — jdeme na přímé volání */ }
+                _proxy404 = true;
+            } catch (e) { if (e && e._http) _proxyErr = e; /* proxy není nasazená nebo selhala — jdeme na přímé volání */ }
         }
 
         // 2) Přímé volání na histra.net — projde jen pokud Histra CORS pro
@@ -3098,6 +3100,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             if (!res.ok) throw new Error((body && (body.error || body.message)) || `HTTP ${res.status}`);
             return body;
         } catch (directErr) {
+            if (_proxyErr) throw _proxyErr; // proxy odpověděla skutečnou chybou z Histry — ukaž ji místo zavádějícího CORS
+            if (_proxy404) throw new Error('Histra / proxy vrátila 404 — operace (' + _m + ' ' + path + ') na Histře neexistuje, nebo není nasazená proxy histra-proxy.');
             throw new Error('CORS zablokoval volání na histra.net z prohlížeče. Potřebuješ přidat malý proxy endpoint na svůj sinator-backend (viz nápověda u tlačítka Synchronizovat) — bez toho nejde Histru z webové appky napojit bezpečně.');
         }
     }
@@ -4123,13 +4127,40 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     window.histraClearProgress = async function(id, type) {
         if (!histraReady()) { alert('⚠️ Histra není připojená.'); return; }
         if (!confirm('Odebrat z rozkoukaných v Histře (bez označení jako shlédnuto)?')) return;
-        const body = _hIsTv(type) ? { action: 'clear', show: { tmdb: String(id) } } : { action: 'clear', movie: { tmdb: String(id) } };
-        try {
-            await histraApi('/api/v1/scrobble', { method: 'POST', body });
-            const v = state._histraView, want = _hIsTv(type) ? 'tv' : 'movie';
+        const tv = _hIsTv(type), want = tv ? 'tv' : 'movie', tid = String(id);
+        const cont = tv ? '/api/v1/scrobble/shows/continue' : '/api/v1/scrobble/continue';
+        const key = tv ? 'show' : 'movie';
+        async function stillThere() {
+            try {
+                const raw = await histraProgressRaw(want);
+                return raw.some(e => { const it = histraMapProgress(e, want); return it && Number(it.id) === Number(id); });
+            } catch (e) { return false; }
+        }
+        // Přesný tvar „smazat rozkoukané“ není v dokumentaci Histry jistý — zkoušíme varianty po řadě a po každé
+        // ověříme, že položka z /continue opravdu zmizela (200 OK samo o sobě nestačí).
+        const attempts = [
+            ['POST ' + '/scrobble clear', () => histraApi('/api/v1/scrobble', { method: 'POST', body: { action: 'clear', [key]: { tmdb: tid } } })],
+            ['DELETE ' + cont, () => histraApi(cont, { method: 'DELETE', body: { [key]: { tmdb: tid }, tmdb: tid } })],
+            ['DELETE ' + cont + '/{id}', () => histraApi(cont + '/' + encodeURIComponent(tid), { method: 'DELETE' })],
+            ['DELETE ' + cont + '?tmdb', () => histraApi(cont + '?tmdb=' + encodeURIComponent(tid), { method: 'DELETE' })],
+            ['POST /scrobble/continue/remove', () => histraApi(cont + '/remove', { method: 'POST', body: { [key]: { tmdb: tid }, tmdb: tid } })]
+        ];
+        const errs = []; let done = false;
+        for (const [label, run] of attempts) {
+            try {
+                await run();
+                if (!(await stillThere())) { done = true; break; }
+                errs.push(label + ': OK, ale položka zůstala');
+            } catch (e) { errs.push(label + ': ' + _hErr(e)); }
+        }
+        if (done) {
+            const v = state._histraView;
             if (v && v.kind === 'items' && /^Rozkoukan/.test(v.title || '')) v.items = v.items.filter(x => !(Number(x.id) === Number(id) && x.type === want));
             _hToast('🗑️ Odebráno z rozkoukaných (Histra)');
-        } catch (e) { _hToast('❌ ' + _hErr(e)); }
+        } else {
+            console.warn('histraClearProgress:', errs);
+            alert('❌ Z rozkoukaných se nepodařilo odebrat.\n\n' + errs.join('\n'));
+        }
     };
 
     // ══ Posuvná lišta s abecedou pro všechny seznamy s řazením A–Z (stejná jako u Shlédnutých) ══
@@ -7313,6 +7344,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             'Zeptej se AI je i v detailu hudebního interpreta (písně, alba, kariéra, zajímavosti)',
             'AI odpovědi mají klikatelné odkazy: jména filmů, seriálů, herců a režisérů otevřou detail v appce (okno chatu se schová, vrátíš se přes tlačítko 🤖 vpravo)',
             'Zeptej se AI je i v nabídce po dlouhém podržení karty filmu / seriálu',
+            '🔧 Histra → Odebrat z rozkoukaných: zkouší víc způsobů mazání a ověří, že položka opravdu zmizela; při chybě ukáže skutečný důvod místo zavádějící hlášky o CORS',
             'Tlačítko se zobrazí jen když je připojená AI (Gemini, Groq nebo OpenRouter klíč v Nastavení → AI klíče)',
         ]},
         { version: '2026-11-02', date: '2. 11. 2026', items: [
