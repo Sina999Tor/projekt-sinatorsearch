@@ -7243,6 +7243,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-01h', date: '1. 11. 2026', items: [
+            { admin: true, text: '📩 Admin level 2: upozornění na žádosti o přístup — když přijde nová žádost (nebo po spuštění appky čeká nevyřízená), nahoře naskočí žlutý banner s tlačítkem Otevřít (rovnou na Registrované uživatele), zavibruje, nastaví se odznak na ikoně appky a při povolených upozorněních přijde i systémová notifikace. Připomene se i po návratu do appky (po 30 min)' },
+        ]},
         { version: '2026-11-01g', date: '1. 11. 2026', items: [
             '🎧 TV / Rádio: nová položka Audioknihy / E-knihy — otevře AB Community (v2.abcommunity.eu); zobrazuje se jen při přihlášeném Admin level 2',
         ]},
@@ -48568,6 +48571,7 @@ function updateAdminStatus() {
   if (usersBox) usersBox.style.display = isLvl2 ? 'block' : 'none';
   if (usersMsg) usersMsg.style.display = (active && !isLvl2) ? 'block' : 'none';
   if (isLvl2 && typeof attachAdminUsersListener === 'function') attachAdminUsersListener();
+  if (isLvl2 && typeof startAccessReqWatcher === 'function') startAccessReqWatcher();
   // Přepínač "Značení nefunkčních TV streamů" — vidí a mění jen Admin level 2
   const tvBrokenBox = document.getElementById('tvBrokenSettingsBox');
   if (tvBrokenBox) tvBrokenBox.style.display = isLvl2 ? 'block' : 'none';
@@ -49072,6 +49076,72 @@ function _bindAccessReqActions() {
 
 // ---- ADMIN: přehled registrovaných uživatelů (online/offline + ⭐ admin) ----
 let _adminUsersListenerAttached = false;
+
+// ── Admin level 2: upozornění na nové žádosti o přístup ──────────────────────
+let _accessWatchAttached = false, _accessSeen = new Set(), _accessFirst = true, _accessBannerAt = 0, _accessPending = [];
+function _accessBannerHide() { const b = document.getElementById('accessReqBanner'); if (b) b.remove(); }
+function _accessOpenUsers() {
+  _accessBannerHide();
+  try { if (typeof openSettingsModal === 'function') openSettingsModal(); } catch (e) {}
+  setTimeout(function() { try { if (window.swOpen) window.swOpen('adUsers'); } catch (e) {} }, 150);
+}
+window._accessOpenUsers = _accessOpenUsers;
+function _accessBannerShow(pending, isNew) {
+  _accessBannerHide();
+  if (!pending.length) return;
+  _accessBannerAt = Date.now();
+  const first = pending[0], more = pending.length - 1;
+  const esc = typeof _escapeHtmlU === 'function' ? _escapeHtmlU : (x => String(x).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])));
+  const age = first.ts ? _formatLastSeen(first.ts) : '';
+  const b = document.createElement('div'); b.id = 'accessReqBanner';
+  b.style.cssText = 'position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:100080;background:#2b2410;border:1.5px solid #ffd700;color:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 8px 30px rgba(0,0,0,.6);font-size:14px;line-height:19px;';
+  const canAsk = ('Notification' in window) && Notification.permission === 'default';
+  b.innerHTML = '<div style="display:flex;gap:10px;align-items:flex-start;"><div style="font-size:24px;line-height:26px;">📩</div><div style="flex:1;min-width:0;">'
+    + '<div style="font-weight:700;color:#ffd700;">' + (isNew ? 'Nová žádost o přístup' : 'Čeká žádost o přístup') + (pending.length > 1 ? ' (' + pending.length + ')' : '') + '</div>'
+    + '<div style="margin-top:2px;overflow-wrap:anywhere;">' + esc(first.nick) + (more > 0 ? ' a další (' + more + ')' : '') + (first.existing ? ' <span style="color:#ffb347;">· přezdívka už existuje</span>' : '') + (age ? ' <span style="opacity:.6;">· ' + esc(age) + '</span>' : '') + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;"><button id="accessReqOpen" style="background:#ffd700;color:#111;border:none;border-radius:10px;padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer;">Otevřít</button>'
+    + (canAsk ? '<button id="accessReqPerm" style="background:none;border:1px solid #ffd700;color:#ffd700;border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;">🔔 Povolit upozornění</button>' : '')
+    + '</div></div><button id="accessReqX" style="background:none;border:none;color:#fff;font-size:20px;line-height:20px;cursor:pointer;padding:0 2px;">✕</button></div>';
+  document.body.appendChild(b);
+  b.querySelector('#accessReqOpen').onclick = _accessOpenUsers;
+  b.querySelector('#accessReqX').onclick = _accessBannerHide;
+  const pb = b.querySelector('#accessReqPerm'); if (pb) pb.onclick = function() { try { Notification.requestPermission().then(function() { pb.remove(); }); } catch (e) {} };
+}
+async function _accessSystemNotify(fresh) {
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const f = fresh[0], body = f.nick + (fresh.length > 1 ? ' a další (' + (fresh.length - 1) + ')' : '') + ' žádá o přístup do appky';
+    let reg = null;
+    try { reg = await navigator.serviceWorker.getRegistration('/notify-scope/'); } catch (e) {}
+    if (!reg) { try { reg = await navigator.serviceWorker.ready; } catch (e) {} }
+    if (reg && reg.showNotification) await reg.showNotification('📩 Nová žádost o přístup', { body: body, tag: 'sinator-access-req', renotify: true, vibrate: [200, 100, 200] });
+  } catch (e) {}
+}
+function startAccessReqWatcher() {
+  if (_accessWatchAttached || !window._isAdminLevel2()) return;
+  _accessWatchAttached = true;
+  onValue(ref(rtdb, 'presence'), (snap) => {
+    if (!window._isAdminLevel2()) { _accessBannerHide(); try { if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (e) {} return; }
+    const all = snap.exists() ? snap.val() : {};
+    const pending = Object.entries(all)
+      .filter(([k, v]) => k.indexOf('_req_') === 0 && v && v.rn && v.st === 'pending')
+      .map(([k, v]) => ({ rk: k, nick: v.rn, ts: v.ts || 0, existing: !!(v.existing || v.prev) }))
+      .sort((a, b) => a.ts - b.ts);
+    _accessPending = pending;
+    try { if (pending.length) { if (navigator.setAppBadge) navigator.setAppBadge(pending.length); } else if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (e) {}
+    const fresh = pending.filter(p => !_accessSeen.has(p.rk));
+    pending.forEach(p => _accessSeen.add(p.rk));
+    if (!pending.length) { _accessBannerHide(); _accessFirst = false; return; }
+    if (_accessFirst) { _accessFirst = false; _accessBannerShow(pending, false); }          // připomínka po startu appky
+    else if (fresh.length) { _accessBannerShow(pending, true); _accessSystemNotify(fresh); try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {} }
+  });
+  // Po návratu do appky znovu připomenout nevyřízené žádosti (nejdřív po 30 min od posledního zobrazení)
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible' && window._isAdminLevel2() && _accessPending.length && !document.getElementById('accessReqBanner') && Date.now() - _accessBannerAt > 30 * 60000) _accessBannerShow(_accessPending, false);
+  });
+}
+window.startAccessReqWatcher = startAccessReqWatcher;
+setTimeout(function() { try { startAccessReqWatcher(); } catch (e) {} }, 1500);
 
 function attachAdminUsersListener() {
   if (!window._isAdminLevel2()) return; // zobrazení + správa uživatelů jen pro Admin level 2
