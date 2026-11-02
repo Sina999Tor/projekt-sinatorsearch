@@ -2318,6 +2318,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 10px;line-height:1.4;">
                     Přehled všech jmen/přezdívek nastavených v appce a jejich aktuální online stav (aktualizuje se v reálném čase).
                 </div>
+                <label style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:0.82rem;cursor:pointer;"><input type="checkbox" id="onlineNotifyChk" checked onchange="window.setOnlineNotify && window.setOnlineNotify(this.checked)"> 🟢 Upozornit, když je uživatel online / se připojí</label>
                 <div style="margin-bottom:14px;">
                     <span class="settings-label" style="color:#ffd700;">📩 Žádosti o přístup <span id="adminAccessReqCount"></span></span>
                     <div id="adminAccessReqList" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
@@ -7243,6 +7244,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-01i', date: '1. 11. 2026', items: [
+            { admin: true, text: '🟢 Admin level 2: když je některý uživatel online nebo se připojí, krátce naskočí zelená bublina „NICK je online“ (a při appce na pozadí i systémová notifikace). Stejného uživatele připomene nejdřív po 10 min; vypnout jde zaškrtávátkem v Admin → Registrovaní uživatelé' },
+        ]},
         { version: '2026-11-01h', date: '1. 11. 2026', items: [
             { admin: true, text: '📩 Admin level 2: upozornění na žádosti o přístup — když přijde nová žádost (nebo po spuštění appky čeká nevyřízená), nahoře naskočí žlutý banner s tlačítkem Otevřít (rovnou na Registrované uživatele), zavibruje, nastaví se odznak na ikoně appky a při povolených upozorněních přijde i systémová notifikace. Připomene se i po návratu do appky (po 30 min)' },
         ]},
@@ -48572,6 +48576,8 @@ function updateAdminStatus() {
   if (usersMsg) usersMsg.style.display = (active && !isLvl2) ? 'block' : 'none';
   if (isLvl2 && typeof attachAdminUsersListener === 'function') attachAdminUsersListener();
   if (isLvl2 && typeof startAccessReqWatcher === 'function') startAccessReqWatcher();
+  if (isLvl2 && typeof startOnlineWatcher === 'function') startOnlineWatcher();
+  const _onChk = document.getElementById('onlineNotifyChk'); if (_onChk) _onChk.checked = (typeof _onlineEnabled === 'function') ? _onlineEnabled() : true;
   // Přepínač "Značení nefunkčních TV streamů" — vidí a mění jen Admin level 2
   const tvBrokenBox = document.getElementById('tvBrokenSettingsBox');
   if (tvBrokenBox) tvBrokenBox.style.display = isLvl2 ? 'block' : 'none';
@@ -49142,6 +49148,55 @@ function startAccessReqWatcher() {
 }
 window.startAccessReqWatcher = startAccessReqWatcher;
 setTimeout(function() { try { startAccessReqWatcher(); } catch (e) {} }, 1500);
+
+// ── Admin level 2: upozornění, když je některý uživatel online (nebo se připojí) ──
+let _onlineWatchAttached = false, _onlineState = new Map(), _onlineLastNotify = new Map(), _onlineSnap = null;
+function _onlineEnabled() { try { return localStorage.getItem('sinator_online_notify') !== '0'; } catch (e) { return true; } }
+window.setOnlineNotify = function(on) { try { localStorage.setItem('sinator_online_notify', on ? '1' : '0'); } catch (e) {} };
+function _onlineBubble(text) {
+  const esc = typeof _escapeHtmlU === 'function' ? _escapeHtmlU : (x => String(x).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])));
+  let c = document.getElementById('onlineBubbles');
+  if (!c) { c = document.createElement('div'); c.id = 'onlineBubbles'; c.style.cssText = 'position:fixed;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);z-index:100079;display:flex;flex-direction:column;gap:6px;pointer-events:none;max-width:calc(100vw - 20px);'; document.body.appendChild(c); }
+  const b = document.createElement('div');
+  b.style.cssText = 'background:rgba(18,32,22,.96);border:1px solid #22c55e;color:#fff;border-radius:18px;padding:8px 14px;font-size:14px;line-height:18px;box-shadow:0 4px 18px rgba(0,0,0,.5);opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;overflow-wrap:anywhere;';
+  b.innerHTML = '<span style="color:#22c55e;">●</span> ' + esc(text);
+  c.appendChild(b);
+  requestAnimationFrame(function() { b.style.opacity = '1'; b.style.transform = 'none'; });
+  setTimeout(function() { b.style.opacity = '0'; b.style.transform = 'translateY(8px)'; setTimeout(function() { b.remove(); }, 300); }, 4500);
+}
+async function _onlineSystemNotify(title, body, tag) {
+  try {
+    if (!document.hidden || !('Notification' in window) || Notification.permission !== 'granted') return;   // v popředí stačí bublina
+    let reg = null;
+    try { reg = await navigator.serviceWorker.getRegistration('/notify-scope/'); } catch (e) {}
+    if (!reg) { try { reg = await navigator.serviceWorker.ready; } catch (e) {} }
+    if (reg && reg.showNotification) await reg.showNotification(title, { body: body, tag: tag, renotify: true, vibrate: [100] });
+  } catch (e) {}
+}
+function _onlineProcess() {
+  if (!_onlineSnap || !window._isAdminLevel2()) return;
+  const now = Date.now(), myKey = _sanitizeNickKey(localStorage.getItem(USER_NICK_KEY) || ''), next = new Map(), newly = [];
+  Object.entries(_onlineSnap).forEach(([k, u]) => {
+    if (!u || !u.nick || k.charAt(0) === '_' || k === myKey) return;
+    const on = (now - (u.t || 0)) < USER_STALE_MS;
+    next.set(k, on);
+    if (on && !_onlineState.get(k) && now - (_onlineLastNotify.get(k) || 0) > 10 * 60000) { newly.push(u.nick); _onlineLastNotify.set(k, now); }
+  });
+  _onlineState = next;
+  if (!newly.length || !_onlineEnabled()) return;
+  const text = newly.length > 2 ? 'Online: ' + newly.join(', ') : newly.map(n => n + ' je online').join('\n');
+  (newly.length > 2 ? [text] : newly.map(n => n + ' je online')).forEach(t => _onlineBubble(t));
+  _onlineSystemNotify('🟢 ' + (newly.length > 2 ? 'Online uživatelé' : newly[0] + ' je online'), newly.length > 2 ? newly.join(', ') : 'Právě se připojil do Sinatoru', 'sinator-online');
+  try { if (navigator.vibrate && !document.hidden) navigator.vibrate(60); } catch (e) {}
+}
+function startOnlineWatcher() {
+  if (_onlineWatchAttached || !window._isAdminLevel2()) return;
+  _onlineWatchAttached = true;
+  onValue(ref(rtdb, 'presence'), (snap) => { _onlineSnap = snap.exists() ? snap.val() : {}; _onlineProcess(); });
+  setInterval(_onlineProcess, 30000);   // odchody se projeví jen časem (záznam zestárne) — přepočítat i bez změny v databázi
+}
+window.startOnlineWatcher = startOnlineWatcher;
+setTimeout(function() { try { startOnlineWatcher(); } catch (e) {} }, 1800);
 
 function attachAdminUsersListener() {
   if (!window._isAdminLevel2()) return; // zobrazení + správa uživatelů jen pro Admin level 2
