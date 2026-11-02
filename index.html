@@ -3055,6 +3055,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     const HISTRA_BASE = 'https://histra.net';
     function histraToken() { return _store.getItem('sinator_histra_token') || ''; }
     function histraReady() { return !!histraToken(); }
+    function _hBodyMsg(body, status) {
+        if (body == null) return 'HTTP ' + status;
+        const m = body.error != null ? body.error : (body.message != null ? body.message : body);
+        let t = (typeof m === 'string') ? m : (m && typeof m === 'object' ? (m.message || m.detail || JSON.stringify(m)) : String(m));
+        if (body && typeof body === 'object' && body.error != null && body.message && typeof body.error !== 'string') t += ' — ' + body.message;
+        return String(t).slice(0, 300) + ' (HTTP ' + status + ')';
+    }
     async function histraApi(path, opts = {}) {
         const _m = String(opts.method || 'GET').toUpperCase();
         const _body = opts.body !== undefined ? JSON.stringify(opts.body) : undefined;
@@ -3083,7 +3090,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 );
                 if (res.status !== 404) {
                     const body = await parseBody(res);
-                    if (!res.ok) { const he = new Error(((body && (body.error || body.message)) || 'chyba') + ` (HTTP ${res.status})`); he._http = true; throw he; }
+                    if (!res.ok) { const he = new Error(_hBodyMsg(body, res.status)); he._http = true; throw he; }
                     return body;
                 }
                 _proxy404 = true;
@@ -3097,7 +3104,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         try {
             const res = await fetchWithRetry(targetUrl, { method: _m, headers: _body !== undefined ? { ...authHeaders, 'Content-Type': 'application/json' } : authHeaders, ...(_body !== undefined ? { body: _body } : {}) }, { retries: _m === 'GET' ? 1 : 0, delayMs: 500, timeoutMs: 10000 });
             const body = await parseBody(res);
-            if (!res.ok) throw new Error((body && (body.error || body.message)) || `HTTP ${res.status}`);
+            if (!res.ok) throw new Error(_hBodyMsg(body, res.status));
             return body;
         } catch (directErr) {
             if (_proxyErr) throw _proxyErr; // proxy odpověděla skutečnou chybou z Histry — ukaž ji místo zavádějícího CORS
@@ -4138,13 +4145,22 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         }
         // Přesný tvar „smazat rozkoukané“ není v dokumentaci Histry jistý — zkoušíme varianty po řadě a po každé
         // ověříme, že položka z /continue opravdu zmizela (200 OK samo o sobě nestačí).
-        const attempts = [
+        let ent = null;
+        try { const raw = await histraProgressRaw(want); ent = raw.find(e => { const it = histraMapProgress(e, want); return it && Number(it.id) === Number(id); }) || null; } catch (e) {}
+        const eid = ent ? (ent.id ?? ent.playback_id ?? ent.progress_id ?? ent.entry_id ?? null) : null;
+        const attempts = [];
+        if (eid != null) {
+            attempts.push(['DELETE ' + cont + '/' + eid, () => histraApi(cont + '/' + encodeURIComponent(eid), { method: 'DELETE' })]);
+            attempts.push(['DELETE /api/v1/scrobble/' + eid, () => histraApi('/api/v1/scrobble/' + encodeURIComponent(eid), { method: 'DELETE' })]);
+            attempts.push(['DELETE /api/v1/scrobble/playback/' + eid, () => histraApi('/api/v1/scrobble/playback/' + encodeURIComponent(eid), { method: 'DELETE' })]);
+        }
+        attempts.push(...[
             ['POST ' + '/scrobble clear', () => histraApi('/api/v1/scrobble', { method: 'POST', body: { action: 'clear', [key]: { tmdb: tid } } })],
             ['DELETE ' + cont, () => histraApi(cont, { method: 'DELETE', body: { [key]: { tmdb: tid }, tmdb: tid } })],
             ['DELETE ' + cont + '/{id}', () => histraApi(cont + '/' + encodeURIComponent(tid), { method: 'DELETE' })],
             ['DELETE ' + cont + '?tmdb', () => histraApi(cont + '?tmdb=' + encodeURIComponent(tid), { method: 'DELETE' })],
             ['POST /scrobble/continue/remove', () => histraApi(cont + '/remove', { method: 'POST', body: { [key]: { tmdb: tid }, tmdb: tid } })]
-        ];
+        ]);
         const errs = []; let done = false;
         for (const [label, run] of attempts) {
             try {
@@ -4159,7 +4175,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             _hToast('🗑️ Odebráno z rozkoukaných (Histra)');
         } else {
             console.warn('histraClearProgress:', errs);
-            alert('❌ Z rozkoukaných se nepodařilo odebrat.\n\n' + errs.join('\n'));
+            let dbg = ''; try { dbg = '\n\nZáznam z Histry: ' + (ent ? JSON.stringify(ent).slice(0, 400) : '(nenalezen v /continue)'); } catch (e) {}
+            alert('❌ Z rozkoukaných se nepodařilo odebrat.\n\n' + errs.join('\n') + dbg);
         }
     };
 
