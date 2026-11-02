@@ -787,6 +787,59 @@ header .logo-container.logo-mini .logo-icon{ height:38px !important; max-height:
 header .logo-container.logo-mini ~ .header-actions{
     flex:1 1 0 !important; width:auto !important; min-width:0 !important; padding-left:6px !important;
 }
+
+/* ═══ NOVÝ VZHLED HLAVIČKY (volba v Nastavení → Vzhled → Rozvržení) ═══
+   body.nm = nový vzhled; body.nm-open = rozbalené boční menu (obsah se zmenší a posune doprava) */
+#nmDots{display:none;}
+#nmSidebar{display:none;}
+body.nm #nmDots{
+    display:flex !important; align-items:center; justify-content:center; flex:0 0 auto;
+    width:42px; height:42px; margin:6px 0 6px 8px; padding:0; border-radius:12px;
+    background:var(--bg-elevated,#1c1c1c); border:1px solid var(--border,#333); color:var(--text,#fff);
+    font-size:1.5rem; font-weight:900; line-height:1; cursor:pointer; -webkit-tap-highlight-color:transparent;
+}
+body.nm.nm-open #nmDots{ border-color:var(--accent,#ffd700); color:var(--accent,#ffd700); }
+body.nm header{
+    flex-wrap:nowrap !important; justify-content:space-between !important; align-items:center !important;
+    padding-left:0 !important; padding-right:8px !important;
+}
+body.nm #logoContainer,
+body.nm #logoContainer.logo-mini{
+    position:relative !important; top:auto !important; left:auto !important; z-index:auto;
+    flex:0 1 auto !important; width:auto !important; max-width:calc(100% - 66px) !important;
+    margin:6px 0 6px auto !important; padding:0 !important; border-radius:10px; display:block !important;
+}
+body.nm #logoContainer .logo,
+body.nm #logoContainer.logo-mini .logo{ width:auto !important; display:block !important; font-size:inherit !important; }
+body.nm #logoContainer .logo-icon,
+body.nm #logoContainer.logo-mini .logo-icon{
+    width:auto !important; height:40px !important; max-height:40px !important; max-width:100% !important;
+    margin:0 !important; border-radius:0 !important; object-fit:contain !important; display:block !important;
+}
+body.nm.hb-logo-hide #logoContainer.logo-mini{ display:block !important; }
+body.nm #nmSidebar{
+    display:block; position:fixed; left:0; bottom:0; top:var(--nm-top,64px); width:74px; z-index:900;
+    box-sizing:border-box; padding:8px 5px calc(8px + env(safe-area-inset-bottom,0px)) 5px;
+    overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch;
+    background:var(--bg-card,#10141f); border-right:1px solid var(--border,#333);
+    transform:translateX(-102%); transition:transform .25s ease; visibility:hidden;
+}
+body.nm.nm-open #nmSidebar{ transform:translateX(0); visibility:visible; }
+body.nm #nmSidebar .header-actions{
+    display:flex !important; flex-direction:column !important; flex-wrap:nowrap !important; align-items:stretch !important;
+    position:static !important; width:100% !important; max-width:none !important; height:auto !important; max-height:none !important;
+    margin:0 !important; padding:0 !important; gap:6px !important; overflow:visible !important;
+    background:none !important; border:0 !important; box-shadow:none !important;
+}
+body.nm #nmSidebar .header-actions > .action-btn:not(.hb-off){
+    display:flex !important; flex-direction:column !important; align-items:center !important; justify-content:center !important;
+    position:relative !important; width:100% !important; min-width:0 !important; max-width:none !important;
+    min-height:54px; margin:0 !important; flex:0 0 auto !important; box-sizing:border-box;
+}
+body.nm #nmSidebar .header-actions > .action-btn.hb-off{ display:none !important; }
+body.nm #nmSidebar #btnToggleToolbar{ display:none !important; }
+body.nm{ transition:padding-left .25s ease; }
+body.nm.nm-open{ padding-left:74px !important; box-sizing:border-box !important; }
 </style>
   <script>
     (function() {
@@ -881,6 +934,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
 <div class="bg-animation"></div>
 
 <header>
+    <button id="nmDots" type="button" title="Menu" aria-label="Menu" onclick="nmToggleMenu()">&#8942;</button>
     <div class="logo-container" id="logoContainer" onclick="goHome()" title="Návrat na hlavní stránku">
         <!-- ✅ FILMOVÁ IKONA V NADPISU -->
         <div class="logo">
@@ -926,6 +980,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         <button class="action-btn icon" id="btnToggleToolbar" onclick="toggleToolbar()" title="Schovat tlačítka">▲</button>
     </div>
 </header>
+<div id="nmSidebar"></div>
 
 <!-- 🔍 Vyhledávání overlay -->
 <div id="searchOverlay" class="search-overlay">
@@ -1971,6 +2026,15 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 </div>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Slovenčina přeloží celou aplikaci a z TMDB načte slovenské názvy a popisy (když chybí, použije se český text). Po přepnutí se aplikace znovu načte.</div>
                 <button id="langMissingBtn" class="settings-full-btn" style="display:none;margin-top:8px;" onclick="sinCopyMissing()" data-notr>📋 Zkopírovat nepřeložené texty</button>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section">
+                <span class="settings-label">📐 Rozvržení hlavní stránky</span>
+                <div style="display:flex;gap:8px;margin-top:10px;" data-notr>
+                    <button id="layoutBtnOld" class="settings-full-btn" style="flex:1;margin:0;" onclick="nmSetLayout('old')">Starý</button>
+                    <button id="layoutBtnNew" class="settings-full-btn" style="flex:1;margin:0;" onclick="nmSetLayout('new')">Nový</button>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">Nový: malé logo vpravo a tlačítka schovaná v menu pod třemi tečkami vlevo nahoře. Po otevření menu se filmy zmenší a posunou doprava. Výchozí je Starý.</div>
             </div>
             <div class="settings-divider"></div>
             <button class="settings-full-btn" onclick="toggleFullscreen()" id="settingsFullscreenBtn">📺 Fullscreen (vypnuto)</button>
@@ -52113,6 +52177,7 @@ window.addEventListener('load', function() {
       {key:'lkIcons',  icon:'🎨', name:'Ikony',            c:'#e879f9', sub:'Barevné ikony tlačítek', els:[{label:'Ikony'}]},
       {key:'lkWatch',  icon:'📺', name:'Kde se to dá sledovat', c:'#c084fc', sub:'Streamovací služby v detailu', els:[{label:'Kde se to dá sledovat'}]},
       {key:'lkLang',   icon:'🌐', name:'Jazyk',            c:'#38bdf8', sub:function(){ return (window.sinLang && window.sinLang()==='sk') ? '🇸🇰 Slovenčina' : '🇨🇿 Čeština'; }, els:[{label:'Jazyk'}]},
+      {key:'lkLayout', icon:'📐', name:'Rozvržení',        c:'#34d399', sub:function(){ var m='old'; try{ m=((typeof _store!=='undefined'&&_store)||localStorage).getItem('sinator_layout_mode')==='new'?'new':'old'; }catch(e){} return m==='new' ? 'Nový (menu pod třemi tečkami)' : 'Starý'; }, els:[{label:'Rozvržení hlavní stránky'}]},
       {key:'lkFull',   icon:'⛶',  name:'Fullscreen',       c:'#a78bfa', sub:function(){ var m=_t('settingsFullscreenBtn','').match(/\(([^)]+)\)/); return m ? m[1].charAt(0).toUpperCase()+m[1].slice(1) : 'Celá obrazovka'; }, els:[{id:'settingsFullscreenBtn'}]}]},
     admin:{container:'settingsTabContentAdmin', kids:[
       {key:'adAccess', icon:'🛡️', name:'Admin přístup',           c:'#ffaa00', sub:function(){ var on=false; try{ on=localStorage.getItem('sinator_admin_mode')==='1'; }catch(e){} return on?'✅ Aktivní':'Neaktivní'; }, els:[{label:'Admin přístup'}]},
@@ -54249,6 +54314,62 @@ window.sfFrAuto=async function(id,t){
     };
 })();
 
+</script>
+<script>
+/* ═══ Nový vzhled hlavní stránky (logo vpravo, menu pod ⋮, obsah se posouvá) ═══ */
+(function(){
+  var KEY='sinator_layout_mode', ph=null, mo=null;
+  function S(){ try{ return (typeof _store!=='undefined'&&_store)||localStorage; }catch(e){ return localStorage; } }
+  function mode(){ try{ return S().getItem(KEY)==='new'?'new':'old'; }catch(e){ return 'old'; } }
+  function ha(){ return document.querySelector('.header-actions'); }
+  function sync(){
+    var h=document.querySelector('header'), sb=document.getElementById('nmSidebar');
+    if(h&&sb) sb.style.setProperty('--nm-top', Math.round(h.getBoundingClientRect().bottom)+'px');
+  }
+  function spacer(){ try{ if(typeof updateHeaderSpacer==='function') setTimeout(updateHeaderSpacer,50); }catch(e){} setTimeout(sync,60); }
+  function ui(){
+    var o=document.getElementById('layoutBtnOld'), n=document.getElementById('layoutBtnNew'), m=mode();
+    [[o,'old'],[n,'new']].forEach(function(p){ if(!p[0])return; var on=m===p[1];
+      p[0].style.borderColor=on?'#34d399':''; p[0].style.color=on?'#34d399':''; p[0].style.fontWeight=on?'700':''; });
+  }
+  function apply(){
+    var isNew=mode()==='new', b=document.body, a=ha(), sb=document.getElementById('nmSidebar'), hd=document.querySelector('header');
+    if(!a||!sb||!hd) return;
+    if(isNew){
+      if(a.parentNode!==sb){ ph=document.createComment('nm-ha'); a.parentNode.insertBefore(ph,a); sb.appendChild(a); }
+      b.classList.add('nm'); a.classList.remove('collapsed');
+      if(!mo && window.MutationObserver){
+        mo=new MutationObserver(function(){ var x=ha(); if(mode()==='new'&&x&&x.classList.contains('collapsed')) x.classList.remove('collapsed'); });
+        mo.observe(a,{attributes:true,attributeFilter:['class']});
+      }
+    } else {
+      b.classList.remove('nm','nm-open');
+      if(a.parentNode===sb){
+        if(ph&&ph.parentNode){ ph.parentNode.insertBefore(a,ph); ph.parentNode.removeChild(ph); ph=null; }
+        else hd.appendChild(a);
+      }
+      try{ if(typeof _applyToolbarState==='function') _applyToolbarState(parseInt(S().getItem('sinator_toolbar_state')||'0')); }catch(e){}
+    }
+    ui(); spacer();
+  }
+  window.nmToggleMenu=function(){
+    if(mode()!=='new') return;
+    document.body.classList.toggle('nm-open'); sync(); spacer();
+  };
+  window.nmSetLayout=function(m){
+    try{ S().setItem(KEY, m==='new'?'new':'old'); }catch(e){}
+    apply();
+    try{ if(window.settingsRefreshSubmenu) window.settingsRefreshSubmenu(); }catch(e){}
+  };
+  function init(){
+    apply();
+    var h=document.querySelector('header');
+    if(h&&window.ResizeObserver) new ResizeObserver(sync).observe(h);
+    window.addEventListener('resize',sync); window.addEventListener('orientationchange',function(){ setTimeout(sync,200); });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+  window.addEventListener('load',function(){ apply(); setTimeout(sync,300); });
+})();
 </script>
 </body>
 </html>
