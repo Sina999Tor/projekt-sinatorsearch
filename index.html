@@ -7379,6 +7379,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-03c', date: '3. 11. 2026', items: [
+            '🎤 Zeptej se AI: u pole pro dotaz je nová ikonka mikrofonu. Klepnutí = diktování (text se objeví v poli, odešleš ➤). Podržení = 🔴 ŽIVÝ REŽIM — ptáš se hlasem, AI odpoví nahlas a hned zase poslouchá, dokud to neukončíš klepnutím na ⏹ nebo slovem „konec“ / „stop“. Živý režim se vypne i zavřením chatu. Potřebuje povolený mikrofon a připojení k internetu (rozpoznávání řeči dělá prohlížeč)',
+        ] },
         { version: '2026-11-03b', date: '3. 11. 2026', items: [
             '🎵 Hudba → seznam skladeb alba: skladby se teď pouštějí v plovoucím okně přímo v appce (místo otevření YouTube) — okno jde přetahovat, ⏮ ⏭ přepíná skladby, po skončení skladby se samo pustí další, ▁ schová video a hudba hraje dál, ↗ otevře YouTube, ✕ zavře. Právě hrající skladba je v seznamu zvýrazněná; zavření seznamu hudbu nevypne. Když se skladba nenajde, otevře se vyhledávání na YouTube jako dřív; 📱 (SmartTube) beze změny',
         ] },
@@ -54985,6 +54988,93 @@ window.sfFrAuto=async function(id,t){
       : ['O čem to je? (bez spoilerů)','Obsazení a režie','Kolekce / pokračování','Podobné tituly','Jak to dopadne? (spoiler)','Zajímavosti z natáčení'];
   }
 
+  /* 🎤 Hlasové zadávání: klepnutí = diktování do pole, podržení = ŽIVÝ REŽIM (poslech → odpověď nahlas → poslech …, dokud neukončíš ⏹ / „konec“) */
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition, rec=null, dict=false, live=false, speaking=false, vstate='', netErr=0;
+  function vlang(){ return sk()?'sk-SK':'cs-CZ'; }
+  function vtoast(t){ try{ showToast(t); }catch(e){} }
+  function vfit(inp){ inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,90)+'px'; }
+  function vui(){
+    var b=document.getElementById('aiAskMic'), l=document.getElementById('aiAskLive'), inp=document.getElementById('aiAskInput'); if(!b) return;
+    b.textContent=live?'⏹':'🎤'; b.classList.toggle('rec',live||dict);
+    if(l){ l.style.display=live?'block':'none';
+      l.textContent={listen:'🔴 Živý režim — poslouchám… (ukončíš ⏹ nebo řekni „konec“)',think:'🔴 Živý režim — přemýšlím…',speak:'🔴 Živý režim — odpovídám nahlas… (⏹ ukončí)'}[vstate]||'🔴 Živý režim'; }
+    if(inp) inp.placeholder=live?'Mluv…':(dict?'Poslouchám…':'Zeptej se na cokoli…');
+  }
+  function stopRec(){ if(rec){ try{ rec.onend=null; rec.onerror=null; rec.onresult=null; rec.abort(); }catch(e){} rec=null; } }
+  function listenOnce(base,done){
+    stopRec(); var r=new SR(), fin='', itm='', err='', inp=document.getElementById('aiAskInput'); rec=r;
+    r.lang=vlang(); r.interimResults=true; r.continuous=false; r.maxAlternatives=1;
+    r.onresult=function(e){ fin=''; itm=''; for(var i=0;i<e.results.length;i++){ var t=e.results[i][0].transcript; if(e.results[i].isFinal) fin+=t; else itm+=t; }
+      if(inp){ inp.value=((base?base+' ':'')+fin+itm).trim(); vfit(inp); } };
+    r.onerror=function(e){ err=e.error||'error'; };
+    r.onend=function(){ if(rec!==r) return; rec=null; done((fin||itm).trim(),err); };
+    try{ r.start(); }catch(e){ rec=null; done('','start'); }
+  }
+  function micDenied(err){ if(/not-allowed|service-not-allowed/.test(err||'')){ vtoast('Povol mikrofon pro appku (nastavení prohlížeče / webu)'); return true; } return false; }
+  function dictStart(){
+    var inp=document.getElementById('aiAskInput'); if(!inp) return; dict=true; vui(); var base=inp.value.trim();
+    listenOnce(base,function(txt,err){ dict=false; vui(); if(micDenied(err)) return; if(err==='network') vtoast('Rozpoznávání řeči potřebuje připojení'); if(txt){ inp.value=((base?base+' ':'')+txt).trim(); vfit(inp); } });
+  }
+  function vclean(t){
+    return String(t||'').replace(/\[\[(?:film|serial|osoba|app|kolekce|postava)\|([^\]|]+?)(?:\|[^\]]*)?\]\]/gi,'$1').replace(/https?:\/\/\S+/g,'').replace(/\*\*/g,'').replace(/[•*_#`]/g,' ').replace(/\s+/g,' ').trim();
+  }
+  function speak(t,done){
+    t=vclean(t); if(!t||!window.speechSynthesis){ done(); return; }
+    if(t.length>900){ var cut=t.slice(0,900), k=Math.max(cut.lastIndexOf('. '),cut.lastIndexOf('! '),cut.lastIndexOf('? ')); t=k>300?cut.slice(0,k+1):cut; }
+    try{ speechSynthesis.cancel(); }catch(e){}
+    var u=new SpeechSynthesisUtterance(t); u.lang=vlang();
+    try{ var v=(speechSynthesis.getVoices()||[]).filter(function(x){ return (x.lang||'').toLowerCase().replace('_','-').indexOf(vlang().slice(0,2))===0; })[0]; if(v) u.voice=v; }catch(e){}
+    speaking=true; vstate='speak'; vui(); var fin=false, wd=null;
+    var end=function(){ if(fin) return; fin=true; clearTimeout(wd); speaking=false; done(); };
+    u.onend=end; u.onerror=end; wd=setTimeout(function(){ try{ speechSynthesis.cancel(); }catch(e){} end(); },6000+t.length*115);
+    speechSynthesis.speak(u);
+  }
+  function liveStop(){ if(!live&&!dict&&!speaking) return; live=false; dict=false; stopRec(); try{ window.speechSynthesis&&speechSynthesis.cancel(); }catch(e){} speaking=false; vstate=''; netErr=0; vui(); }
+  function liveLoop(){
+    if(!live) return;
+    var p=document.getElementById('aiAskPanel'); if(!p||p.style.display==='none'){ liveStop(); return; }
+    if(busy||speaking){ setTimeout(liveLoop,400); return; }
+    vstate='listen'; vui();
+    listenOnce('',function(txt,err){
+      if(!live) return;
+      if(micDenied(err)){ liveStop(); return; }
+      if(err==='network'){ if(++netErr>=3){ vtoast('Rozpoznávání řeči potřebuje připojení'); liveStop(); return; } } else netErr=0;
+      if(!txt){ setTimeout(liveLoop,250); return; }
+      var inp=document.getElementById('aiAskInput'); if(inp){ inp.value=''; vfit(inp); }
+      var w=txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z ]/g,'').trim();
+      if(/^(konec|stop|ukonci|ukoncit|dost|ticho|koncime)$/.test(w)){ liveStop(); vtoast('Živý režim ukončen'); return; }
+      vstate='think'; vui(); var key=cur&&cur.key;
+      send(txt).then(function(){
+        if(!live) return; var c=(key&&convs[key])||[], m=c[c.length-1];
+        if(m&&m.role==='assistant'&&!m.err) speak(m.content,liveLoop); else liveLoop();
+      },function(){ liveLoop(); });
+    });
+  }
+  function liveStart(){
+    if(!cur) return; if(dict){ stopRec(); dict=false; }
+    live=true; netErr=0; vstate='listen'; vui();
+    try{ if(navigator.vibrate) navigator.vibrate(40); }catch(e){}
+    liveLoop();
+  }
+  function wireMic(){
+    var mb=document.getElementById('aiAskMic'); if(!mb) return;
+    var stl=document.createElement('style'); stl.textContent='@keyframes aiMicPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.6)}100%{box-shadow:0 0 0 14px rgba(239,68,68,0)}}#aiAskMic.rec{background:#ef4444 !important;border-color:#ef4444 !important;animation:aiMicPulse 1.2s infinite}';
+    document.head.appendChild(stl);
+    var lt=null, longFired=false;
+    mb.addEventListener('contextmenu',function(e){ e.preventDefault(); });
+    mb.addEventListener('pointerdown',function(){ longFired=false; if(live) return; clearTimeout(lt);
+      lt=setTimeout(function(){ longFired=true; if(!SR){ vtoast('Hlasové zadávání tenhle prohlížeč nepodporuje'); return; } liveStart(); },550); });
+    mb.addEventListener('pointercancel',function(){ clearTimeout(lt); });
+    mb.addEventListener('pointerup',function(){
+      clearTimeout(lt);
+      if(longFired){ longFired=false; return; }
+      if(live){ liveStop(); return; }
+      if(!SR){ vtoast('Hlasové zadávání tenhle prohlížeč nepodporuje'); return; }
+      if(dict){ if(rec){ try{ rec.stop(); }catch(e){} } else { dict=false; vui(); } return; }
+      dictStart();
+    });
+  }
+
   function panel(){
     var p=document.getElementById('aiAskPanel'); if(p) return p;
     p=document.createElement('div'); p.id='aiAskPanel';
@@ -54996,8 +55086,10 @@ window.sfFrAuto=async function(id,t){
       +'<button id="aiAskClose" style="background:none;border:none;color:var(--text,#fff);font-size:1.2rem;cursor:pointer;padding:4px 6px;">✕</button></div>'
       +'<div id="aiAskMsgs" style="flex:1;overflow-y:auto;padding:12px;font-size:.88rem;line-height:1.5;color:var(--text,#fff);-webkit-overflow-scrolling:touch;"></div>'
       +'<div id="aiAskChips" style="display:flex;gap:6px;overflow-x:auto;padding:6px 10px 0;flex:0 0 auto;"></div>'
+      +'<div id="aiAskLive" style="display:none;padding:6px 12px;font-size:.78rem;color:#fca5a5;background:rgba(239,68,68,.12);text-align:center;"></div>'
       +'<div style="display:flex;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));align-items:flex-end;">'
       +'<textarea id="aiAskInput" rows="1" placeholder="Zeptej se na cokoli…" style="flex:1;resize:none;max-height:90px;padding:10px 12px;border-radius:12px;border:1px solid var(--border,#333);background:var(--bg-elevated,#1c1c1c);color:var(--text,#fff);font-size:16px;outline:none;font-family:inherit;"></textarea>'
+      +'<button id="aiAskMic" type="button" title="Klepnutí = diktovat, podržení = živý režim" style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;border:1px solid #a78bfa;background:#2a2150;color:#fff;font-size:1.2rem;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;">🎤</button>'
       +'<button id="aiAskSend" style="flex:0 0 auto;width:44px;height:44px;border-radius:12px;border:none;background:#8b5cf6;color:#fff;font-size:1.2rem;cursor:pointer;">➤</button></div>';
     document.body.appendChild(p);
     var stl=document.createElement('style'); stl.textContent='#aiAskPanel,#aiAskPanel *{font-family:Inter,sans-serif !important;font-weight:400 !important;letter-spacing:normal !important;text-transform:none !important;-webkit-text-fill-color:currentColor !important;}#aiAskPanel #aiAskMsgs{font-size:.88rem !important;color:#e5e7eb !important;}#aiAskPanel #aiAskMsgs div{font-size:.88rem !important;line-height:1.5 !important;color:inherit !important;}#aiAskPanel #aiAskMsgs .aiu{color:#fff !important;}#aiAskPanel #aiAskMsgs .aie{color:#ff8a8a !important;}#aiAskPanel #aiAskTitle{font-weight:700 !important;font-size:.9rem !important;}#aiAskPanel b{font-weight:700 !important;}#aiAskPanel #aiAskMsgs a{color:#c4b5fd !important;text-decoration:underline !important;font-weight:700 !important;}#aiAskPanel #aiAskInput{font-size:16px !important;color:#fff !important;}#aiAskPanel #aiAskChips button{font-size:.75rem !important;}';
@@ -55007,10 +55099,11 @@ window.sfFrAuto=async function(id,t){
     fab.onclick=function(){ fab.style.display='none'; p.style.display='flex'; render(); };
     document.body.appendChild(fab);
     document.getElementById('aiAskMsgs').addEventListener('click',function(e){ var a=e.target.closest&&e.target.closest('a[data-ai-t]'); if(!a) return; e.preventDefault(); if(a.dataset.aiT==='app') runApp(a.dataset.aiY); else if(a.dataset.aiT==='kolekce') openColl(a.dataset.aiY,a.dataset.aiN); else openRef(a.dataset.aiT,a.dataset.aiN,a.dataset.aiY); });
-    document.getElementById('aiAskClose').onclick=function(){ p.style.display='none'; fab.style.display='none'; };
+    document.getElementById('aiAskClose').onclick=function(){ liveStop(); p.style.display='none'; fab.style.display='none'; };
     document.getElementById('aiAskWeb').onclick=function(){ try{ st().setItem('sinator_ai_web', webOn()?'0':'1'); }catch(e){} updWeb(); };
     document.getElementById('aiAskClear').onclick=function(){ if(cur){ convs[cur.key]=[]; render(); } };
-    document.getElementById('aiAskSend').onclick=function(){ send(); };
+    document.getElementById('aiAskSend').onclick=function(){ if(dict){ stopRec(); dict=false; vui(); } send(); };
+    wireMic();
     var inp=document.getElementById('aiAskInput');
     inp.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey&&!/Android|iPhone|iPad/i.test(navigator.userAgent)){ e.preventDefault(); send(); } });
     inp.addEventListener('input',function(){ inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,90)+'px'; });
