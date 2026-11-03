@@ -3019,7 +3019,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // Nejdřív stránka 1 + hlavička s počtem stránek → stáhne se jen tolik stránek, kolik jich reálně je
     // (dřív se vždy volalo 10 stránek najednou, i u malé historie). Bez hlavičky se použije původní postup.
     async function _myHistoryGetAllRaw(type) {
-        const pageSize = 500;
+        // Backend limit neořezává → větší stránky = ~4× méně invokací (14k záznamů: 30 → 8 požadavků).
+        const pageSize = 2000;
         const first = await myApiRaw(`/history?type=${type}&page=1&limit=${pageSize}`);
         const firstBatch = Array.isArray(first.body) ? first.body : [];
         if (!firstBatch.length) return [];
