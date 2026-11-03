@@ -3072,7 +3072,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // záložky Hist. filmy/epizody/seriály...) a bez cache by se stejná
     // (potenciálně velká) historie stahovala víckrát zbytečně za sebou.
     const _historyGetAllCache = {};
-    window.myHistoryGetAll = (t, f) => myHistoryGetAll(t, f);
+    window._myHistoryGetAllShared = (t, f) => myHistoryGetAll(t, f);
     window.myRatingsGetShared = (t) => myRatingsGet(t);
     async function myHistoryGetAll(type, forceRefresh) {
         const cached = _historyGetAllCache[type];
@@ -50867,7 +50867,7 @@ async function _statsFetchMySinator(_s) {
   const MY_BACKEND_STATS_BASE = 'https://sinator-backend.vercel.app/api';
   const headers = { 'Content-Type': 'application/json', 'x-api-key': myData.key };
   const countHistory = async (type) => {
-    if (typeof window.myHistoryGetAll === 'function') { const r = await window.myHistoryGetAll(type); return Array.isArray(r) ? r.length : 0; }
+    if (typeof window._myHistoryGetAllShared === 'function') { const r = await window._myHistoryGetAllShared(type); return Array.isArray(r) ? r.length : 0; }
     return 0;
   };
   try {
@@ -50931,7 +50931,7 @@ async function _calFetchMySinatorHistory() {
   if (!myData.key) return null;
   const BASE_URL = 'https://sinator-backend.vercel.app/api';
   const headers = { 'Content-Type': 'application/json', 'x-api-key': myData.key };
-  const fetchAll = async (type) => { const r = await window.myHistoryGetAll(type); return Array.isArray(r) ? r : []; };
+  const fetchAll = async (type) => { const r = await window._myHistoryGetAllShared(type); return Array.isArray(r) ? r : []; };
   try {
     const [movies, episodes] = await Promise.all([fetchAll('movies'), fetchAll('episodes')]);
     return { movies, episodes };
