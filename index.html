@@ -7379,6 +7379,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-03b', date: '3. 11. 2026', items: [
+            '🎵 Hudba → seznam skladeb alba: skladby se teď pouštějí v plovoucím okně přímo v appce (místo otevření YouTube) — okno jde přetahovat, ⏮ ⏭ přepíná skladby, po skončení skladby se samo pustí další, ▁ schová video a hudba hraje dál, ↗ otevře YouTube, ✕ zavře. Právě hrající skladba je v seznamu zvýrazněná; zavření seznamu hudbu nevypne. Když se skladba nenajde, otevře se vyhledávání na YouTube jako dřív; 📱 (SmartTube) beze změny',
+        ] },
         { version: '2026-11-03', date: '3. 11. 2026', items: [
             '🎞️ Zábava → Trailery: oprava „Nic k zobrazení“ / „Failed to fetch“ — appka teď zkouší víc zdrojů (vlastní server, několik proxy, RSS služba, Piped a Invidious API) a ID kanálu umí dohledat sama (⚙️ kanál přijme i odkaz nebo @handle); v ZIPu je i api/yt.js pro Vercel (nejspolehlivější zdroj), ověřuje, že odpověď je opravdu feed, a když načtení selže, ukáže skutečnou chybu místo prázdné obrazovky',
             '💿 AI chat: napíšeš „interpret + diskografie / alba / skladby“ a rovnou se otevře záložka Diskografie v Hudbě (z libovolného místa; u právě otevřeného interpreta hned přepne záložku)',
@@ -20318,6 +20321,117 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         el.appendChild(img);
     }
 
+    // ═══ 🎵 Přehrávač skladeb v plovoucím okně (seznam skladeb alba) ═══
+    // Najde YouTube video podle „interpret + název“ (Piped / Invidious API, výsledek se cachuje)
+    // a pustí ho v malém plovoucím okně, které jde přetahovat, schovat do lišty (hudba hraje dál),
+    // přepínat ⏮ ⏭ a po skončení skladby samo přejde na další. Zavření seznamu skladeb hudbu nevypne.
+    (function () {
+        const PIPED = ['https://pipedapi.kavin.rocks', 'https://pipedapi.adminforge.de', 'https://api.piped.private.coffee', 'https://pipedapi.leptons.xyz'];
+        const INV = ['https://yewtu.be', 'https://inv.nadeko.net', 'https://invidious.nerdvpn.de', 'https://invidious.privacydev.net'];
+        const CK = 'sinator_trk_vid_v2';
+        let cache = {};
+        try { cache = JSON.parse(localStorage.getItem(CK) || '{}'); } catch (e) {}
+        const saveCache = () => { try { const k = Object.keys(cache); if (k.length > 500) k.slice(0, k.length - 500).forEach(x => delete cache[x]); localStorage.setItem(CK, JSON.stringify(cache)); } catch (e) {} };
+        const tfetch = (url, ms) => { const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 6500); return fetch(url, { signal: c.signal }).then(r => { clearTimeout(t); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }, e => { clearTimeout(t); throw e; }); };
+        const firstOk = ps => new Promise((res, rej) => { let n = ps.length, done = false; if (!n) return rej(new Error('none')); ps.forEach(p => p.then(v => { if (done) return; if (v && v.length) { done = true; res(v); } else if (--n === 0) rej(new Error('none')); }, () => { if (!done && --n === 0) rej(new Error('none')); })); });
+        // z výsledků vybere až 3 kandidáty (krátká videa dřív než hodinové mixy)
+        const pickPiped = items => {
+            const a = (items || []).map(x => { const m = /[?&]v=([\w-]{11})/.exec(x.url || ''); return m ? { id: m[1], d: x.duration > 0 ? x.duration : 0 } : null; }).filter(Boolean);
+            const ok = a.filter(x => !x.d || x.d <= 1200); return (ok.length ? ok : a).slice(0, 3).map(x => x.id);
+        };
+        const pickInv = items => {
+            const a = (items || []).filter(x => x && x.videoId).map(x => ({ id: x.videoId, d: x.lengthSeconds || 0 }));
+            const ok = a.filter(x => !x.d || x.d <= 1200); return (ok.length ? ok : a).slice(0, 3).map(x => x.id);
+        };
+        async function resolveIds(q) {
+            if (cache[q] && cache[q].length) return cache[q];
+            const e = encodeURIComponent(q);
+            let ids = [];
+            try { ids = await firstOk(PIPED.map(b => tfetch(b + '/search?q=' + e + '&filter=music_songs').then(d => pickPiped(d.items)))); } catch (x) {}
+            if (!ids.length) { try { ids = await firstOk(PIPED.map(b => tfetch(b + '/search?q=' + e + '&filter=videos').then(d => pickPiped(d.items)))); } catch (x) {} }
+            if (!ids.length) { try { ids = await firstOk(INV.map(b => tfetch(b + '/api/v1/search?q=' + e + '&type=video').then(d => pickInv(d)))); } catch (x) {} }
+            if (ids.length) { cache[q] = ids; saveCache(); }
+            return ids;
+        }
+
+        const st = { q: [], i: -1, cand: [], ci: 0, tok: 0 };
+        const css = document.createElement('style');
+        css.textContent = '#trkPl{position:fixed;z-index:100000001;width:min(92vw,380px);background:#0b0f1a;border:1px solid #2a3350;border-radius:14px;box-shadow:0 10px 40px #000c;overflow:hidden;color:#fff;font-size:.85rem}'
+            + '#trkPl .th{display:flex;gap:6px;align-items:center;padding:7px 8px 7px 12px;background:#111827;cursor:move;touch-action:none;user-select:none}'
+            + '#trkPl .th b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}'
+            + '#trkPl .th button{color:#fff;background:none;border:none;cursor:pointer;font-size:1.05rem;padding:4px 7px;border-radius:8px}'
+            + '#trkPl .th button:active{background:#ffffff22}'
+            + '#trkPl .tv{width:100%;aspect-ratio:16/9;background:#000}'
+            + '#trkPl.min .tv{height:0;aspect-ratio:auto;overflow:hidden}'
+            + '#trkPl iframe{display:block;width:100%;height:100%;border:0}'
+            + '#trkPl.min .tv iframe{height:90px}'
+            + '#trkPl .ts{padding:5px 12px;font-size:.72rem;color:#94a3b8;display:none}#trkPl .ts.on{display:block}'
+            + '.trk-now{background:rgba(255,80,80,.14)!important}';
+        document.head.appendChild(css);
+
+        function win() {
+            let w = document.getElementById('trkPl'); if (w) return w;
+            w = document.createElement('div'); w.id = 'trkPl';
+            w.innerHTML = '<div class="th"><b id="trkT">🎵</b><button id="trkPv" title="Předchozí">⏮</button><button id="trkNx" title="Další">⏭</button><button id="trkMn" title="Schovat video (hudba hraje dál)">▁</button><a id="trkYt" target="_blank" rel="noopener" title="Otevřít na YouTube" style="color:#fff;text-decoration:none;padding:4px 7px;font-size:1.05rem">↗</a><button id="trkX" title="Zavřít">✕</button></div><div class="ts" id="trkS"></div><div class="tv" id="trkV"></div>';
+            document.body.appendChild(w);
+            w.style.left = Math.max(4, (innerWidth - w.offsetWidth) / 2) + 'px';
+            w.style.top = Math.max(60, innerHeight - w.offsetHeight - 24) + 'px';
+            w.querySelector('#trkX').onclick = closeP;
+            w.querySelector('#trkPv').onclick = () => go(st.i - 1);
+            w.querySelector('#trkNx').onclick = () => go(st.i + 1);
+            w.querySelector('#trkMn').onclick = e => { w.classList.toggle('min'); e.currentTarget.textContent = w.classList.contains('min') ? '▭' : '▁'; };
+            const h = w.querySelector('.th'); let ox, oy, on = 0;
+            h.onpointerdown = e => { if (e.target.closest('a,button')) return; on = 1; ox = e.clientX - w.offsetLeft; oy = e.clientY - w.offsetTop; h.setPointerCapture(e.pointerId); };
+            h.onpointermove = e => { if (!on) return; w.style.left = Math.min(innerWidth - 60, Math.max(-w.offsetWidth + 60, e.clientX - ox)) + 'px'; w.style.top = Math.min(innerHeight - 40, Math.max(0, e.clientY - oy)) + 'px'; };
+            h.onpointerup = h.onpointercancel = () => { on = 0; };
+            return w;
+        }
+        function closeP() { st.tok++; const w = document.getElementById('trkPl'); if (w) w.remove(); st.i = -1; mark(); }
+        function mark() { document.querySelectorAll('[data-trk]').forEach(r => r.classList.toggle('trk-now', +r.dataset.trk === st.i)); }
+        function status(t) { const s = document.getElementById('trkS'); if (!s) return; s.textContent = t || ''; s.classList.toggle('on', !!t); }
+        function embed(id) {
+            const w = win(), v = w.querySelector('#trkV');
+            const o = /^https?:$/.test(location.protocol) ? '&origin=' + encodeURIComponent(location.origin) : '';
+            v.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0&playsinline=1&enablejsapi=1' + o + '" allow="autoplay;encrypted-media;picture-in-picture;fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+            const f = v.querySelector('iframe');
+            f.onload = () => { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*'); } catch (e) {} };
+            w.querySelector('#trkYt').href = 'https://www.youtube.com/watch?v=' + id;
+        }
+        async function go(i) {
+            if (!st.q.length) return;
+            if (i < 0 || i >= st.q.length) { if (i >= st.q.length) status('Konec seznamu'); return; }
+            const my = ++st.tok; st.i = i; mark();
+            const it = st.q[i], w = win();
+            w.querySelector('#trkT').textContent = '🎵 ' + (i + 1) + '. ' + it.t;
+            w.querySelector('#trkPv').style.opacity = i > 0 ? 1 : .35; w.querySelector('#trkNx').style.opacity = i < st.q.length - 1 ? 1 : .35;
+            status('Hledám na YouTube…');
+            let ids = [];
+            try { ids = await resolveIds(it.q); } catch (e) {}
+            if (my !== st.tok) return;
+            if (!ids.length) {
+                status('');
+                try { showToast('Skladbu se nepodařilo najít — otevírám YouTube'); } catch (e) {}
+                window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(it.q), '_blank'); return;
+            }
+            st.cand = ids; st.ci = 0; status(''); embed(ids[0]);
+        }
+        // zprávy z YouTube přehrávače: konec skladby → další; video nejde vložit → další kandidát
+        window.addEventListener('message', ev => {
+            if (!/youtube(-nocookie)?\.com$/.test((ev.origin || '').replace(/^https?:\/\//, ''))) return;
+            let d = ev.data; if (typeof d === 'string') { try { d = JSON.parse(d); } catch (e) { return; } }
+            if (!d || st.i < 0) return;
+            const ended = (d.event === 'onStateChange' && d.info === 0) || (d.event === 'infoDelivery' && d.info && d.info.playerState === 0);
+            if (ended) { go(st.i + 1); return; }
+            if (d.event === 'onError') {
+                if (st.ci + 1 < st.cand.length) { st.ci++; embed(st.cand[st.ci]); }
+                else { status('Video nejde vložit — zkouším další skladbu'); setTimeout(() => go(st.i + 1), 1200); }
+            }
+        });
+        window.trkSetQueue = list => { st.q = list || []; if (st.i >= 0) st.i = -1; mark(); };
+        window.trkPlay = i => go(i);
+        window.trkClose = closeP;
+    })();
+
     async function showReleaseTracklist(releaseId, albumTitle, artistName) {
         // Show tracklist overlay
         const overlay = document.createElement('div');
@@ -20336,6 +20450,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             const data = await res.json();
             const media = data.media || [];
             let tracksHtml = '';
+            const trkQ = [];
             media.forEach((medium, mi) => {
                 if (media.length > 1) tracksHtml += `<div style="font-weight:600;color:var(--music);margin:12px 0 6px;">💿 Disk ${medium.position || mi+1}</div>`;
                 (medium.tracks || []).forEach((track, ti) => {
@@ -20343,7 +20458,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                     const title = track.title || track.recording?.title || '?';
                     const dur = track.length ? formatDuration(track.length) : '';
                     const safeQuery = encodeURIComponent(`${artistName} ${title}`);
-                    tracksHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="window.open('https://www.youtube.com/results?search_query=${safeQuery}','_blank')">
+                    const trkIdx = trkQ.length; trkQ.push({ t: title, q: `${artistName} ${title}` });
+                    tracksHtml += `<div data-trk="${trkIdx}" style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="trkPlay(${trkIdx})">
                         <div style="min-width:28px;text-align:right;color:var(--text-muted);font-size:0.85rem;">${num}.</div>
                         <div style="flex:1;">
                             <div style="font-weight:500;font-size:0.95rem;color:#fff;">${title}</div>
@@ -20356,6 +20472,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             });
             if (!tracksHtml) tracksHtml = '<div class="empty">Skladby nenalezeny</div>';
             document.getElementById('tracklistContent').innerHTML = tracksHtml;
+            if (window.trkSetQueue) window.trkSetQueue(trkQ);
         } catch(e) {
             document.getElementById('tracklistContent').innerHTML = `<div class="empty">❌ Chyba načtení: ${e.message}</div>`;
         }
