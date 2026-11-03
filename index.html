@@ -2222,6 +2222,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <label style="display:flex;align-items:center;gap:10px;margin-top:12px;font-size:0.85rem;cursor:pointer;"><input type="checkbox" id="lmHomeBtnChk" onchange="lmSetHomeBtn(this.checked)" style="width:20px;height:20px;flex-shrink:0;"><span>Zobrazit mezi hlavními tlačítky (vedle Wrapped)</span></label>
             </div>
             </div><!-- /swPageExpLists -->
+            <div class="sw-page" id="swPageExpPlay"></div><!-- /swPageExpPlay (vykresluje playSrcRender) -->
             <div class="sw-page" id="swPageProfile">
             <div class="settings-section" style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.2);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:var(--gold,#ffd700);">👤 Tvoje jméno / přezdívka</span>
@@ -7285,7 +7286,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             </div></div>`;
         document.body.appendChild(o);
         o.querySelector('#vlcLinkInput').value = isPage ? '' : (clip && /^https?:\/\//i.test(clip.trim()) ? clip.trim() : '');
-        o.querySelector('#vlcHsBtn').onclick = () => { if (window.openHellspy) window.openHellspy('https://www.hellspy.to/?query=' + encodeURIComponent(title)); };
+        o.querySelector('#vlcHsBtn').onclick = () => { if (window.openHellspy) window.openHellspy('https://www.hellspy.to/?query=' + encodeURIComponent(title), true); };
         o.querySelector('#vlcOpenBtn').onclick = () => { o.remove(); _openExternalUrl(app.urlTemplate); };
     }
     function launchExternalPlayApp(app, title) {
@@ -7424,6 +7425,11 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-03g', date: '3. 11. 2026', items: [
+            '▶️ Nastavení → 🧪 Experimentální funkce → Tlačítko Přehrát: vybereš zdroj, který se spustí tlačítkem ▶️ Přehrát (Hellspy, Sledujte.to, Hellspio, Dupe.cz, Svetserialu.to, ČR Wiki, Mrkaj.me, Uzi.la, SledujFilmy, FastShare, Bombuj.si, Uzi.si, SKTorrent, iVysílání ČT, Nova, iPrima, Dokufilmy a další). Vždy je zapnutý právě jeden, výchozí je Hellspy',
+            '🪟 Volba „Spustit v plovoucím okně“: vybraný zdroj se otevře v malém okně přímo v appce (jde přetahovat, ⤢ zvětší / zmenší, ↗ otevře v prohlížeči, ✕ zavře). Weby, které vložení do jiné stránky zakazují, se v okně nezobrazí — tam použij ↗',
+            '▶️ Volba zdroje platí pro tlačítko Přehrát ve filmu, seriálu i u epizod; nabídka „Kde přehrát“ dál otevírá přesně ten web, který v ní vybereš',
+        ] },
         { version: '2026-11-03f', date: '3. 11. 2026', items: [
             '📦 Zeptej se AI: klepnutí na odkaz kolekce (📦) teď vždy otevře konkrétní kolekci s jejími filmy — i když AI napsala jen název bez ID, appka kolekci dohledá v TMDB (dřív se otevřel jen obecný seznam kolekcí)',
             '📋 Zeptej se AI: tabulky v odpovědích (řádky s „|“) se zobrazí jako přehledné odrážky bez svislých čar',
@@ -10038,7 +10044,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
 
                 <!-- Akční tlačítka — grid jako v TMDB detailu -->
                 <div class="action-buttons" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:14px 0;">
-                    <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1;font-size:0.92rem;padding:12px;" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeT}'))">▶️ Přehrát (Hellspy)</button>
+                    <button class="action-btn-modal" style="background:rgba(30,60,110,0.35);border-color:#3a6ea5;color:#9cc4f0;grid-column:1/-1;font-size:0.92rem;padding:12px;" onclick="window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('${safeT}'))">▶️ Přehrát</button>
                     <button class="action-btn-modal" style="grid-column:1/-1;" onclick="openSourcesModal('${safeT}','${year}','${type}','${safeT}')">🔗 Kde sledovat</button>
                     <a href="https://www.imdb.com/title/${imdbId}/" target="_blank" class="action-btn-modal imdb" style="text-decoration:none;text-align:center;">🎬 IMDb</a>
                     <button class="action-btn-modal csfd" onclick="openCsfd('${safeT}',${year||0})">🎬 ČSFD</button>
@@ -10279,7 +10285,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     function searchOnSource(source) {
         const urls = getAllSourceUrls();
         if(source === 'hellspy') {
-            window.openHellspy(urls['hellspy']);
+            window.openHellspy(urls['hellspy'], true);
         } else if(source === 'uzisi') {
             const t = state.currentSearchTitle || '';
             try { if (navigator.clipboard && t) navigator.clipboard.writeText(t).then(() => { try { if (typeof showToast === 'function') showToast('📋 Název zkopírován — vlož ho do hledání'); } catch(e) {} }, () => {}); } catch(e) {}
@@ -10560,9 +10566,14 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     }
 
     // Hellspy — přímé otevření (rychlejší a plynulejší přechod)
-    window.openHellspy = function(targetUrl) {
+    window.openHellspy = function(targetUrl, force) {
+        // ▶️ Zdroj tlačítka Přehrát (Nastavení → Experimentální funkce → Tlačítko Přehrát)
+        let _hk = null;
+        if (!force && window.sinatorPlayHook) { try { _hk = window.sinatorPlayHook(targetUrl); } catch(e) { _hk = null; } }
+        if (_hk && _hk.float) return;
+        if (_hk && _hk.url) targetUrl = _hk.url;
         try { if (navigator.vibrate) navigator.vibrate(12); } catch(e) {}
-        try { showToast('Otevírám Hellspy…'); } catch(e) {}
+        try { showToast('Otevírám ' + ((_hk && _hk.label) || 'Hellspy') + '…'); } catch(e) {}
         // noopener+noreferrer = nová záložka se otevře nezávisle a o něco rychleji
         // (aktuální stránka nemusí čekat na window reference)
         window.open(targetUrl, '_blank', 'noopener,noreferrer');
@@ -43401,7 +43412,7 @@ function openEpgDetail(ep) {
             ${ep.isNow ? `<div style="margin-bottom:16px;display:flex;flex-direction:column;gap:8px;">
                 <button onclick="playEpgChannelLiveFromDetail()" style="width:100%;padding:11px 16px;background:linear-gradient(135deg,#e50914,#b20710);border:none;color:#fff;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶ Přehrát živě ve VLC</button>
                 <button onclick="playEpgChannelAltFromDetail()" style="width:100%;padding:9px 16px;background:rgba(255,152,0,0.12);border:1px solid #ff9800;color:#ffcc80;border-radius:10px;cursor:pointer;font-size:0.85rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">🔀 Změnit / opravit zdroj</button>
-                <button onclick="openHellspyFromDetail()" style="width:100%;padding:11px 16px;background:rgba(30,60,110,0.35);border:1px solid #3a6ea5;color:#9cc4f0;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶️ Přehrát od začátku (Hellspy)</button>
+                <button onclick="openHellspyFromDetail()" style="width:100%;padding:11px 16px;background:rgba(30,60,110,0.35);border:1px solid #3a6ea5;color:#9cc4f0;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">▶️ Přehrát od začátku</button>
             </div>` : ''}
             ${(typeof getEnabledExternalPlayApps === 'function' && getEnabledExternalPlayApps().length) ? `<button onclick="playInExternalAppFromDetail()" style="width:100%;padding:11px 16px;background:rgba(139,92,246,0.15);border:1px solid #8b5cf6;color:#c4b5fd;border-radius:10px;cursor:pointer;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;">📱 Přehrát v externí aplikaci</button>` : ''}
             <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Hledat / otevřít</div>
@@ -52470,6 +52481,134 @@ window.addEventListener('load', function() {
     }, 400);
 });
 </script>
+<script id="playSrcCfg">
+(function(){
+  var KS='sinator_play_source', KF='sinator_play_float';
+  var $=function(id){return document.getElementById(id)};
+  function esc(t){return String(t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+  function slug(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
+  function plus(t){return String(t||'').toLowerCase().trim().split(/\s+/).map(encodeURIComponent).join('+')}
+  var e=encodeURIComponent;
+  // g: skupina; b(q, o) → URL; o = {base, tv, s, e}
+  var SRC=[
+    {id:'hellspy',      g:'cz',  n:'👹 Hellspy',        b:function(q){return 'https://www.hellspy.to/?query='+e(q)}},
+    {id:'sledujteto',   g:'cz',  n:'👁️ Sledujte.to',    b:function(q){return 'https://old.sledujteto.cz/vyhledat/'+slug(q)+'.html'}},
+    {id:'hellspio',     g:'cz',  n:'👹 Hellspio',       b:function(q){return 'https://hellspio.vercel.app/cs?search='+e(q)}},
+    {id:'dupe',         g:'cz',  n:'🐲 Dupe.cz',        b:function(q){return 'https://dupe.cz/?s='+e(q)}},
+    {id:'svetserialu',  g:'cz',  n:'🌍 Svetserialu.to', b:function(q,o){ if(!o.tv) return 'https://svetserialu.to/'; var u='https://svetserialu.to/serial/'+slug(o.base); if(o.s&&o.e) u+='/s'+o.s+'e'+o.e; return u; }},
+    {id:'ceskarepublika',g:'cz', n:'🇨🇿 ČR Wiki',       b:function(q,o){ return o.tv ? 'https://ceskarepublika.wiki/serialy-online/'+slug(o.base)+'/' : 'https://ceskarepublika.wiki/filmy-online/?q='+e(q); }},
+    {id:'mrkaj',        g:'cz',  n:'👁️ Mrkaj.me',       b:function(q,o){return 'https://mrkaj.me/hladaj/'+plus(q)+'?t='+(o.tv?'s':'m')}},
+    {id:'uzila',        g:'cz',  n:'🔍 Uzi.la',         b:function(q){return 'https://uzi.la/hladaj/'+plus(q)}},
+    {id:'sledujfilmy',  g:'cz',  n:'🎥 SledujFilmy',    b:function(q){return 'https://ww.sledujfilmy.io/?s='+e(q)}},
+    {id:'fastshare',    g:'cz',  n:'⚡ FastShare',       b:function(q){return 'https://fastshare.cloud/search?q='+e(q)}},
+    {id:'bombuj',       g:'cz',  n:'💣 Bombuj.si',      b:function(q,o){ return o.tv ? 'https://serialy.bombuj.si/serial-'+slug(o.base)+'#serial' : 'https://www.bombuj.si/online-film-'+slug(q); }},
+    {id:'uzisi',        g:'cz',  n:'🎯 Uzi.si',         b:function(){return 'https://ww4.click/uzisi/'}, copy:1},
+    {id:'sktorrent',    g:'cz',  n:'🧲 SKTorrent',      b:function(q){return 'https://online.sktorrent.eu/search/videos?search_query='+e(q)}},
+    {id:'ivysilani',    g:'tv',  n:'📡 iVysílání ČT',   b:function(q){return 'https://www.ceskatelevize.cz/ivysilani/hledani/?keyword='+e(q)}},
+    {id:'nova',         g:'tv',  n:'📺 Nova',           b:function(q){return 'https://tv.nova.cz/hledat?q='+e(q)}},
+    {id:'iprima',       g:'tv',  n:'📺 iPrima',         b:function(q){return 'https://www.iprima.cz/vyhledavani?q='+e(q)}},
+    {id:'dokufilmy',    g:'oth', n:'🎥 Dokufilmy',      b:function(q){return 'https://dokufilmy.cz/?s='+e(q)}},
+    {id:'streamimdb',   g:'oth', n:'🎬 StreamIMDB',     b:function(q){return 'https://streamimdb.ru/search?q='+e(q)}},
+    {id:'123moviesfree',g:'oth', n:'🎬 123Movies',      b:function(q){return 'https://ww8.123moviesfree.net/?s='+e(q)}},
+    {id:'openloadmovies',g:'oth',n:'🎬 OpenloadMovies', b:function(q){return 'https://openloadmovies.live/?s='+e(q)}}
+  ];
+  var GRP=[['cz','🇨🇿 CZ alternativa'],['tv','📡 TV archivy'],['oth','📦 Ostatní']];
+  function find(id){for(var i=0;i<SRC.length;i++) if(SRC[i].id===id) return SRC[i]; return SRC[0];}
+  function getSrc(){var v='hellspy';try{v=localStorage.getItem(KS)||'hellspy'}catch(x){} return find(v).id;}
+  function setSrc(id){try{localStorage.setItem(KS,id)}catch(x){}}
+  function getFloat(){try{return localStorage.getItem(KF)==='1'}catch(x){return false}}
+  function setFloat(v){try{localStorage.setItem(KF,v?'1':'0')}catch(x){}}
+  function toast(m){try{if(typeof showToast==='function')showToast(m)}catch(x){}}
+  function parse(q){
+    var m=/^(.*?)\s+S(\d{1,2})E(\d{1,3})\s*$/i.exec(q);
+    if(m) return {base:m[1].trim(),tv:true,s:('0'+m[2]).slice(-2),e:('0'+m[3]).slice(-2)};
+    return {base:q,tv:false,s:'',e:''};
+  }
+  function css(){
+    if($('playSrcCss')) return;
+    var st=document.createElement('style'); st.id='playSrcCss';
+    st.textContent=
+      '.psfl{position:fixed;z-index:100000001;width:min(94vw,460px);height:min(60vh,500px);display:flex;flex-direction:column;background:#0b1020;border:1px solid #3a6ea5;border-radius:12px;overflow:hidden;box-shadow:0 10px 40px #000b}'+
+      '.psfl.big{width:96vw;height:82vh}'+
+      '.psfl .psh{display:flex;gap:10px;align-items:center;padding:7px 10px;background:#111827;color:#fff;cursor:move;touch-action:none;font-size:.82rem;flex-shrink:0}'+
+      '.psfl .psh span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
+      '.psfl .psh a,.psfl .psh button{color:#fff;background:none;border:none;cursor:pointer;font-size:1.05rem;text-decoration:none;padding:2px 6px}'+
+      '.psfl iframe{flex:1;min-height:0;width:100%;border:0;background:#fff}'+
+      '.psfl .psn{padding:4px 10px;font-size:.68rem;color:#9ca3af;background:#111827;flex-shrink:0}'+
+      '.ps-row{display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;margin-top:6px;background:var(--bg-card,#1a1f2e);border:1px solid var(--border,#2a3350);border-radius:10px;color:var(--text,#eee);font-size:.92rem;cursor:pointer;text-align:left}'+
+      '.ps-row .ps-n{flex:1}'+
+      '.ps-row.on{border-color:#60a5fa;background:rgba(96,165,250,.12)}'+
+      '.ps-sw{width:42px;height:24px;border-radius:12px;background:#3b4256;position:relative;flex-shrink:0;transition:background .15s}'+
+      '.ps-sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}'+
+      '.ps-row.on .ps-sw{background:#3b82f6}.ps-row.on .ps-sw::after{left:21px}'+
+      '.ps-grp{margin-top:16px;font-size:.8rem;font-weight:700;color:var(--text-muted,#9ca3af)}';
+    document.head.appendChild(st);
+  }
+  function openFloat(label,url){
+    css();
+    var old=$('psFloat'); if(old) old.remove();
+    var w=document.createElement('div'); w.id='psFloat'; w.className='psfl';
+    w.innerHTML='<div class="psh"><span>▶️ '+esc(label)+'</span><button id="psSz" title="Větší / menší">⤢</button><a id="psOut" target="_blank" rel="noopener noreferrer" title="Otevřít v prohlížeči">↗</a><button id="psX" title="Zavřít">✕</button></div>'+
+      '<iframe allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowfullscreen referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"></iframe>'+
+      '<div class="psn">Když se stránka nezobrazí (web zakazuje vložení do okna), klepni na ↗.</div>';
+    document.body.appendChild(w);
+    w.querySelector('iframe').src=url;
+    w.querySelector('#psOut').href=url;
+    w.style.left=Math.max(4,(innerWidth-w.offsetWidth)/2)+'px'; w.style.top='64px';
+    w.querySelector('#psX').onclick=function(){w.remove()};
+    w.querySelector('#psSz').onclick=function(){
+      w.classList.toggle('big');
+      w.style.left=Math.max(4,(innerWidth-w.offsetWidth)/2)+'px';
+      w.style.top=(w.classList.contains('big')?'8px':'64px');
+    };
+    var h=w.querySelector('.psh'),ox=0,oy=0,on=0;
+    h.onpointerdown=function(ev){if(ev.target.closest('a,button'))return;on=1;ox=ev.clientX-w.offsetLeft;oy=ev.clientY-w.offsetTop;h.setPointerCapture(ev.pointerId)};
+    h.onpointermove=function(ev){if(on){w.style.left=Math.min(innerWidth-60,Math.max(-w.offsetWidth+60,ev.clientX-ox))+'px';w.style.top=Math.min(innerHeight-40,Math.max(0,ev.clientY-oy))+'px'}};
+    h.onpointerup=h.onpointercancel=function(){on=0};
+  }
+  // Volá se z window.openHellspy(url): vrací null (= výchozí Hellspy v nové záložce) nebo {url,label} / {float:true}
+  window.sinatorPlayHook=function(targetUrl){
+    var m=/[?&]query=([^&#]*)/.exec(targetUrl||''); if(!m) return null;
+    var q; try{q=decodeURIComponent(m[1].replace(/\+/g,' '))}catch(x){q=m[1]}
+    var s=find(getSrc()), fl=getFloat();
+    if(s.id==='hellspy'&&!fl) return null;
+    var url=s.b(q,parse(q));
+    if(s.copy){
+      try{ if(navigator.clipboard) navigator.clipboard.writeText(q).then(function(){toast('📋 Název zkopírován — vlož ho do hledání')},function(){}); }catch(x){}
+    }
+    var label=s.n.replace(/^\S+\s+/,'');
+    if(fl){ try{navigator.vibrate&&navigator.vibrate(12)}catch(x){} openFloat(label,url); return {float:true}; }
+    return {url:url,label:label};
+  };
+  window.playSrcRender=function(){
+    var host=$('swPageExpPlay'); if(!host) return; css();
+    var cur=getSrc(), h='';
+    h+='<div class="settings-section"><span class="settings-label">▶️ Tlačítko Přehrát</span>'+
+       '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">Vyber zdroj, který se spustí tlačítkem <b>▶️ Přehrát</b> u filmu, seriálu i epizod. Vždy je zapnutý právě jeden — výchozí je Hellspy.</div>'+
+       '<label style="display:flex;align-items:center;gap:10px;margin-top:12px;font-size:0.88rem;cursor:pointer;"><input type="checkbox" id="psFloatChk" style="width:20px;height:20px;flex-shrink:0;"'+(getFloat()?' checked':'')+'><span>🪟 Spustit v plovoucím okně</span></label>'+
+       '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;line-height:1.4;">Zdroj se otevře v malém okně v appce (jde přetahovat). Weby, které vložení zakazují, se v okně nezobrazí — pak klepni na ↗ v okně.</div>';
+    GRP.forEach(function(g){
+      h+='<div class="ps-grp">'+g[1]+'</div>';
+      SRC.forEach(function(s){ if(s.g!==g[0]) return;
+        h+='<button type="button" class="ps-row'+(s.id===cur?' on':'')+'" data-ps="'+s.id+'"><span class="ps-n">'+esc(s.n)+'</span><span class="ps-sw"></span></button>';
+      });
+    });
+    h+='<button class="settings-btn-small" style="width:100%;margin-top:16px;border-color:#60a5fa;color:#60a5fa;" id="psTest">▶️ Vyzkoušet („Avengers“)</button></div>';
+    host.innerHTML=h;
+    host.querySelectorAll('.ps-row').forEach(function(b){
+      b.onclick=function(){
+        var id=b.getAttribute('data-ps');
+        if(id===getSrc()){ toast('Jeden zdroj musí být vždy zapnutý'); return; }
+        setSrc(id);
+        host.querySelectorAll('.ps-row').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-ps')===id)});
+        toast('▶️ Přehrát: '+find(id).n.replace(/^\S+\s+/,''));
+      };
+    });
+    $('psFloatChk').onchange=function(){setFloat(this.checked); toast(this.checked?'🪟 Plovoucí okno zapnuto':'🪟 Plovoucí okno vypnuto');};
+    $('psTest').onclick=function(){ if(window.openHellspy) window.openHellspy('https://www.hellspy.to/?query='+encodeURIComponent('Avengers')); };
+  };
+})();
+</script>
 <script id="swEngine">
 (function(){
   var $ = function(id){ return document.getElementById(id); };
@@ -52487,11 +52626,12 @@ window.addEventListener('load', function() {
     help:    {icon:'📖', name:'Nápověda',          sub:'Návody ke všem funkcím appky',            c:'#facc15', node:'swPageHelp', pre:function(){ if(window.helpRender) window.helpRender(); }},
     update:  {icon:'🔄', name:'Aktualizace',       sub:'Kontrola verze a historie změn',           c:'#1db954', node:'swPageUpdate'},
     backup:  {icon:'💾', name:'Záloha dat',        sub:'Export a import',                          c:'#8bc34a', node:'swPageBackup'},
-    experimental:{icon:'🧪', name:'Experimentální funkce', sub:'Vzhled, upozornění, cache, správce seznamů', c:'#38bdf8', node:'swPageExperimental', children:['expLook','expNotify','expCache','expLists'], pre:function(){ renderSubMenu('experimental'); }},
+    experimental:{icon:'🧪', name:'Experimentální funkce', sub:'Vzhled, upozornění, cache, správce seznamů, tlačítko Přehrát', c:'#38bdf8', node:'swPageExperimental', children:['expLook','expNotify','expCache','expLists','expPlay'], pre:function(){ renderSubMenu('experimental'); }},
     expLook:   {icon:'🎨', name:'Vzhled',     sub:'Tlačítka a lišta domovské obrazovky', c:'#f472b6', node:'swPageExpLook',   parent:'experimental', pre:function(){ if(window.homeBtnsRender) window.homeBtnsRender(); }},
     expNotify: {icon:'🔔', name:'Upozornění', sub:'Nové epizody a streamy',              c:'#6090ff', node:'swPageExpNotify', parent:'experimental'},
     expCache:  {icon:'🧹', name:'Cache',      sub:'Smazání dočasných dat v telefonu',    c:'#f5a623', node:'swPageExpCache',  parent:'experimental', pre:function(){ if(window.cacheInfoRefresh) window.cacheInfoRefresh(); }},
     expLists:  {icon:'🗂️', name:'Správce seznamů', sub:'Kopírování a přesun mezi seznamy Histra / Sinator', c:'#34d399', node:'swPageExpLists', parent:'experimental'},
+    expPlay:   {icon:'▶️', name:'Tlačítko Přehrát', sub:'Zdroj přehrávání a plovoucí okno', c:'#60a5fa', node:'swPageExpPlay', parent:'experimental', pre:function(){ if(window.playSrcRender) window.playSrcRender(); }},
     admin:   {icon:'🛡️', name:'Admin',             sub:function(){ try{ if(typeof updateAdminStatus==='function') updateAdminStatus(); }catch(e){} var on=false,l2=false; try{ on=localStorage.getItem('sinator_admin_mode')==='1'; l2=on&&localStorage.getItem('sinator_admin_level')==='2'; }catch(e){} return 'Admin: ' + (on ? (l2 ? '✅ Aktivní (level 2)' : '✅ Aktivní') : 'Neaktivní'); }, c:'#ffaa00', node:'settingsTabContentAdmin', pre:function(){ try{ if(typeof updateAdminStatus==='function') updateAdminStatus(); }catch(e){} }}
   };
 
