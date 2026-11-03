@@ -2924,13 +2924,36 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     function myBackendReady() { return !!myBackendKey(); }
     window.myBackendReady = myBackendReady;
 
+    // GET odpovědi se na 15 s cachují a souběžné stejné dotazy se sloučí do jednoho
+    // (šetří Vercel Active CPU — appka volá stejné /watchlist, /history?id=… atd. z více míst).
+    // Jakýkoli zápis (POST/DELETE/PATCH) cache hned zahodí, takže data zůstávají aktuální.
+    const _myGetCache = new Map();
+    const MY_GET_TTL = 15000;
+    function _myCloneJson(v) { try { return typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v)); } catch (e) { return v; } }
+    function myApiCacheClear() { _myGetCache.clear(); }
+    window.myApiCacheClear = myApiCacheClear;
     async function myApi(path, opts = {}) {
         if (!myBackendReady()) throw new Error('Vlastní backend není nastavený (chybí adresa nebo klíč).');
-        const res = await fetchWithRetry(`${myBackendBase()}${path}`, { ...opts, headers: { ...myHeaders(), ...(opts.headers || {}) } });
-        let body = null;
-        try { body = await res.json(); } catch (e) {}
-        if (!res.ok) throw new Error((body && body.error) || `HTTP ${res.status}`);
-        return body;
+        const doFetch = async () => {
+            const res = await fetchWithRetry(`${myBackendBase()}${path}`, { ...opts, headers: { ...myHeaders(), ...(opts.headers || {}) } });
+            let body = null;
+            try { body = await res.json(); } catch (e) {}
+            if (!res.ok) throw new Error((body && body.error) || `HTTP ${res.status}`);
+            return body;
+        };
+        const method = String(opts.method || 'GET').toUpperCase();
+        if (method !== 'GET') {
+            _myGetCache.clear();
+            try { return await doFetch(); } finally { _myGetCache.clear(); }
+        }
+        const ck = myBackendKey() + '|' + path;
+        const hit = _myGetCache.get(ck);
+        if (hit && (Date.now() - hit.ts) < MY_GET_TTL) return _myCloneJson(await hit.promise);
+        const promise = doFetch();
+        _myGetCache.set(ck, { ts: Date.now(), promise });
+        promise.catch(() => { if ((_myGetCache.get(ck) || {}).promise === promise) _myGetCache.delete(ck); });
+        if (_myGetCache.size > 300) _myGetCache.delete(_myGetCache.keys().next().value);
+        return _myCloneJson(await promise);
     }
     // Stejné jako myApi, ale vrací i hlavičky odpovědi (potřeba pro X-Pagination-Item-Count).
     async function myApiRaw(path, opts = {}) {
@@ -2989,7 +3012,29 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // se spoléhalo na hlavičku s celkovým počtem (ta nemusí být přes CORS
     // viditelná) — prostě se stahují dávky stránek najednou, dokud dávka
     // nevrátí neúplnou/prázdnou stránku.
+    // Nejdřív stránka 1 + hlavička s počtem stránek → stáhne se jen tolik stránek, kolik jich reálně je
+    // (dřív se vždy volalo 10 stránek najednou, i u malé historie). Bez hlavičky se použije původní postup.
     async function _myHistoryGetAllRaw(type) {
+        const pageSize = 500;
+        const first = await myApiRaw(`/history?type=${type}&page=1&limit=${pageSize}`);
+        const firstBatch = Array.isArray(first.body) ? first.body : [];
+        if (!firstBatch.length) return [];
+        let pageCount = NaN;
+        try { pageCount = parseInt(first.headers.get('X-Pagination-Page-Count'), 10); } catch (e) {}
+        if (isFinite(pageCount) && pageCount >= 1) {
+            let all = firstBatch.slice();
+            for (let p = 2; p <= pageCount; p += 6) {
+                const nums = [];
+                for (let i = p; i < p + 6 && i <= pageCount; i++) nums.push(i);
+                const res = await Promise.all(nums.map(n => myHistoryGet(type, n, pageSize)));
+                res.forEach(b => { if (Array.isArray(b)) all = all.concat(b); });
+            }
+            return all;
+        }
+        if (firstBatch.length < pageSize) return firstBatch;
+        return _myHistoryGetAllRawLegacy(type);
+    }
+    async function _myHistoryGetAllRawLegacy(type) {
         const pageSize = 500;
         const concurrency = 10;
         let all = [];
