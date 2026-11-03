@@ -7386,6 +7386,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             'Zeptej se AI je i v nabídce po dlouhém podržení karty filmu / seriálu',
             '🤖 AI je propojená s appkou: načítá z TMDB celé obsazení, režii, kolekci, podobné a doporučené tituly i filmografii herců — už netvrdí, že údaje nejsou dostupné',
             '🧭 AI umí nasměrovat do sekcí appky (Zábava, kolekce, IPTV, rádio, kino, seznamy, oblíbené, složky, kvíz, žebříčky…) klikatelným odkazem; napiš třeba „chci IPTV“',
+            '🧭 Odkazy do appky pokrývají i podsekce: Tematické seznamy, Hodnocené, Shlédnuté, Rozkoukané, Populární streamy, Smart seznamy, Trakt/Simkl/Sinator, Histra, Oblíbené (filmy, seriály, herci, režiséři…), Koukat s… Stačí napsat klíčové slovo — odkaz se ukáže hned',
             '🌐 AI umí hledat na webu (Gemini) — přepínač 🌐 v hlavičce chatu; zdroje se ukážou pod odpovědí',
             '🔧 Histra → Odebrat z rozkoukaných: Histra mazání rozkoukaných přes API neumí (u seriálů v Rozkoukaných jen kvůli částečně shlédnutým epizodám není co mazat), proto se položka skryje v appce; seriál se v Rozkoukaných znovu objeví, jakmile shlédneš novou epizodu',
             '🔧 Histra → Odebrat z rozkoukaných: zkouší víc způsobů mazání a ověří, že položka opravdu zmizela; při chybě ukáže skutečný důvod místo zavádějící hlášky o CORS',
@@ -54484,48 +54485,93 @@ window.sfFrAuto=async function(id,t){
   var TV_PUSH=function(fn){ return "pushModalAndOpen('tvRadioModal', _openTvRadioModalDirect, "+fn+")"; };
   var ZB_PUSH=function(fn){ return "pushModalAndOpen('zabavaModal', openZabavaModal, "+fn+")"; };
   var APP=[
-    ['hledat','Vyhledávání filmů a seriálů','toggleSearchOverlay()'],
-    ['filtry','Filtry / pokročilé hledání / AI vyhledávání','toggleFiltersOverlay()'],
-    ['hudba','Hudba (interpreti, alba)','openMusicModal()'],
-    ['ziva_tv','Živá TV / Rádio / Kino – hlavní menu','openTvRadioModal()'],
-    ['iptv','IPTV – živé vysílání CZ, SK, DE, FR, IT, UK, US…',TV_PUSH('openTvModal')],
-    ['oficialni_tv','Živá TV – oficiální weby (Prima, Nova, ČT, JOJ, Seznam TV…)',TV_PUSH('openLiveOfficialModal')],
-    ['radio','Rádio – české a slovenské stanice',TV_PUSH('openRadioModal')],
-    ['archiv_tv','Archív TV (iVysílání, iPrima, Nova)',TV_PUSH('openArchivTvModal')],
-    ['ivysilani','iVysílání České televize','openIvysilaniModal()'],
-    ['iprima','iPrima – archiv a živě','openIprimaModal()'],
-    ['nova','TV Nova a Voyo','openNovaModal()'],
-    ['kino_program','Kino – program kin a rezervace',TV_PUSH("function(){ openKinoModal(''); }")],
-    ['oblibene','Oblíbené (filmy, seriály, herci, režiséři…)','favsOpenMenu()'],
-    ['seznamy','Seznamy (Trakt, Simkl, Sinator…)','openListsModal()'],
-    ['slozky','Složky / správce seznamů','openListManager()'],
-    ['kolekce','Kolekce','openCollectionsModal()'],
-    ['top_tipy','Top tipy / doporučení','openDoporucujiModal()'],
-    ['co_dnes','Co dnes sledovat? (náhodný tip)','window._ntOpenedFromMain=true;openNahodnyTipModal()'],
-    ['zabava','Zábava – hlavní menu','openZabavaModal()'],
-    ['kino_zabava','Zábava → Kino (co bylo, hraje, chystá se)',ZB_PUSH('openZabavaKinoModal')],
-    ['trailery','Zábava → Trailery',ZB_PUSH('openTrailersModal')],
-    ['ai_nastroje','Zábava → AI nástroje',ZB_PUSH('openZabavaAiModal')],
-    ['prehledy','Zábava → Přehledy a statistiky',ZB_PUSH('openZabavaPrehledyModal')],
-    ['externi_aplikace','Zábava → Externí aplikace (Stremio, Nuvio…)',ZB_PUSH('openZabavaExternalAppsModal')],
-    ['weby','Zábava → Filmové weby, magazíny, recenze','closeZabavaModal();openWebsitesModal()'],
-    ['ai_zabava','AI zábava – doporučení, kvízy, hry','openAiModal()'],
-    ['kviz','Filmový kvíz','openKvizModal()'],
-    ['porovnani','Porovnání dvou filmů/seriálů','openPorovnaniModal()'],
-    ['nalada','Filmová nálada – 3 tipy podle nálady','openMoodModal()'],
-    ['koukat_s','Koukat s… (tipy podle společnosti)','openKoukatSModal()'],
-    ['zeptej_sinatora','Zeptej se Sinatora (vlastními slovy co chceš sledovat)','openAskSinatorModal()'],
-    ['zebricky','Filmové žebříčky','openZebricky()'],
-    ['statistiky','Moje statistiky','openMyStatsModal()'],
-    ['tento_den','Tento den v historii','openTentodenModal()'],
-    ['swipe','Swipe (listování doporučení)',{btn:/swipe/i}],
-    ['up_next','Up Next (další epizody)',{btn:/up\s*next/i}],
-    ['franchise','Franchise (série a univerza)',{btn:/franchis/i}],
-    ['wrapped','Wrapped (shrnutí)',{btn:/wrapped/i}],
-    ['spravce','Správce',{btn:/spr[aá]vce/i}],
-    ['nastaveni','Nastavení','openSettingsModal()'],
-    ['domu','Hlavní stránka','goHome()']
+    ['hledat','Vyhledávání filmů a seriálů','toggleSearchOverlay()','hledat najit vyhledat'],
+    ['filtry','Filtry / pokročilé hledání / AI vyhledávání','toggleFiltersOverlay()','filtr zanr rok'],
+    ['hudba','Hudba (interpreti, alba)','openMusicModal()','pisnicky interpret album'],
+    ['ziva_tv','Živá TV / Rádio / Kino – hlavní menu','openTvRadioModal()','televize'],
+    ['iptv','IPTV – živé vysílání CZ, SK, DE, FR, IT, UK, US…',TV_PUSH('openTvModal'),'televize zive vysilani'],
+    ['oficialni_tv','Živá TV – oficiální weby (Prima, Nova, ČT, JOJ, Seznam TV…)',TV_PUSH('openLiveOfficialModal'),'televize zive'],
+    ['radio','Rádio – české a slovenské stanice',TV_PUSH('openRadioModal'),'rozhlas'],
+    ['archiv_tv','Archív TV (iVysílání, iPrima, Nova)',TV_PUSH('openArchivTvModal'),'archiv televize'],
+    ['ivysilani','iVysílání České televize','openIvysilaniModal()','ct ceska televize'],
+    ['iprima','iPrima – archiv a živě','openIprimaModal()','prima'],
+    ['nova','TV Nova a Voyo','openNovaModal()','voyo'],
+    ['kino_program','Kino – program kin a rezervace',TV_PUSH("function(){ openKinoModal(''); }"),'kina vstupenky'],
+    ['oblibene','Oblíbené – hlavní menu','favsOpenMenu()','oblibene srdce'],
+    ['oblibene_vse','Oblíbené – vše',"favsOpenMenu();favsOpenTab('all')",''],
+    ['oblibene_filmy','Oblíbené filmy',"favsOpenMenu();favsOpenTab('movie')",''],
+    ['oblibene_serialy','Oblíbené seriály',"favsOpenMenu();favsOpenTab('tv')",''],
+    ['oblibene_miniserie','Oblíbené minisérie',"favsOpenMenu();favsOpenTab('miniseries')",'miniserie'],
+    ['oblibene_anime','Oblíbené anime',"favsOpenMenu();favsOpenTab('anime')",''],
+    ['oblibene_herci','Oblíbení herci',"favsOpenMenu();favsOpenTab('actor')",'herec'],
+    ['oblibene_reziseri','Oblíbení režiséři',"favsOpenMenu();favsOpenTab('director')",'reziser'],
+    ['seznamy','Seznamy – hlavní menu','openListsModal()',''],
+    ['trakt','Seznamy → Trakt',"closeListsModal();openTraktModal();tsSrcBtnClick('trakt')",'watchlist sledovane hodnoceni'],
+    ['simkl','Seznamy → Simkl',"closeListsModal();openTraktModal();tsSrcBtnClick('simkl')",'watchlist sledovane hodnoceni'],
+    ['sinator_seznamy','Seznamy → Sinator (watchlist, hodnocení)',"closeListsModal();openTraktModal();tsSrcBtnClick('own')",'sinator watchlist'],
+    ['histra','Seznamy → Histra (tvé seznamy a watchlist)','closeListsModal();openHistraListsModal()',''],
+    ['histra_watchlist','Histra → Watchlist','histraOpenWatchlist()',''],
+    ['histra_rozkoukane_filmy','Histra → Rozkoukané filmy',"histraOpenProgress('movie')",'rozkoukane'],
+    ['histra_rozkoukane_serialy','Histra → Rozkoukané seriály',"histraOpenProgress('tv')",'rozkoukane'],
+    ['histra_shlednute_filmy','Histra → Shlédnuté filmy',"histraOpenWatched('movie')",'shlednute'],
+    ['histra_shlednute_serialy','Histra → Shlédnuté seriály',"histraOpenWatched('tv')",'shlednute'],
+    ['kolekce','Kolekce – filmové a seriálové kolekce','openCollectionsModal()','sbirky'],
+    ['shlednute','Shlédnuté – filmy a seriály, které jsi viděl/a','closeListsModal();openWatchedModal()','videl sledovane'],
+    ['hodnocene_filmy','Hodnocené filmy (pozitivní / průměr / odpad)','closeListsModal();openRatedMoviesMenu()','hodnoceni'],
+    ['hodnocene_serialy','Hodnocené seriály (pozitivní / průměr / odpad)','closeListsModal();openRatedShowsMenu()','hodnoceni'],
+    ['tematicke_seznamy','Tematické seznamy – komunitní seznamy z TMDB podle témat','closeListsModal();openThematicListsModal()','temata'],
+    ['tematicke_seznamy_2','Tematické seznamy 2 – klasiky, žraloci, vánoční pohádky','closeListsModal();openThematicListsModal2()','temata klasiky zraloci vanocni pohadky'],
+    ['streamy','Populární streamy – Netflix, Disney+, HBO Max a další','closeListsModal();openStreamingModal()','netflix disney hbo streamovaci sluzby'],
+    ['smart_seznamy','Smart seznamy – tipy podle shlédnuté historie','closeListsModal();openSmartListsMenu()','tipy historie'],
+    ['rozkoukane','Rozkoukané – seriály i filmy, které sleduješ','closeListsModal();openRozkoukaneModal()','rozkoukano rozdelane'],
+    ['top_tipy','Top tipy / doporučení','openDoporucujiModal()','doporucuji'],
+    ['co_dnes','Co dnes sledovat? (náhodný tip)','window._ntOpenedFromMain=true;openNahodnyTipModal()','nahodny tip'],
+    ['zabava','Zábava – hlavní menu','openZabavaModal()',''],
+    ['kino_zabava','Zábava → Kino (co bylo, hraje, chystá se)',ZB_PUSH('openZabavaKinoModal'),'kina'],
+    ['trailery','Zábava → Trailery',ZB_PUSH('openTrailersModal'),'ukazky'],
+    ['ai_nastroje','Zábava → AI nástroje',ZB_PUSH('openZabavaAiModal'),''],
+    ['prehledy','Zábava → Přehledy a statistiky',ZB_PUSH('openZabavaPrehledyModal'),''],
+    ['externi_aplikace','Zábava → Externí aplikace (Stremio, Nuvio…)',ZB_PUSH('openZabavaExternalAppsModal'),'stremio nuvio'],
+    ['weby','Zábava → Filmové weby, magazíny, recenze','closeZabavaModal();openWebsitesModal()','magaziny recenze'],
+    ['ai_zabava','AI zábava – doporučení, kvízy, hry','openAiModal()',''],
+    ['kviz','Filmový kvíz','openKvizModal()','hra'],
+    ['porovnani','Porovnání dvou filmů/seriálů','openPorovnaniModal()',''],
+    ['nalada','Filmová nálada – 3 tipy podle nálady','openMoodModal()',''],
+    ['koukat_s','Koukat s… – tipy podle společnosti','openKoukatSModal()',''],
+    ['koukat_rodina','Koukat s… → Rodina',"openKoukatSModal();loadKoukatS('rodina')",''],
+    ['koukat_deti','Koukat s… → Děti',"openKoukatSModal();loadKoukatS('deti')",'pohadky'],
+    ['koukat_partner','Koukat s… → Partner',"openKoukatSModal();loadKoukatS('partner')",''],
+    ['koukat_sam','Koukat s… → Sám',"openKoukatSModal();loadKoukatS('sam')",''],
+    ['koukat_pratele','Koukat s… → S přáteli',"openKoukatSModal();loadKoukatS('pratele')",'kamaradi'],
+    ['zeptej_sinatora','Zeptej se Sinatora (vlastními slovy co chceš sledovat)','openAskSinatorModal()',''],
+    ['zebricky','Filmové žebříčky','openZebricky()','nejlepsi filmy'],
+    ['statistiky','Moje statistiky','openMyStatsModal()',''],
+    ['tento_den','Tento den v historii','openTentodenModal()','vyroci'],
+    ['swipe','Swipe (listování doporučení)',{btn:/swipe/i},''],
+    ['up_next','Up Next (další epizody)',{btn:/up\s*next/i},'dalsi epizody'],
+    ['franchise','Franchise (série a univerza)',{btn:/franchis/i},''],
+    ['wrapped','Wrapped (shrnutí)',{btn:/wrapped/i},'shrnuti'],
+    ['spravce','Správce',{btn:/spr[aá]vce/i},''],
+    ['nastaveni','Nastavení','openSettingsModal()','vzhled jazyk'],
+    ['domu','Hlavní stránka','goHome()','home']
   ];
+  /* ⚡ Rychlé odkazy podle klíčového slova (bez čekání na AI): všechna slova dotazu musí sedět na položku katalogu */
+  function nrm(t){ return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9+ ]+/g,' '); }
+  var STOP={chci:1,chtel:1,chtela:1,otevri:1,otevrit:1,otevreni:1,spust:1,spustit:1,ukaz:1,ukazat:1,jdi:1,jit:1,pust:1,pustit:1,zobraz:1,zobrazit:1,prosim:1,muzes:1,mohl:1,bych:1,kam:1,kde:1,najdu:1,najit:1,dej:1,mi:1,me:1,do:1,na:1,ve:1,sekce:1,sekci:1,apce:1,aplikaci:1,appce:1,odkaz:1,the:1,ten:1,tu:1,to:1,ja:1,je:1,jsou:1,si:1,se:1,a:1,v:1,z:1,s:1};
+  function stems(t){ var o={}; nrm(t).split(/\s+/).forEach(function(w){ if(w.length>=3) o[w.slice(0,5)]=1; }); return o; }
+  function localApp(q){
+    var toks=nrm(q).split(/\s+/).filter(function(w){ return w&&!STOP[w]; });
+    if(!toks.length||toks.length>5||q.length>60) return '';
+    var qs=toks.map(function(w){ return w.slice(0,5); }), hits=[];
+    APP.forEach(function(a){
+      var st=stems(a[0].replace(/_/g,' ')+' '+a[1]+' '+(a[3]||'')), ok=qs.every(function(s){ return st[s]; });
+      var nm0=stems(a[0].replace(/_/g,' ')+' '+a[1].split(/ [–→-] /)[0]), cover=qs.filter(function(s){ return nm0[s]; }).length/Math.max(1,Object.keys(nm0).length);
+      if(ok) hits.push({a:a,cover:cover});
+    });
+    if(!hits.length) return '';
+    hits.sort(function(x,y){ return (y.cover-x.cover)||(x.a[1].length-y.a[1].length); });
+    return 'Tady to je — klepni a otevřu to v appce:\n'+hits.slice(0,6).map(function(h){ return '• [[app|'+h.a[1]+'|'+h.a[0]+']]'; }).join('\n');
+  }
   function runApp(key){
     var e=null; for(var i=0;i<APP.length;i++){ if(APP[i][0]===key){ e=APP[i]; break; } }
     if(!e){ alert('Tuhle sekci v appce neumím otevřít ('+key+').'); return; }
@@ -54750,7 +54796,7 @@ window.sfFrAuto=async function(id,t){
     +'1) Kontext níže pochází z databáze TMDB a z obrazovky appky (obsazení, režie, kolekce, podobné a doporučené tituly, filmografie…). Čerpej z něj PŘEDNOSTNĚ a nikdy netvrď, že údaj není dostupný, pokud v kontextu je. '+(web?'Když v kontextu opravdu chybí nebo jde o aktuální informace, použij vyhledávání na webu.':'Když tam opravdu chybí, řekni to.')+'\n'
     +'2) Nevymýšlej si; když si nejsi jistý, řekni to. Spoilery (konec, zvraty) jen na výslovné přání.\n'
     +'3) ODKAZY: každý konkrétní film, seriál nebo osobu (herec, režisér…) zapiš jako odkaz přesně v tomto tvaru: [[film|Název|rok]], [[serial|Název|rok]] nebo [[osoba|Jméno Příjmení]] (rok vynech, pokud ho neznáš; uvnitř odkazu žádné další uvozovky ani tučné písmo). Když uživatel chce herce, režiséra, kolekci, podobné tituly apod., vypiš je jako seznam takových odkazů. Právě zobrazený titul/osobu odkazem neoznačuj.\n'
-    +'4) NAVIGACE V APPCE: když uživatel chce jít do sekce nebo seznamu v appce (zábava, kolekce, TV, IPTV, rádio, kino, seznamy, oblíbené, složky, filtry, hudba…), odpověz krátce a vlož odkaz [[app|Popisek|klíč]] s klíčem z tabulky (může jich být víc). Když se ptá na něco, co appka umí (kvíz, porovnání, nálada, žebříčky, statistiky, Co dnes…), nabídni příslušnou sekci takovým odkazem. Klíče piš přesně z tabulky.\n'
+    +'4) NAVIGACE V APPCE: když uživatel chce jít do sekce nebo seznamu v appce (zábava, kolekce, TV, IPTV, rádio, kino, seznamy, oblíbené, složky, filtry, hudba…), odpověz krátce a vlož odkaz [[app|Popisek|klíč]] s klíčem z tabulky (může jich být víc). Když se ptá na něco, co appka umí (kvíz, porovnání, nálada, žebříčky, statistiky, Co dnes…), nabídni příslušnou sekci takovým odkazem. Uživatel často napíše jen klíčové slovo nebo název sekce (např. „hodnocené“, „tematické seznamy“, „shlédnuté“, „streamy“, „rozkoukané“, „oblíbení herci“) — vždy mu dej odkaz (u nejednoznačných slov klidně víc odkazů, např. hodnocené filmy i seriály). Klíče piš přesně z tabulky.\n'
     +'Sekce appky (klíč = popis):\n'+APP.map(function(a){return a[0]+' = '+a[1];}).join('\n')
     +'\n\nKontext z appky:\n'+(c.ctx||'(žádný)');
   }
@@ -54758,7 +54804,10 @@ window.sfFrAuto=async function(id,t){
     if(busy||!cur) return;
     var inp=document.getElementById('aiAskInput'), q=(txt!=null?txt:inp.value).trim(); if(!q) return;
     inp.value=''; inp.style.height='auto';
-    var me=cur, c=convs[me.key]=convs[me.key]||[]; c.push({role:'user',content:q}); busy=true; render();
+    var me=cur, c=convs[me.key]=convs[me.key]||[]; c.push({role:'user',content:q});
+    var loc=''; try{ loc=localApp(q); }catch(e){}
+    if(loc){ c.push({role:'assistant',content:loc}); render(); return; }
+    busy=true; render();
     if(me.ready){ try{ await me.ready; }catch(e){} }
     var msgs=[{role:'system',content:sysFor(me,webOn())}].concat(c.filter(function(m){return !m.err;}).slice(-14).map(function(m){return {role:m.role,content:m.content};}));
     try{ var a=await ask(msgs); c.push({role:'assistant',content:a.text.trim(),sources:a.sources}); }
