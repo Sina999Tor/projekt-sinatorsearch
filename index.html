@@ -54531,6 +54531,9 @@ window.sfFrAuto=async function(id,t){
     if(!e){ alert('Tuhle sekci v appce neumím otevřít ('+key+').'); return; }
     var p=document.getElementById('aiAskPanel'), fab=document.getElementById('aiAskFab');
     if(p) p.style.display='none'; if(fab) fab.style.display='flex';
+    // zavřít otevřený detail / hudební okno, jinak se cílová sekce otevře „pod“ nimi
+    try{ var dm=document.getElementById('modal'); if(dm&&dm.classList.contains('open')&&typeof closeModal==='function') closeModal(); if(dm) dm.style.zIndex=''; }catch(x){}
+    try{ var mm=document.getElementById('musicModal'); if(mm&&mm.style.display==='flex'&&key!=='hudba'&&typeof closeMusicModal==='function') closeMusicModal(); }catch(x){}
     try{
       if(typeof e[2]==='object'){
         var bs=document.querySelectorAll('.header-actions .action-btn'), hit=null;
