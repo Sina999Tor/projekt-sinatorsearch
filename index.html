@@ -52000,6 +52000,8 @@ window.KinoList = (function() {
       u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
       u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
       u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
+      u => 'https://corsproxy.org/?' + encodeURIComponent(u),
+      u => 'https://yacdn.org/proxy/' + u,
       u => 'https://thingproxy.freeboard.io/fetch/' + u
     ];
     let last;
@@ -52024,12 +52026,14 @@ window.KinoList = (function() {
     if (/^https?:$/.test(location.protocol)) apis.push('/api/yt');
     apis.push('https://sinator-backend.vercel.app/api/yt', 'https://projekt-sinatorsearch.vercel.app/api/yt');
     for (const base of apis) {
+      const tag = 'api ' + base.replace(/^https?:\/\//, '').split('/')[0].replace('.vercel.app', '');
       try {
         const r = await fetch(`${base}?handle=${getHandle()}${chParam}`, { cache: 'no-store' });
-        if (!r.ok) continue;
+        if (!r.ok) { errs.push(tag + ': HTTP ' + r.status); continue; }
         const d = await r.json();
         if (d && Array.isArray(d.items) && d.items.length) return d.items;
-      } catch (e) {}
+        errs.push(tag + ': ' + ((d && d.error) || 'prázdné'));
+      } catch (e) { errs.push(tag + ': ' + _em(e)); }
     }
     // 2) ID kanálu: ručně / uložené / z YouTube stránky přes proxy / vyhledáním přes Piped
     let id = /^UC[\w-]{22}$/.test(manual) ? manual : (localStorage.getItem(IK + '_resolved') || '');
@@ -52073,7 +52077,7 @@ window.KinoList = (function() {
     }, errs, 'Invidious');
     if (iv) return iv;
     localStorage.removeItem(IK + '_resolved');
-    throw new Error('Feed se nepodařilo načíst (' + [...new Set(errs)].slice(0, 12).join(', ') + '). Zkus vypnout VPN');
+    throw new Error('Feed se nepodařilo načíst, kanál ' + id + ' (' + [...new Set(errs)].slice(0, 12).join(', ') + '). Zkus vypnout VPN');
   }
   function when(iso) {
     const d = new Date(iso); if (isNaN(d)) return '';
