@@ -7387,6 +7387,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             '🤖 AI je propojená s appkou: načítá z TMDB celé obsazení, režii, kolekci, podobné a doporučené tituly i filmografii herců — už netvrdí, že údaje nejsou dostupné',
             '🧭 AI umí nasměrovat do sekcí appky (Zábava, kolekce, IPTV, rádio, kino, seznamy, oblíbené, složky, kvíz, žebříčky…) klikatelným odkazem; napiš třeba „chci IPTV“',
             '🧭 Odkazy do appky pokrývají i podsekce: Tematické seznamy, Hodnocené, Shlédnuté, Rozkoukané, Populární streamy, Smart seznamy, Trakt/Simkl/Sinator, Histra, Oblíbené (filmy, seriály, herci, režiséři…), Koukat s… Stačí napsat klíčové slovo — odkaz se ukáže hned',
+            '📦 Odkaz „Kolekce“ v chatu u filmu otevře přímo kolekci toho filmu (ne seznam všech kolekcí)',
             '🌐 AI umí hledat na webu (Gemini) — přepínač 🌐 v hlavičce chatu; zdroje se ukážou pod odpovědí',
             '🔧 Histra → Odebrat z rozkoukaných: Histra mazání rozkoukaných přes API neumí (u seriálů v Rozkoukaných jen kvůli částečně shlédnutým epizodám není co mazat), proto se položka skryje v appce; seriál se v Rozkoukaných znovu objeví, jakmile shlédneš novou epizodu',
             '🔧 Histra → Odebrat z rozkoukaných: zkouší víc způsobů mazání a ověří, že položka opravdu zmizela; při chybě ukáže skutečný důvod místo zavádějící hlášky o CORS',
@@ -54474,10 +54475,10 @@ window.sfFrAuto=async function(id,t){
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function sk(){ try{ return window.sinLang&&window.sinLang()==='sk'; }catch(e){ return false; } }
   function md(t){
-    var ic={film:'🎬',serial:'📺',osoba:'👤',app:'🧭'};
-    return esc(t).replace(/\[\[(film|serial|osoba|app)\|([^\]|]+?)(?:\|([^\]|]+))?\]\]/gi,function(m,ty,n,y){
+    var ic={film:'🎬',serial:'📺',osoba:'👤',app:'🧭',kolekce:'📦'};
+    return esc(t).replace(/\[\[(film|serial|osoba|app|kolekce)\|([^\]|]+?)(?:\|([^\]|]+))?\]\]/gi,function(m,ty,n,y){
         ty=ty.toLowerCase(); y=(y||'').trim(); n=n.trim();
-        var lbl=(ty==='app')?n:n+((y&&/^\d{4}$/.test(y))?' ('+y+')':'');
+        var lbl=(ty==='app'||ty==='kolekce')?n:n+((y&&/^\d{4}$/.test(y))?' ('+y+')':'');
         return '<a href="#" data-ai-t="'+ty+'" data-ai-n="'+n+'" data-ai-y="'+y+'">'+ic[ty]+' '+lbl+'</a>'; })
       .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/^\s*[-*•]\s+/gm,'• ').replace(/\n/g,'<br>'); }
 
@@ -54559,7 +54560,7 @@ window.sfFrAuto=async function(id,t){
   function nrm(t){ return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9+ ]+/g,' '); }
   var STOP={chci:1,chtel:1,chtela:1,otevri:1,otevrit:1,otevreni:1,spust:1,spustit:1,ukaz:1,ukazat:1,jdi:1,jit:1,pust:1,pustit:1,zobraz:1,zobrazit:1,prosim:1,muzes:1,mohl:1,bych:1,kam:1,kde:1,najdu:1,najit:1,dej:1,mi:1,me:1,do:1,na:1,ve:1,sekce:1,sekci:1,apce:1,aplikaci:1,appce:1,odkaz:1,the:1,ten:1,tu:1,to:1,ja:1,je:1,jsou:1,si:1,se:1,a:1,v:1,z:1,s:1};
   function stems(t){ var o={}; nrm(t).split(/\s+/).forEach(function(w){ if(w.length>=3) o[w.slice(0,5)]=1; }); return o; }
-  function localApp(q){
+  function localApp(q,c){
     var toks=nrm(q).split(/\s+/).filter(function(w){ return w&&!STOP[w]; });
     if(!toks.length||toks.length>5||q.length>60) return '';
     var qs=toks.map(function(w){ return w.slice(0,5); }), hits=[];
@@ -54568,9 +54569,11 @@ window.sfFrAuto=async function(id,t){
       var nm0=stems(a[0].replace(/_/g,' ')+' '+a[1].split(/ [–→-] /)[0]), cover=qs.filter(function(s){ return nm0[s]; }).length/Math.max(1,Object.keys(nm0).length);
       if(ok) hits.push({a:a,cover:cover});
     });
-    if(!hits.length) return '';
+    var collLink='';
+    if(c&&c.coll&&qs.indexOf('kolek')>=0&&qs.length<=2) collLink='• [[kolekce|'+c.coll.name+'|'+c.coll.id+']] (kolekce tohoto titulu)\n';
+    if(!hits.length&&!collLink) return '';
     hits.sort(function(x,y){ return (y.cover-x.cover)||(x.a[1].length-y.a[1].length); });
-    return 'Tady to je — klepni a otevřu to v appce:\n'+hits.slice(0,6).map(function(h){ return '• [[app|'+h.a[1]+'|'+h.a[0]+']]'; }).join('\n');
+    return 'Tady to je — klepni a otevřu to v appce:\n'+collLink+hits.slice(0,6).map(function(h){ return '• [[app|'+h.a[1]+'|'+h.a[0]+']]'; }).join('\n');
   }
   function runApp(key){
     var e=null; for(var i=0;i<APP.length;i++){ if(APP[i][0]===key){ e=APP[i]; break; } }
@@ -54604,7 +54607,7 @@ window.sfFrAuto=async function(id,t){
   function nm(x){ return x.title||x.name||''; }
   function ys(x){ var y=yr(x.release_date||x.first_air_date); return y?' ('+y+')':''; }
   function listT(a,n){ return (a||[]).slice(0,n).map(function(x){ return nm(x)+ys(x); }).join('; '); }
-  async function ctxTitle(type,id){
+  async function ctxTitle(type,id,holder){
     var j=await tj('/'+type+'/'+id,'&append_to_response=credits,recommendations,similar,keywords'), cr=j.credits||{}, o=[];
     o.push('Název: '+nm(j)+ys(j)+(j.original_title&&j.original_title!==j.title?' | originál: '+j.original_title:(j.original_name&&j.original_name!==j.name?' | originál: '+j.original_name:'')));
     if(j.tagline) o.push('Tagline: '+j.tagline);
@@ -54623,9 +54626,10 @@ window.sfFrAuto=async function(id,t){
     var dp=(cr.crew||[]).filter(function(c){return c.job==='Director of Photography';}).map(function(c){return c.name;}); if(dp.length) o.push('Kamera: '+dp.slice(0,2).join(', '));
     if((cr.cast||[]).length) o.push('Obsazení (herec jako postava): '+cr.cast.slice(0,30).map(function(c){return c.name+(c.character?' jako '+c.character:'');}).join('; '));
     if(j.belongs_to_collection&&j.belongs_to_collection.id){
+      if(holder) holder.coll={id:j.belongs_to_collection.id,name:j.belongs_to_collection.name};
       try{ var cj=await tj('/collection/'+j.belongs_to_collection.id), ps=(cj.parts||[]).slice().sort(function(a,b){return (a.release_date||'9').localeCompare(b.release_date||'9');});
-        o.push('Kolekce / série filmů „'+cj.name+'“ ('+ps.length+' dílů, chronologicky): '+ps.map(function(p){return nm(p)+ys(p);}).join('; '));
-      }catch(e){ o.push('Kolekce: '+j.belongs_to_collection.name); }
+        o.push('Kolekce / série filmů „'+cj.name+'“ [ID kolekce: '+j.belongs_to_collection.id+'] ('+ps.length+' dílů, chronologicky): '+ps.map(function(p){return nm(p)+ys(p);}).join('; '));
+      }catch(e){ o.push('Kolekce: '+j.belongs_to_collection.name+' [ID kolekce: '+j.belongs_to_collection.id+']'); }
     }
     var rec=(j.recommendations&&j.recommendations.results)||[], sim=(j.similar&&j.similar.results)||[];
     if(rec.length) o.push('Doporučené (TMDB): '+listT(rec,12));
@@ -54661,14 +54665,22 @@ window.sfFrAuto=async function(id,t){
   function loadCtx(c,type,id,screen){
     if(!id||!/^(movie|tv|person)$/.test(type)){ c.ready=Promise.resolve(); return; }
     c.ready=(async function(){
-      var k=type+'|'+id, t=ctxCache[k];
-      if(!t){ try{ t=await (type==='person'?ctxPerson(id):ctxTitle(type,id)); ctxCache[k]=t; }catch(e){ t=''; } }
+      var k=type+'|'+id, t=ctxCache[k], h={};
+      if(!t){ try{ t=await (type==='person'?ctxPerson(id):ctxTitle(type,id,h)); ctxCache[k]=t; if(h.coll) ctxCache[k+'|c']=h.coll; }catch(e){ t=''; } }
+      c.coll=ctxCache[k+'|c']||null;
       if(t) c.ctx=t+(screen?'\n\nZobrazeno v appce (obrazovka detailu):\n'+screen:'');
     })();
   }
 
   function srcHtml(m){ if(!m.sources||!m.sources.length) return ''; return '<div style="font-size:.7rem;margin-top:6px;opacity:.9;">🌐 '+m.sources.map(function(s){return '<a href="'+esc(s.u)+'" target="_blank" rel="noopener">'+esc(s.t)+'</a>';}).join(' · ')+'</div>'; }
   function updWeb(){ var b=document.getElementById('aiAskWeb'); if(!b) return; b.style.display=K('sinator_gemini_api_key')?'inline-block':'none'; b.style.opacity=webOn()?'1':'0.35'; b.title=webOn()?'Hledání na webu: zapnuto (klepni pro vypnutí)':'Hledání na webu: vypnuto (klepni pro zapnutí)'; }
+  function openColl(id,name){
+    id=parseInt(id,10); if(!id){ runApp('kolekce'); return; }
+    var p=document.getElementById('aiAskPanel'), fab=document.getElementById('aiAskFab');
+    if(p) p.style.display='none'; if(fab) fab.style.display='flex';
+    try{ if(typeof openCollFromModal==='function') openCollFromModal(id,String(name||'').replace(/'/g,"’")); else runApp('kolekce'); }
+    catch(e){ alert('Kolekci se nepodařilo otevřít: '+e.message); }
+  }
   async function openRef(ty,n,y){
     var key=window._siGetKey&&window._siGetKey(); if(!key){ alert('Chybí TMDB API klíč.'); return; }
     var base=(window._siGetBase&&window._siGetBase())||'https://api.themoviedb.org/3', lang=sk()?'sk-SK':'cs-CZ';
@@ -54758,7 +54770,7 @@ window.sfFrAuto=async function(id,t){
     fab.style.cssText='display:none;position:fixed;right:12px;bottom:90px;width:52px;height:52px;border-radius:50%;border:2px solid #a78bfa;background:#2a2150;color:#fff;font-size:1.5rem;align-items:center;justify-content:center;z-index:10001;box-shadow:0 4px 16px rgba(0,0,0,.6);cursor:pointer;';
     fab.onclick=function(){ fab.style.display='none'; p.style.display='flex'; render(); };
     document.body.appendChild(fab);
-    document.getElementById('aiAskMsgs').addEventListener('click',function(e){ var a=e.target.closest&&e.target.closest('a[data-ai-t]'); if(!a) return; e.preventDefault(); if(a.dataset.aiT==='app') runApp(a.dataset.aiY); else openRef(a.dataset.aiT,a.dataset.aiN,a.dataset.aiY); });
+    document.getElementById('aiAskMsgs').addEventListener('click',function(e){ var a=e.target.closest&&e.target.closest('a[data-ai-t]'); if(!a) return; e.preventDefault(); if(a.dataset.aiT==='app') runApp(a.dataset.aiY); else if(a.dataset.aiT==='kolekce') openColl(a.dataset.aiY,a.dataset.aiN); else openRef(a.dataset.aiT,a.dataset.aiN,a.dataset.aiY); });
     document.getElementById('aiAskClose').onclick=function(){ p.style.display='none'; fab.style.display='none'; };
     document.getElementById('aiAskWeb').onclick=function(){ try{ st().setItem('sinator_ai_web', webOn()?'0':'1'); }catch(e){} updWeb(); };
     document.getElementById('aiAskClear').onclick=function(){ if(cur){ convs[cur.key]=[]; render(); } };
@@ -54796,7 +54808,7 @@ window.sfFrAuto=async function(id,t){
     +'1) Kontext níže pochází z databáze TMDB a z obrazovky appky (obsazení, režie, kolekce, podobné a doporučené tituly, filmografie…). Čerpej z něj PŘEDNOSTNĚ a nikdy netvrď, že údaj není dostupný, pokud v kontextu je. '+(web?'Když v kontextu opravdu chybí nebo jde o aktuální informace, použij vyhledávání na webu.':'Když tam opravdu chybí, řekni to.')+'\n'
     +'2) Nevymýšlej si; když si nejsi jistý, řekni to. Spoilery (konec, zvraty) jen na výslovné přání.\n'
     +'3) ODKAZY: každý konkrétní film, seriál nebo osobu (herec, režisér…) zapiš jako odkaz přesně v tomto tvaru: [[film|Název|rok]], [[serial|Název|rok]] nebo [[osoba|Jméno Příjmení]] (rok vynech, pokud ho neznáš; uvnitř odkazu žádné další uvozovky ani tučné písmo). Když uživatel chce herce, režiséra, kolekci, podobné tituly apod., vypiš je jako seznam takových odkazů. Právě zobrazený titul/osobu odkazem neoznačuj.\n'
-    +'4) NAVIGACE V APPCE: když uživatel chce jít do sekce nebo seznamu v appce (zábava, kolekce, TV, IPTV, rádio, kino, seznamy, oblíbené, složky, filtry, hudba…), odpověz krátce a vlož odkaz [[app|Popisek|klíč]] s klíčem z tabulky (může jich být víc). Když se ptá na něco, co appka umí (kvíz, porovnání, nálada, žebříčky, statistiky, Co dnes…), nabídni příslušnou sekci takovým odkazem. Uživatel často napíše jen klíčové slovo nebo název sekce (např. „hodnocené“, „tematické seznamy“, „shlédnuté“, „streamy“, „rozkoukané“, „oblíbení herci“) — vždy mu dej odkaz (u nejednoznačných slov klidně víc odkazů, např. hodnocené filmy i seriály). Klíče piš přesně z tabulky.\n'
+    +'4) NAVIGACE V APPCE: když uživatel chce jít do sekce nebo seznamu v appce (zábava, kolekce, TV, IPTV, rádio, kino, seznamy, oblíbené, složky, filtry, hudba…), odpověz krátce a vlož odkaz [[app|Popisek|klíč]] s klíčem z tabulky (může jich být víc). Když se ptá na něco, co appka umí (kvíz, porovnání, nálada, žebříčky, statistiky, Co dnes…), nabídni příslušnou sekci takovým odkazem. Uživatel často napíše jen klíčové slovo nebo název sekce (např. „hodnocené“, „tematické seznamy“, „shlédnuté“, „streamy“, „rozkoukané“, „oblíbení herci“) — vždy mu dej odkaz (u nejednoznačných slov klidně víc odkazů, např. hodnocené filmy i seriály). Kolekci právě zobrazeného titulu (nebo jinou konkrétní kolekci z kontextu) odkazuj jako [[kolekce|Název kolekce|ID kolekce]] (ID je v kontextu v hranatých závorkách) — NE přes [[app|…|kolekce]], to otevře jen seznam všech kolekcí. Klíče piš přesně z tabulky.\n'
     +'Sekce appky (klíč = popis):\n'+APP.map(function(a){return a[0]+' = '+a[1];}).join('\n')
     +'\n\nKontext z appky:\n'+(c.ctx||'(žádný)');
   }
@@ -54805,10 +54817,10 @@ window.sfFrAuto=async function(id,t){
     var inp=document.getElementById('aiAskInput'), q=(txt!=null?txt:inp.value).trim(); if(!q) return;
     inp.value=''; inp.style.height='auto';
     var me=cur, c=convs[me.key]=convs[me.key]||[]; c.push({role:'user',content:q});
-    var loc=''; try{ loc=localApp(q); }catch(e){}
-    if(loc){ c.push({role:'assistant',content:loc}); render(); return; }
     busy=true; render();
     if(me.ready){ try{ await me.ready; }catch(e){} }
+    var loc=''; try{ loc=localApp(q,me); }catch(e){}
+    if(loc){ c.push({role:'assistant',content:loc}); busy=false; render(); return; }
     var msgs=[{role:'system',content:sysFor(me,webOn())}].concat(c.filter(function(m){return !m.err;}).slice(-14).map(function(m){return {role:m.role,content:m.content};}));
     try{ var a=await ask(msgs); c.push({role:'assistant',content:a.text.trim(),sources:a.sources}); }
     catch(e){ c.push({role:'assistant',content:'⚠️ AI se nepodařilo zavolat: '+e.message,err:true}); }
