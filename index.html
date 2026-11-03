@@ -52026,10 +52026,10 @@ window.KinoList = (function() {
     if (/^https?:$/.test(location.protocol)) apis.push('/api/yt');
     apis.push('https://sinator-backend.vercel.app/api/yt', 'https://projekt-sinatorsearch.vercel.app/api/yt');
     for (const base of apis) {
-      const tag = 'api ' + base.replace(/^https?:\/\//, '').split('/')[0].replace('.vercel.app', '');
+      const tag = 'api ' + (base.charAt(0) === '/' ? 'tato doména' : base.replace(/^https?:\/\//, '').split('/')[0].replace('.vercel.app', ''));
       try {
         const r = await fetch(`${base}?handle=${getHandle()}${chParam}`, { cache: 'no-store' });
-        if (!r.ok) { errs.push(tag + ': HTTP ' + r.status); continue; }
+        if (!r.ok) { let m = ''; try { m = ((await r.json()) || {}).error || ''; } catch (e) {} errs.push(tag + ': HTTP ' + r.status + (m ? ' (' + m + ')' : '')); continue; }
         const d = await r.json();
         if (d && Array.isArray(d.items) && d.items.length) return d.items;
         errs.push(tag + ': ' + ((d && d.error) || 'prázdné'));
