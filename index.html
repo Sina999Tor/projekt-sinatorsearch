@@ -2929,14 +2929,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // (šetří Vercel Active CPU — appka volá stejné /watchlist, /history?id=… atd. z více míst).
     // Jakýkoli zápis (POST/DELETE/PATCH) cache hned zahodí, takže data zůstávají aktuální.
     const _myGetCache = new Map();
-    const MY_GET_TTL = 15000;
+    const MY_GET_TTL = 60000;
     function _myCloneJson(v) { try { return typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v)); } catch (e) { return v; } }
     function myApiCacheClear() { _myGetCache.clear(); }
     window.myApiCacheClear = myApiCacheClear;
     async function myApi(path, opts = {}) {
         if (!myBackendReady()) throw new Error('Vlastní backend není nastavený (chybí adresa nebo klíč).');
         const doFetch = async () => {
-            const res = await fetchWithRetry(`${myBackendBase()}${path}`, { ...opts, headers: { ...myHeaders(), ...(opts.headers || {}) } });
+            // Backend posílá Cache-Control (30 s) + ETag; po vlastním zápisu prohlížečovou cache 40 s obcházíme, ať se hned ukážou čerstvá data.
+            const _bust = (String(opts.method || 'GET').toUpperCase() === 'GET' && Date.now() - (window._myLastWriteTs || 0) < 40000) ? { cache: 'reload' } : {};
+            const res = await fetchWithRetry(`${myBackendBase()}${path}`, { ...opts, ..._bust, headers: { ...myHeaders(), ...(opts.headers || {}) } }, { retries: 1, delayMs: 2500, timeoutMs: 15000 });
             let body = null;
             try { body = await res.json(); } catch (e) {}
             if (!res.ok) throw new Error((body && body.error) || `HTTP ${res.status}`);
@@ -2945,7 +2947,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const method = String(opts.method || 'GET').toUpperCase();
         if (method !== 'GET') {
             _myGetCache.clear();
-            try { return await doFetch(); } finally { _myGetCache.clear(); }
+            window._myLastWriteTs = Date.now();
+            try { return await doFetch(); } finally { _myGetCache.clear(); try { for (const k in _historyGetAllCache) delete _historyGetAllCache[k]; } catch (e) {} }
         }
         const ck = myBackendKey() + '|' + path;
         const hit = _myGetCache.get(ck);
@@ -3069,10 +3072,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // záložky Hist. filmy/epizody/seriály...) a bez cache by se stejná
     // (potenciálně velká) historie stahovala víckrát zbytečně za sebou.
     const _historyGetAllCache = {};
+    window.myHistoryGetAll = (t, f) => myHistoryGetAll(t, f);
+    window.myRatingsGetShared = (t) => myRatingsGet(t);
     async function myHistoryGetAll(type, forceRefresh) {
         const cached = _historyGetAllCache[type];
         const now = Date.now();
-        if (!forceRefresh && cached && (now - cached.ts) < 10000) {
+        if (!forceRefresh && cached && (now - cached.ts) < 300000) {
             if (cached.promise) return cached.promise; // probíhající fetch — počkej na stejný výsledek
             return cached.data;
         }
@@ -50862,28 +50867,13 @@ async function _statsFetchMySinator(_s) {
   const MY_BACKEND_STATS_BASE = 'https://sinator-backend.vercel.app/api';
   const headers = { 'Content-Type': 'application/json', 'x-api-key': myData.key };
   const countHistory = async (type) => {
-    const pageSize = 500, concurrency = 6;
-    let total = 0, page = 1, done = false, rounds = 0;
-    while (!done && rounds < 40) {
-      rounds++;
-      const pages = Array.from({ length: concurrency }, (_, i) => page + i);
-      const batches = await Promise.all(pages.map(p =>
-        fetch(`${MY_BACKEND_STATS_BASE}/history?type=${type}&page=${p}&limit=${pageSize}`, { headers })
-          .then(r => r.ok ? r.json() : [])
-          .catch(() => [])
-      ));
-      for (const batch of batches) {
-        if (Array.isArray(batch)) total += batch.length;
-        if (!Array.isArray(batch) || batch.length < pageSize) done = true;
-      }
-      page += concurrency;
-    }
-    return total;
+    if (typeof window.myHistoryGetAll === 'function') { const r = await window.myHistoryGetAll(type); return Array.isArray(r) ? r.length : 0; }
+    return 0;
   };
   try {
     const [mRatingsRes, sRatingsRes, histMovies, histEpisodes] = await Promise.all([
-      fetch(`${MY_BACKEND_STATS_BASE}/ratings?type=movies`, { headers }).then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch(`${MY_BACKEND_STATS_BASE}/ratings?type=shows`, { headers }).then(r => r.ok ? r.json() : []).catch(() => []),
+      window.myRatingsGetShared('movies').catch(() => []),
+      window.myRatingsGetShared('shows').catch(() => []),
       countHistory('movies'),
       countHistory('episodes')
     ]);
@@ -50941,24 +50931,7 @@ async function _calFetchMySinatorHistory() {
   if (!myData.key) return null;
   const BASE_URL = 'https://sinator-backend.vercel.app/api';
   const headers = { 'Content-Type': 'application/json', 'x-api-key': myData.key };
-  const fetchAll = async (type) => {
-    const pageSize = 500, concurrency = 8;
-    let all = [], page = 1, done = false, rounds = 0;
-    while (!done && rounds < 60) {
-      rounds++;
-      const pages = Array.from({ length: concurrency }, (_, i) => page + i);
-      const batches = await Promise.all(pages.map(p =>
-        fetch(`${BASE_URL}/history?type=${type}&page=${p}&limit=${pageSize}`, { headers })
-          .then(r => r.ok ? r.json() : []).catch(() => [])
-      ));
-      for (const b of batches) {
-        if (Array.isArray(b) && b.length) all = all.concat(b);
-        if (!Array.isArray(b) || b.length < pageSize) done = true;
-      }
-      page += concurrency;
-    }
-    return all;
-  };
+  const fetchAll = async (type) => { const r = await window.myHistoryGetAll(type); return Array.isArray(r) ? r : []; };
   try {
     const [movies, episodes] = await Promise.all([fetchAll('movies'), fetchAll('episodes')]);
     return { movies, episodes };
