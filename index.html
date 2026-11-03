@@ -7380,7 +7380,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-03', date: '3. 11. 2026', items: [
-            '🎞️ Zábava → Trailery: oprava „Nic k zobrazení“ — appka teď zkouší víc zdrojů (vlastní server, několik proxy, záložní RSS služba), ověřuje, že odpověď je opravdu feed, a když načtení selže, ukáže skutečnou chybu místo prázdné obrazovky',
+            '🎞️ Zábava → Trailery: oprava „Nic k zobrazení“ / „Failed to fetch“ — appka teď zkouší víc zdrojů (vlastní server, několik proxy, RSS služba, Piped a Invidious API) a ID kanálu umí dohledat sama, ověřuje, že odpověď je opravdu feed, a když načtení selže, ukáže skutečnou chybu místo prázdné obrazovky',
             '🤖 Dlouhý stisk na logo v hlavičce otevře plovoucí chat „Zeptej se AI“ (obecné dotazy na filmy, seriály, herce, hudbu i appku; vyžaduje připojenou AI); krátké klepnutí na logo dál vrací domů',
         ] },
         { version: '2026-11-02b', date: '2. 11. 2026', items: [
@@ -52006,10 +52006,19 @@ window.KinoList = (function() {
     throw last || new Error('Proxy nedostupná');
   }
   const _isFeed = t => /<entry>/.test(t || '') && /<yt:videoId>/.test(t || '');
+  const _PIPED = ['https://pipedapi.kavin.rocks', 'https://pipedapi.adminforge.de', 'https://api.piped.private.coffee', 'https://pipedapi.leptons.xyz'];
+  const _INV = ['https://yewtu.be', 'https://inv.nadeko.net', 'https://invidious.nerdvpn.de', 'https://invidious.privacydev.net'];
+  const _em = e => String((e && e.message) || e || 'chyba').replace(/^TypeError: /, '').slice(0, 40);
+  async function _json(url, ms) { return JSON.parse(await _tx(url, t => /^\s*[\[{]/.test(t || ''), ms || 9000)); }
+  async function _firstOk(list, fn, errs, tag) {
+    for (const base of list) { try { const r = await fn(base); if (r) return r; } catch (e) { errs.push(tag + ': ' + _em(e)); } }
+    return null;
+  }
   async function fetchAll() {
+    const errs = [];
     const manual = (localStorage.getItem(IK) || '').trim();
     const chParam = /^UC[\w-]{22}$/.test(manual) ? '&channel=' + manual : '';
-    // 1) serverová funkce /api/yt (vlastní doména i backend) — jen když vrací platné JSON s položkami
+    // 1) serverová funkce /api/yt — jen platné JSON s položkami
     const apis = [];
     if (/^https?:$/.test(location.protocol)) apis.push('/api/yt');
     apis.push('https://sinator-backend.vercel.app/api/yt', 'https://projekt-sinatorsearch.vercel.app/api/yt');
@@ -52021,26 +52030,49 @@ window.KinoList = (function() {
         if (d && Array.isArray(d.items) && d.items.length) return d.items;
       } catch (e) {}
     }
-    // 2) ID kanálu (ručně / uložené / zjištěné z YouTube stránky)
+    // 2) ID kanálu: ručně / uložené / z YouTube stránky přes proxy / vyhledáním přes Piped
     let id = /^UC[\w-]{22}$/.test(manual) ? manual : (localStorage.getItem(IK + '_resolved') || '');
     if (!id) {
-      const html = await viaProxy(`https://www.youtube.com/@${HANDLE}`, t => /externalId|channel_id=|channelId/.test(t || ''));
-      const m = html.match(/"externalId":"(UC[\w-]{22})"/) || html.match(/channel_id=(UC[\w-]{22})/) || html.match(/"channelId":"(UC[\w-]{22})"/);
-      if (!m) throw new Error('ID kanálu se nepodařilo zjistit — nastav ho ručně (⚙️ kanál).');
-      id = m[1]; localStorage.setItem(IK + '_resolved', id);
+      try {
+        const html = await viaProxy(`https://www.youtube.com/@${HANDLE}`, t => /externalId|channel_id=|channelId/.test(t || ''));
+        const m = html.match(/"externalId":"(UC[\w-]{22})"/) || html.match(/channel_id=(UC[\w-]{22})/) || html.match(/"channelId":"(UC[\w-]{22})"/);
+        if (m) id = m[1];
+      } catch (e) { errs.push('YT stránka: ' + _em(e)); }
     }
+    if (!id) {
+      id = await _firstOk(_PIPED, async base => {
+        const j = await _json(base + '/search?q=' + encodeURIComponent('Totalfilm.cz') + '&filter=channels');
+        const hit = (j.items || []).find(x => /total\s*film/i.test(x.name || '') && /\/channel\/(UC[\w-]{22})/.test(x.url || ''));
+        return hit ? hit.url.match(/\/channel\/(UC[\w-]{22})/)[1] : null;
+      }, errs, 'Piped hledání');
+    }
+    if (id) localStorage.setItem(IK + '_resolved', id);
+    if (!id) throw new Error('ID kanálu se nepodařilo zjistit (' + [...new Set(errs)].slice(0, 3).join(', ') + '). Nastav ho ručně přes ⚙️ kanál');
     const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${id}`;
     // 3) RSS feed přes proxy
-    try { const items = parseFeed(await viaProxy(feedUrl, _isFeed)); if (items.length) return items; } catch (e) {}
-    // 4) záloha: rss2json (vrací JSON, má CORS)
+    try { const items = parseFeed(await viaProxy(feedUrl, _isFeed)); if (items.length) return items; } catch (e) { errs.push('RSS proxy: ' + _em(e)); }
+    // 4) rss2json
     try {
       const j = JSON.parse(await _tx('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(feedUrl), t => /"items"/.test(t || ''), 12000));
       const items = (j.items || []).map(x => ({ id: String(x.guid || x.link || '').replace(/^.*(?:video:|v=)/, '').slice(0, 11), title: x.title || '', published: (x.pubDate || '').replace(' ', 'T') + 'Z', desc: '' })).filter(x => /^[\w-]{11}$/.test(x.id));
       if (items.length) return items;
-    } catch (e) {}
-    // uložené ID mohlo být špatné — příště se zjistí znovu
+    } catch (e) { errs.push('rss2json: ' + _em(e)); }
+    // 5) Piped API (CORS povoleno, bez proxy)
+    const pv = await _firstOk(_PIPED, async base => {
+      const j = await _json(base + '/channel/' + id, 12000);
+      const items = (j.relatedStreams || []).map(x => ({ id: String(x.url || '').replace(/^.*v=/, '').slice(0, 11), title: x.title || '', published: x.uploaded > 0 ? new Date(x.uploaded).toISOString() : '', desc: '' })).filter(x => /^[\w-]{11}$/.test(x.id));
+      return items.length ? items : null;
+    }, errs, 'Piped');
+    if (pv) return pv;
+    // 6) Invidious API
+    const iv = await _firstOk(_INV, async base => {
+      const j = await _json(base + '/api/v1/channels/' + id + '/latest', 12000);
+      const items = (Array.isArray(j) ? j : (j.videos || [])).map(x => ({ id: x.videoId || '', title: x.title || '', published: x.published ? new Date(x.published * 1000).toISOString() : '', desc: '' })).filter(x => /^[\w-]{11}$/.test(x.id));
+      return items.length ? items : null;
+    }, errs, 'Invidious');
+    if (iv) return iv;
     localStorage.removeItem(IK + '_resolved');
-    throw new Error('Feed se nepodařilo načíst (proxy nedostupné).');
+    throw new Error('Feed se nepodařilo načíst (' + [...new Set(errs)].slice(0, 3).join(', ') + '). Zkus vypnout VPN');
   }
   function when(iso) {
     const d = new Date(iso); if (isNaN(d)) return '';
@@ -52088,13 +52120,14 @@ window.KinoList = (function() {
       const items = await fetchAll();
       _items = items; localStorage.setItem(CK, JSON.stringify({ t: Date.now(), items }));
     } catch (e) {
-      if (!_items.length) { _err = '⚠️ ' + ((e && e.message) || 'Načtení se nezdařilo') + ' Zkus 🔄, nebo nastav ID kanálu (⚙️ kanál).'; }
+      if (!_items.length) { _err = '⚠️ ' + ((e && e.message) || 'Načtení se nezdařilo') + '. Zkus 🔄 nebo nastav ID kanálu (⚙️ kanál).'; }
     } finally { _loading = false; paint(); }
   };
   window.trailersSetChannel = function() {
     const cur = localStorage.getItem(IK) || '';
-    const v = prompt('ID YouTube kanálu (UC…) — nech prázdné pro automatické zjištění z @TotalfilmCz:', cur);
-    if (v === null) return;
+    const v0 = prompt('ID YouTube kanálu (UC…, jde vložit i odkaz youtube.com/channel/UC…) — nech prázdné pro automatické zjištění:', cur);
+    if (v0 === null) return;
+    const mm = String(v0).match(/UC[\w-]{22}/); const v = mm ? mm[0] : String(v0).trim();
     localStorage.setItem(IK, v.trim()); localStorage.removeItem(IK + '_resolved'); localStorage.removeItem(CK);
     trailersRefresh(true);
   };
