@@ -7424,6 +7424,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-03f', date: '3. 11. 2026', items: [
+            '📦 Zeptej se AI: klepnutí na odkaz kolekce (📦) teď vždy otevře konkrétní kolekci s jejími filmy — i když AI napsala jen název bez ID, appka kolekci dohledá v TMDB (dřív se otevřel jen obecný seznam kolekcí)',
+            '📋 Zeptej se AI: tabulky v odpovědích (řádky s „|“) se zobrazí jako přehledné odrážky bez svislých čar',
+        ] },
         { version: '2026-11-03e', date: '3. 11. 2026', items: [
             '🎤 Živý režim chatu „Zeptej se AI“: když AI mluví a ty začneš mluvit, odpověď se hned přeruší a appka vyřídí tvoji novou otázku (appka rozpozná a ignoruje vlastní hlas z reproduktoru; nejlépe funguje se sluchátky)',
             '🙂 Živý režim: v plovoucím okně se zobrazuje animovaná tvář — mrká, při poslechu je pozorná (zelená), při přemýšlení se dívá nahoru (fialová) a při mluvení pohybuje ústy (žlutá). Okno jde přetahovat, klepnutím se zvětší / zmenší, ⏹ ukončí živý režim',
@@ -54792,6 +54796,10 @@ window.sfFrAuto=async function(id,t){
   function sk(){ try{ return window.sinLang&&window.sinLang()==='sk'; }catch(e){ return false; } }
   function md(t){
     var ic={film:'🎬',serial:'📺',osoba:'👤',app:'🧭',kolekce:'📦',postava:'🎭'};
+    t=String(t==null?'':t).replace(/\[\[[^\]]*\]\]/g,function(m){ return m.replace(/\|/g,'\u0001'); })
+      .replace(/^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*$/gm,'')
+      .replace(/^[ \t]*\|(.+)\|[ \t]*$/gm,function(m,c){ return '• '+c.split('|').map(function(s){ return s.trim(); }).filter(Boolean).join(' · '); })
+      .replace(/\u0001/g,'|').replace(/\n{3,}/g,'\n\n');
     return esc(t).replace(/\[\[(film|serial|osoba|app|kolekce|postava)\|([^\]|]+?)(?:\|([^\]|]+))?\]\]/gi,function(m,ty,n,y){
         ty=ty.toLowerCase(); y=(y||'').trim(); n=n.trim();
         var lbl=(ty==='app'||ty==='kolekce'||ty==='postava')?n:n+((y&&/^\d{4}$/.test(y))?' ('+y+')':'');
@@ -55021,8 +55029,29 @@ window.sfFrAuto=async function(id,t){
 
   function srcHtml(m){ if(!m.sources||!m.sources.length) return ''; return '<div style="font-size:.7rem;margin-top:6px;opacity:.9;">🌐 '+m.sources.map(function(s){return '<a href="'+esc(s.u)+'" target="_blank" rel="noopener">'+esc(s.t)+'</a>';}).join(' · ')+'</div>'; }
   function updWeb(){ var b=document.getElementById('aiAskWeb'); if(!b) return; b.style.display=K('sinator_gemini_api_key')?'inline-block':'none'; b.style.opacity=webOn()?'1':'0.35'; b.title=webOn()?'Hledání na webu: zapnuto (klepni pro vypnutí)':'Hledání na webu: vypnuto (klepni pro zapnutí)'; }
-  function openColl(id,name){
-    id=parseInt(id,10); if(!id){ runApp('kolekce'); return; }
+  async function openColl(id,name){
+    id=parseInt(id,10);
+    if(!id){
+      /* odkaz bez ID (AI napsala jen název) → najdi kolekci v TMDB podle názvu a otevři ji přímo */
+      var nm0=String(name||'').trim(), best=null;
+      if(nm0){
+        try{
+          try{ showToast('📦 Hledám kolekci…'); }catch(e){}
+          var qs=[], seenQ={}, noPar=nm0.replace(/\s*\([^)]*\)/g,'');
+          [nm0,noPar,noPar.replace(/\s+(collection|kolekce|saga|série|serie)\s*$/i,'')].forEach(function(x){ x=x.replace(/\s+/g,' ').trim(); if(x.length>=2&&!seenQ[x]){ seenQ[x]=1; qs.push(x); } });
+          var res=await Promise.all(qs.map(function(x){ return tj('/search/collection','&query='+encodeURIComponent(x)).then(function(j){ return j.results||[]; }).catch(function(){ return []; }); }));
+          var tk=function(s){ return nrm(s).replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(function(w){ return w.length>1; }); };
+          var want=tk(nm0), score=-1e9;
+          res.forEach(function(r){ r.forEach(function(x){
+            var have=tk(x.name), sc=(nrm(x.name)===nrm(nm0))?100:0;
+            want.forEach(function(w){ if(have.indexOf(w)>=0) sc+=2; });
+            sc-=Math.abs(have.length-want.length)*0.3;
+            if(sc>score){ score=sc; best=x; } }); });
+        }catch(e){}
+      }
+      if(!best){ runApp('kolekce'); return; }
+      id=best.id; name=best.name;
+    }
     var p=document.getElementById('aiAskPanel'), fab=document.getElementById('aiAskFab');
     if(p) p.style.display='none'; if(fab) fab.style.display='flex';
     try{ if(typeof openCollFromModal==='function') openCollFromModal(id,String(name||'').replace(/'/g,"’")); else runApp('kolekce'); }
