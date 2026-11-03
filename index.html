@@ -7379,6 +7379,10 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-03', date: '3. 11. 2026', items: [
+            '🎞️ Zábava → Trailery: oprava „Nic k zobrazení“ — appka teď zkouší víc zdrojů (vlastní server, několik proxy, záložní RSS služba), ověřuje, že odpověď je opravdu feed, a když načtení selže, ukáže skutečnou chybu místo prázdné obrazovky',
+            '💬 Dlouhý stisk na logo v hlavičce otevře „Zeptej se Sinatora“; ✕ ho zavře rovnou na hlavní stránku (krátké klepnutí na logo dál vrací domů)',
+        ] },
         { version: '2026-11-02b', date: '2. 11. 2026', items: [
             '🤖 Zeptej se AI: v detailu filmu, seriálu, herce i režiséra je nové tlačítko, které otevře plovoucí okno s AI chatem — zeptáš se na děj, jak to dopadne, zajímavosti, u herců na počet filmů, nejoblíbenější filmy a cokoli dalšího. Okno jde posouvat za hlavičku, rozhovor se pamatuje pro každý titul',
             'Zeptej se AI je i v detailu hudebního interpreta (písně, alba, kariéra, zajímavosti)',
@@ -51369,6 +51373,7 @@ function closeAskSinatorModal() {
     const m = document.getElementById('askSinatorModal');
     if (m) m.style.display = 'none';
     if (window._clearLastZabavaList) window._clearLastZabavaList();
+    if (window._askFromLogo) { window._askFromLogo = false; if (window.updatePwaBtn) updatePwaBtn(); return; }
     // Na rozdíl od ostatních nástrojů v "Zábava" (Nálada, Koukat s...), které se
     // vrací na hlavní menu Zábava, se ✕ tady vrací rovnou do "AI nástroje" —
     // odsud se sem přišlo, takže je to nejkratší cesta zpátky.
@@ -51971,7 +51976,7 @@ window.KinoList = (function() {
 // ===== TRAILERY (YouTube kanál Totalfilm.cz — stejně jako bot Palantír na Discordu) =====
 (function() {
   const HANDLE = 'TotalfilmCz', CK = 'sinator_trailers_cache_v1', IK = 'sinator_trailers_channel';
-  let _items = [], _filter = 'all', _loading = false;
+  let _items = [], _filter = 'all', _loading = false, _err = '';
   const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const dec = s => String(s || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
   function parseFeed(xml) {
@@ -51983,34 +51988,60 @@ window.KinoList = (function() {
     });
     return out;
   }
-  async function viaProxy(url) {
-    const proxies = [u => 'https://corsproxy.io/?url=' + encodeURIComponent(u), u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u)];
+  // Každý zdroj vrací text; validace obsahu zajistí, že "chybová stránka" proxy se nebere jako úspěch
+  async function _tx(url, check, ms) {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms || 12000);
+    try { const r = await fetch(url, { signal: ctl.signal, cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); const txt = await r.text(); if (!check(txt)) throw new Error('neplatná odpověď'); return txt; }
+    finally { clearTimeout(t); }
+  }
+  async function viaProxy(url, check) {
+    check = check || (t => t && t.length > 200);
+    const proxies = [
+      u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+      u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+      u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
+      u => 'https://thingproxy.freeboard.io/fetch/' + u
+    ];
     let last;
-    for (const p of proxies) {
-      try {
-        const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 12000);
-        const r = await fetch(p(url), { signal: ctl.signal }); clearTimeout(t);
-        if (r.ok) { const txt = await r.text(); if (txt && txt.length > 200) return txt; }
-      } catch (e) { last = e; }
-    }
+    for (const p of proxies) { try { return await _tx(p(url), check, 12000); } catch (e) { last = e; } }
     throw last || new Error('Proxy nedostupná');
   }
+  const _isFeed = t => /<entry>/.test(t || '') && /<yt:videoId>/.test(t || '');
   async function fetchAll() {
     const manual = (localStorage.getItem(IK) || '').trim();
-    // 1) vlastní serverová funkce /api/yt (nejspolehlivější, když je nasazená)
-    try {
-      const r = await fetch(`/api/yt?handle=${HANDLE}` + (/^UC[\w-]{22}$/.test(manual) ? '&channel=' + manual : ''));
-      if (r.ok) { const d = await r.json(); if (d && Array.isArray(d.items) && d.items.length) return d.items; }
-    } catch (e) {}
-    // 2) přímo z prohlížeče přes veřejné CORS proxy
+    const chParam = /^UC[\w-]{22}$/.test(manual) ? '&channel=' + manual : '';
+    // 1) serverová funkce /api/yt (vlastní doména i backend) — jen když vrací platné JSON s položkami
+    const apis = [];
+    if (/^https?:$/.test(location.protocol)) apis.push('/api/yt');
+    apis.push('https://sinator-backend.vercel.app/api/yt', 'https://projekt-sinatorsearch.vercel.app/api/yt');
+    for (const base of apis) {
+      try {
+        const r = await fetch(`${base}?handle=${HANDLE}${chParam}`, { cache: 'no-store' });
+        if (!r.ok) continue;
+        const d = await r.json();
+        if (d && Array.isArray(d.items) && d.items.length) return d.items;
+      } catch (e) {}
+    }
+    // 2) ID kanálu (ručně / uložené / zjištěné z YouTube stránky)
     let id = /^UC[\w-]{22}$/.test(manual) ? manual : (localStorage.getItem(IK + '_resolved') || '');
     if (!id) {
-      const html = await viaProxy(`https://www.youtube.com/@${HANDLE}`);
+      const html = await viaProxy(`https://www.youtube.com/@${HANDLE}`, t => /externalId|channel_id=|channelId/.test(t || ''));
       const m = html.match(/"externalId":"(UC[\w-]{22})"/) || html.match(/channel_id=(UC[\w-]{22})/) || html.match(/"channelId":"(UC[\w-]{22})"/);
       if (!m) throw new Error('ID kanálu se nepodařilo zjistit — nastav ho ručně (⚙️ kanál).');
       id = m[1]; localStorage.setItem(IK + '_resolved', id);
     }
-    return parseFeed(await viaProxy(`https://www.youtube.com/feeds/videos.xml?channel_id=${id}`));
+    const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${id}`;
+    // 3) RSS feed přes proxy
+    try { const items = parseFeed(await viaProxy(feedUrl, _isFeed)); if (items.length) return items; } catch (e) {}
+    // 4) záloha: rss2json (vrací JSON, má CORS)
+    try {
+      const j = JSON.parse(await _tx('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(feedUrl), t => /"items"/.test(t || ''), 12000));
+      const items = (j.items || []).map(x => ({ id: String(x.guid || x.link || '').replace(/^.*(?:video:|v=)/, '').slice(0, 11), title: x.title || '', published: (x.pubDate || '').replace(' ', 'T') + 'Z', desc: '' })).filter(x => /^[\w-]{11}$/.test(x.id));
+      if (items.length) return items;
+    } catch (e) {}
+    // uložené ID mohlo být špatné — příště se zjistí znovu
+    localStorage.removeItem(IK + '_resolved');
+    throw new Error('Feed se nepodařilo načíst (proxy nedostupné).');
   }
   function when(iso) {
     const d = new Date(iso); if (isNaN(d)) return '';
@@ -52039,7 +52070,7 @@ window.KinoList = (function() {
             <button onclick="window.open('https://youtu.be/${x.id}','_blank')" style="padding:7px 12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:0.78rem;">↗ YouTube</button>
           </div></div></div>`).join('');
     msg.style.display = arr.length ? 'none' : 'block';
-    if (!arr.length) msg.textContent = _loading ? 'Načítám…' : (_filter === 'trailer' ? 'Žádné trailery mezi posledními videi.' : 'Nic k zobrazení.');
+    if (!arr.length) msg.textContent = _loading ? 'Načítám…' : (_err && !_items.length ? _err : (_filter === 'trailer' ? 'Žádné trailery mezi posledními videi.' : 'Nic k zobrazení.'));
   }
   function setFilterBtns() {
     const on = 'padding:7px 14px;border-radius:18px;border:1px solid #f87171;background:rgba(248,113,113,0.15);color:#f87171;cursor:pointer;font-size:0.82rem;';
@@ -52054,10 +52085,11 @@ window.KinoList = (function() {
     try {
       if (!force) { try { const c = JSON.parse(localStorage.getItem(CK) || 'null'); if (c && c.items && c.items.length) { _items = c.items; paint(); if (Date.now() - c.t < 20 * 60 * 1000) { _loading = false; return; } } } catch (e) {} }
       if (!_items.length) { msg.style.display = 'block'; msg.textContent = 'Načítám…'; }
+      _err = '';
       const items = await fetchAll();
       _items = items; localStorage.setItem(CK, JSON.stringify({ t: Date.now(), items }));
     } catch (e) {
-      if (!_items.length) { msg.style.display = 'block'; msg.textContent = '⚠️ ' + ((e && e.message) || 'Načtení se nezdařilo') + ' Zkus 🔄, nebo nastav ID kanálu (⚙️ kanál).'; }
+      if (!_items.length) { _err = '⚠️ ' + ((e && e.message) || 'Načtení se nezdařilo') + ' Zkus 🔄, nebo nastav ID kanálu (⚙️ kanál).'; }
     } finally { _loading = false; paint(); }
   };
   window.trailersSetChannel = function() {
@@ -54939,6 +54971,37 @@ window.sfFrAuto=async function(id,t){
     var t=null; new MutationObserver(function(){ if(t) return; t=requestAnimationFrame(function(){ t=null; try{inject();}catch(e){} }); }).observe(sb,{childList:true,subtree:true});
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+})();
+</script>
+
+<script>
+/* Dlouhý stisk na logo = rychlé otevření „Zeptej se Sinatora“ (✕ zavře rovnou na hlavní stránku) */
+(function () {
+  function init() {
+    var el = document.getElementById('logoContainer'); if (!el || el._lpAsk) return; el._lpAsk = true;
+    var timer = null, fired = false, sx = 0, sy = 0;
+    function clear() { if (timer) { clearTimeout(timer); timer = null; } }
+    function start(x, y) {
+      fired = false; sx = x; sy = y; clear();
+      timer = setTimeout(function () {
+        timer = null; fired = true;
+        try { if (navigator.vibrate) navigator.vibrate(25); } catch (e) {}
+        if (typeof window.openAskSinatorModal === 'function') { window._askFromLogo = true; window.openAskSinatorModal(); }
+      }, 550);
+    }
+    el.addEventListener('touchstart', function (e) { var t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: true });
+    el.addEventListener('touchmove', function (e) { var t = e.touches[0]; if (Math.abs(t.clientX - sx) > 12 || Math.abs(t.clientY - sy) > 12) clear(); }, { passive: true });
+    el.addEventListener('touchend', clear, { passive: true });
+    el.addEventListener('touchcancel', clear, { passive: true });
+    el.addEventListener('mousedown', function (e) { if (e.button === 0) start(e.clientX, e.clientY); });
+    el.addEventListener('mouseup', clear);
+    el.addEventListener('mouseleave', clear);
+    el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    // po dlouhém stisku se nesmí spustit klik (goHome)
+    el.addEventListener('click', function (e) { if (fired) { fired = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+    var img = el.querySelector('img'); if (img) { img.draggable = false; img.style.webkitTouchCallout = 'none'; img.style.userSelect = 'none'; }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
 </script>
 </body>
