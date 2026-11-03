@@ -7380,7 +7380,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-03', date: '3. 11. 2026', items: [
-            '🎞️ Zábava → Trailery: oprava „Nic k zobrazení“ / „Failed to fetch“ — appka teď zkouší víc zdrojů (vlastní server, několik proxy, RSS služba, Piped a Invidious API) a ID kanálu umí dohledat sama, ověřuje, že odpověď je opravdu feed, a když načtení selže, ukáže skutečnou chybu místo prázdné obrazovky',
+            '🎞️ Zábava → Trailery: oprava „Nic k zobrazení“ / „Failed to fetch“ — appka teď zkouší víc zdrojů (vlastní server, několik proxy, RSS služba, Piped a Invidious API) a ID kanálu umí dohledat sama (⚙️ kanál přijme i odkaz nebo @handle); v ZIPu je i api/yt.js pro Vercel (nejspolehlivější zdroj), ověřuje, že odpověď je opravdu feed, a když načtení selže, ukáže skutečnou chybu místo prázdné obrazovky',
             '🤖 Dlouhý stisk na logo v hlavičce otevře plovoucí chat „Zeptej se AI“ (obecné dotazy na filmy, seriály, herce, hudbu i appku; vyžaduje připojenou AI); krátké klepnutí na logo dál vrací domů',
         ] },
         { version: '2026-11-02b', date: '2. 11. 2026', items: [
@@ -51974,7 +51974,8 @@ window.KinoList = (function() {
 
 // ===== TRAILERY (YouTube kanál Totalfilm.cz — stejně jako bot Palantír na Discordu) =====
 (function() {
-  const HANDLE = 'TotalfilmCz', CK = 'sinator_trailers_cache_v1', IK = 'sinator_trailers_channel';
+  const CK = 'sinator_trailers_cache_v1', IK = 'sinator_trailers_channel';
+  const getHandle = () => (localStorage.getItem(IK + '_handle') || 'TotalfilmCz').replace(/^@/, '');
   let _items = [], _filter = 'all', _loading = false, _err = '';
   const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const dec = s => String(s || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
@@ -52024,7 +52025,7 @@ window.KinoList = (function() {
     apis.push('https://sinator-backend.vercel.app/api/yt', 'https://projekt-sinatorsearch.vercel.app/api/yt');
     for (const base of apis) {
       try {
-        const r = await fetch(`${base}?handle=${HANDLE}${chParam}`, { cache: 'no-store' });
+        const r = await fetch(`${base}?handle=${getHandle()}${chParam}`, { cache: 'no-store' });
         if (!r.ok) continue;
         const d = await r.json();
         if (d && Array.isArray(d.items) && d.items.length) return d.items;
@@ -52034,20 +52035,20 @@ window.KinoList = (function() {
     let id = /^UC[\w-]{22}$/.test(manual) ? manual : (localStorage.getItem(IK + '_resolved') || '');
     if (!id) {
       try {
-        const html = await viaProxy(`https://www.youtube.com/@${HANDLE}`, t => /externalId|channel_id=|channelId/.test(t || ''));
+        const html = await viaProxy(`https://www.youtube.com/@${getHandle()}`, t => /externalId|channel_id=|channelId/.test(t || ''));
         const m = html.match(/"externalId":"(UC[\w-]{22})"/) || html.match(/channel_id=(UC[\w-]{22})/) || html.match(/"channelId":"(UC[\w-]{22})"/);
         if (m) id = m[1];
       } catch (e) { errs.push('YT stránka: ' + _em(e)); }
     }
     if (!id) {
       id = await _firstOk(_PIPED, async base => {
-        const j = await _json(base + '/search?q=' + encodeURIComponent('Totalfilm.cz') + '&filter=channels');
+        const j = await _json(base + '/search?q=' + encodeURIComponent(getHandle().replace(/cz$/i, '.cz')) + '&filter=channels');
         const hit = (j.items || []).find(x => /total\s*film/i.test(x.name || '') && /\/channel\/(UC[\w-]{22})/.test(x.url || ''));
         return hit ? hit.url.match(/\/channel\/(UC[\w-]{22})/)[1] : null;
       }, errs, 'Piped hledání');
     }
     if (id) localStorage.setItem(IK + '_resolved', id);
-    if (!id) throw new Error('ID kanálu se nepodařilo zjistit (' + [...new Set(errs)].slice(0, 3).join(', ') + '). Nastav ho ručně přes ⚙️ kanál');
+    if (!id) throw new Error('ID kanálu se nepodařilo zjistit (' + [...new Set(errs)].slice(0, 12).join(', ') + '). Nastav ho ručně přes ⚙️ kanál');
     const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${id}`;
     // 3) RSS feed přes proxy
     try { const items = parseFeed(await viaProxy(feedUrl, _isFeed)); if (items.length) return items; } catch (e) { errs.push('RSS proxy: ' + _em(e)); }
@@ -52072,7 +52073,7 @@ window.KinoList = (function() {
     }, errs, 'Invidious');
     if (iv) return iv;
     localStorage.removeItem(IK + '_resolved');
-    throw new Error('Feed se nepodařilo načíst (' + [...new Set(errs)].slice(0, 3).join(', ') + '). Zkus vypnout VPN');
+    throw new Error('Feed se nepodařilo načíst (' + [...new Set(errs)].slice(0, 12).join(', ') + '). Zkus vypnout VPN');
   }
   function when(iso) {
     const d = new Date(iso); if (isNaN(d)) return '';
@@ -52125,10 +52126,12 @@ window.KinoList = (function() {
   };
   window.trailersSetChannel = function() {
     const cur = localStorage.getItem(IK) || '';
-    const v0 = prompt('ID YouTube kanálu (UC…, jde vložit i odkaz youtube.com/channel/UC…) — nech prázdné pro automatické zjištění:', cur);
+    const v0 = prompt('Odkaz nebo @handle YouTube kanálu, nebo ID (UC…) — nech prázdné pro výchozí @TotalfilmCz:', cur);
     if (v0 === null) return;
-    const mm = String(v0).match(/UC[\w-]{22}/); const v = mm ? mm[0] : String(v0).trim();
-    localStorage.setItem(IK, v.trim()); localStorage.removeItem(IK + '_resolved'); localStorage.removeItem(CK);
+    const mm = String(v0).match(/UC[\w-]{22}/), hh = String(v0).match(/@([\w.\-]+)/);
+    const v = mm ? mm[0] : '';
+    localStorage.setItem(IK + '_handle', hh ? hh[1] : '');
+    localStorage.setItem(IK, v); localStorage.removeItem(IK + '_resolved'); localStorage.removeItem(CK);
     trailersRefresh(true);
   };
   window.trailersPlay = function(id) {
