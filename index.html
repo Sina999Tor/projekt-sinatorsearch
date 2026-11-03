@@ -7387,6 +7387,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             '🤖 AI je propojená s appkou: načítá z TMDB celé obsazení, režii, kolekci, podobné a doporučené tituly i filmografii herců — už netvrdí, že údaje nejsou dostupné',
             '🧭 AI umí nasměrovat do sekcí appky (Zábava, kolekce, IPTV, rádio, kino, seznamy, oblíbené, složky, kvíz, žebříčky…) klikatelným odkazem; napiš třeba „chci IPTV“',
             '🧭 Odkazy do appky pokrývají i podsekce: Tematické seznamy, Hodnocené, Shlédnuté, Rozkoukané, Populární streamy, Smart seznamy, Trakt/Simkl/Sinator, Histra, Oblíbené (filmy, seriály, herci, režiséři…), Koukat s… Stačí napsat klíčové slovo — odkaz se ukáže hned',
+            '📦 AI umí hledat další kolekce v TMDB (např. všechny kolekce Spider-Mana) a nabídnout je jako odkazy',
             '📦 Odkaz „Kolekce“ v chatu u filmu otevře přímo kolekci toho filmu (ne seznam všech kolekcí)',
             '🌐 AI umí hledat na webu (Gemini) — přepínač 🌐 v hlavičce chatu; zdroje se ukážou pod odpovědí',
             '🔧 Histra → Odebrat z rozkoukaných: Histra mazání rozkoukaných přes API neumí (u seriálů v Rozkoukaných jen kvůli částečně shlédnutým epizodám není co mazat), proto se položka skryje v appce; seriál se v Rozkoukaných znovu objeví, jakmile shlédneš novou epizodu',
@@ -54556,6 +54557,22 @@ window.sfFrAuto=async function(id,t){
     ['nastaveni','Nastavení','openSettingsModal()','vzhled jazyk'],
     ['domu','Hlavní stránka','goHome()','home']
   ];
+  /* 📦 Hledání kolekcí v TMDB (franšíza, název titulu, slova z dotazu) */
+  async function collSearch(c,q){
+    function clean(x){ return String(x||'').replace(/\((kolekce|collection)\)/ig,'').replace(/\b(kolekce|collection|kolekci|kolekcí|kolekcia|kolekcie)\b/ig,'').replace(/:.*$/,'').replace(/\s[–—-]\s.*$/,'').replace(/\s+/g,' ').trim(); }
+    var qs=[], seen={};
+    function add(x){ x=clean(x); var k=nrm(x); if(x.length>=3&&!seen[k]){ seen[k]=1; qs.push(x); } }
+    var uw=String(q||'').split(/\s+/).filter(function(w){ var n=nrm(w); return n.length>2&&!STOP[n]&&n.slice(0,5)!=='kolek'; }).join(' ');
+    add(uw); if(c){ add(c.coll&&c.coll.name); add(c.title); }
+    qs=qs.slice(0,4);
+    var res=await Promise.all(qs.map(function(x){ return tj('/search/collection','&query='+encodeURIComponent(x)).then(function(j){ return j.results||[]; }).catch(function(){ return []; }); }));
+    var ids={}, list=[]; res.forEach(function(r){ r.forEach(function(x){ if(!ids[x.id]){ ids[x.id]=1; list.push({id:x.id,name:x.name}); } }); });
+    list=list.slice(0,10);
+    await Promise.all(list.map(function(x){ return tj('/collection/'+x.id).then(function(j){ var ps=(j.parts||[]), ys=ps.map(function(p){return yr(p.release_date);}).filter(Boolean).sort(); x.n=ps.length; x.years=ys.length?(ys[0]===ys[ys.length-1]?ys[0]:ys[0]+'–'+ys[ys.length-1]):''; }).catch(function(){}); }));
+    return {queries:qs,list:list};
+  }
+  function collLine(x){ return x.name+' [ID kolekce: '+x.id+']'+(x.n?' — '+x.n+' filmů'+(x.years?' ('+x.years+')':''):''); }
+
   /* ⚡ Rychlé odkazy podle klíčového slova (bez čekání na AI): všechna slova dotazu musí sedět na položku katalogu */
   function nrm(t){ return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9+ ]+/g,' '); }
   var STOP={chci:1,chtel:1,chtela:1,otevri:1,otevrit:1,otevreni:1,spust:1,spustit:1,ukaz:1,ukazat:1,jdi:1,jit:1,pust:1,pustit:1,zobraz:1,zobrazit:1,prosim:1,muzes:1,mohl:1,bych:1,kam:1,kde:1,najdu:1,najit:1,dej:1,mi:1,me:1,do:1,na:1,ve:1,sekce:1,sekci:1,apce:1,aplikaci:1,appce:1,odkaz:1,the:1,ten:1,tu:1,to:1,ja:1,je:1,jsou:1,si:1,se:1,a:1,v:1,z:1,s:1};
@@ -54570,7 +54587,7 @@ window.sfFrAuto=async function(id,t){
       if(ok) hits.push({a:a,cover:cover});
     });
     var collLink='';
-    if(c&&c.coll&&qs.indexOf('kolek')>=0&&qs.length<=2) collLink='• [[kolekce|'+c.coll.name+'|'+c.coll.id+']] (kolekce tohoto titulu)\n';
+    if(c&&c.coll&&qs.indexOf('kolek')>=0&&qs.length===1) collLink='• [[kolekce|'+c.coll.name+'|'+c.coll.id+']] (kolekce tohoto titulu)\n';
     if(!hits.length&&!collLink) return '';
     hits.sort(function(x,y){ return (y.cover-x.cover)||(x.a[1].length-y.a[1].length); });
     return 'Tady to je — klepni a otevřu to v appce:\n'+collLink+hits.slice(0,6).map(function(h){ return '• [[app|'+h.a[1]+'|'+h.a[0]+']]'; }).join('\n');
@@ -54802,7 +54819,7 @@ window.sfFrAuto=async function(id,t){
     if(ch){ ch.innerHTML=''; if(!c.length) chips(cur.kind).forEach(function(t){ var b=document.createElement('button'); b.textContent=t; b.style.cssText='flex:0 0 auto;white-space:nowrap;padding:6px 10px;border-radius:14px;border:1px solid #a78bfa;background:rgba(167,139,250,.12);color:#c4b5fd;font-size:.75rem;cursor:pointer;'; b.onclick=function(){ send(t); }; ch.appendChild(b); }); }
   }
 
-  function sysFor(c,web){
+  function sysFor(c,web,colls){
     return 'Jsi AI asistent přímo v aplikaci Sinator (filmy, seriály, hudba, TV, IPTV, kolekce, seznamy…). Uživatel se ptá na: '+c.label+' „'+c.title+'“. Odpovídej '+(sk()?'slovensky':'česky')+', stručně a věcně (zhruba do 8 vět, pokud uživatel nechce víc).\n'
     +'PRAVIDLA:\n'
     +'1) Kontext níže pochází z databáze TMDB a z obrazovky appky (obsazení, režie, kolekce, podobné a doporučené tituly, filmografie…). Čerpej z něj PŘEDNOSTNĚ a nikdy netvrď, že údaj není dostupný, pokud v kontextu je. '+(web?'Když v kontextu opravdu chybí nebo jde o aktuální informace, použij vyhledávání na webu.':'Když tam opravdu chybí, řekni to.')+'\n'
@@ -54810,6 +54827,7 @@ window.sfFrAuto=async function(id,t){
     +'3) ODKAZY: každý konkrétní film, seriál nebo osobu (herec, režisér…) zapiš jako odkaz přesně v tomto tvaru: [[film|Název|rok]], [[serial|Název|rok]] nebo [[osoba|Jméno Příjmení]] (rok vynech, pokud ho neznáš; uvnitř odkazu žádné další uvozovky ani tučné písmo). Když uživatel chce herce, režiséra, kolekci, podobné tituly apod., vypiš je jako seznam takových odkazů. Právě zobrazený titul/osobu odkazem neoznačuj.\n'
     +'4) NAVIGACE V APPCE: když uživatel chce jít do sekce nebo seznamu v appce (zábava, kolekce, TV, IPTV, rádio, kino, seznamy, oblíbené, složky, filtry, hudba…), odpověz krátce a vlož odkaz [[app|Popisek|klíč]] s klíčem z tabulky (může jich být víc). Když se ptá na něco, co appka umí (kvíz, porovnání, nálada, žebříčky, statistiky, Co dnes…), nabídni příslušnou sekci takovým odkazem. Uživatel často napíše jen klíčové slovo nebo název sekce (např. „hodnocené“, „tematické seznamy“, „shlédnuté“, „streamy“, „rozkoukané“, „oblíbení herci“) — vždy mu dej odkaz (u nejednoznačných slov klidně víc odkazů, např. hodnocené filmy i seriály). Kolekci právě zobrazeného titulu (nebo jinou konkrétní kolekci z kontextu) odkazuj jako [[kolekce|Název kolekce|ID kolekce]] (ID je v kontextu v hranatých závorkách) — NE přes [[app|…|kolekce]], to otevře jen seznam všech kolekcí. Klíče piš přesně z tabulky.\n'
     +'Sekce appky (klíč = popis):\n'+APP.map(function(a){return a[0]+' = '+a[1];}).join('\n')
+    +(colls&&colls.list&&colls.list.length?'\n\nKOLEKCE NALEZENÉ V TMDB (hledáno: '+colls.queries.join(' | ')+') — výsledek vyhledávání v databázi appky. Když se uživatel ptá na kolekce, vypiš všechny relevantní z tohoto seznamu jako odkazy [[kolekce|Název|ID]]:\n'+colls.list.map(function(x){return '- '+collLine(x);}).join('\n'):'')
     +'\n\nKontext z appky:\n'+(c.ctx||'(žádný)');
   }
   async function send(txt){
@@ -54819,9 +54837,13 @@ window.sfFrAuto=async function(id,t){
     var me=cur, c=convs[me.key]=convs[me.key]||[]; c.push({role:'user',content:q});
     busy=true; render();
     if(me.ready){ try{ await me.ready; }catch(e){} }
+    var colls=null; if(/kolek/.test(nrm(q))){ try{ colls=await collSearch(me,q); }catch(e){} }
     var loc=''; try{ loc=localApp(q,me); }catch(e){}
-    if(loc){ c.push({role:'assistant',content:loc}); busy=false; render(); return; }
-    var msgs=[{role:'system',content:sysFor(me,webOn())}].concat(c.filter(function(m){return !m.err;}).slice(-14).map(function(m){return {role:m.role,content:m.content};}));
+    if(loc){
+      if(colls&&colls.list.length){ var own=me.coll&&me.coll.id; loc+='\n\nDalší kolekce v databázi:\n'+colls.list.filter(function(x){return x.id!==own;}).map(function(x){ return '• [[kolekce|'+x.name+'|'+x.id+']]'+(x.n?' ('+x.n+' filmů'+(x.years?', '+x.years:'')+')':''); }).join('\n'); }
+      c.push({role:'assistant',content:loc}); busy=false; render(); return;
+    }
+    var msgs=[{role:'system',content:sysFor(me,webOn(),colls)}].concat(c.filter(function(m){return !m.err;}).slice(-14).map(function(m){return {role:m.role,content:m.content};}));
     try{ var a=await ask(msgs); c.push({role:'assistant',content:a.text.trim(),sources:a.sources}); }
     catch(e){ c.push({role:'assistant',content:'⚠️ AI se nepodařilo zavolat: '+e.message,err:true}); }
     busy=false; render();
