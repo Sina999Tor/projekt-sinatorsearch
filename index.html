@@ -7381,6 +7381,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     const CHANGELOG_HISTORY = [
         { version: '2026-11-03', date: '3. 11. 2026', items: [
             '🎞️ Zábava → Trailery: oprava „Nic k zobrazení“ / „Failed to fetch“ — appka teď zkouší víc zdrojů (vlastní server, několik proxy, RSS služba, Piped a Invidious API) a ID kanálu umí dohledat sama (⚙️ kanál přijme i odkaz nebo @handle); v ZIPu je i api/yt.js pro Vercel (nejspolehlivější zdroj), ověřuje, že odpověď je opravdu feed, a když načtení selže, ukáže skutečnou chybu místo prázdné obrazovky',
+            '💿 AI chat: napíšeš „interpret + diskografie / alba / skladby“ a rovnou se otevře záložka Diskografie v Hudbě (z libovolného místa; u právě otevřeného interpreta hned přepne záložku)',
             '🤖 Dlouhý stisk na logo v hlavičce otevře plovoucí chat „Zeptej se AI“ (obecné dotazy na filmy, seriály, herce, hudbu i appku; vyžaduje připojenou AI); krátké klepnutí na logo dál vrací domů',
         ] },
         { version: '2026-11-02b', date: '2. 11. 2026', items: [
@@ -54931,6 +54932,44 @@ window.sfFrAuto=async function(id,t){
     +(colls&&colls.list&&colls.list.length?'\n\nKOLEKCE NALEZENÉ V TMDB (hledáno: '+colls.queries.join(' | ')+') — výsledek vyhledávání v databázi appky. Když se uživatel ptá na kolekce, vypiš všechny relevantní z tohoto seznamu jako odkazy [[kolekce|Název|ID]]:\n'+colls.list.map(function(x){return '- '+collLine(x);}).join('\n'):'')
     +'\n\nKontext z appky:\n'+(c.ctx||'(žádný)');
   }
+  /* 💿 Zkratka: „interpret + diskografie / alba / skladby“ → rovnou záložka Diskografie v Hudbě */
+  var MUS_KW=/(diskograf|discograf|diskograph|discograph|\balba\b|\balbum|skladb|\bpisn|\bsongy?\b|\bsongs\b|tracklist|\bsingl|nahravk)/;
+  var MUS_FILL=/^(a|i|od|je|jeho|jeji|jejich|interpreta|interpret|interpretu|kapely|kapela|zpevaka|zpevacky|skupiny|skupina|vsechna|vsechny|vsechno|vsech|ukaz|zobraz|chci|mi|seznam|prehled|hudba|hudby|vydane|vydana|jake|jaka|jaky|ma|na|v|ze|z|se|do|hned|prosim|pls|the|discography|discografie|diskografie|album|alba|alb|albu|alby|albums)$/;
+  function musName(q){
+    return q.split(/\s+/).filter(Boolean).filter(function(t){ var n=nrm(t).trim(); return n&&!MUS_KW.test(n)&&!MUS_FILL.test(n); }).join(' ').replace(/[?!.,;:]+/g,' ').replace(/\s+/g,' ').trim();
+  }
+  function hidePanelForNav(){ var p=document.getElementById('aiAskPanel'), fab=document.getElementById('aiAskFab'); if(p) p.style.display='none'; if(fab) fab.style.display='flex'; }
+  async function localMusic(q,me){
+    var nq=nrm(q); if(!MUS_KW.test(nq)) return false;
+    if(/nejznamejsi|nejlepsi|nejpopularnejsi|nejhranejsi/.test(nq)) return false; // „nejznámější písně“ = dotaz pro AI
+    if(q.split(/\s+/).filter(Boolean).length>7) return false;
+    var name=musName(q), isMusic=me.kind==='music';
+    if(!name&&!isMusic) return false;
+    if(name.split(' ').length>4) return false;
+    var c=convs[me.key]=convs[me.key]||[];
+    var cn=nrm(name).trim(), tn=nrm(me.title||'').trim();
+    var same=isMusic&&(!name||cn===tn||tn.indexOf(cn)>=0||cn.indexOf(tn)>=0);
+    var haveData=(typeof currentArtistData!=='undefined')&&currentArtistData&&nrm(currentArtistData.name||'').trim()===tn;
+    var mm=document.getElementById('musicModal');
+    if(same&&haveData&&mm&&mm.classList.contains('open')){
+      c.push({role:'assistant',content:'💿 Otevírám diskografii: '+me.title});
+      hidePanelForNav(); switchArtistTab('discography');
+      try{ document.getElementById('artistContent').scrollIntoView({block:'start'}); }catch(x){}
+      return true;
+    }
+    var r=await searchMusicBrainz(name||me.title);
+    var arts=(r&&r.artists)||[]; if(!arts.length) return false;
+    var want=nrm(name||me.title).trim(), a=arts[0];
+    for(var i=0;i<arts.length;i++){ if(nrm(arts[i].name).trim()===want){ a=arts[i]; break; } }
+    c.push({role:'assistant',content:'💿 Otevírám diskografii: '+a.name});
+    hidePanelForNav();
+    try{ var dm=document.getElementById('modal'); if(dm&&dm.classList.contains('open')&&typeof closeModal==='function') closeModal(); if(dm) dm.style.zIndex=''; }catch(x){}
+    if(!(mm&&mm.classList.contains('open'))) openMusicModal();
+    await openArtistDetail(a.id,a.name);
+    switchArtistTab('discography');
+    try{ document.getElementById('artistContent').scrollIntoView({block:'start'}); }catch(x){}
+    return true;
+  }
   async function send(txt){
     if(busy||!cur) return;
     var inp=document.getElementById('aiAskInput'), q=(txt!=null?txt:inp.value).trim(); if(!q) return;
@@ -54940,6 +54979,8 @@ window.sfFrAuto=async function(id,t){
     if(me.ready){ try{ await me.ready; }catch(e){} }
     var castTxt=''; try{ castTxt=localCast(q,me); }catch(e){}
     if(castTxt){ c.push({role:'assistant',content:castTxt}); busy=false; render(); return; }
+    var mus=false; try{ mus=await localMusic(q,me); }catch(e){ console.warn(e); }
+    if(mus){ busy=false; render(); return; }
     var colls=null; if(/kolek/.test(nrm(q))){ try{ colls=await collSearch(me,q); }catch(e){} }
     var loc=''; try{ loc=localApp(q,me); }catch(e){}
     if(loc){
