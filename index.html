@@ -7381,7 +7381,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     const CHANGELOG_HISTORY = [
         { version: '2026-11-03', date: '3. 11. 2026', items: [
             '🎞️ Zábava → Trailery: oprava „Nic k zobrazení“ — appka teď zkouší víc zdrojů (vlastní server, několik proxy, záložní RSS služba), ověřuje, že odpověď je opravdu feed, a když načtení selže, ukáže skutečnou chybu místo prázdné obrazovky',
-            '💬 Dlouhý stisk na logo v hlavičce otevře „Zeptej se Sinatora“; ✕ ho zavře rovnou na hlavní stránku (krátké klepnutí na logo dál vrací domů)',
+            '🤖 Dlouhý stisk na logo v hlavičce otevře plovoucí chat „Zeptej se AI“ (obecné dotazy na filmy, seriály, herce, hudbu i appku; vyžaduje připojenou AI); krátké klepnutí na logo dál vrací domů',
         ] },
         { version: '2026-11-02b', date: '2. 11. 2026', items: [
             '🤖 Zeptej se AI: v detailu filmu, seriálu, herce i režiséra je nové tlačítko, které otevře plovoucí okno s AI chatem — zeptáš se na děj, jak to dopadne, zajímavosti, u herců na počet filmů, nejoblíbenější filmy a cokoli dalšího. Okno jde posouvat za hlavičku, rozhovor se pamatuje pro každý titul',
@@ -51373,7 +51373,6 @@ function closeAskSinatorModal() {
     const m = document.getElementById('askSinatorModal');
     if (m) m.style.display = 'none';
     if (window._clearLastZabavaList) window._clearLastZabavaList();
-    if (window._askFromLogo) { window._askFromLogo = false; if (window.updatePwaBtn) updatePwaBtn(); return; }
     // Na rozdíl od ostatních nástrojů v "Zábava" (Nálada, Koukat s...), které se
     // vrací na hlavní menu Zábava, se ✕ tady vrací rovnou do "AI nástroje" —
     // odsud se sem přišlo, takže je to nejkratší cesta zpátky.
@@ -54821,6 +54820,7 @@ window.sfFrAuto=async function(id,t){
   }
 
   function chips(kind){
+    if(kind==='general') return ['Co dnes večer pustit?','Doporuč film podle nálady','Najdi kolekce s…','Kde v appce najdu…?','Nejlepší seriály posledních let'];
     if(kind==='music') return ['Čím je známý/á?','Nejznámější písně','Přehled alb / diskografie','Zajímavosti ze kariéry','Co podobného poslouchat?'];
     return kind==='person'
       ? ['Čím je známý/á?','Kolik má filmů a seriálů?','Nejlepší filmy','Režie – jeho/její filmy','Co natočil/a naposledy?','Zajímavosti ze života']
@@ -54920,6 +54920,14 @@ window.sfFrAuto=async function(id,t){
     var p=panel(); p.style.display='flex'; var fb=document.getElementById('aiAskFab'); if(fb) fb.style.display='none';
     document.getElementById('aiAskTitle').textContent='Zeptej se AI — '+title; render();
   };
+  window.aiAskGeneral=function(){
+    if(!connected()) return false;
+    cur={key:'general',title:'Sinator',kind:'general',label:'obecný dotaz (film, seriál, herec, hudba, TV, kolekce nebo appka Sinator)',ctx:''};
+    loadCtx(cur,'',0,'');
+    var p=panel(); p.style.display='flex'; var fb=document.getElementById('aiAskFab'); if(fb) fb.style.display='none';
+    document.getElementById('aiAskTitle').textContent='Zeptej se AI';
+    render(); return true;
+  };
   window.aiAskOpen=function(src){
     if(src==='music'){
       var mc=document.getElementById('musicResultsContainer'), mh=mc&&mc.querySelector('h2'); if(!mh) return;
@@ -54975,7 +54983,7 @@ window.sfFrAuto=async function(id,t){
 </script>
 
 <script>
-/* Dlouhý stisk na logo = rychlé otevření „Zeptej se Sinatora“ (✕ zavře rovnou na hlavní stránku) */
+/* Dlouhý stisk na logo = rychlé otevření plovoucího chatu „Zeptej se AI“ */
 (function () {
   function init() {
     var el = document.getElementById('logoContainer'); if (!el || el._lpAsk) return; el._lpAsk = true;
@@ -54986,7 +54994,8 @@ window.sfFrAuto=async function(id,t){
       timer = setTimeout(function () {
         timer = null; fired = true;
         try { if (navigator.vibrate) navigator.vibrate(25); } catch (e) {}
-        if (typeof window.openAskSinatorModal === 'function') { window._askFromLogo = true; window.openAskSinatorModal(); }
+        var ok = false; try { ok = typeof window.aiAskGeneral === 'function' && window.aiAskGeneral(); } catch (e) { console.warn(e); }
+        if (!ok) alert('🤖 Zeptej se AI: nejdřív připoj AI klíč (Nastavení → AI).');
       }, 550);
     }
     el.addEventListener('touchstart', function (e) { var t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: true });
