@@ -2680,6 +2680,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <button class="source-btn" id="srcbtn-uzila" onclick="searchOnSource('uzila')"><span class="src-status"></span>🔍 Uzi.la</button>
                 <button class="source-btn" id="srcbtn-sledujfilmy" onclick="searchOnSource('sledujfilmy')"><span class="src-status"></span>🎥 SledujFilmy</button>
                 <button class="source-btn" id="srcbtn-fastshare" onclick="searchOnSource('fastshare')"><span class="src-status"></span>⚡ FastShare</button>
+                <button class="source-btn" id="srcbtn-sdilej" onclick="searchOnSource('sdilej')"><span class="src-status"></span>📥 Sdílej.cz</button>
                 <button class="source-btn" id="srcbtn-bombuj" onclick="searchOnSource('bombuj')"><span class="src-status"></span>💣 Bombuj.si</button>
                 <button class="source-btn" id="srcbtn-uzisi" onclick="searchOnSource('uzisi')"><span class="src-status"></span>🎯 Uzi.si</button>
                 <button class="source-btn" id="srcbtn-sktorrent" onclick="searchOnSource('sktorrent')"><span class="src-status"></span>🧲 SKTorrent</button>
@@ -10277,6 +10278,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             // Ostatní: standardní query parametry
             'sledujteto': (()=>{ const s=(state.currentSearchTitle||'').toLowerCase(); const m={'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z','à':'a','â':'a','ä':'a','ô':'o','ö':'o','ü':'u'}; const slug=[...s].map(c=>m[c]||c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); return `https://old.sledujteto.cz/vyhledat/${slug}.html`; })(),
             'fastshare': `https://fastshare.cloud/search?q=${title}`,
+            // Sdílej.cz: hledání = /{slug-názvu}/s (např. /temna-vez/s) — formát odvozen z odkazů „Uživatelé právě hledají“ na webu
+            'sdilej': (()=>{ const raw=(state.currentSearchType==='tv'?(state.currentSearchTitle||''):(state.currentSearchTitle||'')); const sl=raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); return sl ? `https://sdilej.cz/${sl}/s` : 'https://sdilej.cz/'; })(),
             'sledujfilmy': `https://ww.sledujfilmy.io/?s=${title}`,
             'dokufilmy': `https://dokufilmy.cz/?s=${title}`,
             'hellspio': `https://hellspio.vercel.app/cs?search=${title}`,
@@ -52496,6 +52499,7 @@ window.addEventListener('load', function() {
     {id:'uzila',        g:'cz',  n:'🔍 Uzi.la',         b:function(q){return 'https://uzi.la/hladaj/'+plus(q)}},
     {id:'sledujfilmy',  g:'cz',  n:'🎥 SledujFilmy',    b:function(q){return 'https://ww.sledujfilmy.io/?s='+e(q)}},
     {id:'fastshare',    g:'cz',  n:'⚡ FastShare',       b:function(q){return 'https://fastshare.cloud/search?q='+e(q)}},
+    {id:'sdilej',       g:'cz',  n:'📥 Sdílej.cz',      b:function(q,o){var s=slug(o.base||q); return s ? 'https://sdilej.cz/'+s+'/s' : 'https://sdilej.cz/'}},
     {id:'bombuj',       g:'cz',  n:'💣 Bombuj.si',      b:function(q,o){ return o.tv ? 'https://serialy.bombuj.si/serial-'+slug(o.base)+'#serial' : 'https://www.bombuj.si/online-film-'+slug(q); }},
     {id:'uzisi',        g:'cz',  n:'🎯 Uzi.si',         b:function(){return 'https://ww4.click/uzisi/'}, copy:1},
     {id:'sktorrent',    g:'cz',  n:'🧲 SKTorrent',      b:function(q){return 'https://online.sktorrent.eu/search/videos?search_query='+e(q)}},
