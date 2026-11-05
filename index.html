@@ -3593,6 +3593,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         if (typeof openListsModal === 'function') openListsModal();
     };
     async function histraShowOverview() {
+        window._histraCurList = null;
         state._histraView = { kind: 'overview' };
         _hSetHeader('🟣 Histra', '← Seznamy');
         const body = $('histraListsBody'); if (!body) return;
@@ -3777,7 +3778,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const body = $('histraListsBody');
         if (!items.length) { azxDetach(); body.innerHTML = '<div style="text-align:center;padding:40px 10px;color:var(--text-muted);">Seznam je prázdný (nebo se z něj nepodařilo vyčíst TMDB id).</div>'; return; }
         const sortSel = sortable ? `<select onchange="histraSetSort(this.value)" style="background:var(--bg-elevated);color:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font:inherit;font-size:0.8rem;"><option value="default"${sort === 'default' ? ' selected' : ''}>${hasW ? 'Výchozí (od nejnověji shlédnutých)' : 'Výchozí'}</option><option value="az"${sort === 'az' ? ' selected' : ''}>Podle abecedy (A–Z)</option></select>` : '';
-        body.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><div style="font-weight:700;color:var(--text-muted);">${items.length} položek <button onclick="histraRebuildWatched()" title="Znovu načíst shlédnuté z Histry" style="margin-left:6px;background:var(--bg-elevated);color:#fff;border:1px solid var(--border);border-radius:8px;padding:3px 8px;font:inherit;font-size:0.75rem;cursor:pointer;">🔄 ✓</button></div>${sortSel}</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">` + shown.map(it => {
+        body.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><div style="font-weight:700;color:var(--text-muted);">${items.length} položek <button onclick="histraRebuildWatched()" title="Znovu načíst shlédnuté z Histry" style="margin-left:6px;background:var(--bg-elevated);color:#fff;border:1px solid var(--border);border-radius:8px;padding:3px 8px;font:inherit;font-size:0.75rem;cursor:pointer;">🔄 ✓</button>${(window._histraCurList && window._histraCurList.name === title) ? `<button onclick="syncOneListToSinator(this)" title="Synchronizovat tento seznam do Sinatora (Histra je hlavní)" style="margin-left:6px;background:var(--bg-elevated);color:#fff;border:1px solid var(--border);border-radius:8px;padding:3px 8px;font:inherit;font-size:0.75rem;cursor:pointer;">🔄 Sinator</button>` : ''}</div>${sortSel}</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">` + shown.map(it => {
             const poster = it.poster_path ? (String(it.poster_path).startsWith('http') ? it.poster_path : `https://image.tmdb.org/t/p/w500${it.poster_path}`) : '';
             return `<div data-az="${_hEsc(it.title || '')}" data-hid="${it.id}" data-htype="${it.type}" onclick="openDetailFromHistra(${it.id},'${it.type}')" style="position:relative;cursor:pointer;background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;overflow:hidden;">${it._w ? _H_WATCHED_BADGE : ''}${poster ? `<img src="${poster}" loading="lazy" style="width:100%;aspect-ratio:2/3;object-fit:cover;display:block;">` : `<div style="width:100%;aspect-ratio:2/3;display:grid;place-items:center;font-size:2rem;background:var(--bg-dark);">${it.type === 'tv' ? '📺' : '🎬'}</div>`}<div style="padding:8px 10px;"><div class="h-title" style="font-weight:700;font-size:0.85rem;line-height:1.25;">${_hEsc(it.title || ('#' + it.id))}</div><div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">${it.type === 'tv' ? '📺' : '🎬'} ${_hEsc(it.year || '')}</div></div></div>`;
         }).join('') + '</div>';
@@ -3863,11 +3864,45 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         _hToast('✅ Shlédnuté aktualizovány (' + Object.keys(idx.movies).length + ' filmů, ' + Object.keys(idx.shows).length + ' seriálů)');
     };
     setTimeout(() => { try { histraRefreshWatchedIndex(false); } catch (e) {} }, 8000);
-    window.histraOpenWatchlist = function() { histraLoadItems('Watchlist', async () => sinSortItems(await histraFetchAllPaged('/api/v1/watchlist?extended=full&lang=cs-CZ', 100, 30), sinListSortGet('h:wl'))); };
+    window.histraOpenWatchlist = function() { window._histraCurList = null; histraLoadItems('Watchlist', async () => sinSortItems(await histraFetchAllPaged('/api/v1/watchlist?extended=full&lang=cs-CZ', 100, 30), sinListSortGet('h:wl'))); };
     window.histraOpenList = function(i) {
         const l = (window._histraLists || [])[i]; if (!l) return;
         const id = l.id ?? l.list_id;
+        window._histraCurList = { id, name: l.name || l.title || 'Seznam' };
         histraLoadItems(l.name || l.title || 'Seznam', async () => sinSortItems(await histraFetchAllPaged(`/api/v1/lists/${id}?extended=full&lang=cs-CZ`, 100, 30, null, true), sinListSortGet('h:L:' + id)));
+    };
+    // ── 🔄 Synchronizace JEDNOHO seznamu: Histra (master) → seznam stejného jména v Sinatoru ──
+    let _oneSyncBusy = false;
+    window.syncOneListToSinator = async function(btn) {
+        const cur = window._histraCurList;
+        if (_oneSyncBusy || !cur) return;
+        if (!myBackendReady()) { _hToast('⚠️ Sinator backend není připojený.'); return; }
+        _oneSyncBusy = true;
+        const orig = btn ? btn.innerHTML : '';
+        try {
+            if (btn) btn.innerHTML = '⏳';
+            try { window._myLastWriteTs = Date.now(); if (window.myApiCacheClear) window.myApiCacheClear(); } catch (e) {}
+            const raw = await histraFetchAllPaged(`/api/v1/lists/${cur.id}?extended=full&lang=cs-CZ`, 100, 30, null, true);
+            const hItems = (raw || []).map(histraMapItem).filter(Boolean).map(x => ({ id: Number(x.id), type: x.type }));
+            let sl = await myListsGet(); sl = Array.isArray(sl) ? sl : ((sl && sl.lists) || []);
+            const key = String(cur.name || '').trim().toLowerCase();
+            let s = sl.find(l => String(l.name || '').trim().toLowerCase() === key) || null;
+            let sItems = [];
+            if (s) { const r = await myListItemsGet(s.id); sItems = (Array.isArray(r) ? r : []).map(x => ({ id: Number(x.id), type: (x.type === 'tv' || x.type === 'show') ? 'tv' : 'movie' })); }
+            const hSet = new Set(hItems.map(x => x.type + x.id)), sSet = new Set(sItems.map(x => x.type + x.id));
+            const add = hItems.filter(x => !sSet.has(x.type + x.id)).reverse();
+            let del = sItems.filter(x => !hSet.has(x.type + x.id));
+            if (!hItems.length && sItems.length) { _hToast('⚠️ Histra vrátila prázdný seznam — nic nemažu.'); return; }
+            if (del.length && !confirm(`Histra je hlavní. V Sinatoru se ze seznamu „${cur.name}“ smaže ${del.length} položek, které v Histře nejsou. Pokračovat?`)) del = [];
+            if (!s) { if (!add.length) { _hToast('Seznam je prázdný.'); return; } s = await myListCreate(cur.name); }
+            let a = 0, d = 0, er = 0, i = 0;
+            for (const x of add) { if (btn) btn.innerHTML = `⏳ ${++i}/${add.length}`; try { await myApi('/lists/' + s.id + '/items', { method: 'POST', body: JSON.stringify({ id: x.id, type: x.type }) }); a++; } catch (e) { er++; } }
+            for (const x of del) { try { await myApi('/lists/' + s.id + '/items', { method: 'DELETE', body: JSON.stringify({ id: x.id, type: x.type }) }); d++; } catch (e) { er++; } }
+            try { if (window._sinListCache) delete window._sinListCache[s.id]; window._myLastWriteTs = Date.now(); if (window.myApiCacheClear) window.myApiCacheClear(); } catch (e) {}
+            _hToast(`✅ „${cur.name}“ → Sinator: +${a}, −${d}` + (er ? ` · chyb ${er}` : '') + ` (celkem ${hItems.length})`);
+        } catch (e) {
+            _hToast('❌ Synchronizace selhala: ' + _hErr(e).slice(0, 80));
+        } finally { if (btn) btn.innerHTML = orig; _oneSyncBusy = false; }
     };
     window._histraSaveScroll = function() {
         const v = state._histraView, b = $('histraListsBody');
