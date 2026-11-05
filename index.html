@@ -16104,6 +16104,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 <input id="favsLetterFilter" type="text" maxlength="1" inputmode="text" autocomplete="off" autocapitalize="characters" placeholder="A" value="${(window._favsLetter||'').replace(/"/g,'')}" oninput="setFavsLetter(this.value)" style="width:42px;height:36px;box-sizing:border-box;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:1rem;font-weight:700;outline:none;">
                 <button onclick="setFavsLetter('');const i=$('favsLetterFilter');if(i)i.value='';" style="padding:7px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-muted);cursor:pointer;font-size:0.76rem;">Vše</button>
             </div>
+            ${String(tab).indexOf('folder:') === 0 ? (() => { const ff = favFoldersGet().find(x => 'folder:' + x.id === tab); return ff ? `<div style="display:flex;align-items:center;gap:8px;margin:0 16px 12px;"><span style="font-weight:700;color:#fbbf24;">📁 ${_favEsc(ff.name)} (${ff.items.length})</span><button onclick="favFolderDelete('${ff.id}',event)" style="margin-left:auto;padding:5px 12px;border-radius:14px;border:1px solid var(--border);background:var(--bg-elevated);color:#f87171;cursor:pointer;font-size:0.8rem;">🗑 Smazat složku</button></div>` : ''; })() : ''}
             ${(tab === 'actor' || tab === 'director') ? `<div style="display:flex;gap:6px;margin:0 16px 14px;flex-wrap:wrap;align-items:center;">
                 <span style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-right:2px;">Zobrazit:</span>
                 <button onclick="setFavsActorFilterMode('all')" style="padding:4px 11px;border-radius:14px;border:1px solid ${(window._favsActorFilterMode||'all')==='all'?'#1db954':'var(--border)'};background:${(window._favsActorFilterMode||'all')==='all'?'#1db954':'var(--bg-elevated)'};color:${(window._favsActorFilterMode||'all')==='all'?'#000':'var(--text)'};cursor:pointer;font-size:0.75rem;font-weight:${(window._favsActorFilterMode||'all')==='all'?'600':'normal'};">Všichni</button>
@@ -16153,7 +16154,54 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         ];
         $('modalScrollBody').innerHTML = '<div style="padding:16px;display:flex;flex-direction:column;gap:10px;">' + rows.map(r =>
             `<button onclick="favsOpenTab('${r[0]}')" class="menu-row-btn"><span style="font-size:1.6rem;">${r[1]}</span><div><div style="color:${r[3]};font-weight:700;">${r[2]} <span style="color:var(--text-muted);">(${r[4]})</span></div>${r[5] ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${r[5]}</div>` : ''}</div></button>`
-        ).join('') + '</div>';
+        ).join('') + (() => {
+            const fl = favFoldersGet(); if (!fl.length) return '';
+            return '<div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin:8px 2px 0;">📁 Vlastní složky</div>' + fl.map(f =>
+                `<div style="display:flex;gap:8px;align-items:stretch;"><button onclick="favsOpenTab('folder:${f.id}')" class="menu-row-btn" style="flex:1;"><span style="font-size:1.6rem;">📁</span><div><div style="color:#fbbf24;font-weight:700;">${_favEsc(f.name)} <span style="color:var(--text-muted);">(${f.items.length})</span></div></div></button><button onclick="favFolderDelete('${f.id}',event)" title="Smazat složku" style="flex:0 0 auto;width:46px;border-radius:14px;border:1px solid var(--border);background:var(--bg-elevated);color:#f87171;font-size:1.1rem;cursor:pointer;">🗑</button></div>`
+            ).join('');
+        })() + '</div>';
+    }
+    // ── Oblíbené → vlastní složky (lokální v zařízení; vytváří je např. AI chat, jdou smazat) ──
+    // Pevné kategorie (Filmy, Seriály, Minisérie, Anime, Herci, Režiséři) zůstávají beze změny a plní se srdíčkem.
+    const FAV_FOLDERS_KEY = 'sinator_fav_folders';
+    function favFoldersGet() { try { const a = JSON.parse(_store.getItem(FAV_FOLDERS_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+    function favFoldersSave(a) { try { _store.setItem(FAV_FOLDERS_KEY, JSON.stringify(a)); } catch (e) {} }
+    function _favEsc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    window.favFoldersGet = favFoldersGet;
+    // items: [{id, type:'movie'|'tv', title, year, rating, poster}] — pořadí v poli = pořadí ve složce (výchozí řazení „nejnovější přidané“)
+    window.favFolderCreate = function(name, items) {
+        name = String(name || '').trim(); if (!name) return null;
+        const all = favFoldersGet();
+        let f = all.find(x => String(x.name).trim().toLowerCase() === name.toLowerCase());
+        const existed = !!f;
+        if (!f) { f = { id: 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, created: Date.now(), items: [] }; all.push(f); }
+        let added = 0; const now = Date.now(), list = items || [];
+        list.forEach((it, i) => {
+            if (!it || it.id == null) return;
+            const type = it.type === 'tv' ? 'tv' : 'movie';
+            if (f.items.some(x => Number(x.id) === Number(it.id) && (x.type || 'movie') === type)) return;
+            f.items.push({ id: it.id, type, title: it.title || '', year: it.year || '', rating: it.rating || 0, poster: it.poster || '', addedAt: now + list.length - i });
+            added++;
+        });
+        favFoldersSave(all);
+        return { folder: f, added, existed };
+    };
+    window.favFolderDelete = function(id, e) {
+        if (e && e.stopPropagation) e.stopPropagation();
+        const f = favFoldersGet().find(x => x.id === id); if (!f) return;
+        if (!confirm('Smazat složku „' + f.name + '“ (' + f.items.length + ' položek)?\nPoložky v pevných kategoriích Oblíbených (Filmy, Seriály…) zůstanou.')) return;
+        favFoldersSave(favFoldersGet().filter(x => x.id !== id));
+        if (String(state._favsTab || '').indexOf('folder:') === 0) { state._favsTab = 'all'; state._favsView = 'menu'; }
+        try { _favToast('🗑 Složka „' + f.name + '“ smazána'); } catch (x) {}
+        renderFavsModal();
+    };
+    window.favFolderRemoveItem = function(fid, id, e) {
+        if (e && e.stopPropagation) e.stopPropagation();
+        const all = favFoldersGet(), f = all.find(x => x.id === fid); if (!f) return;
+        f.items = f.items.filter(x => Number(x.id) !== Number(id));
+        favFoldersSave(all);
+        try { _favToast('Odebráno ze složky „' + f.name + '“'); } catch (x) {}
+        renderFavsModal();
     }
     function setFavsTab(tab) {
         state._favsTab = tab;
@@ -16281,6 +16329,9 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
                 ...state.favs.map(f => ({...f, media_type: f.type || 'movie', poster_path: f.poster})),
                 ...state.actorFavs.map(f => ({...f, media_type: 'actor', title: f.name, poster_path: f.poster, vote_average: 0}))
             ];
+        } else if (String(tab).indexOf('folder:') === 0) {
+            const ff = favFoldersGet().find(x => 'folder:' + x.id === tab);
+            items = (ff ? ff.items : []).map(x => ({ ...x, media_type: x.type || 'movie', poster_path: x.poster, vote_average: x.rating || 0, _folderId: ff.id }));
         } else if (tab === 'actor' || tab === 'director') {
             let arr = state.actorFavs.filter(a => (tab === 'director') === (a.isDirector === true));
             if (window._favsActorFilterMode === 'nationality' && window._favsActorNationality) {
@@ -16354,7 +16405,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         const mediaType = isActor ? 'actor' : (it.media_type || it.type || 'movie');
         const poster = it.poster_path ? `${IMG}w500${it.poster_path}` : '';
         const clickAction = isActor ? `openPersonDetailFromFavs(${it.id})` : `openDetailFromFavs(${it.id},'${mediaType}')`;
-        const favAction = isActor
+        const favAction = it._folderId ? `favFolderRemoveItem('${it._folderId}',${it.id},event)` : isActor
             ? `toggleActorFav(${it.id},'${titleJs}','${it.poster_path||''}',event);renderFavsGrid()`
             : `toggleFav(${it.id},'${titleJs}','${year}',${it.vote_average||0},'${mediaType}','${it.poster_path||''}',event);renderFavsGrid()`;
         if (cols1) {
@@ -16363,7 +16414,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
             // stejně jako u ostatních seznamů (myBackend, hlavní mřížka...).
             return `<div onclick="${clickAction}" style="position:relative;cursor:pointer;overflow:hidden;background:var(--bg-elevated);border-radius:0;">
                 ${poster ? `<img src="${poster}" loading="lazy" style="width:100%;height:auto;display:block;object-fit:contain;">` : `<div style="width:100%;aspect-ratio:2/3;display:grid;place-items:center;font-size:3rem;">${isActor?(it.isDirector?'🎥':'👤'):(mediaType==='tv'?'📺':'🎬')}</div>`}
-                <button onclick="${favAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.85rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;">❤️</button>
+                <button onclick="${favAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.85rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;">${it._folderId?'✖':'❤️'}</button>
                 <div style="padding:8px 4px 12px;">
                     <div style="font-weight:700;font-size:0.9rem;">${title}</div>
                     <div style="font-size:0.75rem;color:#aaa;">${year||'—'} <span style="color:var(--gold);">❤</span></div>
@@ -16372,7 +16423,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         }
         return `<div onclick="${clickAction}" style="position:relative;cursor:pointer;overflow:hidden;background:var(--bg-elevated);display:flex;align-items:flex-end;height:220px;border-radius:8px;">
             ${poster ? `<img src="${poster}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="position:absolute;inset:0;display:grid;place-items:center;font-size:3rem;">${isActor?(it.isDirector?'🎥':'👤'):(mediaType==='tv'?'📺':'🎬')}</div>`}
-            <button onclick="${favAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.85rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;">❤️</button>
+            <button onclick="${favAction}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;font-size:0.85rem;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;">${it._folderId?'✖':'❤️'}</button>
             <div style="position:relative;z-index:1;width:100%;background:linear-gradient(transparent,rgba(0,0,0,0.9));padding:8px 8px 6px;">
                 <div style="font-weight:700;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
                 <div style="font-size:0.68rem;color:#aaa;">${year||'—'} <span style="color:var(--gold);">❤</span></div>
@@ -55523,7 +55574,7 @@ window.sfFrAuto=async function(id,t){
     +'2) Nevymýšlej si; když si nejsi jistý, řekni to. Spoilery (konec, zvraty) jen na výslovné přání.\n'
     +'3) ODKAZY: každý konkrétní film, seriál nebo osobu (herec, režisér…) zapiš jako odkaz přesně v tomto tvaru: [[film|Název|rok]], [[serial|Název|rok]] nebo [[osoba|Jméno Příjmení]] (rok vynech, pokud ho neznáš; uvnitř odkazu žádné další uvozovky ani tučné písmo). Když uživatel chce herce, režiséra, kolekci, podobné tituly apod., vypiš je jako seznam takových odkazů. Právě zobrazený titul/osobu odkazem neoznačuj. HEREC / POSTAVA: v obsazení v kontextu je u herců ID ve tvaru [#12345]. Herce z obsazení piš jako [[osoba|Jméno|#ID]], postavu jako [[postava|Jméno postavy|#ID herce]] (klepnutí na postavu otevře detail herce, který ji hraje) a u postavy vždy uveď i herce. Když uživatel chce herce / obsazení, vypiš je jako seznam takových odkazů s postavami.\n'
     +'4) NAVIGACE V APPCE: když uživatel chce jít do sekce nebo seznamu v appce (zábava, kolekce, TV, IPTV, rádio, kino, seznamy, oblíbené, složky, filtry, hudba…), odpověz krátce a vlož odkaz [[app|Popisek|klíč]] s klíčem z tabulky (může jich být víc). Když se ptá na něco, co appka umí (kvíz, porovnání, nálada, žebříčky, statistiky, Co dnes…), nabídni příslušnou sekci takovým odkazem. Uživatel často napíše jen klíčové slovo nebo název sekce (např. „hodnocené“, „tematické seznamy“, „shlédnuté“, „streamy“, „rozkoukané“, „oblíbení herci“) — vždy mu dej odkaz (u nejednoznačných slov klidně víc odkazů, např. hodnocené filmy i seriály). Kolekci právě zobrazeného titulu (nebo jinou konkrétní kolekci z kontextu) odkazuj jako [[kolekce|Název kolekce|ID kolekce]] (ID je v kontextu v hranatých závorkách) — NE přes [[app|…|kolekce]], to otevře jen seznam všech kolekcí. Klíče piš přesně z tabulky.\n'
-    +'5) VYTVÁŘENÍ SEZNAMŮ: když uživatel chce filmy/seriály VYTVOŘIT, ULOŽIT nebo PŘIDAT do seznamu (např. „vytvoř seznam“, „přidej je do seznamu X v Histře/Sinatoru“), seznam založí APPKA SAMA — ty nic nevytváříš a NIKDY netvrď, že je seznam hotový. Napiš jednu krátkou větu, pod ni VŽDY všechny položky jako odkazy [[film|Název|rok]] / [[serial|Název|rok]] — název PŘESNĚ česky tak, jak se film/seriál jmenuje v českém TMDB a v české distribuci (např. „Harry Potter a Kámen mudrců“, ne anglicky), a VŽDY s rokem prvního vydání, seřazené podle roku od nejstaršího po nejnovější (jeden na řádek; když se odvolává na tituly z předchozí odpovědi, zopakuj je všechny, žádnou nevynechávej) a na úplný konec samostatný řádek [[seznam|Název seznamu]] (název podle uživatele; když ho neřekl, vymysli krátký). Tento řádek nepoužívej, když uživatel seznam nechce.\n'
+    +'5) VYTVÁŘENÍ SEZNAMŮ: když uživatel chce filmy/seriály VYTVOŘIT, ULOŽIT nebo PŘIDAT do seznamu nebo složky (např. „vytvoř seznam“, „přidej je do seznamu X v Histře/Sinatoru“, „vytvoř složku X v oblíbených“), seznam založí APPKA SAMA — ty nic nevytváříš a NIKDY netvrď, že je seznam hotový. Napiš jednu krátkou větu, pod ni VŽDY všechny položky jako odkazy [[film|Název|rok]] / [[serial|Název|rok]] — název PŘESNĚ česky tak, jak se film/seriál jmenuje v českém TMDB a v české distribuci (např. „Harry Potter a Kámen mudrců“, ne anglicky), a VŽDY s rokem prvního vydání, seřazené podle roku od nejstaršího po nejnovější (jeden na řádek; když se odvolává na tituly z předchozí odpovědi, zopakuj je všechny, žádnou nevynechávej) a na úplný konec samostatný řádek [[seznam|Název seznamu]] (název podle uživatele; když ho neřekl, vymysli krátký). Tento řádek nepoužívej, když uživatel seznam nechce.\n'
     +'Sekce appky (klíč = popis):\n'+APP.map(function(a){return a[0]+' = '+a[1];}).join('\n')
     +(colls&&colls.list&&colls.list.length?'\n\nKOLEKCE NALEZENÉ V TMDB (hledáno: '+colls.queries.join(' | ')+') — výsledek vyhledávání v databázi appky. Když se uživatel ptá na kolekce, vypiš všechny relevantní z tohoto seznamu jako odkazy [[kolekce|Název|ID]]:\n'+colls.list.map(function(x){return '- '+collLine(x);}).join('\n'):'')
     +'\n\nKontext z appky:\n'+(c.ctx||'(žádný)');
@@ -55569,7 +55620,14 @@ window.sfFrAuto=async function(id,t){
   /* 📋 Vytváření seznamů z odpovědi AI: AI vypíše položky jako [[film|..]] / [[serial|..]] a řádek [[seznam|Název]];
      appka seznam SKUTEČNĚ založí (Sinator + Histra, pokud jsou připojené), dohledá položky v TMDB a přidá je. */
   var LIST_RE=/\[\[seznam\|([^\]|]+?)\]\]/i;
-  function listIntent(q){ var n=nrm(q); return /(seznam|zoznam|\blist)/.test(n)&&/(vytvor|zaloz|udelej|vyrob|pridej|pridat|uloz|dej|nahraj|vloz|zapis|create|add|vytvor)/.test(n); }
+  function listIntent(q){ var n=nrm(q); return /(seznam|zoznam|\blist|slozk|priecinok)/.test(n)&&/(vytvor|zaloz|udelej|vyrob|pridej|pridat|uloz|dej|nahraj|vloz|zapis|create|add|vytvor)/.test(n); }
+  /* Kam seznam založit — podle toho, co napsal uživatel: „v oblíbených“ → složka v Oblíbených (lokální), „Histra“ / „Sinator“;
+     když nezmíní nic, jako dosud Sinator + Histra (zrcadlí se). */
+  function listDest(q){
+    var n=nrm(q), fav=/oblib|oblub/.test(n), his=/histr/.test(n), sin=/sinator/.test(n);
+    if(!fav&&!his&&!sin) return {fav:false,his:true,sin:true};
+    return {fav:fav,his:his,sin:sin};
+  }
   function parseItems(t){
     var out=[], seen={}, m, re=/\[\[(film|serial)\|([^\]|]+?)(?:\|(\d{4}))?\]\]/gi;
     while((m=re.exec(String(t||'')))){ var ty=m[1].toLowerCase()==='serial'?'tv':'movie', k=ty+'|'+nrm(m[2]).trim()+'|'+(m[3]||''); if(!seen[k]){ seen[k]=1; out.push({type:ty,name:m[2].trim(),year:m[3]||''}); } }
@@ -55616,7 +55674,7 @@ window.sfFrAuto=async function(id,t){
           res=await find(eps[ei],qs[qi],iy||'',lgs[li]); if(!res.length&&iy) res=await find(eps[ei],qs[qi],iy-1,lgs[li]); if(!res.length&&iy) res=await find(eps[ei],qs[qi],iy+1,lgs[li]);
           if(!res.length) res=await find(eps[ei],qs[qi],'',lgs[li]);
           if(!res.length) continue;
-          hit=pick(res,qs[qi],false); if(hit) return {id:hit.id,type:eps[ei],title:nm(hit),date:hit.release_date||hit.first_air_date||''};
+          hit=pick(res,qs[qi],false); if(hit) return {id:hit.id,type:eps[ei],title:nm(hit),date:hit.release_date||hit.first_air_date||'',poster:hit.poster_path||'',vote:hit.vote_average||0};
           if(!first&&ei===0) first={r:res[0],ep:eps[ei]};
         }
       }
@@ -55627,19 +55685,21 @@ window.sfFrAuto=async function(id,t){
           var q2=w.slice(0,k).join(' '); if(q2.length<4) break;
           for(li=0;li<lgs.length;li++){
             res=await find(eps[ei],q2,iy,lgs[li]); if(!res.length) res=await find(eps[ei],q2,iy-1,lgs[li]); if(!res.length) res=await find(eps[ei],q2,iy+1,lgs[li]);
-            if(res.length){ hit=pick(res,n0,true); if(hit) return {id:hit.id,type:eps[ei],title:nm(hit),date:hit.release_date||hit.first_air_date||''}; }
+            if(res.length){ hit=pick(res,n0,true); if(hit) return {id:hit.id,type:eps[ei],title:nm(hit),date:hit.release_date||hit.first_air_date||'',poster:hit.poster_path||'',vote:hit.vote_average||0}; }
           }
         }
       }
     }
     // poslední záchrana: první výsledek původního hledání (raději přidat nejbližší shodu než nic)
-    if(first&&first.r&&(simil(n0,first.r.title||first.r.name)>=0.25||simil(n0,first.r.original_title||first.r.original_name)>=0.25)) return {id:first.r.id,type:first.ep,title:nm(first.r),date:first.r.release_date||first.r.first_air_date||''};
+    if(first&&first.r&&(simil(n0,first.r.title||first.r.name)>=0.25||simil(n0,first.r.original_title||first.r.original_name)>=0.25)) return {id:first.r.id,type:first.ep,title:nm(first.r),date:first.r.release_date||first.r.first_air_date||'',poster:first.r.poster_path||'',vote:first.r.vote_average||0};
     return null;
   }
-  async function createList(name,items){
-    var b=window._lmBackend; if(!b) return '⚠️ Správce seznamů ještě není načtený, zkus to za chvíli.';
-    var sinOk=false, hisOk=false; try{ sinOk=!!b.myBackendReady(); }catch(e){} try{ hisOk=!!b.histraReady(); }catch(e){}
-    if(!sinOk&&!hisOk) return '⚠️ Není připojený Sinator ani Histra (Nastavení) — seznam nelze vytvořit.';
+  async function createList(name,items,dest){
+    dest=dest||{fav:false,his:true,sin:true};
+    var b=window._lmBackend||{};
+    var sinOk=false, hisOk=false; try{ sinOk=!!(dest.sin&&b.myBackendReady&&b.myBackendReady()); }catch(e){} try{ hisOk=!!(dest.his&&b.histraReady&&b.histraReady()); }catch(e){}
+    if(!dest.fav&&!sinOk&&!hisOk) return '⚠️ '+(dest.sin||dest.his?'Není připojený ':'')+((dest.sin||dest.his)?'Sinator ani Histra (Nastavení) — seznam nelze vytvořit.':'Nelze určit, kam seznam uložit.');
+    if(dest.fav&&typeof window.favFolderCreate!=='function') return '⚠️ Oblíbené složky nejsou k dispozici.';
     var key=window._siGetKey&&window._siGetKey(); if(!key) return '⚠️ Chybí TMDB API klíč.';
     var base=tmBase(), lang=sk()?'sk-SK':'cs-CZ';
     var res=await pool(items,5,function(it){ return resolveItem(it,key,base,lang); });
@@ -55649,6 +55709,12 @@ window.sfFrAuto=async function(id,t){
     // VŽDY řadit podle roku vydání od nejstaršího po nejnovější (stejné datum / chybějící datum → pořadí od AI)
     ok=ok.map(function(r,i){ return {r:r,i:i,d:r.date||'9999'}; }).sort(function(a,b){ return a.d<b.d?-1:a.d>b.d?1:a.i-b.i; }).map(function(x){ return x.r; });
     var rep=[];
+    if(dest.fav){
+      try{
+        var fr=window.favFolderCreate(name,ok.map(function(r){ return {id:r.id,type:r.type,title:r.title,year:(r.date||'').slice(0,4),rating:r.vote||0,poster:r.poster||''}; }));
+        rep.push(fr?'Oblíbené 📁 ✓'+(fr.existed?' (složka už existovala, doplněno)':''):'Oblíbené ❌ chybí název');
+      }catch(e){ rep.push('Oblíbené ❌ '+String((e&&e.message)||e).slice(0,70)); }
+    }
     if(sinOk){
       try{
         // čerstvý seznam seznamů (ne z cache) — seznam mohl být smazán jinde
@@ -55684,7 +55750,7 @@ window.sfFrAuto=async function(id,t){
     }
     var out='✅ Seznam „'+name+'“ — '+ok.length+' z '+items.length+' titulů ('+rep.join(' · ')+')';
     if(miss.length) out+='\nNenalezeno: '+miss.join('; ');
-    out+=' · seřazeno podle roku od nejstarší\n'+(hisOk?'[[app|Histra – seznamy|histra]] ':'')+(sinOk?'[[app|Seznamy → Sinator|sinator_seznamy]]':'');
+    out+=' · seřazeno podle roku od nejstarší\n'+(dest.fav?'[[app|Oblíbené|oblibene]] ':'')+(hisOk?'[[app|Histra – seznamy|histra]] ':'')+(sinOk?'[[app|Seznamy → Sinator|sinator_seznamy]]':'');
     return out;
   }
   async function send(txt){
@@ -55719,7 +55785,7 @@ window.sfFrAuto=async function(id,t){
       if(!items.length){ for(var pi=c.length-2;pi>=0&&!items.length;pi--){ if(c[pi].role==='assistant'&&!c[pi].err) items=parseItems(c[pi].content); } }
       var stm={role:'assistant',content:items.length?'⏳ Zakládám seznam „'+lname+'“ ('+items.length+' titulů)…':'⚠️ Nemám žádné tituly, které bych do seznamu přidal.'};
       c.push(stm); render();
-      if(items.length){ try{ stm.content=await createList(lname,items); }catch(e){ stm.content='⚠️ Seznam se nepodařilo vytvořit: '+((e&&e.message)||e); stm.err=true; } }
+      if(items.length){ try{ stm.content=await createList(lname,items,listDest(q)); }catch(e){ stm.content='⚠️ Seznam se nepodařilo vytvořit: '+((e&&e.message)||e); stm.err=true; } }
     }
     busy=false; render();
   }
