@@ -55756,14 +55756,20 @@ window.sfFrAuto=async function(id,t){
   /* 📚 Podklad pro tvorbu seznamů: aktuální TMDB kolekce (české názvy + roky), aby AI nevycházela jen z vlastní paměti,
      která nezná nové filmy (např. loňské a letošní premiéry). */
   var LISTW={vytvor:1,zaloz:1,udelej:1,vyrob:1,pridej:1,pridat:1,uloz:1,nahraj:1,vloz:1,zapis:1,dej:1,seznam:1,seznamu:1,seznamy:1,seznamem:1,slozku:1,slozka:1,slozce:1,oblibenych:1,oblibene:1,oblibenym:1,histra:1,histry:1,histre:1,histru:1,sinator:1,sinatoru:1,sinatorovi:1,filmy:1,filmu:1,film:1,serialy:1,serial:1,serialu:1,vsechny:1,vsechna:1,vsechno:1,chronologicky:1,chronologii:1,podle:1,roku:1,rok:1,nejstarsi:1,nejnovejsi:1,nejstarsiho:1,nejnovejsiho:1,kolekce:1,kolekci:1,kolekcemi:1,vcetne:1,jmenem:1,nazvem:1,nazev:1,jako:1,pro:1,mne:1,mych:1,moje:1,moji:1,tem:1,tech:1,jsou:1,nove:1,novy:1,noveho:1,posledni:1,vsech:1};
-  async function listCtx(q){
+  async function listCtx(q,me){
     try{
       var key=window._siGetKey&&window._siGetKey(); if(!key) return '';
       var words=String(q||'').split(/\s+/).map(function(w){ return w.replace(/[„“"'.,;:!?()]/g,''); }).filter(function(w){ var n=nrm(w).trim(); return n.length>2&&!STOP[n]&&!LISTW[n]; });
-      if(!words.length) return '';
-      var qs=[words.join(' ')]; if(words.length>1&&words[0].length>3) qs.push(words[0]);
+      var qs=[]; function addq(x){ x=String(x||'').trim(); if(x.length>=3&&qs.indexOf(x)<0) qs.push(x); }
+      if(words.length){ addq(words.join(' ')); }
+      // vlastní jména (velké písmeno / pomlčka, např. „Spider-Mana“) i bez českého skloňování → „Spider-Man“
+      String(q||'').split(/\s+/).forEach(function(w,i){ w=w.replace(/[„“"'.,;:!?()]/g,''); if(w.length>3&&(/[-]/.test(w)||(i>0&&/^[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(w)))){ addq(w); addq(w.replace(/(ovi|ovu|em|ům|a|u|e|y|i)$/,'')); } });
+      if(words.length>1&&words[0].length>3) addq(words[0]);
+      qs=qs.slice(0,5);
       var res=await Promise.all(qs.map(function(x){ return tj('/search/collection','&query='+encodeURIComponent(x)).then(function(j){ return j.results||[]; }).catch(function(){ return []; }); }));
       var ids={}, cols=[]; res.forEach(function(r){ r.forEach(function(x){ if(!ids[x.id]){ ids[x.id]=1; cols.push(x); } }); });
+      // kolekce právě otevřeného filmu/seriálu je vždy relevantní
+      if(me&&me.coll&&me.coll.id&&!ids[me.coll.id]){ ids[me.coll.id]=1; cols.unshift({id:me.coll.id,name:me.coll.name}); }
       cols=cols.slice(0,6); if(!cols.length) return '';
       var today=new Date().toISOString().slice(0,10), out=[];
       var det=await Promise.all(cols.map(function(c){ return tj('/collection/'+c.id).catch(function(){ return null; }); }));
@@ -55773,7 +55779,7 @@ window.sfFrAuto=async function(id,t){
         out.push('• '+(d.name||cols[i].name)+':\n'+parts.map(function(p){ var rd=p.release_date||''; return '  - '+nm(p)+(rd?' ('+yr(rd)+')':'')+(rd&&rd>today?' — ještě nevyšlo':(!rd?' — datum neznámé':'')); }).join('\n'));
       });
       if(!out.length) return '';
-      return '\n\nAKTUÁLNÍ KOLEKCE Z TMDB (závazný podklad pro seznam). Tvá paměť může být zastaralá — o filmech z posledních let nemusíš vědět. Použij PŘESNĚ tyto české názvy a roky, zařaď všechny VYDANÉ filmy z kolekcí, které odpovídají přání uživatele (nezařazuj nesouvisející kolekce) a nic nevymýšlej. Položky „ještě nevyšlo“ vynech, pokud je uživatel výslovně nechce:\n'+out.join('\n');
+      return '\n\nAKTUÁLNÍ KOLEKCE Z TMDB (závazný podklad pro odpověď i pro seznamy). Tvá paměť může být zastaralá — o filmech z posledních let nemusíš vědět. Použij PŘESNĚ tyto české názvy a roky, uváděj všechny VYDANÉ filmy z kolekcí, které odpovídají dotazu (nezařazuj nesouvisející kolekce), vždy jako odkazy [[film|Název|rok]], a nic nevymýšlej. Filmy „ještě nevyšlo“ zmiň jen jako chystané (u seznamů je vynech, pokud je uživatel výslovně nechce):\n'+out.join('\n');
     }catch(e){ return ''; }
   }
   async function send(txt){
@@ -55793,7 +55799,8 @@ window.sfFrAuto=async function(id,t){
       if(colls&&colls.list.length){ var own=me.coll&&me.coll.id; loc+='\n\nDalší kolekce v databázi:\n'+colls.list.filter(function(x){return x.id!==own;}).map(function(x){ return '• [[kolekce|'+x.name+'|'+x.id+']]'+(x.n?' ('+x.n+' filmů'+(x.years?', '+x.years:'')+')':''); }).join('\n'); }
       c.push({role:'assistant',content:loc}); busy=false; render(); return;
     }
-    var lctx=''; if(listIntent(q)){ try{ lctx=await listCtx(q); }catch(e){} }
+    // Aktuální data z TMDB (kolekce, franšízy) vždy, když se dotaz týká seznamu / kolekce / série / pořadí filmů — AI paměť nezná nové filmy
+    var lctx=''; if(listIntent(q)||/(kolek|seznam|slozk|chronolog|\bserie\b|\bsaga\b|franchis|trilogi|vsechny|vsechna|vsechno|poradi|pokracovani|sequel|dalsi dil|nejnovejsi|novy film|nove filmy)/.test(nrm(q))){ try{ lctx=await listCtx(q,me); }catch(e){} }
     var msgs=[{role:'system',content:sysFor(me,webOn(),colls)+lctx}].concat(c.filter(function(m){return !m.err;}).slice(-14).map(function(m){return {role:m.role,content:m.content};}));
     var mk=null, aText='';
     try{
