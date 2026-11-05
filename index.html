@@ -2978,7 +2978,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // Vlastní seznamy
     const myListsGet = () => myApi('/lists').then(r => { try { (Array.isArray(r) ? r : ((r && r.lists) || [])).forEach(l => { if (l && l.id != null && l.name) _myListNames[l.id] = l.name; }); } catch (e) {} return r; });
     const myListCreate = (name) => myApi('/lists', { method: 'POST', body: JSON.stringify({ name }) }).then(r => { try { if (r && r.id != null) _myListNames[r.id] = name; } catch (e) {} return r; });
-    const myListDelete = (listId) => myApi(`/lists/${listId}`, { method: 'DELETE' });
+    const myListDelete = async (listId) => { const nm0 = (typeof _myListNames !== 'undefined' && _myListNames[listId]) || ''; const r = await myApi(`/lists/${listId}`, { method: 'DELETE' }); if (nm0) histraMirrorDeleteList(nm0); return r; };
     const myListItemsGet = (listId) => myApi(`/lists/${listId}/items`);
     const myListItemAdd = async (listId, id, type) => { if (window._sinListCache) delete window._sinListCache[listId]; const r = await myApi(`/lists/${listId}/items`, { method: 'POST', body: JSON.stringify({ id, type }) }); return r; };
     const myListItemRemove = async (listId, id, type) => { if (window._sinListCache) delete window._sinListCache[listId]; const r = await myApi(`/lists/${listId}/items`, { method: 'DELETE', body: JSON.stringify({ id, type }) }); histraMirrorRemoveFromList(listId, id, type); return r; };
@@ -3504,6 +3504,15 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             window._histraMirrorLastError = '';
         } catch (e) { histraMirrorFail(e); }
     }
+    // Smazání celého seznamu v Sinatoru → smaže se i seznam stejného jména v Histře
+    async function histraMirrorDeleteList(name) {
+        if (!histraMirrorOn()) return;
+        try {
+            const hid = await histraFindListId(name);
+            if (hid != null) await histraApi(`/api/v1/lists/${hid}`, { method: 'DELETE' });
+            _histraListIds = null;
+        } catch (e) { histraMirrorFail(e); }
+    }
     async function histraMirrorRemoveFromList(listId, id, type) {
         if (!histraMirrorOn()) return;
         let name = _myListNames[listId];
@@ -3606,6 +3615,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 const n = l.item_count ?? l.items_count ?? l.count ?? (Array.isArray(l.items) ? l.items.length : null);
                 h += `<button class="menu-row-btn" onclick="histraOpenList(${i})"><span style="font-size:1.6rem;">📋</span><div><div style="color:${colors[i % colors.length]};font-weight:700;word-break:break-word;">${_hEsc(l.name || l.title || 'Seznam')}${n != null ? ` <span style="color:var(--text-muted);">(${n})</span>` : ''}</div></div></button>`;
             });
+            h += `<button class="menu-row-btn" onclick="syncListsSinatorHistra(this)"><span style="font-size:1.6rem;">🔄</span><div><div style="color:#8b5cf6;font-weight:700;">Synchronizovat seznamy Sinator ↔ Histra</div></div></button>`;
             if (!lists.length) h += '<div style="text-align:center;padding:20px;color:var(--text-muted);">V Histře zatím nemáš žádné vlastní seznamy.</div>';
             body.innerHTML = h;
         } catch (e) {
@@ -17061,7 +17071,8 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
         $('myBackendListTabs').innerHTML = allTabs.map(t => `<span style="position:relative;display:flex;width:100%;">
             <button class="ts-list-tab-btn" data-tab="${t.key}" onclick="renderMyBackendTab('${t.key}')" style="width:100%;text-align:left;white-space:normal;padding:10px ${t.smartId ? '34px' : '14px'} 10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);cursor:pointer;font-size:0.82rem;">${t.label}</button>
             ${t.smartId ? `<button onclick="event.stopPropagation();mySmartDelete('${t.smartId}')" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:rgba(224,122,111,0.25);border:none;color:#e07a6f;font-size:0.7rem;line-height:1;cursor:pointer;">✕</button>` : ''}
-        </span>`).join('') + `<button onclick="myBackendCreateList()" style="width:100%;white-space:nowrap;padding:10px 14px;border-radius:10px;border:1px dashed #6090ff;background:transparent;color:#6090ff;cursor:pointer;font-size:0.82rem;">➕ Nový seznam</button>`;
+        </span>`).join('') + `<button onclick="myBackendCreateList()" style="width:100%;white-space:nowrap;padding:10px 14px;border-radius:10px;border:1px dashed #6090ff;background:transparent;color:#6090ff;cursor:pointer;font-size:0.82rem;">➕ Nový seznam</button>`
+        + (histraReady() ? `<button onclick="syncListsSinatorHistra(this)" style="width:100%;padding:10px 14px;border-radius:10px;border:1px dashed #8b5cf6;background:transparent;color:#8b5cf6;cursor:pointer;font-size:0.82rem;">🔄 Synchronizovat seznamy s Histrou</button>` : '');
         $('myBackendListTabsWrap').style.display = 'block';
         myBackendSyncListToggle(tab);
 
@@ -17371,7 +17382,7 @@ Countries (with_origin_country): CZ=Česko,SK=Slovensko,US=USA,GB=Velká Britán
     window.mySmartNew = function() { smartOpenWizard(smartDefault(), null); };
 
     window.myBackendDeleteList = async function(listId) {
-        if (!confirm('Smazat celý seznam i s obsahem?')) return;
+        if (!confirm('Smazat celý seznam i s obsahem (v Sinatoru i v Histře)?')) return;
         try {
             await myListDelete(listId);
             loadMyBackendOverview(null, true);
@@ -24304,10 +24315,82 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
 
     // Export pro Správce seznamů (Nastavení → Experimentální funkce): surové volání Sinator backendu a Histry
     // bez zrcadlení (správce si kopírování / přesun mezi službami řídí sám)
+    // ── 🔄 Ruční synchronizace seznamů Sinator ↔ Histra — MASTER JE HISTRA ──
+    // Histra → Sinator: chybějící seznamy a položky se doplní, co v Histře není (smazané seznamy / položky), se smaže i v Sinatoru.
+    // Pojistky: před mazáním potvrzení s počty; když Histra nevrátí žádné seznamy nebo seznam načte prázdný, nic se nemaže.
+    let _listSyncBusy = false;
+    window.syncListsSinatorHistra = async function(btn) {
+        if (_listSyncBusy) return;
+        if (!myBackendReady() || !histraReady()) { try { _favToast('⚠️ Pro synchronizaci musí být připojený Sinator i Histra.'); } catch (e) { alert('Pro synchronizaci musí být připojený Sinator i Histra.'); } return; }
+        _listSyncBusy = true;
+        const orig = btn ? btn.innerHTML : '';
+        const say = t => { if (btn) btn.innerHTML = '⏳ ' + t; };
+        const stats = { addS: 0, delS: 0, delL: 0, newL: 0, err: 0, skipped: [] };
+        try {
+            try { window._myLastWriteTs = Date.now(); if (window.myApiCacheClear) window.myApiCacheClear(); } catch (e) {}
+            try { window._histraResetListIds(); } catch (e) {}
+            say('Načítám seznamy…');
+            let sl = await myListsGet(); sl = Array.isArray(sl) ? sl : ((sl && sl.lists) || []);
+            const hl = await histraFetchLists();
+            const ep = hl.endpoint || '/api/v1/lists';
+            if (!hl.endpoint || (!hl.lists.length && sl.length)) {
+                const m = '⚠️ Histra nevrátila žádné seznamy — nic jsem nesmazal ani neměnil.';
+                try { _favToast(m); } catch (e) { alert(m); }
+                if (btn) btn.innerHTML = orig; return;
+            }
+            const sByName = new Map(); sl.forEach(l => { const k = String(l.name || '').trim().toLowerCase(); if (k && !sByName.has(k)) sByName.set(k, l); });
+            // 1) plán
+            const plan = [];
+            let n = 0;
+            for (const h of hl.lists) {
+                const name = String(h.name || h.title || '').trim(); if (!name) continue;
+                n++; say(`Plán ${n}/${hl.lists.length}`);
+                const s = sByName.get(name.toLowerCase()) || null;
+                const hItems = (await histraFetchListItems(ep, h)).map(histraMapItem).filter(Boolean).map(x => ({ id: Number(x.id), type: x.type }));
+                let sItems = [];
+                if (s) { const r = await myListItemsGet(s.id); sItems = (Array.isArray(r) ? r : []).map(x => ({ id: Number(x.id), type: (x.type === 'tv' || x.type === 'show') ? 'tv' : 'movie' })); }
+                const hSet = new Set(hItems.map(x => x.type + x.id)), sSet = new Set(sItems.map(x => x.type + x.id));
+                const hCount = h.item_count ?? h.items_count ?? h.count;
+                let del = sItems.filter(x => !hSet.has(x.type + x.id));
+                if (!hItems.length && sItems.length && hCount !== 0) { stats.skipped.push(name); del = []; }   // Histra seznam nenačetla → nemazat
+                plan.push({ name, s, add: hItems.filter(x => !sSet.has(x.type + x.id)).reverse(), del, newList: !s && true });
+                sByName.delete(name.toLowerCase());
+            }
+            const orphans = [...sByName.values()];   // seznamy, které existují jen v Sinatoru (v Histře smazané)
+            const nDelItems = plan.reduce((a, p) => a + p.del.length, 0);
+            if (orphans.length || nDelItems) {
+                const ok = confirm(`Histra je hlavní. Při synchronizaci se v Sinatoru smaže:\n• seznamů: ${orphans.length}${orphans.length ? ' (' + orphans.map(o => o.name).slice(0, 6).join(', ') + ')' : ''}\n• položek ze seznamů: ${nDelItems}\n\nPokračovat?`);
+                if (!ok) { orphans.length = 0; plan.forEach(p => p.del = []); }
+            }
+            // 2) provedení
+            let i = 0;
+            for (const p of plan) {
+                i++; say(`${i}/${plan.length} ${p.name.slice(0, 18)}`);
+                try {
+                    let sid = p.s && p.s.id;
+                    if (!sid && p.add.length) { const c = await myListCreate(p.name); sid = c.id; stats.newL++; }
+                    if (sid) {
+                        for (const x of p.add) { try { await myApi('/lists/' + sid + '/items', { method: 'POST', body: JSON.stringify({ id: x.id, type: x.type }) }); stats.addS++; } catch (er) { stats.err++; } }
+                        for (const x of p.del) { try { await myApi('/lists/' + sid + '/items', { method: 'DELETE', body: JSON.stringify({ id: x.id, type: x.type }) }); stats.delS++; } catch (er) { stats.err++; } }
+                        try { if (window._sinListCache) delete window._sinListCache[sid]; } catch (er) {}
+                    }
+                } catch (er) { stats.err++; console.warn('[sync seznamů]', p.name, er); }
+            }
+            for (const o of orphans) { try { await myApi('/lists/' + o.id, { method: 'DELETE' }); stats.delL++; } catch (er) { stats.err++; } }
+            try { window._myLastWriteTs = Date.now(); if (window.myApiCacheClear) window.myApiCacheClear(); } catch (e) {}
+            const msg = `✅ Seznamy synchronizovány (master Histra): +${stats.addS} položek, −${stats.delS} položek, −${stats.delL} seznamů` + (stats.newL ? `, nových ${stats.newL}` : '') + (stats.skipped.length ? ` · přeskočeno (prázdné z Histry): ${stats.skipped.slice(0, 3).join(', ')}` : '') + (stats.err ? ` · chyb ${stats.err}` : '');
+            try { _favToast(msg); } catch (e) { alert(msg); }
+            if (btn) btn.innerHTML = msg.slice(0, 90);
+            setTimeout(() => { if (btn) btn.innerHTML = orig; }, 8000);
+        } catch (e) {
+            try { _favToast('❌ Synchronizace selhala: ' + String((e && e.message) || e).slice(0, 80)); } catch (e2) {}
+            if (btn) btn.innerHTML = orig;
+        } finally { _listSyncBusy = false; }
+    };
     window._lmBackend = {
         myBackendReady, myApi, myListsGet, myListCreate, myListItemsGet,
         histraReady, histraApi, histraUnwrapList, histraFetchAllPaged, histraMapItem,
-        histraPostItem, histraEnsureList, histraCacheTouch,
+        histraPostItem, histraEnsureList, histraCacheTouch, syncLists: (b) => window.syncListsSinatorHistra(b),
         tmdbKey: () => tmdbApiKey,
         // lokální oblíbené (state.favs v zařízení)
         favsGet: () => state.favs || [],
@@ -55625,8 +55708,9 @@ window.sfFrAuto=async function(id,t){
      když nezmíní nic, jako dosud Sinator + Histra (zrcadlí se). */
   function listDest(q){
     var n=nrm(q), fav=/oblib|oblub/.test(n), his=/histr/.test(n), sin=/sinator/.test(n);
-    if(!fav&&!his&&!sin) return {fav:false,his:true,sin:true};
-    return {fav:fav,his:his,sin:sin};
+    // Sinator a Histra se vždy zrcadlí spolu; samotné Oblíbené jen když uživatel zmínil jen je
+    if(fav&&!his&&!sin) return {fav:true,his:false,sin:false};
+    return {fav:fav,his:true,sin:true};
   }
   function parseItems(t){
     var out=[], seen={}, m, re=/\[\[(film|serial)\|([^\]|]+?)(?:\|(\d{4}))?\]\]/gi;
@@ -55724,9 +55808,12 @@ window.sfFrAuto=async function(id,t){
         var lid=ex?ex.id:(await b.myListCreate(name)).id, bad=0;
         // Sinator backend vrací položky seznamu od naposledy přidané → přidává se od nejnovějšího, aby výchozí pohled začínal nejstarším
         // (jedna po druhé, ať pořadí přidání sedí).
-        await pool(ok.slice().reverse(),1,async function(r){ try{ await b.myApi('/lists/'+lid+'/items',{method:'POST',body:JSON.stringify({id:r.id,type:r.type})}); }catch(e){ bad++; } });
+        var failed=[];
+        await pool(ok.slice().reverse(),1,async function(r){ try{ await b.myApi('/lists/'+lid+'/items',{method:'POST',body:JSON.stringify({id:r.id,type:r.type})}); }catch(e){ failed.push(r); } });
+        // oprava: neúspěšné položky ještě jednou (po krátké pauze); co ani pak nejde, se nahlásí
+        if(failed.length){ await new Promise(function(r){ setTimeout(r,1500); }); for(var fi=0;fi<failed.length;fi++){ try{ await b.myApi('/lists/'+lid+'/items',{method:'POST',body:JSON.stringify({id:failed[fi].id,type:failed[fi].type})}); }catch(e){ bad++; } } }
         try{ if(window._sinListCache) delete window._sinListCache[lid]; }catch(e){}
-        rep.push('Sinator ✓'+(ex?' (seznam už existoval, doplněno)':'')+(bad?' · '+bad+' chyb':''));
+        rep.push('Sinator '+(bad?'⚠️':'✓')+(ex?' (seznam už existoval, doplněno)':'')+(bad?' · '+bad+' chyb':''));
       }catch(e){ rep.push('Sinator ❌ '+String((e&&e.message)||e).slice(0,70)); }
     }
     if(hisOk){
