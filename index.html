@@ -55521,6 +55521,7 @@ window.sfFrAuto=async function(id,t){
     +'2) Nevymýšlej si; když si nejsi jistý, řekni to. Spoilery (konec, zvraty) jen na výslovné přání.\n'
     +'3) ODKAZY: každý konkrétní film, seriál nebo osobu (herec, režisér…) zapiš jako odkaz přesně v tomto tvaru: [[film|Název|rok]], [[serial|Název|rok]] nebo [[osoba|Jméno Příjmení]] (rok vynech, pokud ho neznáš; uvnitř odkazu žádné další uvozovky ani tučné písmo). Když uživatel chce herce, režiséra, kolekci, podobné tituly apod., vypiš je jako seznam takových odkazů. Právě zobrazený titul/osobu odkazem neoznačuj. HEREC / POSTAVA: v obsazení v kontextu je u herců ID ve tvaru [#12345]. Herce z obsazení piš jako [[osoba|Jméno|#ID]], postavu jako [[postava|Jméno postavy|#ID herce]] (klepnutí na postavu otevře detail herce, který ji hraje) a u postavy vždy uveď i herce. Když uživatel chce herce / obsazení, vypiš je jako seznam takových odkazů s postavami.\n'
     +'4) NAVIGACE V APPCE: když uživatel chce jít do sekce nebo seznamu v appce (zábava, kolekce, TV, IPTV, rádio, kino, seznamy, oblíbené, složky, filtry, hudba…), odpověz krátce a vlož odkaz [[app|Popisek|klíč]] s klíčem z tabulky (může jich být víc). Když se ptá na něco, co appka umí (kvíz, porovnání, nálada, žebříčky, statistiky, Co dnes…), nabídni příslušnou sekci takovým odkazem. Uživatel často napíše jen klíčové slovo nebo název sekce (např. „hodnocené“, „tematické seznamy“, „shlédnuté“, „streamy“, „rozkoukané“, „oblíbení herci“) — vždy mu dej odkaz (u nejednoznačných slov klidně víc odkazů, např. hodnocené filmy i seriály). Kolekci právě zobrazeného titulu (nebo jinou konkrétní kolekci z kontextu) odkazuj jako [[kolekce|Název kolekce|ID kolekce]] (ID je v kontextu v hranatých závorkách) — NE přes [[app|…|kolekce]], to otevře jen seznam všech kolekcí. Klíče piš přesně z tabulky.\n'
+    +'5) VYTVÁŘENÍ SEZNAMŮ: když uživatel chce filmy/seriály VYTVOŘIT, ULOŽIT nebo PŘIDAT do seznamu (např. „vytvoř seznam“, „přidej je do seznamu X v Histře/Sinatoru“), seznam založí APPKA SAMA — ty nic nevytváříš a NIKDY netvrď, že je seznam hotový. Napiš jednu krátkou větu, pod ni VŽDY všechny položky jako odkazy [[film|Název|rok]] / [[serial|Název|rok]] (jeden na řádek; když se odvolává na tituly z předchozí odpovědi, zopakuj je všechny, žádnou nevynechávej) a na úplný konec samostatný řádek [[seznam|Název seznamu]] (název podle uživatele; když ho neřekl, vymysli krátký). Tento řádek nepoužívej, když uživatel seznam nechce.\n'
     +'Sekce appky (klíč = popis):\n'+APP.map(function(a){return a[0]+' = '+a[1];}).join('\n')
     +(colls&&colls.list&&colls.list.length?'\n\nKOLEKCE NALEZENÉ V TMDB (hledáno: '+colls.queries.join(' | ')+') — výsledek vyhledávání v databázi appky. Když se uživatel ptá na kolekce, vypiš všechny relevantní z tohoto seznamu jako odkazy [[kolekce|Název|ID]]:\n'+colls.list.map(function(x){return '- '+collLine(x);}).join('\n'):'')
     +'\n\nKontext z appky:\n'+(c.ctx||'(žádný)');
@@ -55563,6 +55564,71 @@ window.sfFrAuto=async function(id,t){
     try{ document.getElementById('artistContent').scrollIntoView({block:'start'}); }catch(x){}
     return true;
   }
+  /* 📋 Vytváření seznamů z odpovědi AI: AI vypíše položky jako [[film|..]] / [[serial|..]] a řádek [[seznam|Název]];
+     appka seznam SKUTEČNĚ založí (Sinator + Histra, pokud jsou připojené), dohledá položky v TMDB a přidá je. */
+  var LIST_RE=/\[\[seznam\|([^\]|]+?)\]\]/i;
+  function listIntent(q){ var n=nrm(q); return /(seznam|zoznam|\blist)/.test(n)&&/(vytvor|zaloz|udelej|vyrob|pridej|pridat|uloz|dej|nahraj|vloz|zapis|create|add|vytvor)/.test(n); }
+  function parseItems(t){
+    var out=[], seen={}, m, re=/\[\[(film|serial)\|([^\]|]+?)(?:\|(\d{4}))?\]\]/gi;
+    while((m=re.exec(String(t||'')))){ var ty=m[1].toLowerCase()==='serial'?'tv':'movie', k=ty+'|'+nrm(m[2]).trim()+'|'+(m[3]||''); if(!seen[k]){ seen[k]=1; out.push({type:ty,name:m[2].trim(),year:m[3]||''}); } }
+    return out;
+  }
+  async function pool(arr,n,fn){
+    var i=0, out=new Array(arr.length);
+    async function w(){ while(i<arr.length){ var k=i++; out[k]=await fn(arr[k],k); } }
+    var ws=[]; for(var j=0;j<Math.min(n,arr.length);j++) ws.push(w());
+    await Promise.all(ws); return out;
+  }
+  async function resolveItem(it,key,base,lang){
+    async function find(ep,y){
+      var u=base+'/search/'+ep+'?api_key='+key+'&language='+lang+'&query='+encodeURIComponent(it.name)+(y?(ep==='tv'?'&first_air_date_year=':'&year=')+y:'');
+      var j=await (await fetch(u)).json(); return j.results||[];
+    }
+    var ep=it.type==='tv'?'tv':'movie', res=[];
+    try{
+      res=await find(ep,it.year); if(!res.length&&it.year) res=await find(ep,'');
+      if(!res.length){ ep=ep==='tv'?'movie':'tv'; res=await find(ep,it.year); if(!res.length&&it.year) res=await find(ep,''); }
+    }catch(e){ return null; }
+    if(!res.length) return null;
+    var want=nrm(it.name).trim(), best=null, i;
+    for(i=0;i<res.length&&!best;i++){ var r=res[i], t1=nrm(r.title||r.name).trim(), t2=nrm(r.original_title||r.original_name).trim(); if((t1===want||t2===want)&&(!it.year||yr(r.release_date||r.first_air_date)===it.year)) best=r; }
+    for(i=0;i<res.length&&!best;i++){ var r2=res[i]; if(nrm(r2.title||r2.name).trim()===want||nrm(r2.original_title||r2.original_name).trim()===want) best=r2; }
+    best=best||res[0];
+    return {id:best.id,type:ep,title:nm(best)};
+  }
+  async function createList(name,items){
+    var b=window._lmBackend; if(!b) return '⚠️ Správce seznamů ještě není načtený, zkus to za chvíli.';
+    var sinOk=false, hisOk=false; try{ sinOk=!!b.myBackendReady(); }catch(e){} try{ hisOk=!!b.histraReady(); }catch(e){}
+    if(!sinOk&&!hisOk) return '⚠️ Není připojený Sinator ani Histra (Nastavení) — seznam nelze vytvořit.';
+    var key=window._siGetKey&&window._siGetKey(); if(!key) return '⚠️ Chybí TMDB API klíč.';
+    var base=tmBase(), lang=sk()?'sk-SK':'cs-CZ';
+    var res=await pool(items,5,function(it){ return resolveItem(it,key,base,lang); });
+    var ok=[], seen={}, miss=[];
+    res.forEach(function(r,i){ if(!r){ miss.push(items[i].name+(items[i].year?' ('+items[i].year+')':'')); return; } var k=r.type+r.id; if(!seen[k]){ seen[k]=1; ok.push(r); } });
+    if(!ok.length) return '⚠️ Žádný z titulů se nepodařilo dohledat v databázi, seznam jsem nezaložil.';
+    var rep=[];
+    if(sinOk){
+      try{
+        var ls=await b.myListsGet(); ls=Array.isArray(ls)?ls:((ls&&ls.lists)||[]);
+        var ex=ls.filter(function(l){ return String(l.name||'').trim().toLowerCase()===name.toLowerCase(); })[0];
+        var lid=ex?ex.id:(await b.myListCreate(name)).id, bad=0;
+        await pool(ok,4,async function(r){ try{ await b.myApi('/lists/'+lid+'/items',{method:'POST',body:JSON.stringify({id:r.id,type:r.type})}); }catch(e){ bad++; } });
+        try{ if(window._sinListCache) delete window._sinListCache[lid]; }catch(e){}
+        rep.push('Sinator ✓'+(ex?' (seznam už existoval, doplněno)':'')+(bad?' · '+bad+' chyb':''));
+      }catch(e){ rep.push('Sinator ❌ '+String((e&&e.message)||e).slice(0,70)); }
+    }
+    if(hisOk){
+      try{
+        var hid=await b.histraEnsureList(name), hbad=0, hlast='';
+        await pool(ok,3,async function(r){ if(hbad>=4) return; try{ await b.histraPostItem('/api/v1/lists/'+hid+'/items',r.id,r.type); }catch(e){ hbad++; hlast=(e&&e.message)||''; } });
+        rep.push('Histra '+(hbad>=4?'❌ '+String(hlast).slice(0,60):'✓'+(hbad?' · '+hbad+' chyb':'')));
+      }catch(e){ rep.push('Histra ❌ '+String((e&&e.message)||e).slice(0,70)); }
+    }
+    var out='✅ Seznam „'+name+'“ — '+ok.length+' z '+items.length+' titulů ('+rep.join(' · ')+')';
+    if(miss.length) out+='\nNenalezeno: '+miss.join('; ');
+    out+='\n'+(hisOk?'[[app|Histra – seznamy|histra]] ':'')+(sinOk?'[[app|Seznamy → Sinator|sinator_seznamy]]':'');
+    return out;
+  }
   async function send(txt){
     if(busy||!cur) return;
     var inp=document.getElementById('aiAskInput'), q=(txt!=null?txt:inp.value).trim(); if(!q) return;
@@ -55581,8 +55647,22 @@ window.sfFrAuto=async function(id,t){
       c.push({role:'assistant',content:loc}); busy=false; render(); return;
     }
     var msgs=[{role:'system',content:sysFor(me,webOn(),colls)}].concat(c.filter(function(m){return !m.err;}).slice(-14).map(function(m){return {role:m.role,content:m.content};}));
-    try{ var a=await ask(msgs); c.push({role:'assistant',content:a.text.trim(),sources:a.sources}); }
-    catch(e){ c.push({role:'assistant',content:'⚠️ AI se nepodařilo zavolat: '+e.message,err:true}); }
+    var mk=null, aText='';
+    try{
+      var a=await ask(msgs); aText=a.text.trim();
+      mk=LIST_RE.exec(aText);
+      if(mk) aText=aText.replace(/\[\[seznam\|[^\]|]+?\]\]/gi,'').trim();
+      c.push({role:'assistant',content:aText,sources:a.sources});
+    }
+    catch(e){ c.push({role:'assistant',content:'⚠️ AI se nepodařilo zavolat: '+e.message,err:true}); mk=null; }
+    // Seznam se zakládá jen na výslovné přání uživatele (ne podle textu z webu / odpovědi AI)
+    if(mk&&listIntent(q)){
+      var lname=mk[1].trim(), items=parseItems(aText);
+      if(!items.length){ for(var pi=c.length-2;pi>=0&&!items.length;pi--){ if(c[pi].role==='assistant'&&!c[pi].err) items=parseItems(c[pi].content); } }
+      var stm={role:'assistant',content:items.length?'⏳ Zakládám seznam „'+lname+'“ ('+items.length+' titulů)…':'⚠️ Nemám žádné tituly, které bych do seznamu přidal.'};
+      c.push(stm); render();
+      if(items.length){ try{ stm.content=await createList(lname,items); }catch(e){ stm.content='⚠️ Seznam se nepodařilo vytvořit: '+((e&&e.message)||e); stm.err=true; } }
+    }
     busy=false; render();
   }
 
