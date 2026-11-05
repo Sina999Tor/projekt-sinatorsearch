@@ -55521,7 +55521,7 @@ window.sfFrAuto=async function(id,t){
     +'2) Nevymýšlej si; když si nejsi jistý, řekni to. Spoilery (konec, zvraty) jen na výslovné přání.\n'
     +'3) ODKAZY: každý konkrétní film, seriál nebo osobu (herec, režisér…) zapiš jako odkaz přesně v tomto tvaru: [[film|Název|rok]], [[serial|Název|rok]] nebo [[osoba|Jméno Příjmení]] (rok vynech, pokud ho neznáš; uvnitř odkazu žádné další uvozovky ani tučné písmo). Když uživatel chce herce, režiséra, kolekci, podobné tituly apod., vypiš je jako seznam takových odkazů. Právě zobrazený titul/osobu odkazem neoznačuj. HEREC / POSTAVA: v obsazení v kontextu je u herců ID ve tvaru [#12345]. Herce z obsazení piš jako [[osoba|Jméno|#ID]], postavu jako [[postava|Jméno postavy|#ID herce]] (klepnutí na postavu otevře detail herce, který ji hraje) a u postavy vždy uveď i herce. Když uživatel chce herce / obsazení, vypiš je jako seznam takových odkazů s postavami.\n'
     +'4) NAVIGACE V APPCE: když uživatel chce jít do sekce nebo seznamu v appce (zábava, kolekce, TV, IPTV, rádio, kino, seznamy, oblíbené, složky, filtry, hudba…), odpověz krátce a vlož odkaz [[app|Popisek|klíč]] s klíčem z tabulky (může jich být víc). Když se ptá na něco, co appka umí (kvíz, porovnání, nálada, žebříčky, statistiky, Co dnes…), nabídni příslušnou sekci takovým odkazem. Uživatel často napíše jen klíčové slovo nebo název sekce (např. „hodnocené“, „tematické seznamy“, „shlédnuté“, „streamy“, „rozkoukané“, „oblíbení herci“) — vždy mu dej odkaz (u nejednoznačných slov klidně víc odkazů, např. hodnocené filmy i seriály). Kolekci právě zobrazeného titulu (nebo jinou konkrétní kolekci z kontextu) odkazuj jako [[kolekce|Název kolekce|ID kolekce]] (ID je v kontextu v hranatých závorkách) — NE přes [[app|…|kolekce]], to otevře jen seznam všech kolekcí. Klíče piš přesně z tabulky.\n'
-    +'5) VYTVÁŘENÍ SEZNAMŮ: když uživatel chce filmy/seriály VYTVOŘIT, ULOŽIT nebo PŘIDAT do seznamu (např. „vytvoř seznam“, „přidej je do seznamu X v Histře/Sinatoru“), seznam založí APPKA SAMA — ty nic nevytváříš a NIKDY netvrď, že je seznam hotový. Napiš jednu krátkou větu, pod ni VŽDY všechny položky jako odkazy [[film|Název|rok]] / [[serial|Název|rok]] (jeden na řádek; když se odvolává na tituly z předchozí odpovědi, zopakuj je všechny, žádnou nevynechávej) a na úplný konec samostatný řádek [[seznam|Název seznamu]] (název podle uživatele; když ho neřekl, vymysli krátký). Tento řádek nepoužívej, když uživatel seznam nechce.\n'
+    +'5) VYTVÁŘENÍ SEZNAMŮ: když uživatel chce filmy/seriály VYTVOŘIT, ULOŽIT nebo PŘIDAT do seznamu (např. „vytvoř seznam“, „přidej je do seznamu X v Histře/Sinatoru“), seznam založí APPKA SAMA — ty nic nevytváříš a NIKDY netvrď, že je seznam hotový. Napiš jednu krátkou větu, pod ni VŽDY všechny položky jako odkazy [[film|Název|rok]] / [[serial|Název|rok]] — název PŘESNĚ česky tak, jak se film/seriál jmenuje v českém TMDB a v české distribuci (např. „Harry Potter a Kámen mudrců“, ne anglicky), a VŽDY s rokem prvního vydání, seřazené podle roku od nejstaršího po nejnovější (jeden na řádek; když se odvolává na tituly z předchozí odpovědi, zopakuj je všechny, žádnou nevynechávej) a na úplný konec samostatný řádek [[seznam|Název seznamu]] (název podle uživatele; když ho neřekl, vymysli krátký). Tento řádek nepoužívej, když uživatel seznam nechce.\n'
     +'Sekce appky (klíč = popis):\n'+APP.map(function(a){return a[0]+' = '+a[1];}).join('\n')
     +(colls&&colls.list&&colls.list.length?'\n\nKOLEKCE NALEZENÉ V TMDB (hledáno: '+colls.queries.join(' | ')+') — výsledek vyhledávání v databázi appky. Když se uživatel ptá na kolekce, vypiš všechny relevantní z tohoto seznamu jako odkazy [[kolekce|Název|ID]]:\n'+colls.list.map(function(x){return '- '+collLine(x);}).join('\n'):'')
     +'\n\nKontext z appky:\n'+(c.ctx||'(žádný)');
@@ -55579,22 +55579,60 @@ window.sfFrAuto=async function(id,t){
     var ws=[]; for(var j=0;j<Math.min(n,arr.length);j++) ws.push(w());
     await Promise.all(ws); return out;
   }
+  function simil(a,b){
+    var A=nrm(a).split(/\s+/).filter(Boolean), B=nrm(b).split(/\s+/).filter(Boolean); if(!A.length||!B.length) return 0;
+    var sb={}; B.forEach(function(w){ sb[w]=1; }); var hit=0; A.forEach(function(w){ if(sb[w]) hit++; });
+    return hit/Math.max(A.length,B.length);
+  }
+  /* Hledání titulu v TMDB — česky i anglicky, s tolerancí roku (±1), zkrácenými názvy a nakonec nejlepší shodou.
+     Cíl: dohledat VŽDY všechno, co na TMDB je, i když AI napsala název anglicky / s překlepem / jinou verzí. */
   async function resolveItem(it,key,base,lang){
-    async function find(ep,y){
-      var u=base+'/search/'+ep+'?api_key='+key+'&language='+lang+'&query='+encodeURIComponent(it.name)+(y?(ep==='tv'?'&first_air_date_year=':'&year=')+y:'');
-      var j=await (await fetch(u)).json(); return j.results||[];
+    var iy=parseInt(it.year,10)||0;
+    async function find(ep,q,y,lg){
+      var u=base+'/search/'+ep+'?api_key='+key+'&language='+lg+'&query='+encodeURIComponent(q)+(y?(ep==='tv'?'&first_air_date_year=':'&year=')+y:'');
+      try{ var j=await (await fetch(u)).json(); return j.results||[]; }catch(e){ return []; }
     }
-    var ep=it.type==='tv'?'tv':'movie', res=[];
-    try{
-      res=await find(ep,it.year); if(!res.length&&it.year) res=await find(ep,'');
-      if(!res.length){ ep=ep==='tv'?'movie':'tv'; res=await find(ep,it.year); if(!res.length&&it.year) res=await find(ep,''); }
-    }catch(e){ return null; }
-    if(!res.length) return null;
-    var want=nrm(it.name).trim(), best=null, i;
-    for(i=0;i<res.length&&!best;i++){ var r=res[i], t1=nrm(r.title||r.name).trim(), t2=nrm(r.original_title||r.original_name).trim(); if((t1===want||t2===want)&&(!it.year||yr(r.release_date||r.first_air_date)===it.year)) best=r; }
-    for(i=0;i<res.length&&!best;i++){ var r2=res[i]; if(nrm(r2.title||r2.name).trim()===want||nrm(r2.original_title||r2.original_name).trim()===want) best=r2; }
-    best=best||res[0];
-    return {id:best.id,type:ep,title:nm(best)};
+    function score(r,q){
+      var s1=Math.max(simil(q,r.title||r.name),simil(q,r.original_title||r.original_name));
+      var cy=parseInt(yr(r.release_date||r.first_air_date),10)||0, yd=(iy&&cy)?Math.abs(cy-iy):9;
+      return {sim:s1,ys:yd===0?1:(yd===1?0.5:0)};
+    }
+    function pick(res,q,loose){
+      var best=null,bs=-1;
+      res.slice(0,8).forEach(function(r){ var sc=score(r,q), v=sc.sim+sc.ys; if(v>bs){ bs=v; best=r; best._sc=sc; } });
+      if(!best) return null;
+      var sc2=best._sc;
+      if(sc2.sim>=0.5||(iy&&sc2.ys>=0.5&&sc2.sim>=0.25)||(loose&&iy&&sc2.ys>=0.5)) return best;
+      return null;
+    }
+    var n0=String(it.name).replace(/\([^)]*\)/g,' ').replace(/\s+/g,' ').trim();
+    var qs=[n0], pp=n0.split(/\s*[:–—]\s*|\s+-\s+/); if(pp.length>1&&pp[0].length>=3) qs.push(pp[0].trim());
+    var eps=it.type==='tv'?['tv','movie']:['movie','tv'], lgs=[lang,'en-US'], first=null, ei, li, qi, res, hit;
+    for(ei=0;ei<eps.length;ei++){
+      for(li=0;li<lgs.length;li++){
+        for(qi=0;qi<qs.length;qi++){
+          res=await find(eps[ei],qs[qi],iy||'',lgs[li]); if(!res.length&&iy) res=await find(eps[ei],qs[qi],iy-1,lgs[li]); if(!res.length&&iy) res=await find(eps[ei],qs[qi],iy+1,lgs[li]);
+          if(!res.length) res=await find(eps[ei],qs[qi],'',lgs[li]);
+          if(!res.length) continue;
+          hit=pick(res,qs[qi],false); if(hit) return {id:hit.id,type:eps[ei],title:nm(hit),date:hit.release_date||hit.first_air_date||''};
+          if(!first&&ei===0) first={r:res[0],ep:eps[ei]};
+        }
+      }
+      // zkrácené názvy (ubírání posledních slov) — jen s rokem, ať se netrefí jiný film
+      if(iy){
+        var w=n0.split(' ');
+        for(var k=w.length-1;k>=1;k--){
+          var q2=w.slice(0,k).join(' '); if(q2.length<4) break;
+          for(li=0;li<lgs.length;li++){
+            res=await find(eps[ei],q2,iy,lgs[li]); if(!res.length) res=await find(eps[ei],q2,iy-1,lgs[li]); if(!res.length) res=await find(eps[ei],q2,iy+1,lgs[li]);
+            if(res.length){ hit=pick(res,n0,true); if(hit) return {id:hit.id,type:eps[ei],title:nm(hit),date:hit.release_date||hit.first_air_date||''}; }
+          }
+        }
+      }
+    }
+    // poslední záchrana: první výsledek původního hledání (raději přidat nejbližší shodu než nic)
+    if(first&&first.r&&(simil(n0,first.r.title||first.r.name)>=0.25||simil(n0,first.r.original_title||first.r.original_name)>=0.25)) return {id:first.r.id,type:first.ep,title:nm(first.r),date:first.r.release_date||first.r.first_air_date||''};
+    return null;
   }
   async function createList(name,items){
     var b=window._lmBackend; if(!b) return '⚠️ Správce seznamů ještě není načtený, zkus to za chvíli.';
@@ -55606,13 +55644,17 @@ window.sfFrAuto=async function(id,t){
     var ok=[], seen={}, miss=[];
     res.forEach(function(r,i){ if(!r){ miss.push(items[i].name+(items[i].year?' ('+items[i].year+')':'')); return; } var k=r.type+r.id; if(!seen[k]){ seen[k]=1; ok.push(r); } });
     if(!ok.length) return '⚠️ Žádný z titulů se nepodařilo dohledat v databázi, seznam jsem nezaložil.';
+    // VŽDY řadit podle roku vydání od nejstaršího po nejnovější (stejné datum / chybějící datum → pořadí od AI)
+    ok=ok.map(function(r,i){ return {r:r,i:i,d:r.date||'9999'}; }).sort(function(a,b){ return a.d<b.d?-1:a.d>b.d?1:a.i-b.i; }).map(function(x){ return x.r; });
     var rep=[];
     if(sinOk){
       try{
         var ls=await b.myListsGet(); ls=Array.isArray(ls)?ls:((ls&&ls.lists)||[]);
         var ex=ls.filter(function(l){ return String(l.name||'').trim().toLowerCase()===name.toLowerCase(); })[0];
         var lid=ex?ex.id:(await b.myListCreate(name)).id, bad=0;
-        await pool(ok,4,async function(r){ try{ await b.myApi('/lists/'+lid+'/items',{method:'POST',body:JSON.stringify({id:r.id,type:r.type})}); }catch(e){ bad++; } });
+        // Sinator backend vrací položky seznamu od naposledy přidané → přidává se od nejnovějšího, aby výchozí pohled začínal nejstarším
+        // (jedna po druhé, ať pořadí přidání sedí).
+        await pool(ok.slice().reverse(),1,async function(r){ try{ await b.myApi('/lists/'+lid+'/items',{method:'POST',body:JSON.stringify({id:r.id,type:r.type})}); }catch(e){ bad++; } });
         try{ if(window._sinListCache) delete window._sinListCache[lid]; }catch(e){}
         rep.push('Sinator ✓'+(ex?' (seznam už existoval, doplněno)':'')+(bad?' · '+bad+' chyb':''));
       }catch(e){ rep.push('Sinator ❌ '+String((e&&e.message)||e).slice(0,70)); }
@@ -55620,13 +55662,13 @@ window.sfFrAuto=async function(id,t){
     if(hisOk){
       try{
         var hid=await b.histraEnsureList(name), hbad=0, hlast='';
-        await pool(ok,3,async function(r){ if(hbad>=4) return; try{ await b.histraPostItem('/api/v1/lists/'+hid+'/items',r.id,r.type); }catch(e){ hbad++; hlast=(e&&e.message)||''; } });
+        await pool(ok,1,async function(r){ if(hbad>=4) return; try{ await b.histraPostItem('/api/v1/lists/'+hid+'/items',r.id,r.type); }catch(e){ hbad++; hlast=(e&&e.message)||''; } });
         rep.push('Histra '+(hbad>=4?'❌ '+String(hlast).slice(0,60):'✓'+(hbad?' · '+hbad+' chyb':'')));
       }catch(e){ rep.push('Histra ❌ '+String((e&&e.message)||e).slice(0,70)); }
     }
     var out='✅ Seznam „'+name+'“ — '+ok.length+' z '+items.length+' titulů ('+rep.join(' · ')+')';
     if(miss.length) out+='\nNenalezeno: '+miss.join('; ');
-    out+='\n'+(hisOk?'[[app|Histra – seznamy|histra]] ':'')+(sinOk?'[[app|Seznamy → Sinator|sinator_seznamy]]':'');
+    out+=' · seřazeno podle roku od nejstarší\n'+(hisOk?'[[app|Histra – seznamy|histra]] ':'')+(sinOk?'[[app|Seznamy → Sinator|sinator_seznamy]]':'');
     return out;
   }
   async function send(txt){
