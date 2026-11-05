@@ -3347,6 +3347,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     function histraMirrorOn() { return histraReady() && _store.getItem(HISTRA_MIRROR_KEY) !== '0'; }
     window.toggleHistraMirror = function(on) { _store.setItem(HISTRA_MIRROR_KEY, on ? '1' : '0'); };
     let _histraListIds = null;           // název seznamu (lowercase) → id v Histře
+    // Zapomene pamatovanou mapu název → id (po smazání seznamu mimo appku by jinak mířila na neexistující id → 404)
+    window._histraResetListIds = function() { _histraListIds = null; };
     const _myListNames = {};             // id seznamu v Sinatoru → název
     window._myListNames = _myListNames;
     async function histraEnsureList(name) {
@@ -55649,6 +55651,8 @@ window.sfFrAuto=async function(id,t){
     var rep=[];
     if(sinOk){
       try{
+        // čerstvý seznam seznamů (ne z cache) — seznam mohl být smazán jinde
+        try{ window._myLastWriteTs=Date.now(); if(window.myApiCacheClear) window.myApiCacheClear(); }catch(e){}
         var ls=await b.myListsGet(); ls=Array.isArray(ls)?ls:((ls&&ls.lists)||[]);
         var ex=ls.filter(function(l){ return String(l.name||'').trim().toLowerCase()===name.toLowerCase(); })[0];
         var lid=ex?ex.id:(await b.myListCreate(name)).id, bad=0;
@@ -55661,8 +55665,20 @@ window.sfFrAuto=async function(id,t){
     }
     if(hisOk){
       try{
-        var hid=await b.histraEnsureList(name), hbad=0, hlast='';
-        await pool(ok,1,async function(r){ if(hbad>=4) return; try{ await b.histraPostItem('/api/v1/lists/'+hid+'/items',r.id,r.type); }catch(e){ hbad++; hlast=(e&&e.message)||''; } });
+        try{ if(window._histraResetListIds) window._histraResetListIds(); }catch(e){}   // vždy čerstvé ID seznamu z Histry
+        var hid=await b.histraEnsureList(name), hbad=0, hlast='', healed=false;
+        await pool(ok,1,async function(r){
+          if(hbad>=4) return;
+          try{ await b.histraPostItem('/api/v1/lists/'+hid+'/items',r.id,r.type); }
+          catch(e){
+            // 404 = seznam mezitím zmizel → zapomenout cache, založit znovu a položku zkusit ještě jednou (jen jednou za běh)
+            if(!healed&&/404/.test(String((e&&e.message)||''))){
+              healed=true;
+              try{ if(window._histraResetListIds) window._histraResetListIds(); hid=await b.histraEnsureList(name); await b.histraPostItem('/api/v1/lists/'+hid+'/items',r.id,r.type); return; }catch(e2){ e=e2; }
+            }
+            hbad++; hlast=(e&&e.message)||'';
+          }
+        });
         rep.push('Histra '+(hbad>=4?'❌ '+String(hlast).slice(0,60):'✓'+(hbad?' · '+hbad+' chyb':'')));
       }catch(e){ rep.push('Histra ❌ '+String((e&&e.message)||e).slice(0,70)); }
     }
