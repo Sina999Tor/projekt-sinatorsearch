@@ -180,6 +180,35 @@
 
 </script>
     <script>
+    /* ⚡ Rychlé návraty: GET odpovědi TMDB (detaily, obsazení, kolekce, seznamy…) se drží v paměti 10 min,
+       takže už viděná stránka se při návratu / opakovaném otevření zobrazí hned, bez nového načítání. */
+    (function(){
+        try {
+            if (window.__sinFetchCache || typeof window.fetch !== 'function') return;
+            window.__sinFetchCache = true;
+            var of = window.fetch.bind(window), C = new Map(), TTL = 600000, MAX = 400;
+            window.fetch = function(input, init) {
+                try {
+                    var url = typeof input === 'string' ? input : (input && input.url) || '';
+                    var method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+                    if (method === 'GET' && /^https:\/\/api\.themoviedb\.org\/3\//.test(url) && !(init && init.cache === 'reload') && !/\/(account|authentication)\b/.test(url)) {
+                        var hit = C.get(url), now = Date.now();
+                        if (hit && now - hit.t < TTL) return hit.p.then(function(r){ return r.clone(); });
+                        var p = of(input, init);
+                        var store = p.then(function(r){ return r.ok ? r.clone() : Promise.reject(); });
+                        store.catch(function(){ if (C.get(url) && C.get(url).p === store) C.delete(url); });
+                        C.set(url, { t: now, p: store });
+                        if (C.size > MAX) C.delete(C.keys().next().value);
+                        return p;
+                    }
+                } catch (e) {}
+                return of(input, init);
+            };
+            window.sinClearFetchCache = function(){ C.clear(); };
+        } catch (e) {}
+    })();
+    </script>
+    <script>
     // ── TEST: běžný uživatel (Admin level 2) ─────────────────────────────────
     // Když je zapnuto, appka vidí jen TMDB klíč (+ přístup/identitu zařízení, aby nezamkla admina).
     // Všechno ostatní (AI klíče, Sinator backend, Histra, Trakt/Simkl, admin režim, nastavení, cache…)
@@ -895,6 +924,21 @@ html body #accessReqOverlay * {
 }
 html body #accessReqOverlay[style*="display:none"], html body #accessReqOverlay[style*="display: none"] { display: none !important; }
 html body #accessReqNick { -webkit-user-select: text !important; user-select: text !important; -webkit-appearance: none; }
+
+/* ✨ Plynulé přechody: okna a obsah jemně najíždějí, karty v seznamech se objevují postupně (bez skákání) */
+@keyframes sinFadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes sinFade{from{opacity:0}to{opacity:1}}
+.modal-body,.modal-backdrop-wrap,.menu-row-btn{animation:sinFade .22s ease-out backwards}
+.card:nth-child(-n+14),#histraListsBody [data-hid]:nth-child(-n+14){animation:sinFadeUp .3s ease-out backwards}
+.card:nth-child(2),#histraListsBody [data-hid]:nth-child(2){animation-delay:.03s}
+.card:nth-child(3),#histraListsBody [data-hid]:nth-child(3){animation-delay:.06s}
+.card:nth-child(4),#histraListsBody [data-hid]:nth-child(4){animation-delay:.09s}
+.card:nth-child(5),#histraListsBody [data-hid]:nth-child(5){animation-delay:.12s}
+.card:nth-child(6),#histraListsBody [data-hid]:nth-child(6){animation-delay:.15s}
+.card:nth-child(7),#histraListsBody [data-hid]:nth-child(7){animation-delay:.18s}
+.card:nth-child(8),#histraListsBody [data-hid]:nth-child(8){animation-delay:.21s}
+.card:nth-child(n+9),#histraListsBody [data-hid]:nth-child(n+9){animation-delay:.24s}
+@media (prefers-reduced-motion:reduce){.modal-body,.modal-backdrop-wrap,.menu-row-btn,.card,#histraListsBody [data-hid]{animation:none!important}}
 </style>
 <div id="accessReqOverlay" style="display:none;position:fixed;inset:0;z-index:2147483647;background:rgba(6,6,10,0.97);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:24px;">
   <div style="max-width:380px;width:100%;background:#141414;border:1px solid rgba(255,215,0,0.3);border-radius:16px;padding:28px 22px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.6);">
@@ -7500,6 +7544,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-06a', date: '6. 11. 2026', items: [
+            '⚡ Rychlejší návraty — stránky, které jsi už viděl, se při návratu (tlačítko zpět, opakované kliknutí) zobrazí z paměti, bez nového načítání',
+            '✨ Plynulejší přechody — nové stránky jemně najíždějí a seznamy se objevují postupně, žádné skákání obsahu',
+            '🔄 Seznamy: tlačítko „🔄 Sinator“ přímo v seznamu Histry (jen tento seznam), hromadná synchronizace v přehledu; hlavní je Histra; smazání seznamu v Sinatoru smaže i Histru',
+            '📋 Zeptej se AI: seznam se vždy vytvoří v Sinatoru i v Histře (zrcadlově), neúspěšné položky se zkusí znovu',
+        ] },
         { version: '2026-11-03g', date: '3. 11. 2026', items: [
             '▶️ Nastavení → 🧪 Experimentální funkce → Tlačítko Přehrát: vybereš zdroj, který se spustí tlačítkem ▶️ Přehrát (Hellspy, Sledujte.to, Hellspio, Dupe.cz, Svetserialu.to, ČR Wiki, Mrkaj.me, Uzi.la, SledujFilmy, FastShare, Bombuj.si, Uzi.si, SKTorrent, iVysílání ČT, Nova, iPrima, Dokufilmy a další). Vždy je zapnutý právě jeden, výchozí je Hellspy',
             '🪟 Volba „Spustit v plovoucím okně“: vybraný zdroj se otevře v malém okně přímo v appce (jde přetahovat, ⤢ zvětší / zmenší, ↗ otevře v prohlížeči, ✕ zavře). Weby, které vložení do jiné stránky zakazují, se v okně nezobrazí — tam použij ↗',
