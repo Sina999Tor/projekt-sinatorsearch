@@ -26754,7 +26754,7 @@ function tvGroupChannels(list, opts) {
     const disabledMap = _tvAdminOv().disabled;
     const disabledUrlsMap = _tvAdminOv().disabledUrls;
     const disabledInMap = _tvAdminOv().disabledIn || {};
-    const urlOff = c => !!(disabledUrlsMap[c.url] || disabledInMap[_tvCurList(c) + '|' + c.url]);
+    const urlOff = c => !!(disabledUrlsMap[c.url] || disabledInMap[_tvCurList(c) + '|' + c.url] || disabledInMap[_tvOffKey(c)]);
     const orderMap = _tvAdminOv().order;
     const pinnedMap = _tvAdminOv().pinned || {};
     const groups = new Map();
@@ -27761,7 +27761,7 @@ function _tvMgrApply(entry, on) {
         else {
             // vypnout streamy JEN v seznamu, ve kterém jsou (ne globálně podle URL)
             if (!ov.disabledIn) ov.disabledIn = {};
-            vars.forEach(v => { ov.disabledIn[_tvCurList(v) + '|' + v.url] = true; });
+            vars.forEach(v => { ov.disabledIn[_tvOffKey(v)] = true; });
         }
     }
 }
@@ -27911,16 +27911,19 @@ window._tvAdminMoveOrder = _tvAdminMoveOrder;
 // s totožnou URL v jiném seznamu. Teď se vypíná jen v seznamu (ov.disabledIn), kde kanál aktuálně je.
 // Každý kanál si nese _curList = id seznamu, ve kterém se zrovna zobrazuje (po přesunech).
 function _tvCurList(c) { return (c && (c._curList || c._mvNat || c._src)) || ''; }
+// Vypnutí streamu v seznamu je platné jen pro kanál (klíč názvu), u kterého bylo vypnuto — dřív se vypínalo
+// podle URL a vypnutím jedné varianty (např. "CT 1") zmizely i ostatní kanály se stejnou URL v tom seznamu.
+function _tvOffKey(c) { return _tvCurList(c) + '|' + c.url + '|' + tvChannelKey(c); }
 function tvUrlOff(c) {
     const ov = _tvAdminOv();
     if (ov.disabledUrls[c.url]) return true;
-    return !!(ov.disabledIn && ov.disabledIn[_tvCurList(c) + '|' + c.url]);
+    return !!(ov.disabledIn && (ov.disabledIn[_tvCurList(c) + '|' + c.url] || ov.disabledIn[_tvOffKey(c)]));
 }
 window.tvUrlOff = tvUrlOff;
 function _tvUrlEnable(c) {
     const ov = _tvAdminOv();
     delete ov.disabledUrls[c.url];
-    if (ov.disabledIn) delete ov.disabledIn[_tvCurList(c) + '|' + c.url];
+    if (ov.disabledIn) { delete ov.disabledIn[_tvCurList(c) + '|' + c.url]; delete ov.disabledIn[_tvOffKey(c)]; }
 }
 function _tvTagCurrent() {
     _tvMvContainers().forEach(c => {
