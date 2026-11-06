@@ -28167,22 +28167,47 @@ window.tvListRowHtml = tvListRowHtml;
                 if (!ch || !ch.url || seen.has(ch.url)) continue;
                 if (norm(ch.name) !== key) continue;
                 seen.add(ch.url);
-                out.push({ url: ch.url, name: ch.name, label: L.label });
+                out.push({ url: ch.url, name: ch.name, label: L.label, ch: ch });
             }
         });
         return out.slice(0, 40);
     }
     function closeSheet() { const o = document.getElementById('tvSrcSheet'); if (o) o.remove(); }
-    function openSheet(name) {
+    function isAdmin() { try { return typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2(); } catch (e) { return false; } }
+    // Zapnout/vypnout JEN tento jeden stream (v seznamu, kde je, a jen pro kanál s tímto názvem) — ostatní zdroje se nemění.
+    function toggleOff(ch) {
+        const ov = _tvAdminOv();
+        if (!ov.disabledIn) ov.disabledIn = {};
+        const k1 = _tvOffKey(ch), k2 = _tvCurList(ch) + '|' + ch.url;
+        if (ov.disabledIn[k1]) delete ov.disabledIn[k1];
+        else if (ov.disabledIn[k2]) delete ov.disabledIn[k2];
+        else if (ov.disabledUrls[ch.url]) delete ov.disabledUrls[ch.url];
+        else ov.disabledIn[k1] = true;
+        try { tvAdminSaveOverrides(); } catch (e) {}
+        try { tvRerenderAllChannelLists(); } catch (e) {}
+    }
+    function pick(name, sr) {
+        closeSheet();
+        // Zdroj se zapamatuje pro kanál, na který jsi dlouze klepl (i když stream patří jinému kanálu / je vypnutý).
+        try { window.tvSrcPrefSet(name, sr.url); } catch (e) {}
+        try {
+            tvState.currentChannel = { name: sr.name, url: sr.url };
+            tvState._lastUrl = sr.url; tvState._lastName = sr.name;
+            window._tvLastUrl = sr.url; window._tvLastName = sr.name;
+        } catch (e) {}
+        _openInVlcRaw(sr.url);
+    }
+    function openSheet(name, keepScroll) {
+        const prev = document.getElementById('tvSrcSheet');
+        const scroll = (keepScroll && prev && prev.firstChild) ? prev.firstChild.scrollTop : 0;
         closeSheet();
         const srcs = collect(name);
-        if (!srcs.length) { try { showToast('Žádný jiný zdroj nenalezen'); } catch (e) {} return; }
         const o = document.createElement('div');
         o.id = 'tvSrcSheet';
         o.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;';
         o.addEventListener('click', function (e) { if (e.target === o) closeSheet(); });
         const box = document.createElement('div');
-        box.style.cssText = 'width:100%;max-height:70vh;overflow-y:auto;background:var(--bg-card,#161b26);border-radius:16px 16px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px));box-sizing:border-box;';
+        box.style.cssText = 'width:100%;max-height:75vh;overflow-y:auto;background:var(--bg-card,#161b26);border-radius:16px 16px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px));box-sizing:border-box;';
         const h = document.createElement('div');
         h.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
         const ht = document.createElement('b');
@@ -28195,36 +28220,76 @@ window.tvListRowHtml = tvListRowHtml;
         h.appendChild(ht); h.appendChild(hx); box.appendChild(h);
         const pref = (window.tvSrcPrefGet && window.tvSrcPrefGet(name)) || '';
         const cur = pref || (tvState && tvState.currentChannel && tvState.currentChannel.url) || window._tvLastUrl || '';
-        srcs.forEach(function (sr, i) {
+        const admin = isAdmin();
+        function rowFor(sr, i, showToggle) {
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;';
             const b = document.createElement('button');
-            let off = false; try { off = !!tvUrlOff(sr); } catch (e) {}
-            b.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;margin-bottom:6px;padding:12px;border-radius:10px;border:1px solid ' + (sr.url === cur ? '#5dade2' : 'var(--border,#2a3142)') + ';background:var(--bg-elevated,#1d2433);color:inherit;font-size:.9rem;cursor:pointer;' + (off ? 'opacity:.5;' : '');
+            let off = false; try { off = !!(sr.ch ? tvUrlOff(sr.ch) : tvUrlOff(sr)); } catch (e) {}
+            b.style.cssText = 'flex:1;min-width:0;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;padding:12px;border-radius:10px;border:1px solid ' + (sr.url === cur ? '#5dade2' : 'var(--border,#2a3142)') + ';background:var(--bg-elevated,#1d2433);color:inherit;font-size:.9rem;cursor:pointer;' + (off ? 'opacity:.55;' : '');
             const l = document.createElement('span');
             l.textContent = sr.name + (off ? ' (vypnuto)' : '');
             const r = document.createElement('span');
             r.style.cssText = 'font-size:.72rem;color:var(--text-muted);flex-shrink:0;';
-            r.textContent = (sr.url === cur ? (pref ? '★ ' : '▶ ') : '') + sr.label + ' #' + (i + 1);
+            r.textContent = (sr.url === cur ? (pref ? '★ ' : '▶ ') : '') + sr.label + (i != null ? ' #' + (i + 1) : '');
             b.appendChild(l); b.appendChild(r);
-            b.onclick = function () {
-                closeSheet();
-                try {
-                    tvState.currentChannel = { name: sr.name, url: sr.url };
-                    tvState._lastUrl = sr.url; tvState._lastName = sr.name;
-                    window._tvLastUrl = sr.url; window._tvLastName = sr.name;
-                } catch (e) {}
-                openInVlcUrl(sr.url, true);
-            };
-            box.appendChild(b);
-        });
+            b.onclick = function () { pick(name, sr); };
+            wrap.appendChild(b);
+            if (showToggle && admin && sr.ch) {
+                const t = document.createElement('button');
+                t.textContent = off ? '✅' : '⛔';
+                t.title = off ? 'Zapnout tento zdroj' : 'Vypnout jen tento zdroj';
+                t.style.cssText = 'flex-shrink:0;width:46px;border-radius:10px;border:1px solid ' + (off ? '#1db954' : '#ff6b6b') + ';background:transparent;font-size:1.05rem;cursor:pointer;';
+                t.onclick = function (e) { e.stopPropagation(); toggleOff(sr.ch); openSheet(name, true); };
+                wrap.appendChild(t);
+            }
+            return wrap;
+        }
+        if (!srcs.length) {
+            const em = document.createElement('div');
+            em.style.cssText = 'color:var(--text-muted);font-size:.85rem;margin-bottom:8px;';
+            em.textContent = 'Žádný další zdroj se stejným názvem — níže můžeš vyhledat stream jiného kanálu.';
+            box.appendChild(em);
+        }
+        srcs.forEach(function (sr, i) { box.appendChild(rowFor(sr, i, true)); });
         if (pref) {
             const rb = document.createElement('button');
             rb.textContent = '↺ Zrušit zapamatovaný zdroj (výchozí)';
-            rb.style.cssText = 'width:100%;margin-top:4px;padding:11px;border-radius:10px;border:1px solid var(--border,#2a3142);background:transparent;color:var(--text-muted);cursor:pointer;';
+            rb.style.cssText = 'width:100%;margin:4px 0 10px;padding:11px;border-radius:10px;border:1px solid var(--border,#2a3142);background:transparent;color:var(--text-muted);cursor:pointer;';
             rb.onclick = function () { window.tvSrcPrefSet(name, null); closeSheet(); try { showToast('Zdroj zrušen — platí výchozí'); } catch (e) {} };
             box.appendChild(rb);
         }
+        // Vyhledání streamu JINÉHO kanálu (i vypnutého) a použití jako zdroje pro tento kanál
+        const sep = document.createElement('div');
+        sep.style.cssText = 'margin:8px 0 6px;font-size:.78rem;color:var(--text-muted);';
+        sep.textContent = 'Použít stream jiného kanálu (i vypnutý):';
+        const inp = document.createElement('input');
+        inp.type = 'text'; inp.placeholder = '🔍 Hledat kanál…';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;padding:11px;border-radius:10px;border:1px solid var(--border,#2a3142);background:var(--bg-elevated,#1d2433);color:inherit;margin-bottom:8px;';
+        const res = document.createElement('div');
+        const have = new Set(srcs.map(x => x.url));
+        inp.addEventListener('input', function () {
+            res.innerHTML = '';
+            const q = inp.value.trim().toLowerCase();
+            if (q.length < 2) return;
+            const seen = new Set(), out = [];
+            allLists(true).forEach(L => {
+                if (!Array.isArray(L.list)) return;
+                for (const ch of L.list) {
+                    if (out.length >= 30) return;
+                    if (!ch || !ch.url || have.has(ch.url) || seen.has(ch.url)) continue;
+                    if ((ch.name || '').toLowerCase().indexOf(q) === -1) continue;
+                    seen.add(ch.url);
+                    out.push({ url: ch.url, name: ch.name, label: L.label, ch: ch });
+                }
+            });
+            if (!out.length) { res.textContent = 'Nic nenalezeno.'; res.style.cssText = 'color:var(--text-muted);font-size:.85rem;'; return; }
+            out.forEach(function (sr) { res.appendChild(rowFor(sr, null, true)); });
+        });
+        box.appendChild(sep); box.appendChild(inp); box.appendChild(res);
         o.appendChild(box);
         document.body.appendChild(o);
+        if (scroll) box.scrollTop = scroll;
     }
     window.tvOpenSourceSheet = openSheet;
     window._tvSrcAllLists = allLists;
