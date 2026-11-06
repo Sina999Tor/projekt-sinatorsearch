@@ -27166,7 +27166,7 @@ function _tvAdminVariantsHtml(entry, rid) {
                 ${src ? `<div style="font-size:0.66rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📺 ${_esc(src)}</div>` : ''}
             </div>
             <button onclick="event.stopPropagation();_tvAdminOnlyVariant('${rid}', ${idx})" title="Nechat zapnutý jen tento zdroj, ostatní vypnout" style="background:none;border:1px solid #5dade2;color:#5dade2;padding:0 7px;height:24px;border-radius:6px;cursor:pointer;font-size:0.68rem;flex-shrink:0;white-space:nowrap;">jen tento</button>
-            <button onclick="event.stopPropagation();openInVlcUrl('${safeUrl}')" title="Otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;width:26px;height:24px;border-radius:6px;cursor:pointer;font-size:0.78rem;flex-shrink:0;">▶️</button>
+            <button onclick="event.stopPropagation();_openInVlcRaw('${safeUrl}')" title="Otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;width:26px;height:24px;border-radius:6px;cursor:pointer;font-size:0.78rem;flex-shrink:0;">▶️</button>
             <div onclick="event.stopPropagation();_tvAdminToggleUrlEnabled('${safeUrl}', '${_esc(_tvCurList(v))}')" style="width:34px;height:20px;border-radius:10px;background:${vOff ? '#444' : '#1db954'};position:relative;cursor:pointer;flex-shrink:0;">
                 <div style="width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${vOff ? '2px' : '16px'};transition:left .15s;"></div>
             </div>
@@ -27396,7 +27396,7 @@ function _tvAdminChannelRowHtml(entry, ctx, brokenFlag, sourceLabel, pos, total)
             ${moveBtn}
             ${orderControls}
             <button onclick="_tvAdminToggleBroken('${_esc(key)}', '${_esc(entry.ch._origName || entry.ch.name)}')" title="${brokenFlag ? 'Obnovit (funguje zase)' : 'Označit jako nefunkční'}" style="background:none;border:1px solid ${brokenFlag ? '#ff6b6b' : 'var(--border)'};color:${brokenFlag ? '#ff6b6b' : '#ccc'};width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">${brokenFlag ? '↺' : '🚫'}</button>
-            <button onclick="openInVlcUrl('${_esc(entry.ch.url).replace(/'/g, "\\'")}')" title="Spustit / otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">▶️</button>
+            <button onclick="_openInVlcRaw('${_esc(entry.ch.url).replace(/'/g, "\\'")}')" title="Spustit / otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;width:30px;height:26px;border-radius:6px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">▶️</button>
             ${posBtn}
             <div onclick="_tvAdminToggleEnabled('${_esc(key)}')" style="width:38px;height:22px;border-radius:11px;background:${enabled ? '#1db954' : '#444'};position:relative;cursor:pointer;flex-shrink:0;transition:background 0.15s;">
                 <div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${enabled ? '18px' : '2px'};transition:left 0.15s;"></div>
@@ -28135,34 +28135,38 @@ window.tvListRowHtml = tvListRowHtml;
     let t = null, fired = false, suppress = false, sx = 0, sy = 0;
     const SEL = '.tv-ch-item, .tv-ch-row:not([data-progtitle])';
     function norm(n) { return _tvNormalizeName(n).replace(/\s+/g, ''); }
-    function collect(name) {
-        const key = norm(name);
-        const out = [], seen = new Set();
-        if (!key) return out;
-        const add = (list, label) => {
-            if (!Array.isArray(list)) return;
-            for (const ch of list) {
-                if (!ch || !ch.url || seen.has(ch.url)) continue;
-                if (norm(ch.name) !== key) continue;
-                seen.add(ch.url);
-                out.push({ url: ch.url, name: ch.name, label: label });
-            }
-        };
-        try { add(tvState.channels, '📺 Kanály'); } catch (e) {}
+    function allLists(parse) {
+        const L = [];
+        try { L.push({ list: tvState.channels, label: '📺 Kanály' }); } catch (e) {}
         try {
             if (typeof ALT_PLAYLISTS === 'object') Object.keys(ALT_PLAYLISTS).forEach(code => {
                 if (/^alt[2-5]$/.test(code)) return;
                 try {
-                    if (!altState.parsedCache[code]) altState.parsedCache[code] = parseM3U(ALT_PLAYLISTS[code].m3u);
-                    add(altState.parsedCache[code], '📺 K2 · ' + (ALT_PLAYLISTS[code].label || code));
+                    if (!altState.parsedCache[code] && parse !== false) altState.parsedCache[code] = parseM3U(ALT_PLAYLISTS[code].m3u);
+                    L.push({ list: altState.parsedCache[code], label: '📺 K2 · ' + (ALT_PLAYLISTS[code].label || code) });
                 } catch (e) {}
             });
         } catch (e) {}
-        try { add(alt2State.channels, '📺 Kanály 3'); } catch (e) {}
-        try { add(alt3State.channels, '📺 Kanály 4'); } catch (e) {}
-        try { add(alt4State.channels, '📺 Kanály 5'); } catch (e) {}
-        try { add(alt5State.channels, '📺 Kanály 6'); } catch (e) {}
-        try { _tvUpState().lists.forEach(l => add(l.channels, '📺 ' + (l.name || 'Vlastní'))); } catch (e) {}
+        try { L.push({ list: alt2State.channels, label: '📺 Kanály 3' }); } catch (e) {}
+        try { L.push({ list: alt3State.channels, label: '📺 Kanály 4' }); } catch (e) {}
+        try { L.push({ list: alt4State.channels, label: '📺 Kanály 5' }); } catch (e) {}
+        try { L.push({ list: alt5State.channels, label: '📺 Kanály 6' }); } catch (e) {}
+        try { _tvUpState().lists.forEach(l => L.push({ list: l.channels, label: '📺 ' + (l.name || 'Vlastní') })); } catch (e) {}
+        return L;
+    }
+    function collect(name) {
+        const key = norm(name);
+        const out = [], seen = new Set();
+        if (!key) return out;
+        allLists(true).forEach(L => {
+            if (!Array.isArray(L.list)) return;
+            for (const ch of L.list) {
+                if (!ch || !ch.url || seen.has(ch.url)) continue;
+                if (norm(ch.name) !== key) continue;
+                seen.add(ch.url);
+                out.push({ url: ch.url, name: ch.name, label: L.label });
+            }
+        });
         return out.slice(0, 40);
     }
     function closeSheet() { const o = document.getElementById('tvSrcSheet'); if (o) o.remove(); }
@@ -28186,7 +28190,8 @@ window.tvListRowHtml = tvListRowHtml;
         hx.style.cssText = 'background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;';
         hx.onclick = closeSheet;
         h.appendChild(ht); h.appendChild(hx); box.appendChild(h);
-        const cur = (tvState && tvState.currentChannel && tvState.currentChannel.url) || window._tvLastUrl || '';
+        const pref = (window.tvSrcPrefGet && window.tvSrcPrefGet(name)) || '';
+        const cur = pref || (tvState && tvState.currentChannel && tvState.currentChannel.url) || window._tvLastUrl || '';
         srcs.forEach(function (sr, i) {
             const b = document.createElement('button');
             let off = false; try { off = !!tvUrlOff(sr); } catch (e) {}
@@ -28195,7 +28200,7 @@ window.tvListRowHtml = tvListRowHtml;
             l.textContent = sr.name + (off ? ' (vypnuto)' : '');
             const r = document.createElement('span');
             r.style.cssText = 'font-size:.72rem;color:var(--text-muted);flex-shrink:0;';
-            r.textContent = (sr.url === cur ? '▶ ' : '') + sr.label + ' #' + (i + 1);
+            r.textContent = (sr.url === cur ? (pref ? '★ ' : '▶ ') : '') + sr.label + ' #' + (i + 1);
             b.appendChild(l); b.appendChild(r);
             b.onclick = function () {
                 closeSheet();
@@ -28204,14 +28209,22 @@ window.tvListRowHtml = tvListRowHtml;
                     tvState._lastUrl = sr.url; tvState._lastName = sr.name;
                     window._tvLastUrl = sr.url; window._tvLastName = sr.name;
                 } catch (e) {}
-                openInVlcUrl(sr.url);
+                openInVlcUrl(sr.url, true);
             };
             box.appendChild(b);
         });
+        if (pref) {
+            const rb = document.createElement('button');
+            rb.textContent = '↺ Zrušit zapamatovaný zdroj (výchozí)';
+            rb.style.cssText = 'width:100%;margin-top:4px;padding:11px;border-radius:10px;border:1px solid var(--border,#2a3142);background:transparent;color:var(--text-muted);cursor:pointer;';
+            rb.onclick = function () { window.tvSrcPrefSet(name, null); closeSheet(); try { showToast('Zdroj zrušen — platí výchozí'); } catch (e) {} };
+            box.appendChild(rb);
+        }
         o.appendChild(box);
         document.body.appendChild(o);
     }
     window.tvOpenSourceSheet = openSheet;
+    window._tvSrcAllLists = allLists;
     function clear() { if (t) { clearTimeout(t); t = null; } fired = false; }
     function start(e) {
         const el = e.target.closest ? e.target.closest(SEL) : null;
@@ -43043,7 +43056,7 @@ function _tvUpTestRender(reset) {
             <button title="Otestovat ve VLC" style="background:none;border:1px solid #1db954;color:#1db954;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;flex-shrink:0;">▶ VLC</button>
             <button title="Kopírovat odkaz" style="background:none;border:1px solid var(--border);color:#ccc;width:34px;height:32px;border-radius:8px;cursor:pointer;flex-shrink:0;">📋</button>`;
         const [bPlay, bCopy] = row.querySelectorAll('button');
-        bPlay.onclick = () => { bPlay.textContent = '▶ ✓'; openInVlcUrl(c.url); };
+        bPlay.onclick = () => { bPlay.textContent = '▶ ✓'; _openInVlcRaw(c.url); };
         bCopy.onclick = async () => { try { await navigator.clipboard.writeText(c.url); bCopy.textContent = '✓'; setTimeout(() => bCopy.textContent = '📋', 1200); } catch (e) { prompt('Odkaz na stream:', c.url); } };
         box.appendChild(row);
     });
@@ -43457,7 +43470,43 @@ function showTvLaunchPanel(name, url) {
     openInVlcUrl(url);
 }
 
-function openInVlcUrl(url) {
+// Zapamatovaný zdroj kanálu: klíč = normalizovaný název kanálu (bez mezer), hodnota = URL zvoleného zdroje.
+// Při dalším spuštění téhož kanálu (z kterékoli záložky / EPG) se místo původní URL pustí zvolená.
+const _TV_SRC_PREF_KEY = 'sinator_tv_src_pref';
+function _tvSrcPrefMap() { try { return JSON.parse(localStorage.getItem(_TV_SRC_PREF_KEY) || '{}') || {}; } catch (e) { return {}; } }
+function _tvSrcPrefSave(m) { try { localStorage.setItem(_TV_SRC_PREF_KEY, JSON.stringify(m)); } catch (e) {} }
+function _tvSrcKey(name) { return _tvNormalizeName(name).replace(/\s+/g, ''); }
+function tvSrcNameForUrl(url) {
+    const lists = (window._tvSrcAllLists ? window._tvSrcAllLists(false) : []);
+    for (const L of lists) for (const ch of (L.list || [])) if (ch && ch.url === url) return ch.name;
+    return '';
+}
+function tvSrcPrefGet(name) { const k = _tvSrcKey(name); return k ? (_tvSrcPrefMap()[k] || '') : ''; }
+function tvSrcPrefSet(name, url) {
+    const k = _tvSrcKey(name); if (!k) return;
+    const m = _tvSrcPrefMap();
+    if (url) m[k] = url; else delete m[k];
+    _tvSrcPrefSave(m);
+}
+window.tvSrcPrefGet = tvSrcPrefGet; window.tvSrcPrefSet = tvSrcPrefSet;
+function openInVlcUrl(url, explicit) {
+    try {
+        const nm = tvSrcNameForUrl(url);
+        if (explicit) { if (nm) tvSrcPrefSet(nm, url); }
+        else if (nm) {
+            const p = tvSrcPrefGet(nm);
+            if (p && p !== url) {
+                url = p;
+                try { tvState._lastUrl = p; window._tvLastUrl = p; } catch (e) {}
+                try { showToast('🔀 Zapamatovaný zdroj'); } catch (e) {}
+            }
+        }
+    } catch (e) { console.warn('src pref', e); }
+    _openInVlcRaw(url);
+}
+window.openInVlcUrl = openInVlcUrl;
+
+function _openInVlcRaw(url) {
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
     if (isIOS) {
         const encoded = encodeURIComponent(url);
@@ -43546,7 +43595,7 @@ function updateTvQuickAltRow(name, currentUrl) {
     if (!alts.length) { wrap.style.display = 'none'; chipsEl.innerHTML = ''; return; }
     wrap.style.display = 'block';
     chipsEl.innerHTML = alts.map(ch =>
-        `<button onclick="openInVlcUrl(decodeURIComponent('${encodeURIComponent(ch.url)}'))" style="flex-shrink:0;padding:7px 11px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.72rem;font-weight:600;white-space:nowrap;cursor:pointer;">${ch.source}</button>`
+        `<button onclick="openInVlcUrl(decodeURIComponent('${encodeURIComponent(ch.url)}'),true)" style="flex-shrink:0;padding:7px 11px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.72rem;font-weight:600;white-space:nowrap;cursor:pointer;">${ch.source}</button>`
     ).join('');
 }
 window.updateTvQuickAltRow = updateTvQuickAltRow;
@@ -43662,7 +43711,7 @@ function _epgChoosePick(i) {
     const row = (window._epgChooserRows || [])[i]; if (!row) return;
     _epgPrefSet(window._epgChooserTarget, row.ch.url);
     const m = document.getElementById('epgAltChooserModal'); if (m) m.remove();
-    openInVlcUrl(row.ch.url);
+    openInVlcUrl(row.ch.url, true);
 }
 window._epgChoosePick = _epgChoosePick;
 
