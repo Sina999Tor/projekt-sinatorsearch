@@ -53072,6 +53072,7 @@ window.addEventListener('load', function() {
     +'#swPageHelp .hp-b{padding:2px 14px 14px;font-size:.88rem;line-height:1.55}'
     +'#swPageHelp .hp-b p{margin:6px 0}#swPageHelp .hp-b ol,#swPageHelp .hp-b ul{margin:6px 0;padding-left:20px}#swPageHelp .hp-b li{margin:4px 0}'
     +'#swPageHelp .hp-tip{margin:8px 0;padding:8px 10px;border-radius:10px;background:rgba(250,204,21,.1);border:1px solid rgba(250,204,21,.35);font-size:.82rem}'
+    +'#swPageHelp mark{background:rgba(250,204,21,.35);color:inherit;border-radius:3px;padding:0 1px}#swPageHelp details.hp-sec{scroll-margin-top:64px}#swPageHelp details.hp-sec>details{display:block}'
     +'#swPageHelp .hp-none{text-align:center;opacity:.7;padding:24px 0}';
     document.head.appendChild(s);
   }
@@ -53079,29 +53080,66 @@ window.addEventListener('load', function() {
     var root=document.getElementById('swPageHelp'); if(!root) return;
     if(root.__hpDone){ var inp0=root.querySelector('input'); if(inp0&&inp0.value){ inp0.value=''; filter(''); } return; }
     root.__hpDone=true; css();
-    var h='<div class="hp-search"><input type="search" id="hpQ" placeholder="🔍 Hledat v nápovědě (např. TMDB, rádio, hudba…)" autocomplete="off"></div>'
+    var h='<div class="hp-search"><input type="search" id="hpQ" placeholder="🔍 Hledat v nápovědě (např. TMDB, rádio, hudba…)" autocomplete="off"></div><div id="hpCnt" class="hp-intro" style="margin:0 0 4px;font-weight:700;color:#facc15"></div>'
       +'<p class="hp-intro">Návody ke všem funkcím appky. Klepni na téma a rozbalí se postup krok za krokem.</p><div id="hpList">';
     DATA.forEach(function(s){
-      h+='<details class="hp-sec" data-s="'+s.id+'"><summary>'+s.icon+' '+esc(s.title)+'</summary>';
-      s.items.forEach(function(it){ h+='<details class="hp-it" data-t="'+esc(nrm(s.title+' '+it.q+' '+it.a))+'"><summary>'+esc(it.q)+'</summary><div class="hp-b">'+body(it.a)+'</div></details>'; });
+      h+='<details class="hp-sec" data-s="'+s.id+'" data-st="'+esc(nrm(s.title))+'"><summary>'+s.icon+' '+esc(s.title)+'</summary>';
+      s.items.forEach(function(it){ h+='<details class="hp-it" data-q="'+esc(nrm(it.q))+'" data-t="'+esc(nrm(s.title+' '+it.q+' '+it.a))+'"><summary>'+esc(it.q)+'</summary><div class="hp-b">'+body(it.a)+'</div></details>'; });
       h+='</details>';
     });
     h+='<div class="hp-none" id="hpNone" style="display:none">Nic nenalezeno. Zkus jiné slovo.</div></div>';
     root.innerHTML=h;
     root.querySelector('#hpQ').addEventListener('input',function(){ filter(this.value); });
   };
+  /* Hledání: shoda v názvu tématu / otázky má přednost (rozbalí se a je nahoře), zmínky jen v textu návodu zůstanou sbalené
+     pod nimi. Hledané slovo se zvýrazní, výsledky se seřadí podle relevance a seznam odroluje na první nález. */
+  var _hpT=null;
+  function hlNode(el,words){
+    if(!el) return;
+    if(el.__o===undefined) el.__o=el.innerHTML;
+    if(!words.length){ el.innerHTML=el.__o; return; }
+    el.innerHTML=el.__o;
+    var w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,null), nodes=[], n;
+    while((n=w.nextNode())) nodes.push(n);
+    nodes.forEach(function(tn){
+      var t=tn.nodeValue, nt=nrm(t); if(nt.length!==t.length) return;
+      var rg=[]; words.forEach(function(wd){ var i=-1; while((i=nt.indexOf(wd,i+1))>=0) rg.push([i,i+wd.length]); });
+      if(!rg.length) return;
+      rg.sort(function(x,y){ return x[0]-y[0]; });
+      var m=[rg[0]]; for(var k=1;k<rg.length;k++){ var l=m[m.length-1]; if(rg[k][0]<=l[1]) l[1]=Math.max(l[1],rg[k][1]); else m.push(rg[k]); }
+      var f=document.createDocumentFragment(), p=0;
+      m.forEach(function(r){ if(r[0]>p) f.appendChild(document.createTextNode(t.slice(p,r[0]))); var mk=document.createElement('mark'); mk.textContent=t.slice(r[0],r[1]); f.appendChild(mk); p=r[1]; });
+      if(p<t.length) f.appendChild(document.createTextNode(t.slice(p)));
+      tn.parentNode.replaceChild(f,tn);
+    });
+  }
   function filter(q){
     var root=document.getElementById('swPageHelp'); if(!root) return;
-    var words=nrm(q).split(/\s+/).filter(Boolean), any=false;
-    root.querySelectorAll('details.hp-sec').forEach(function(sec){
-      var n=0;
-      sec.querySelectorAll('details.hp-it').forEach(function(it){
-        var t=it.getAttribute('data-t'), ok=words.every(function(w){ return t.indexOf(w)>=0; });
-        it.style.display=ok?'':'none'; if(ok){ n++; it.open=!!words.length; } else it.open=false;
+    var words=nrm(q).split(/\s+/).filter(Boolean), any=false, list=document.getElementById('hpList'), first=null, total=0;
+    list.style.display='flex'; list.style.flexDirection='column';
+    var secs=[].slice.call(root.querySelectorAll('details.hp-sec'));
+    secs.forEach(function(sec,si){
+      var best=0, n=0, st=sec.getAttribute('data-st')||'';
+      var its=[].slice.call(sec.querySelectorAll('details.hp-it'));
+      var secTitleHit=words.length&&words.every(function(w){ return st.indexOf(w)>=0; });
+      its.forEach(function(it,ii){
+        var t=it.getAttribute('data-t'), tq=(it.getAttribute('data-q')||'');
+        var ok=words.every(function(w){ return t.indexOf(w)>=0; });
+        var sc=!ok?0:(words.every(function(w){ return tq.indexOf(w)>=0; })?3:(secTitleHit?2:1));
+        it.style.display=ok?'':'none';
+        it.open=!!words.length&&sc>=2;
+        if(ok){ n++; total++; if(sc>best) best=sc; }
+        var sm=it.querySelector('summary'), hb=it.querySelector('.hp-b');
+        hlNode(sm,ok?words:[]); hlNode(hb,ok?words:[]);
       });
-      sec.style.display=n?'':'none'; if(n) any=true; sec.open=!!words.length&&n>0;
+      sec.style.display=n?'':'none'; if(n) any=true;
+      sec.open=!!words.length&&n>0;
+      sec.style.order=words.length?(4-best)*100+si:si;
+      if(n&&(!first||(4-best)*100+si<first.k)) first={k:(4-best)*100+si,el:sec};
     });
     var no=document.getElementById('hpNone'); if(no) no.style.display=any?'none':'block';
+    var cnt=document.getElementById('hpCnt'); if(cnt) cnt.textContent=words.length?(any?('Nalezeno: '+total+' '+(total===1?'téma':(total<5?'témata':'témat'))):''):'';
+    if(words.length&&first){ clearTimeout(_hpT); _hpT=setTimeout(function(){ try{ first.el.scrollIntoView({block:'start',behavior:'smooth'}); }catch(e){} },120); }
   }
 })();
 </script>
