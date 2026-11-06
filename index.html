@@ -28129,6 +28129,129 @@ window.tvListRowHtml = tvListRowHtml;
     });
 })();
 
+// === Dlouhý stisk na kanálu (dlaždice / řádek) -> výběr zdroje (stejnojmenné kanály ze všech seznamů) ===
+(function () {
+    const LP_MS = 500;
+    let t = null, fired = false, suppress = false, sx = 0, sy = 0;
+    const SEL = '.tv-ch-item, .tv-ch-row:not([data-progtitle])';
+    function norm(n) { return _tvNormalizeName(n).replace(/\s+/g, ''); }
+    function collect(name) {
+        const key = norm(name);
+        const out = [], seen = new Set();
+        if (!key) return out;
+        const add = (list, label) => {
+            if (!Array.isArray(list)) return;
+            for (const ch of list) {
+                if (!ch || !ch.url || seen.has(ch.url)) continue;
+                if (norm(ch.name) !== key) continue;
+                seen.add(ch.url);
+                out.push({ url: ch.url, name: ch.name, label: label });
+            }
+        };
+        try { add(tvState.channels, '📺 Kanály'); } catch (e) {}
+        try {
+            if (typeof ALT_PLAYLISTS === 'object') Object.keys(ALT_PLAYLISTS).forEach(code => {
+                if (/^alt[2-5]$/.test(code)) return;
+                try {
+                    if (!altState.parsedCache[code]) altState.parsedCache[code] = parseM3U(ALT_PLAYLISTS[code].m3u);
+                    add(altState.parsedCache[code], '📺 K2 · ' + (ALT_PLAYLISTS[code].label || code));
+                } catch (e) {}
+            });
+        } catch (e) {}
+        try { add(alt2State.channels, '📺 Kanály 3'); } catch (e) {}
+        try { add(alt3State.channels, '📺 Kanály 4'); } catch (e) {}
+        try { add(alt4State.channels, '📺 Kanály 5'); } catch (e) {}
+        try { add(alt5State.channels, '📺 Kanály 6'); } catch (e) {}
+        try { _tvUpState().lists.forEach(l => add(l.channels, '📺 ' + (l.name || 'Vlastní'))); } catch (e) {}
+        return out.slice(0, 40);
+    }
+    function closeSheet() { const o = document.getElementById('tvSrcSheet'); if (o) o.remove(); }
+    function openSheet(name) {
+        closeSheet();
+        const srcs = collect(name);
+        if (!srcs.length) { try { showToast('Žádný jiný zdroj nenalezen'); } catch (e) {} return; }
+        const o = document.createElement('div');
+        o.id = 'tvSrcSheet';
+        o.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;';
+        o.addEventListener('click', function (e) { if (e.target === o) closeSheet(); });
+        const box = document.createElement('div');
+        box.style.cssText = 'width:100%;max-height:70vh;overflow-y:auto;background:var(--bg-card,#161b26);border-radius:16px 16px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px));box-sizing:border-box;';
+        const h = document.createElement('div');
+        h.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
+        const ht = document.createElement('b');
+        ht.style.color = 'var(--gold,#f5c518)';
+        ht.textContent = '🔀 Změnit zdroj — ' + tvDisplayName(name);
+        const hx = document.createElement('button');
+        hx.textContent = '✕';
+        hx.style.cssText = 'background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;';
+        hx.onclick = closeSheet;
+        h.appendChild(ht); h.appendChild(hx); box.appendChild(h);
+        const cur = (tvState && tvState.currentChannel && tvState.currentChannel.url) || window._tvLastUrl || '';
+        srcs.forEach(function (sr, i) {
+            const b = document.createElement('button');
+            let off = false; try { off = !!tvUrlOff(sr); } catch (e) {}
+            b.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;margin-bottom:6px;padding:12px;border-radius:10px;border:1px solid ' + (sr.url === cur ? '#5dade2' : 'var(--border,#2a3142)') + ';background:var(--bg-elevated,#1d2433);color:inherit;font-size:.9rem;cursor:pointer;' + (off ? 'opacity:.5;' : '');
+            const l = document.createElement('span');
+            l.textContent = sr.name + (off ? ' (vypnuto)' : '');
+            const r = document.createElement('span');
+            r.style.cssText = 'font-size:.72rem;color:var(--text-muted);flex-shrink:0;';
+            r.textContent = (sr.url === cur ? '▶ ' : '') + sr.label + ' #' + (i + 1);
+            b.appendChild(l); b.appendChild(r);
+            b.onclick = function () {
+                closeSheet();
+                try {
+                    tvState.currentChannel = { name: sr.name, url: sr.url };
+                    tvState._lastUrl = sr.url; tvState._lastName = sr.name;
+                    window._tvLastUrl = sr.url; window._tvLastName = sr.name;
+                } catch (e) {}
+                openInVlcUrl(sr.url);
+            };
+            box.appendChild(b);
+        });
+        o.appendChild(box);
+        document.body.appendChild(o);
+    }
+    window.tvOpenSourceSheet = openSheet;
+    function clear() { if (t) { clearTimeout(t); t = null; } fired = false; }
+    function start(e) {
+        const el = e.target.closest ? e.target.closest(SEL) : null;
+        if (!el) return;
+        if (e.target.closest('button, .tv-ch-alts')) return;
+        const name = el.getAttribute('title');
+        if (!name) return;
+        const pt = (e.touches && e.touches[0]) || e;
+        sx = pt.clientX; sy = pt.clientY;
+        clear();
+        t = setTimeout(function () {
+            fired = true; suppress = true;
+            if (navigator.vibrate) { try { navigator.vibrate(30); } catch (err) {} }
+            openSheet(name);
+        }, LP_MS);
+    }
+    function move(e) {
+        if (!t) return;
+        const pt = (e.touches && e.touches[0]) || e;
+        if (Math.abs(pt.clientX - sx) > 10 || Math.abs(pt.clientY - sy) > 10) clear();
+    }
+    function end(e) {
+        if (t) { clearTimeout(t); t = null; }
+        if (fired) { e.preventDefault(); e.stopPropagation(); }
+        fired = false;
+    }
+    document.addEventListener('touchstart', start, { passive: true });
+    document.addEventListener('touchmove', move, { passive: true });
+    document.addEventListener('touchend', end, { passive: false });
+    document.addEventListener('touchcancel', clear, { passive: true });
+    document.addEventListener('mousedown', start);
+    document.addEventListener('mouseup', end);
+    document.addEventListener('click', function (e) {
+        if (suppress) { suppress = false; e.preventDefault(); e.stopPropagation(); }
+    }, true);
+    document.addEventListener('contextmenu', function (e) {
+        if (e.target.closest && e.target.closest(SEL)) e.preventDefault();
+    });
+})();
+
 // Zavře TV modal a spustí hlavní vyhledávání Sinator Search podle názvu
 // pořadu z EPG (dlouhý stisk na řádku kanálu).
 function tvOpenSearchForProgram(title) {
