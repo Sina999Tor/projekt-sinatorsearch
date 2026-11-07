@@ -7865,7 +7865,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-08', date: '8. 11. 2026', items: [
-            { admin: true, text: 'Záloha dat ze Sinator backendu přesunuta z Nastavení → Záloha dat do Admin → 🧩 Záloha backendu (jen Admin level 2); v „Záloha dat“ zůstala jen kompletní záloha (Export/Import). Auto záloha backendu běží jen pro Admin level 2 a má nastavitelný interval (vypnuto / denně / 3 dny / týdně / 2 týdny / měsíčně; výchozí týdně). Opraveno zdvojení řádku se stavem zálohy' }
+            { admin: true, text: 'Záloha dat ze Sinator backendu přesunuta z Nastavení → Záloha dat do Admin → 🧩 Záloha backendu (jen Admin level 2); v „Záloha dat“ zůstala jen kompletní záloha (Export/Import). Auto záloha backendu běží jen pro Admin level 2 a má nastavitelný interval (vypnuto / denně / 3 dny / týdně / 2 týdny / měsíčně; výchozí týdně). Záloha se řídí kalendářními dny — proběhne při prvním otevření appky v den, kdy interval uplyne (na hodině nezáleží). Opraveno zdvojení řádku se stavem zálohy' }
         ] },
         { version: '2026-11-07d', date: '7. 11. 2026', items: [
             { admin: true, text: 'Admin → 📊 Zatížení serveru (jen Admin level 2) — ukazatele spotřeby z Vercelu za běžné fakturační období (přenos dat, funkce, buildy…); vyžaduje nasazenou funkci api/vercel-usage a proměnnou VERCEL_TOKEN' },
@@ -21229,6 +21229,8 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             _sinBkSay('✅ Záloha stažena.\n' + _sinBkSummary(d));
         } catch (e) { _sinBkSay('❌ ' + ((e && e.message) || e)); }
     }
+    // Číslo kalendářního dne (místní čas) — záloha se řídí dny, na hodině nezáleží
+    function _sinBkDay(ts) { const d = new Date(ts); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000); }
     // Interval auto zálohy ve dnech (0 = vypnuto, výchozí 7 = týdně — beze změny pro stávající uživatele)
     function sinBkGetInterval() {
         let v; try { v = localStorage.getItem('sinator_bk_interval_days'); } catch (e) {}
@@ -21247,7 +21249,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         try { if (!myBackendReady()) return false; } catch (e) { return false; }
         const last = Number(localStorage.getItem('sinator_bk_auto_ts') || 0);
         const _ivDays = sinBkGetInterval();
-        if (!force && (_ivDays === 0 || Date.now() - last < _ivDays * 24 * 3600 * 1000)) return false;
+        if (!force && (_ivDays === 0 || (last && _sinBkDay(Date.now()) - _sinBkDay(last) < _ivDays))) return false;   // první otevření appky v den, kdy interval uplyne
         window._sinBkBusy = true;
         try {
             const d = await _sinBkCollect(force ? _sinBkSay : null);
@@ -21261,7 +21263,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 return false;
             }
             localStorage.removeItem('sinator_bk_auto_warn');
-            if (latest && Date.now() - latest.ts >= 6 * 24 * 3600 * 1000) await _sinBkPut('prev', latest);
+            if (latest && _sinBkDay(Date.now()) - _sinBkDay(latest.ts) >= 6) await _sinBkPut('prev', latest);
             await _sinBkPut('latest', { ts: Date.now(), total, data: d });
             sinBkRefreshInfo();
             return true;
@@ -21282,7 +21284,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             if (pv) t += `\n🕰️ Starší kopie: ${f(pv)} (${pv.total} záznamů)`;
             const _iv = sinBkGetInterval();
             if (_iv === 0) t += '\n⏸️ Auto záloha je vypnutá.';
-            else { const lastTs = Number(localStorage.getItem('sinator_bk_auto_ts') || 0); t += '\n⏱️ Další automatická záloha: ' + (lastTs ? (lastTs + _iv * 86400000 <= Date.now() ? 'při nejbližším spuštění appky' : new Date(lastTs + _iv * 86400000).toLocaleString('cs-CZ')) : 'při nejbližším spuštění appky') + ' (appka musí být otevřená)'; }
+            else { const lastTs = Number(localStorage.getItem('sinator_bk_auto_ts') || 0); const nd = lastTs ? new Date(new Date(lastTs).getFullYear(), new Date(lastTs).getMonth(), new Date(lastTs).getDate() + _iv) : null; t += '\n⏱️ Další automatická záloha: ' + ((!nd || _sinBkDay(nd.getTime()) <= _sinBkDay(Date.now())) ? 'při nejbližším otevření appky' : nd.toLocaleDateString('cs-CZ') + ' (při prvním otevření appky v ten den)'); }
             const _sel = document.getElementById('sinBkInterval'); if (_sel) _sel.value = String(_iv);
             if (localStorage.getItem('sinator_bk_auto_warn')) t += '\n⚠️ Poslední kontrola: backend vracel podezřele málo dat.';
             if (!keep) _sinBkSay(t);
