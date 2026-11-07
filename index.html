@@ -2392,9 +2392,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     </label>
                 </div>
             </div>
-            <div class="settings-section" id="sinBkSection" style="margin-top:14px;">
+            <div class="settings-section" id="sinBkSection" style="display:none;background:rgba(96,144,255,0.06);border:1px solid rgba(96,144,255,0.25);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label">🧩 Záloha dat ze Sinator backendu</span>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">Watchlist, historie (filmy i epizody), hodnocení, rozkoukané a vlastní seznamy z backendu. Appka si je 1× týdně sama uloží do telefonu (poslední + předchozí kopie). Pro jistotu si je občas stáhni i do souboru.</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">Watchlist, historie (filmy i epizody), hodnocení, rozkoukané a vlastní seznamy z backendu. Appka si je sama uloží (interval nastavíš níže) do telefonu (poslední + předchozí kopie). Pro jistotu si je občas stáhni i do souboru.</div>
                 <div class="settings-actions" style="flex-wrap:wrap;gap:6px;">
                     <button class="settings-btn-small" onclick="sinBkExportFile()">📤 Stáhnout do souboru</button>
                     <label class="settings-btn-small" style="cursor:pointer;">📥 Obnovit ze souboru
@@ -2403,6 +2403,17 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     <button class="settings-btn-small" onclick="sinBkBackupNow()">🔄 Zálohovat teď</button>
                     <button class="settings-btn-small" onclick="sinBkRestoreLocal('latest')">📲 Obnovit z auto zálohy</button>
                     <button class="settings-btn-small" onclick="sinBkRestoreLocal('prev')">🕰️ Obnovit ze starší</button>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:0.8rem;flex-wrap:wrap;">
+                    <span>⏱️ Auto záloha:</span>
+                    <select id="sinBkInterval" onchange="sinBkSetInterval(this.value)" style="flex:1;min-width:150px;padding:8px 10px;border-radius:10px;border:1px solid #333;background:#1c1c1c;color:#fff;font-size:0.85rem;">
+                        <option value="0">Vypnuto</option>
+                        <option value="1">Každý den</option>
+                        <option value="3">Každé 3 dny</option>
+                        <option value="7">Jednou týdně</option>
+                        <option value="14">Jednou za 2 týdny</option>
+                        <option value="30">Jednou měsíčně</option>
+                    </select>
                 </div>
                 <div id="sinBkStatus" style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;line-height:1.5;white-space:pre-line;"></div>
             </div>
@@ -7853,6 +7864,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-08', date: '8. 11. 2026', items: [
+            { admin: true, text: 'Záloha dat ze Sinator backendu přesunuta z Nastavení → Záloha dat do Admin → 🧩 Záloha backendu (jen Admin level 2); v „Záloha dat“ zůstala jen kompletní záloha (Export/Import). Auto záloha backendu běží jen pro Admin level 2 a má nastavitelný interval (vypnuto / denně / 3 dny / týdně / 2 týdny / měsíčně; výchozí týdně). Opraveno zdvojení řádku se stavem zálohy' }
+        ] },
         { version: '2026-11-07d', date: '7. 11. 2026', items: [
             { admin: true, text: 'Admin → 📊 Zatížení serveru (jen Admin level 2) — ukazatele spotřeby z Vercelu za běžné fakturační období (přenos dat, funkce, buildy…); vyžaduje nasazenou funkci api/vercel-usage a proměnnou VERCEL_TOKEN' },
             { admin: true, text: 'Admin → 🐙 GitHub repozitář (jen Admin level 2) — rychlé odkazy na repozitář, commity a Actions' }
@@ -21215,11 +21229,25 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             _sinBkSay('✅ Záloha stažena.\n' + _sinBkSummary(d));
         } catch (e) { _sinBkSay('❌ ' + ((e && e.message) || e)); }
     }
+    // Interval auto zálohy ve dnech (0 = vypnuto, výchozí 7 = týdně — beze změny pro stávající uživatele)
+    function sinBkGetInterval() {
+        let v; try { v = localStorage.getItem('sinator_bk_interval_days'); } catch (e) {}
+        if (v == null || v === '') return 7;
+        v = Number(v); return [0, 1, 3, 7, 14, 30].indexOf(v) >= 0 ? v : 7;
+    }
+    function sinBkSetInterval(v) {
+        v = Number(v); if ([0, 1, 3, 7, 14, 30].indexOf(v) < 0) v = 7;
+        try { localStorage.setItem('sinator_bk_interval_days', String(v)); } catch (e) {}
+        if (v > 0) { try { sinBkAuto(false); } catch (e) {} }
+        sinBkRefreshInfo();
+    }
     async function sinBkAuto(force) {
         if (window._sinBkBusy) return false;
+        if (!(typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2())) return false;   // backend používá jen Admin level 2
         try { if (!myBackendReady()) return false; } catch (e) { return false; }
         const last = Number(localStorage.getItem('sinator_bk_auto_ts') || 0);
-        if (!force && Date.now() - last < 7 * 24 * 3600 * 1000) return false;
+        const _ivDays = sinBkGetInterval();
+        if (!force && (_ivDays === 0 || Date.now() - last < _ivDays * 24 * 3600 * 1000)) return false;
         window._sinBkBusy = true;
         try {
             const d = await _sinBkCollect(force ? _sinBkSay : null);
@@ -21252,9 +21280,13 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
             const f = x => new Date(x.ts).toLocaleString('cs-CZ');
             let t = l ? `📲 Poslední auto záloha: ${f(l)} (${l.total} záznamů)` : '📲 Auto záloha zatím neproběhla.';
             if (pv) t += `\n🕰️ Starší kopie: ${f(pv)} (${pv.total} záznamů)`;
+            const _iv = sinBkGetInterval();
+            if (_iv === 0) t += '\n⏸️ Auto záloha je vypnutá.';
+            else { const lastTs = Number(localStorage.getItem('sinator_bk_auto_ts') || 0); t += '\n⏱️ Další automatická záloha: ' + (lastTs ? (lastTs + _iv * 86400000 <= Date.now() ? 'při nejbližším spuštění appky' : new Date(lastTs + _iv * 86400000).toLocaleString('cs-CZ')) : 'při nejbližším spuštění appky') + ' (appka musí být otevřená)'; }
+            const _sel = document.getElementById('sinBkInterval'); if (_sel) _sel.value = String(_iv);
             if (localStorage.getItem('sinator_bk_auto_warn')) t += '\n⚠️ Poslední kontrola: backend vracel podezřele málo dat.';
             if (!keep) _sinBkSay(t);
-            else { const el = document.getElementById('sinBkStatus'); if (el) el.textContent += '\n' + t; }
+            else { const el = document.getElementById('sinBkStatus'); if (el) { const first = (el.textContent || '').split('\n')[0]; el.textContent = (/^[✅❌⚠]/.test(first) ? first + '\n' : '') + t; } }
         } catch (e) {}
     }
     // Zapíše do backendu jen to, co tam ještě není.
@@ -21331,6 +21363,10 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     }
     window.sinBkExportFile = sinBkExportFile; window.sinBkRestoreFile = sinBkRestoreFile; window.sinBkRestoreLocal = sinBkRestoreLocal;
     window.sinBkBackupNow = sinBkBackupNow; window.sinBkAuto = sinBkAuto; window.sinBkRefreshInfo = sinBkRefreshInfo;
+    window.sinBkSetInterval = sinBkSetInterval; window.sinBkGetInterval = sinBkGetInterval;
+    // Kontrola i při dlouho otevřené appce (hodinově a po návratu do appky) — sinBkAuto sama hlídá interval
+    setInterval(() => { try { sinBkAuto(false); } catch (e) {} }, 3600 * 1000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { try { sinBkAuto(false); } catch (e) {} } });
     setTimeout(() => { try { sinBkAuto(false); } catch (e) {} }, 25000);
     setTimeout(() => { try { sinBkRefreshInfo(); } catch (e) {} }, 2500);
 
@@ -49886,6 +49922,8 @@ function updateAdminStatus() {
   if (srvLoadBox) srvLoadBox.style.display = isLvl2 ? 'block' : 'none';
   const gitBox = document.getElementById('githubRepoSettingsBox');
   if (gitBox) gitBox.style.display = isLvl2 ? 'block' : 'none';
+  const bkBox = document.getElementById('sinBkSection');
+  if (bkBox) bkBox.style.display = isLvl2 ? 'block' : 'none';
   // Audioknihy / E-knihy (menu TV / Rádio) — jen Admin level 2
   const abcBtn = document.getElementById('tvRadioAbcBtn'); if (abcBtn) abcBtn.style.display = isLvl2 ? '' : 'none';
 }
@@ -53584,7 +53622,8 @@ window.addEventListener('load', function() {
       {key:'adBroken', icon:'🚫', name:'Nefunkční TV streamy',    c:'#f87171', sub:'Sdílené značení pro všechny', els:[{id:'tvBrokenSettingsBox'}], hideIfHidden:true},
       {key:'adIptv',   icon:'📡', name:'Správa IPTV kanálů',      c:'#60a5fa', sub:'Kanály a kategorie', els:[{id:'tvChannelAdminSettingsBox'}], hideIfHidden:true},
       {key:'adLoad',   icon:'📊', name:'Zatížení serveru',        c:'#a78bfa', sub:'Vercel: přenos dat, funkce, buildy', els:[{id:'serverLoadSettingsBox'}], hideIfHidden:true, pre:function(){ if(window.serverLoadRefresh) window.serverLoadRefresh(); }},
-      {key:'adGit',    icon:'🐙', name:'GitHub repozitář',        c:'#e6edf3', sub:'Kód, commity, Actions', els:[{id:'githubRepoSettingsBox'}], hideIfHidden:true}]},
+      {key:'adGit',    icon:'🐙', name:'GitHub repozitář',        c:'#e6edf3', sub:'Kód, commity, Actions', els:[{id:'githubRepoSettingsBox'}], hideIfHidden:true},
+      {key:'adBackup', icon:'🧩', name:'Záloha backendu',        c:'#6090ff', sub:'Sinator backend: auto záloha a obnova', els:[{id:'sinBkSection'}], hideIfHidden:true, pre:function(){ if(window.sinBkRefreshInfo) window.sinBkRefreshInfo(); }}]},
     ai:{container:'settingsSubtabContentAi', kids:[
       {key:'aiGemini', icon:'🤖', name:'Gemini',     c:'#a78bfa', sub:function(){ return _t('geminiStatusText','API klíč pro AI vyhledávání'); },     els:[{label:'Gemini'}]},
       {key:'aiGroq',   icon:'⚡', name:'Groq',       c:'#fbbf24', sub:function(){ return _t('groqStatusText','Rychlý fallback'); },                    els:[{label:'Groq'}]},
