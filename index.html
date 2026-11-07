@@ -1902,6 +1902,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             <div class="settings-section">
                 <span class="settings-label" style="color:#6090ff;">🧩 Sinator backend</span>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Vlastní náhrada za Trakt — watchlist, seznamy, hodnocení, historie.</div>
+                <input type="url" id="myBackendUrlInput" placeholder="Adresa backendu (prázdné = výchozí), např. https://muj-backend.vercel.app" style="width:100%;margin-bottom:8px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.8rem;">
                 <input type="password" id="myBackendKeyInput" placeholder="API_SECRET" style="width:100%;margin-bottom:8px;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;">
                 <div class="settings-actions">
                     <button class="settings-btn-small show-key-btn apikey-lvl2-btn" style="display:none;" onclick="toggleMyBackendKeyVisibility()">👁️ Zobrazit</button>
@@ -1956,6 +1957,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     <button class="settings-btn-small settings-btn-remove" onclick="disconnectHistra()">❌ Odpojit</button>
                 </div>
                 <label style="display:flex;align-items:center;gap:10px;margin:10px 0 2px;font-size:0.8rem;cursor:pointer;"><input type="checkbox" id="histraMirrorChk" onchange="toggleHistraMirror(this.checked)" style="width:18px;height:18px;"><span>📤 Zrcadlit do Histry watchlist a odebírání ze seznamů (přidání do seznamu se zeptá)</span></label>
+                <div style="margin:10px 0 2px;">
+                    <label for="histraIntervalSel" style="display:block;font-size:0.8rem;margin-bottom:4px;">⏱️ Automatický sync Histry</label>
+                    <select id="histraIntervalSel" onchange="setHistraInterval(this.value)" style="width:100%;padding:9px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.85rem;">
+                        <option value="daily">Jednou denně (po 12:00)</option>
+                        <option value="3d">Jednou za 3 dny</option>
+                        <option value="weekly">Jednou týdně</option>
+                        <option value="manual">Jen ručně (tlačítko Synchronizovat nyní)</option>
+                    </select>
+                    <div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;line-height:1.4;">Delší interval šetří Vercel i Redis. Ruční tlačítko funguje vždy a hned.</div>
+                </div>
                 <div class="settings-actions" style="margin-top:8px;">
                     <button class="settings-btn-small" id="histraSyncBtn" style="width:100%;border-color:#8b5cf6;color:#8b5cf6;" onclick="syncFromHistra(this)">🔄 Synchronizovat nyní</button>
                 </div>
@@ -2978,7 +2989,18 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ── Vlastní backend (náhrada za Trakt, viz sinator-backend) ─────────────
     // Adresa je napevno (stejný princip jako TRAKT_BASE) — uživatel zadává jen klíč.
     const MY_BACKEND_BASE = 'https://sinator-backend.vercel.app/api';
-    function myBackendBase() { return MY_BACKEND_BASE; }
+    // Adresa backendu je výchozí (MY_BACKEND_BASE), ale jde přepsat v Nastavení → Sinator backend (state.myBackend.url) —
+    // při přesunu backendu na jiný účet/hosting tak netřeba měnit kód.
+    function _myNormBackendUrl(u) {
+        u = String(u || '').trim().replace(/\/+$/, '');
+        if (!u) return '';
+        if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+        if (!/\/api$/i.test(u)) u += '/api';
+        return u;
+    }
+    function myBackendBase() { return _myNormBackendUrl(state.myBackend && state.myBackend.url) || MY_BACKEND_BASE; }
+    window.myBackendBase = myBackendBase;
+    window._myBackendBaseFromData = function (d) { return _myNormBackendUrl(d && d.url) || MY_BACKEND_BASE; };
     function myBackendKey() { return (state.myBackend && state.myBackend.key) || ''; }
     function myHeaders() { return { 'Content-Type': 'application/json', 'x-api-key': myBackendKey() }; }
     function myBackendReady() { return !!myBackendKey(); }
@@ -5388,6 +5410,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     function initHistraSettingsInputs() {
         if ($('histraTokenInput')) $('histraTokenInput').value = histraToken();
         if ($('histraMirrorChk')) $('histraMirrorChk').checked = _store.getItem(HISTRA_MIRROR_KEY) !== '0';
+        if ($('histraIntervalSel')) $('histraIntervalSel').value = (typeof histraGetInterval === 'function') ? histraGetInterval() : 'daily';
         updateHistraStatus();
         updateHistraUndoBtn();
     }
@@ -6169,14 +6192,28 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // automaticky spouští jen 1× denně — první spuštění appky po 12:00 místního času.
     // Sinator → Histra se zrcadlí hned při každém zápisu (histraMirrorAdd/Remove), takže
     // není co dohánět. Ruční tlačítko „Synchronizovat“ funguje pořád a hned.
+    const HISTRA_INTERVAL_KEY = 'sinator_histra_interval';
+    const HISTRA_INTERVALS = { daily: 0, '3d': 3 * 86400000, weekly: 7 * 86400000, manual: -1 };
+    function histraGetInterval() {
+        try { const v = _store.getItem(HISTRA_INTERVAL_KEY) || 'daily'; return (v in HISTRA_INTERVALS) ? v : 'daily'; } catch (e) { return 'daily'; }
+    }
+    window.histraGetInterval = histraGetInterval;
+    window.setHistraInterval = function(v) {
+        if (!(v in HISTRA_INTERVALS)) v = 'daily';
+        try { _store.setItem(HISTRA_INTERVAL_KEY, v); } catch (e) {}
+        try { if (typeof _favToast === 'function') _favToast(v === 'manual' ? '⏱️ Auto-sync Histry vypnut — jen ručně' : '⏱️ Auto-sync Histry nastaven'); } catch (e) {}
+    };
     function _histraDailyDue() {
         try {
+            const mode = histraGetInterval();
+            if (mode === 'manual') return false; // jen ruční tlačítko
+            const failedAt = parseInt(_store.getItem('sinator_histra_daily_fail') || '0', 10);
+            if (Date.now() - failedAt < 30 * 60 * 1000) return false; // po chybě zkusit až za 30 min
+            const last = parseInt(_store.getItem('sinator_histra_last_daily') || '0', 10);
+            if (mode !== 'daily') return (Date.now() - last) >= HISTRA_INTERVALS[mode];
             const now = new Date();
             const noon = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0).getTime();
             const slot = now.getTime() >= noon ? noon : noon - 86400000; // poslední uplynulé poledne
-            const last = parseInt(_store.getItem('sinator_histra_last_daily') || '0', 10);
-            const failedAt = parseInt(_store.getItem('sinator_histra_daily_fail') || '0', 10);
-            if (Date.now() - failedAt < 30 * 60 * 1000) return false; // po chybě zkusit až za 30 min
             return last < slot;
         } catch (e) { return false; }
     }
@@ -6719,11 +6756,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         const key = ($('myBackendKeyInput')?.value || '').trim();
         const statusEl = $('myBackendStatus');
         if (!key) { if (statusEl) statusEl.innerHTML = '<span style="color:#e07a6f;">⚠️ Vyplň klíč.</span>'; return; }
-        state.myBackend = { key };
+        const _url = ($('myBackendUrlInput')?.value || '').trim();
+        state.myBackend = _url ? { key, url: _url } : { key };
         _store.setItem('sinator_mybackend', JSON.stringify(state.myBackend));
+        try { myApiCacheClear(); } catch (e) {}
         if (statusEl) statusEl.innerHTML = 'Testuju…';
         try {
-            const res = await fetchWithRetry(`${MY_BACKEND_BASE}/health`, { headers: myHeaders() });
+            const res = await fetchWithRetry(`${myBackendBase()}/health`, { headers: myHeaders() });
             const data = await res.json();
             if (res.ok && data.ok) {
                 if (statusEl) statusEl.innerHTML = '<span style="color:#1db954;">✅ Připojeno. Redis: ' + data.redis + '</span>';
@@ -6740,11 +6779,13 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         state.myBackend = {};
         _store.removeItem('sinator_mybackend');
         if ($('myBackendKeyInput')) $('myBackendKeyInput').value = '';
+        if ($('myBackendUrlInput')) $('myBackendUrlInput').value = '';
         if ($('myBackendStatus')) $('myBackendStatus').innerHTML = '';
         if (typeof syncConnectServiceDots === 'function') syncConnectServiceDots();
     };
     function initMyBackendSettingsInputs() {
         if ($('myBackendKeyInput')) $('myBackendKeyInput').value = myBackendKey();
+        if ($('myBackendUrlInput')) $('myBackendUrlInput').value = (state.myBackend && state.myBackend.url) || '';
     }
 
     // Paralelní zpracování pole položek s limitem souběžných requestů (stejný
@@ -7558,6 +7599,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-07a', date: '7. 11. 2026', items: [
+            '⏱️ Nastavení → Histra: nový přepínač automatického syncu — jednou denně, jednou za 3 dny, jednou týdně, nebo jen ručně (šetří Vercel i Redis); tlačítko „Synchronizovat nyní“ funguje vždy',
+        ] },
         { version: '2026-11-06a', date: '6. 11. 2026', items: [
             '⚡ Rychlejší návraty — stránky, které jsi už viděl, se při návratu (tlačítko zpět, opakované kliknutí) zobrazí z paměti, bez nového načítání',
             '✨ Plynulejší přechody — nové stránky jemně najíždějí a seznamy se objevují postupně, žádné skákání obsahu',
@@ -48331,7 +48375,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var l = window.location;
             if (l && (l.protocol === 'https:' || l.protocol === 'http:')) return l.origin + (l.pathname || '/').replace(/index\.html$/, '');
         } catch (e) {}
-        return 'https://projekt-sinatorsearch.vercel.app/';
+        return 'https://sinator.vercel.app/';
     };
     // Odkaz s klíčem: jen když je zaškrtnuto, jsi Admin level 2 a máš TMDB klíč. Klíč je za # (nejde na server).
     window._inviteKey = function() {
@@ -51525,7 +51569,7 @@ async function _statsFetchMySinator(_s) {
   let myData = {};
   try { myData = JSON.parse(_s.getItem('sinator_mybackend') || '{}'); } catch(e) { myData = {}; }
   if (!myData.key) return null;
-  const MY_BACKEND_STATS_BASE = 'https://sinator-backend.vercel.app/api';
+  const MY_BACKEND_STATS_BASE = (window._myBackendBaseFromData ? window._myBackendBaseFromData(myData) : 'https://sinator-backend.vercel.app/api');
   const headers = { 'Content-Type': 'application/json', 'x-api-key': myData.key };
   const countHistory = async (type) => {
     if (typeof window._myHistoryGetAllShared === 'function') { const r = await window._myHistoryGetAllShared(type); return Array.isArray(r) ? r.length : 0; }
@@ -51590,7 +51634,7 @@ function calShowGridView() {
 async function _calFetchMySinatorHistory() {
   let myData = {}; try { myData = JSON.parse((window._store || localStorage).getItem('sinator_mybackend') || '{}'); } catch (e) {}
   if (!myData.key) return null;
-  const BASE_URL = 'https://sinator-backend.vercel.app/api';
+  const BASE_URL = (window._myBackendBaseFromData ? window._myBackendBaseFromData(myData) : 'https://sinator-backend.vercel.app/api');
   const headers = { 'Content-Type': 'application/json', 'x-api-key': myData.key };
   const fetchAll = async (type) => { const r = await window._myHistoryGetAllShared(type); return Array.isArray(r) ? r : []; };
   try {
@@ -52846,7 +52890,7 @@ window.KinoList = (function() {
     // 1) serverová funkce /api/yt — jen platné JSON s položkami
     const apis = [];
     if (/^https?:$/.test(location.protocol)) apis.push('/api/yt');
-    apis.push('https://sinator-backend.vercel.app/api/yt', 'https://projekt-sinatorsearch.vercel.app/api/yt');
+    apis.push((window.myBackendBase ? window.myBackendBase() : 'https://sinator-backend.vercel.app/api') + '/yt', 'https://sinator.vercel.app/api/yt');
     for (const base of apis) {
       const tag = 'api ' + (base.charAt(0) === '/' ? 'tato doména' : base.replace(/^https?:\/\//, '').split('/')[0].replace('.vercel.app', ''));
       try {
