@@ -1971,8 +1971,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     <button class="settings-btn-small" id="histraSyncBtn" style="width:100%;border-color:#8b5cf6;color:#8b5cf6;" onclick="syncFromHistra(this)">🔄 Synchronizovat nyní</button>
                 </div>
                 <div class="settings-actions" style="margin-top:8px;">
-                    <button class="settings-btn-small" id="histraWlExportBtn" style="width:100%;border-color:#8b5cf6;color:#a78bfa;" onclick="exportHistraWatchlistJson(this)">📥 Stáhnout watchlist z Histry (JSON)</button>
-                    <button class="settings-btn-small" style="width:100%;margin-top:6px;border-color:#4caf50;color:#4caf50;" onclick="document.getElementById('histraWlImportFile').click()">📤 Nahrát JSON watchlistu do Sinatoru</button>
+                    <button class="settings-btn-small" id="histraWlExportBtn" style="width:100%;border-color:#8b5cf6;color:#a78bfa;" onclick="exportHistraWatchlistJson(this)">📥 Stáhnout vše z Histry (JSON)</button>
+                    <button class="settings-btn-small" style="width:100%;margin-top:6px;border-color:#4caf50;color:#4caf50;" onclick="document.getElementById('histraWlImportFile').click()">📤 Nahrát JSON do Sinatoru</button>
                     <input type="file" id="histraWlImportFile" accept=".json,application/json" style="display:none;" onchange="importHistraWatchlistJson(this.files && this.files[0]); this.value='';">
                     <div id="histraWlJsonStatus" style="font-size:0.75rem;margin-top:6px;white-space:pre-wrap;line-height:1.5;"></div>
                 </div>
@@ -6566,18 +6566,87 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 if (seen.has(key)) continue;
                 seen.add(key); out.push(it);
             }
-            if (!out.length) {
+            // Vlastní seznamy (složky) z Histry
+            const listsOut = []; let listsFail = 0;
+            try {
+                say('Stahuji seznamy z Histry…');
+                const { endpoint: lep, lists: hLists } = await histraFetchLists();
+                for (const hl of (lep ? hLists : [])) {
+                    const name = String(hl.name || hl.title || '').trim();
+                    const hid = hl.id ?? hl.list_id ?? hl.slug ?? hl.uuid;
+                    if (!name || hid == null) continue;
+                    say(`Stahuji seznam „${name}“…`);
+                    let raw = [];
+                    try { raw = await histraFetchAllPaged(`/api/v1/lists/${hid}?extended=full`, 100, 30, null, true); } catch (e) {}
+                    if (!raw.length) { try { raw = await histraFetchListItems(lep, hl); } catch (e) {} }
+                    const seenL = new Set(), li = [];
+                    for (const r of raw) {
+                        const pm = histraParseMediaEntry(r);
+                        if (!pm || !pm.tmdb) continue;
+                        const kk = pm.type + '_' + pm.tmdb;
+                        if (seenL.has(kk)) continue;
+                        seenL.add(kk);
+                        li.push({ id: pm.tmdb, type: (pm.type === 'tv' || pm.type === 'show' || pm.type === 'shows') ? 'tv' : 'movie', title: pm.title || null, year: pm.year || null });
+                    }
+                    if (!li.length && raw.length) listsFail++;
+                    listsOut.push({ name, items: li });
+                }
+            } catch (e) { listsFail++; }
+            // Historie sledování (filmy + epizody se skutečným časem zhlédnutí)
+            const hisMovies = [], hisEpisodes = []; let hisFail = null;
+            try {
+                say('Stahuji historii z Histry…');
+                const rawHis = await histraFetchHistoryRaw(n => say(`Stahuji historii z Histry… ${n} záznamů`));
+                const seenH = new Set();
+                for (const r of rawHis) {
+                    const q = histraParseHistoryEntry(r);
+                    if (!q || !q.tmdb) continue;
+                    if (q.kind === 'episode') {
+                        const k = `e${q.tmdb}_${q.season}_${q.number}_${q.watchedAt}`;
+                        if (seenH.has(k)) continue; seenH.add(k);
+                        hisEpisodes.push({ id: q.tmdb, season: q.season, episode: q.number, watched_at: q.watchedAt, title: q.title || null });
+                    } else {
+                        const k = `m${q.tmdb}_${q.watchedAt}`;
+                        if (seenH.has(k)) continue; seenH.add(k);
+                        hisMovies.push({ id: q.tmdb, watched_at: q.watchedAt, title: q.title || null, year: q.year ? parseInt(q.year, 10) : null });
+                    }
+                }
+            } catch (e) { hisFail = e; }
+            // Hodnocení (Histra je nemusí nabízet — pak zůstane prázdné)
+            const ratOut = []; let ratFail = null;
+            try {
+                say('Stahuji hodnocení z Histry…');
+                const rmap = await histraRatingsAll(true);
+                Object.keys(rmap).forEach(k => { const i = k.indexOf('_'); ratOut.push({ type: k.slice(0, i), id: parseInt(k.slice(i + 1), 10), rating: rmap[k] }); });
+            } catch (e) { ratFail = e; }
+            // Rozkoukané
+            const progOut = []; let progFail = null;
+            try {
+                say('Stahuji rozkoukané z Histry…');
+                for (const t of ['movie', 'tv']) {
+                    const rawP = await histraProgressRaw(t === 'tv' ? 'tv' : 'movie').catch(() => []);
+                    for (const e of rawP) {
+                        const m = histraMapProgress(e, t); if (!m) continue;
+                        let pr = e.progress != null ? e.progress : (e.percent != null ? e.percent : (e.progress_percent != null ? e.progress_percent : null));
+                        if (pr && typeof pr === 'object') pr = pr.percent != null ? pr.percent : pr.value;
+                        pr = Number(pr);
+                        const ep = e.episode && typeof e.episode === 'object' ? e.episode : e;
+                        progOut.push({ id: m.id, type: m.type, title: m.title || null, progress: isFinite(pr) && pr > 0 ? pr : null, season: ep.season != null ? ep.season : null, episode: ep.number != null ? ep.number : (ep.episode != null && typeof ep.episode !== 'object' ? ep.episode : null) });
+                    }
+                }
+            } catch (e) { progFail = e; }
+            if (!out.length && !listsOut.length && !hisMovies.length && !hisEpisodes.length && !ratOut.length && !progOut.length) {
                 say(items.length ? `⚠️ Histra vrátila ${items.length} položek, ale žádná nemá TMDB id (přeskočeno ${skipped}). Ukázka první:\n${JSON.stringify(items[0]).slice(0, 400)}` : `⚠️ Watchlist na Histře je prázdný (endpoint ${base}).`, '#f5a623');
                 return;
             }
-            const payload = { format: 'sinator-histra-watchlist-v1', exported_at: new Date().toISOString(), source: 'histra.net', watchlist: out };
+            const payload = { format: 'sinator-histra-watchlist-v1', exported_at: new Date().toISOString(), source: 'histra.net', watchlist: out, lists: listsOut, history: { movies: hisMovies, episodes: hisEpisodes }, ratings: ratOut, progress: progOut };
             const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = `histra-watchlist-${new Date().toISOString().slice(0, 10)}.json`;
+            a.href = url; a.download = `histra-export-${new Date().toISOString().slice(0, 10)}.json`;
             document.body.appendChild(a); a.click();
             setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
-            say(`✅ Staženo ${out.length} položek (filmy: ${out.filter(x => x.type === 'movie').length}, seriály: ${out.filter(x => x.type === 'tv').length})${skipped ? `, přeskočeno bez TMDB id: ${skipped}` : ''}. Teď je nahraj tlačítkem „Nahrát JSON watchlistu do Sinatoru“.`, '#1db954');
+            say(`✅ Staženo — watchlist: ${out.length}, seznamy: ${listsOut.length} (${listsOut.reduce((a, l) => a + l.items.length, 0)} položek), historie: ${hisMovies.length} filmů + ${hisEpisodes.length} epizod${hisFail ? ' (⚠️ ' + _hErr(hisFail) + ')' : ''}, hodnocení: ${ratOut.length}${ratFail && !ratOut.length ? ' (Histra je zřejmě nenabízí)' : ''}, rozkoukané: ${progOut.length}${progFail ? ' (⚠️ ' + _hErr(progFail) + ')' : ''}${skipped ? `; watchlist bez TMDB id přeskočeno: ${skipped}` : ''}${listsFail ? `; u ${listsFail} seznamů se nepodařilo načíst položky` : ''}. Soubor nahraj tlačítkem „Nahrát JSON do Sinatoru“.`, '#1db954');
         } catch (e) {
             say('❌ ' + (e && e.message ? e.message : e), '#e07a6f');
         } finally { if (btnEl) btnEl.disabled = false; }
@@ -6600,11 +6669,93 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 seen.add(key);
                 items.push({ id, type: t, title: e.title || null, year: e.year || null, poster_path: e.poster_path || null });
             }
-            if (!items.length) { say('⚠️ V souboru nejsou žádné použitelné položky (chybí TMDB id).', '#f5a623'); return; }
-            say(`Nahrávám ${items.length} položek do Sinatoru…`);
-            await myImportChunked('watchlist', items, st, 'Watchlist');
-            try { window._myCacheClear && window._myCacheClear(); } catch (e) {}
-            say(`✅ Nahráno ${items.length} položek do Sinator watchlistu. Obnov záložku Watchlist.`, '#1db954');
+            const fileLists = (!Array.isArray(data) && Array.isArray(data.lists)) ? data.lists : [];
+            const fHis = (!Array.isArray(data) && data.history) || {};
+            const fRat = (!Array.isArray(data) && Array.isArray(data.ratings)) ? data.ratings : [];
+            const fProg = (!Array.isArray(data) && Array.isArray(data.progress)) ? data.progress : [];
+            const fHisM = Array.isArray(fHis.movies) ? fHis.movies : [], fHisE = Array.isArray(fHis.episodes) ? fHis.episodes : [];
+            if (!items.length && !fileLists.length && !fHisM.length && !fHisE.length && !fRat.length && !fProg.length) { say('⚠️ V souboru nejsou žádné použitelné položky (chybí TMDB id).', '#f5a623'); return; }
+            if (items.length) {
+                say(`Nahrávám watchlist (${items.length} položek)…`);
+                await myImportChunked('watchlist', items, st, 'Watchlist');
+            }
+            // Seznamy: existující název se přeskočí (stejné pravidlo jako u syncu), nové se založí
+            let created = 0, skippedLists = 0, listItems = 0;
+            if (fileLists.length) {
+                const have = new Set(((await myListsGet().catch(() => [])) || []).map(l => String(l.name || '').trim().toLocaleLowerCase('cs-CZ')));
+                for (const fl of fileLists) {
+                    const name = String(fl && fl.name || '').trim();
+                    if (!name) continue;
+                    const key = name.toLocaleLowerCase('cs-CZ');
+                    if (have.has(key)) { skippedLists++; continue; }
+                    have.add(key);
+                    const li = [], seenI = new Set();
+                    for (const e of (fl.items || [])) {
+                        const id = parseInt(e && e.id, 10); if (!id) continue;
+                        const t = (e.type === 'tv' || e.type === 'show' || e.type === 'shows') ? 'tv' : 'movie';
+                        if (seenI.has(t + '_' + id)) continue; seenI.add(t + '_' + id);
+                        li.push({ id, type: t });
+                    }
+                    if (!li.length) continue;
+                    say(`Zakládám seznam „${name}“ (${li.length} položek)…`);
+                    let listId = null;
+                    for (let k = 0; k < li.length; k += 300) {
+                        const resp = await myImportBatch('list', li.slice(k, k + 300), { name, listId });
+                        listId = resp && resp.listId;
+                    }
+                    if (listId) { created++; listItems += li.length; }
+                }
+            }
+            // Historie — bez duplicit proti tomu, co už v Sinatoru je (podle id + času zhlédnutí na minutu)
+            let hisAddedM = 0, hisAddedE = 0, hisDup = 0;
+            if (fHisM.length) {
+                say('Porovnávám historii filmů se Sinatorem…');
+                const have = new Set(((await myHistoryGetAll('movies', true).catch(() => [])) || []).map(x => `${x.id}_${Math.floor(Number(x.watched_at) / 60000)}`));
+                const add = [];
+                for (const e of fHisM) {
+                    const id = parseInt(e && e.id, 10), w = Number(e && e.watched_at); if (!id || !w) continue;
+                    const k = `${id}_${Math.floor(w / 60000)}`; if (have.has(k)) { hisDup++; continue; } have.add(k);
+                    add.push({ id, watched_at: w });
+                }
+                if (add.length) await myImportChunked('history-movies', add, st, 'Historie filmů');
+                hisAddedM = add.length;
+            }
+            if (fHisE.length) {
+                say('Porovnávám historii epizod se Sinatorem…');
+                const have = new Set(((await myHistoryGetAll('episodes', true).catch(() => [])) || []).map(x => `${x.id}_${x.season}_${x.episode}_${Math.floor(Number(x.watched_at) / 60000)}`));
+                const add = [];
+                for (const e of fHisE) {
+                    const id = parseInt(e && e.id, 10), w = Number(e && e.watched_at); if (!id || !w || e.season == null || e.episode == null) continue;
+                    const k = `${id}_${e.season}_${e.episode}_${Math.floor(w / 60000)}`; if (have.has(k)) { hisDup++; continue; } have.add(k);
+                    add.push({ id, season: e.season, episode: e.episode, watched_at: w });
+                }
+                if (add.length) await myImportChunked('history-episodes', add, st, 'Historie epizod');
+                hisAddedE = add.length;
+            }
+            // Hodnocení (přepíše hodnocení stejného titulu v Sinatoru)
+            let ratN = 0;
+            if (fRat.length) {
+                const rm = [], rs = [];
+                for (const e of fRat) { const id = parseInt(e && e.id, 10), r = Number(e && e.rating); if (!id || !(r > 0)) continue; const o = { id, rating: r, rated_at: Date.now() }; (e.type === 'tv' || e.type === 'show' ? rs : rm).push(o); }
+                if (rm.length) await myImportChunked('ratings-movies', rm, st, 'Hodnocení filmů');
+                if (rs.length) await myImportChunked('ratings-shows', rs, st, 'Hodnocení seriálů');
+                ratN = rm.length + rs.length;
+            }
+            // Rozkoukané (jen položky, u kterých Histra uvedla procento)
+            let progN = 0;
+            if (fProg.length) {
+                const pm = [], ps = [];
+                for (const e of fProg) {
+                    const id = parseInt(e && e.id, 10), pr = Number(e && e.progress); if (!id || !(pr > 0)) continue;
+                    if (e.type === 'tv') ps.push({ id, season: e.season != null ? e.season : null, episode: e.episode != null ? e.episode : null, progress: pr, paused_at: Date.now() });
+                    else pm.push({ id, progress: pr, paused_at: Date.now() });
+                }
+                if (pm.length) await myImportChunked('progress-movies', pm, st, 'Rozkoukané filmy');
+                if (ps.length) await myImportChunked('progress-shows', ps, st, 'Rozkoukané seriály');
+                progN = pm.length + ps.length;
+            }
+            try { Object.keys(_historyGetAllCache).forEach(k => delete _historyGetAllCache[k]); } catch (e) {}
+            say(`✅ Watchlist: ${items.length} položek. Historie: +${hisAddedM} filmů, +${hisAddedE} epizod${hisDup ? ` (${hisDup} už v Sinatoru bylo)` : ''}. Hodnocení: ${ratN}. Rozkoukané: ${progN}. Seznamy: založeno ${created} (${listItems} položek)${skippedLists ? `, přeskočeno ${skippedLists} (stejný název už v Sinatoru je)` : ''}. Obnov appku, ať se vše načte znovu.`, '#1db954');
         } catch (e) {
             say('❌ ' + (e && e.message ? e.message : e), '#e07a6f');
         }
@@ -7692,7 +7843,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-07b', date: '7. 11. 2026', items: [
-            '📥 Nastavení → Histra: tlačítko „Stáhnout watchlist z Histry (JSON)“ uloží watchlist z Histry do souboru a „Nahrát JSON watchlistu do Sinatoru“ ho přidá do Sinator watchlistu (jen přidává, nic nemaže a nezapisuje zpět do Histry)',
+            '📥 Nastavení → Histra: „Stáhnout vše z Histry (JSON)“ uloží watchlist, vlastní seznamy, historii, hodnocení a rozkoukané do jednoho souboru; „Nahrát JSON do Sinatoru“ je přidá do Sinatoru (historie bez duplicit, seznamy se stejným názvem se přeskočí, nic se nezapisuje zpět do Histry)',
         ] },
         { version: '2026-11-07a', date: '7. 11. 2026', items: [
             '⏱️ Nastavení → Histra: nový přepínač automatického syncu — jednou denně, jednou za 3 dny, jednou týdně, nebo jen ručně (šetří Vercel i Redis); tlačítko „Synchronizovat nyní“ funguje vždy',
