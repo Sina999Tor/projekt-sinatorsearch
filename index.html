@@ -2377,7 +2377,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             </div>
             <div class="settings-section" id="sinBkSection" style="margin-top:14px;">
                 <span class="settings-label">🧩 Záloha dat ze Sinator backendu</span>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">Watchlist, historie (filmy i epizody), hodnocení, rozkoukané a vlastní seznamy z backendu. Appka si je 1× denně sama uloží do telefonu (poslední + starší týdenní kopie). Pro jistotu si je občas stáhni i do souboru.</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">Watchlist, historie (filmy i epizody), hodnocení, rozkoukané a vlastní seznamy z backendu. Appka si je 1× týdně sama uloží do telefonu (poslední + předchozí kopie). Pro jistotu si je občas stáhni i do souboru.</div>
                 <div class="settings-actions" style="flex-wrap:wrap;gap:6px;">
                     <button class="settings-btn-small" onclick="sinBkExportFile()">📤 Stáhnout do souboru</button>
                     <label class="settings-btn-small" style="cursor:pointer;">📥 Obnovit ze souboru
@@ -20897,7 +20897,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
     }
 
     // ═══ Záloha dat ze Sinator backendu (watchlist, historie, hodnocení, rozkoukané, seznamy) ═══
-    // Automaticky 1× denně do IndexedDB (poslední + týdenní starší kopie), ručně do JSON souboru.
+    // Automaticky 1× týdně do IndexedDB (poslední + předchozí kopie), ručně do JSON souboru.
     // Obnova nic nenásobí: zapisuje jen to, co backend ještě nemá.
     const _SINBK_DB = 'sinator_backup_v1';
     function _sinBkIdb() { return new Promise((res, rej) => { const r = indexedDB.open(_SINBK_DB, 1); r.onupgradeneeded = () => r.result.createObjectStore('snap'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
@@ -20942,7 +20942,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         if (window._sinBkBusy) return false;
         try { if (!myBackendReady()) return false; } catch (e) { return false; }
         const last = Number(localStorage.getItem('sinator_bk_auto_ts') || 0);
-        if (!force && Date.now() - last < 24 * 3600 * 1000) return false;
+        if (!force && Date.now() - last < 7 * 24 * 3600 * 1000) return false;
         window._sinBkBusy = true;
         try {
             const d = await _sinBkCollect(force ? _sinBkSay : null);
@@ -20956,7 +20956,7 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
                 return false;
             }
             localStorage.removeItem('sinator_bk_auto_warn');
-            if (latest && Date.now() - latest.ts >= 7 * 24 * 3600 * 1000) await _sinBkPut('prev', latest);
+            if (latest && Date.now() - latest.ts >= 6 * 24 * 3600 * 1000) await _sinBkPut('prev', latest);
             await _sinBkPut('latest', { ts: Date.now(), total, data: d });
             sinBkRefreshInfo();
             return true;
