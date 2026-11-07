@@ -1971,6 +1971,12 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     <button class="settings-btn-small" id="histraSyncBtn" style="width:100%;border-color:#8b5cf6;color:#8b5cf6;" onclick="syncFromHistra(this)">🔄 Synchronizovat nyní</button>
                 </div>
                 <div class="settings-actions" style="margin-top:8px;">
+                    <button class="settings-btn-small" id="histraWlExportBtn" style="width:100%;border-color:#8b5cf6;color:#a78bfa;" onclick="exportHistraWatchlistJson(this)">📥 Stáhnout watchlist z Histry (JSON)</button>
+                    <button class="settings-btn-small" style="width:100%;margin-top:6px;border-color:#4caf50;color:#4caf50;" onclick="document.getElementById('histraWlImportFile').click()">📤 Nahrát JSON watchlistu do Sinatoru</button>
+                    <input type="file" id="histraWlImportFile" accept=".json,application/json" style="display:none;" onchange="importHistraWatchlistJson(this.files && this.files[0]); this.value='';">
+                    <div id="histraWlJsonStatus" style="font-size:0.75rem;margin-top:6px;white-space:pre-wrap;line-height:1.5;"></div>
+                </div>
+                <div class="settings-actions" style="margin-top:8px;">
                     <button class="settings-btn-small" id="histraUndoBtn" style="display:none;width:100%;border-color:#f5a623;color:#f5a623;" onclick="undoLastHistraSync(this)"></button>
                 </div>
                 <div class="settings-actions" style="margin-top:8px;">
@@ -6518,6 +6524,92 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         }
     }
 
+    // ── Histra watchlist → JSON soubor → ruční nahrání do Sinatoru ──
+    // Bez zápisu do Histry a bez zrcadlení zpět (nahrává se přes /import, ne přes myWatchlistAdd).
+    function _hWlParse(e) {
+        if (!e || typeof e !== 'object') return null;
+        const obj = e.movie || e.show || e.media || e.item || e.title_info || e;
+        const tmdb = histraExtractTmdb(obj) || histraExtractTmdb(e);
+        if (!tmdb) return null;
+        const k = String(e.type || e.kind || e.media_type || obj.type || obj.media_type || '').toLowerCase();
+        const isTv = ['show', 'tv', 'series', 'serial'].includes(k) || !!e.show || !!obj.first_air_date || obj.number_of_seasons != null;
+        const title = obj.title || obj.name || e.title || e.name || null;
+        const year = histraExtractYear(obj) || histraExtractYear(e) || null;
+        return { id: tmdb, type: isTv ? 'tv' : 'movie', title, year: year ? parseInt(year, 10) : null, poster_path: null };
+    }
+    async function _hWlFetchRaw(onProg) {
+        const bases = ['/api/v1/watchlist', '/api/v1/tracking/watchlist'];
+        let lastErr = null;
+        for (const b of bases) {
+            try {
+                const probe = await histraApi(`${b}?limit=100&offset=0`);
+                if (!histraUnwrapList(probe).length) return { items: [], base: b };
+                const all = await histraFetchAllPaged(b, 100, 100, onProg);
+                return { items: all, base: b };
+            } catch (e) { lastErr = e; }
+        }
+        throw lastErr || new Error('Endpoint watchlistu na Histře nenalezen.');
+    }
+    window.exportHistraWatchlistJson = async function(btnEl) {
+        const st = $('histraWlJsonStatus');
+        const say = (t, c) => { if (st) { st.style.color = c || ''; st.textContent = t; } };
+        if (!histraReady()) { alert('⚠️ Nejdřív nastav Histra token.'); return; }
+        if (btnEl) btnEl.disabled = true;
+        try {
+            say('Stahuji watchlist z Histry…');
+            const { items, base } = await _hWlFetchRaw((n, page) => say(`Stahuji watchlist z Histry… ${n} položek (strana ${page})`));
+            const seen = new Set(), out = []; let skipped = 0;
+            for (const e of items) {
+                const it = _hWlParse(e);
+                if (!it) { skipped++; continue; }
+                const key = it.type + '_' + it.id;
+                if (seen.has(key)) continue;
+                seen.add(key); out.push(it);
+            }
+            if (!out.length) {
+                say(items.length ? `⚠️ Histra vrátila ${items.length} položek, ale žádná nemá TMDB id (přeskočeno ${skipped}). Ukázka první:\n${JSON.stringify(items[0]).slice(0, 400)}` : `⚠️ Watchlist na Histře je prázdný (endpoint ${base}).`, '#f5a623');
+                return;
+            }
+            const payload = { format: 'sinator-histra-watchlist-v1', exported_at: new Date().toISOString(), source: 'histra.net', watchlist: out };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `histra-watchlist-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+            say(`✅ Staženo ${out.length} položek (filmy: ${out.filter(x => x.type === 'movie').length}, seriály: ${out.filter(x => x.type === 'tv').length})${skipped ? `, přeskočeno bez TMDB id: ${skipped}` : ''}. Teď je nahraj tlačítkem „Nahrát JSON watchlistu do Sinatoru“.`, '#1db954');
+        } catch (e) {
+            say('❌ ' + (e && e.message ? e.message : e), '#e07a6f');
+        } finally { if (btnEl) btnEl.disabled = false; }
+    };
+    window.importHistraWatchlistJson = async function(file) {
+        const st = $('histraWlJsonStatus');
+        const say = (t, c) => { if (st) { st.style.color = c || ''; st.textContent = t; } };
+        if (!file) return;
+        if (!myBackendReady()) { alert('⚠️ Nejdřív nastav a ulož Sinator backend (klíč).'); return; }
+        try {
+            const data = JSON.parse(await file.text());
+            const arr = Array.isArray(data) ? data : (data.watchlist || data.items || []);
+            const seen = new Set(), items = [];
+            for (const e of arr) {
+                const id = parseInt(e && (e.id != null ? e.id : histraExtractTmdb(e)), 10);
+                if (!id) continue;
+                const t = (e.type === 'tv' || e.type === 'show' || e.type === 'shows') ? 'tv' : 'movie';
+                const key = t + '_' + id;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                items.push({ id, type: t, title: e.title || null, year: e.year || null, poster_path: e.poster_path || null });
+            }
+            if (!items.length) { say('⚠️ V souboru nejsou žádné použitelné položky (chybí TMDB id).', '#f5a623'); return; }
+            say(`Nahrávám ${items.length} položek do Sinatoru…`);
+            await myImportChunked('watchlist', items, st, 'Watchlist');
+            try { window._myCacheClear && window._myCacheClear(); } catch (e) {}
+            say(`✅ Nahráno ${items.length} položek do Sinator watchlistu. Obnov záložku Watchlist.`, '#1db954');
+        } catch (e) {
+            say('❌ ' + (e && e.message ? e.message : e), '#e07a6f');
+        }
+    };
+
     window.handleTraktExportImport = async function(file) {
         const statusEl = $('traktImportStatus');
         if (!file) return;
@@ -7599,6 +7691,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-07b', date: '7. 11. 2026', items: [
+            '📥 Nastavení → Histra: tlačítko „Stáhnout watchlist z Histry (JSON)“ uloží watchlist z Histry do souboru a „Nahrát JSON watchlistu do Sinatoru“ ho přidá do Sinator watchlistu (jen přidává, nic nemaže a nezapisuje zpět do Histry)',
+        ] },
         { version: '2026-11-07a', date: '7. 11. 2026', items: [
             '⏱️ Nastavení → Histra: nový přepínač automatického syncu — jednou denně, jednou za 3 dny, jednou týdně, nebo jen ručně (šetří Vercel i Redis); tlačítko „Synchronizovat nyní“ funguje vždy',
         ] },
