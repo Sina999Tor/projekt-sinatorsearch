@@ -2510,6 +2510,16 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 </div>
                 <button class="settings-btn-small" style="width:100%;border-color:#5dade2;color:#5dade2;" onclick="openTvChannelAdminModal()">📡 Spravovat kanály</button>
             </div>
+            <div class="settings-section" id="serverLoadSettingsBox" style="display:none;background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.25);border-radius:12px;padding:14px 16px;margin-top:10px;">
+                <span class="settings-label" style="color:#a78bfa;">📊 Zatížení serveru (Vercel)</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 10px;line-height:1.4;">Aktuální spotřeba z Vercelu za běžné fakturační období. Vidí jen Admin level 2.</div>
+                <div id="serverLoadPeriod" style="font-size:0.72rem;color:#888;margin-bottom:8px;"></div>
+                <div id="serverLoadBody" style="display:flex;flex-direction:column;gap:10px;"><div style="color:#888;font-size:0.8rem;">Načítám…</div></div>
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                    <button class="settings-btn-small" style="flex:1;border-color:#a78bfa;color:#a78bfa;" onclick="serverLoadRefresh(true)">🔄 Obnovit</button>
+                    <button class="settings-btn-small" style="flex:1;border-color:#888;color:#ccc;" onclick="window.open('https://vercel.com/sinator/~/usage','_blank','noopener')">↗ Vercel Usage</button>
+                </div>
+            </div>
             </div>
         </div>
     </div>
@@ -7834,6 +7844,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-07d', date: '7. 11. 2026', items: [
+            { admin: true, text: 'Admin → 📊 Zatížení serveru (jen Admin level 2) — ukazatele spotřeby z Vercelu za běžné fakturační období (přenos dat, funkce, buildy…); vyžaduje nasazenou funkci api/vercel-usage a proměnnou VERCEL_TOKEN' }
+        ] },
         { version: '2026-11-07c', date: '7. 11. 2026', items: [
             '🧹 Odstraněno Nastavení → Aplikace → „Instalace do externí aplikace“ (odkazy na doplňky pro Stremio / Nuvio) — doplňky už neexistují; „Přehrávání v externí aplikaci“ zůstává',
         ] },
@@ -49688,6 +49701,59 @@ async function prefillAndOpenAdd(id, type) {
 
 window._prefillAndOpenAdd = prefillAndOpenAdd;
 
+// ---- 📊 Zatížení serveru (Vercel) — jen Admin level 2 ----
+(function() {
+  var _cache = null, _cacheAt = 0;
+  function _bases() {
+    var b = [];
+    if (/^https?:$/.test(location.protocol)) b.push('/api/vercel-usage');
+    b.push('https://projekt-sinatorsearch.vercel.app/api/vercel-usage', 'https://sinator.vercel.app/api/vercel-usage');
+    return b;
+  }
+  function _esc(x) { return String(x == null ? '' : x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function _fmt(n) { n = Number(n) || 0; return n >= 100 ? Math.round(n).toLocaleString('cs-CZ') : (Math.round(n * 100) / 100).toLocaleString('cs-CZ'); }
+  function _render(d) {
+    var body = document.getElementById('serverLoadBody'), per = document.getElementById('serverLoadPeriod');
+    if (!body) return;
+    if (per) per.textContent = d.from && d.to ? ('Období: ' + d.from + ' → ' + d.to + (d.cached ? ' (z cache)' : '')) : '';
+    var rows = d.services || [];
+    if (!rows.length) { body.innerHTML = '<div style="color:#888;font-size:0.8rem;">Vercel zatím nevrátil žádná data o spotřebě.</div>'; return; }
+    var max = Math.max.apply(null, rows.map(function(r) { return r.quantity; })) || 1;
+    var h = '';
+    rows.forEach(function(r) {
+      var pct = Math.max(2, Math.round(r.quantity / max * 100));
+      h += '<div><div style="display:flex;justify-content:space-between;gap:8px;font-size:0.82rem;"><span style="color:#eee;font-weight:600;">' + _esc(r.name) + '</span><span style="color:#c4b5fd;">' + _fmt(r.quantity) + ' ' + _esc(r.unit || '') + '</span></div>'
+        + '<div style="height:8px;border-radius:4px;background:#222;margin-top:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,#7c3aed,#a78bfa);"></div></div>'
+        + (r.cost ? '<div style="font-size:0.7rem;color:#888;margin-top:2px;">≈ $' + _fmt(r.cost) + '</div>' : '') + '</div>';
+    });
+    if (d.totalCost) h += '<div style="font-size:0.8rem;color:#ddd;border-top:1px solid #333;padding-top:8px;">Celkem za období: <b>$' + _fmt(d.totalCost) + '</b></div>';
+    body.innerHTML = h;
+  }
+  function _err(msg) {
+    var body = document.getElementById('serverLoadBody'); if (!body) return;
+    body.innerHTML = '<div style="color:#ff8a80;font-size:0.8rem;line-height:1.4;">⚠️ ' + _esc(msg) + '</div>';
+  }
+  window.serverLoadRefresh = async function(force) {
+    if (!(typeof window._isAdminLevel2 === 'function' && window._isAdminLevel2())) return;
+    var body = document.getElementById('serverLoadBody'); if (!body) return;
+    if (!force && _cache && Date.now() - _cacheAt < 60000) { _render(_cache); return; }
+    body.innerHTML = '<div style="color:#888;font-size:0.8rem;">Načítám…</div>';
+    var apis = _bases(), last = 'Server nedostupný';
+    for (var i = 0; i < apis.length; i++) {
+      try {
+        var ctl = new AbortController(), to = setTimeout(function() { ctl.abort(); }, 15000);
+        var r = await fetch(apis[i], { headers: { 'x-admin-hash': _ADMIN2_HASH }, signal: ctl.signal });
+        clearTimeout(to);
+        var j = await r.json().catch(function() { return null; });
+        if (!j) { last = 'Neplatná odpověď serveru'; continue; }
+        if (j.error) { last = j.error; if (r.status === 401 || r.status === 500) break; continue; }
+        _cache = j; _cacheAt = Date.now(); _render(j); return;
+      } catch (e) { last = 'Nepodařilo se spojit se serverem (' + (e && e.message ? e.message : e) + ')'; }
+    }
+    _err(last + ' — zkontroluj, že je na Vercelu nasazená funkce api/vercel-usage a nastavená proměnná VERCEL_TOKEN.');
+  };
+})();
+
 // ---- ADMIN MODE ----
 const _ADMIN_HASH = '781813bb37eab22353b8a69c29a5cac43df0e1efb8b3a112d2528a3c3b59f4d2';
 // Admin level 2 (superadmin) — může mazat uživatele a odhlašovat admin level 1
@@ -49805,6 +49871,8 @@ function updateAdminStatus() {
   // Sekce "Správa IPTV kanálů" — vidí jen Admin level 2
   const tvChAdminBox = document.getElementById('tvChannelAdminSettingsBox');
   if (tvChAdminBox) tvChAdminBox.style.display = isLvl2 ? 'block' : 'none';
+  const srvLoadBox = document.getElementById('serverLoadSettingsBox');
+  if (srvLoadBox) srvLoadBox.style.display = isLvl2 ? 'block' : 'none';
   // Audioknihy / E-knihy (menu TV / Rádio) — jen Admin level 2
   const abcBtn = document.getElementById('tvRadioAbcBtn'); if (abcBtn) abcBtn.style.display = isLvl2 ? '' : 'none';
 }
@@ -53501,7 +53569,8 @@ window.addEventListener('load', function() {
       {key:'adUsers',  icon:'👥', name:'Registrovaní uživatelé',  c:'#38bdf8', sub:'Přehled, žádosti o přístup', els:[{id:'adminUsersSectionBox'},{id:'adminUsersNoLvl2Msg'}], hideIfHidden:true},
       {key:'adTest',   icon:'🧪', name:'TEST: běžný uživatel',    c:'#fbbf24', sub:'Načíst appku jako běžný uživatel', els:[{id:'testUserModeBox'}], hideIfHidden:true},
       {key:'adBroken', icon:'🚫', name:'Nefunkční TV streamy',    c:'#f87171', sub:'Sdílené značení pro všechny', els:[{id:'tvBrokenSettingsBox'}], hideIfHidden:true},
-      {key:'adIptv',   icon:'📡', name:'Správa IPTV kanálů',      c:'#60a5fa', sub:'Kanály a kategorie', els:[{id:'tvChannelAdminSettingsBox'}], hideIfHidden:true}]},
+      {key:'adIptv',   icon:'📡', name:'Správa IPTV kanálů',      c:'#60a5fa', sub:'Kanály a kategorie', els:[{id:'tvChannelAdminSettingsBox'}], hideIfHidden:true},
+      {key:'adLoad',   icon:'📊', name:'Zatížení serveru',        c:'#a78bfa', sub:'Vercel: přenos dat, funkce, buildy', els:[{id:'serverLoadSettingsBox'}], hideIfHidden:true, pre:function(){ if(window.serverLoadRefresh) window.serverLoadRefresh(); }}]},
     ai:{container:'settingsSubtabContentAi', kids:[
       {key:'aiGemini', icon:'🤖', name:'Gemini',     c:'#a78bfa', sub:function(){ return _t('geminiStatusText','API klíč pro AI vyhledávání'); },     els:[{label:'Gemini'}]},
       {key:'aiGroq',   icon:'⚡', name:'Groq',       c:'#fbbf24', sub:function(){ return _t('groqStatusText','Rychlý fallback'); },                    els:[{label:'Groq'}]},
