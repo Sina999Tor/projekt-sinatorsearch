@@ -2375,6 +2375,20 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     </label>
                 </div>
             </div>
+            <div class="settings-section" id="sinBkSection" style="margin-top:14px;">
+                <span class="settings-label">🧩 Záloha dat ze Sinator backendu</span>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">Watchlist, historie (filmy i epizody), hodnocení, rozkoukané a vlastní seznamy z backendu. Appka si je 1× denně sama uloží do telefonu (poslední + starší týdenní kopie). Pro jistotu si je občas stáhni i do souboru.</div>
+                <div class="settings-actions" style="flex-wrap:wrap;gap:6px;">
+                    <button class="settings-btn-small" onclick="sinBkExportFile()">📤 Stáhnout do souboru</button>
+                    <label class="settings-btn-small" style="cursor:pointer;">📥 Obnovit ze souboru
+                        <input type="file" accept=".json" style="display:none;" onchange="sinBkRestoreFile(this)">
+                    </label>
+                    <button class="settings-btn-small" onclick="sinBkBackupNow()">🔄 Zálohovat teď</button>
+                    <button class="settings-btn-small" onclick="sinBkRestoreLocal('latest')">📲 Obnovit z auto zálohy</button>
+                    <button class="settings-btn-small" onclick="sinBkRestoreLocal('prev')">🕰️ Obnovit ze starší</button>
+                </div>
+                <div id="sinBkStatus" style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;line-height:1.5;white-space:pre-line;"></div>
+            </div>
             </div><!-- /swPageBackup -->
             <div class="settings-divider"></div>
             <div class="sw-page" id="swPageApps">
@@ -20881,6 +20895,167 @@ ${state.trakt.accessToken ? `<button class="action-btn-modal" style="background:
         ].filter(Boolean).join('\n');
         alert('✅ Kompletní záloha exportována!\n\n' + stats);
     }
+
+    // ═══ Záloha dat ze Sinator backendu (watchlist, historie, hodnocení, rozkoukané, seznamy) ═══
+    // Automaticky 1× denně do IndexedDB (poslední + týdenní starší kopie), ručně do JSON souboru.
+    // Obnova nic nenásobí: zapisuje jen to, co backend ještě nemá.
+    const _SINBK_DB = 'sinator_backup_v1';
+    function _sinBkIdb() { return new Promise((res, rej) => { const r = indexedDB.open(_SINBK_DB, 1); r.onupgradeneeded = () => r.result.createObjectStore('snap'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+    async function _sinBkGet(key) { const db = await _sinBkIdb(); return new Promise((res, rej) => { const q = db.transaction('snap').objectStore('snap').get(key); q.onsuccess = () => res(q.result || null); q.onerror = () => rej(q.error); }); }
+    async function _sinBkPut(key, val) { const db = await _sinBkIdb(); return new Promise((res, rej) => { const t = db.transaction('snap', 'readwrite'); t.objectStore('snap').put(val, key); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); }
+    function _sinBkMs(v) { if (v == null || v === '') return 0; let t = typeof v === 'number' ? v : (/^\d+$/.test(String(v)) ? Number(v) : Date.parse(v)); if (!isFinite(t)) return 0; if (t > 0 && t < 1e11) t *= 1000; return t; }
+    function _sinBkArr(v) { return Array.isArray(v) ? v : ((v && (v.items || v.data || v.lists)) || []); }
+    function _sinBkType(t) { return (t === 'tv' || t === 'show' || t === 'shows') ? 'tv' : 'movie'; }
+    function _sinBkTotal(d) { return ['watchlist', 'ratingsMovies', 'ratingsShows', 'progressMovies', 'progressShows', 'historyMovies', 'historyEpisodes'].reduce((a, k) => a + ((d[k] || []).length), 0) + (d.lists || []).reduce((a, l) => a + 1 + ((l.items || []).length), 0); }
+    function _sinBkSummary(d) {
+        return `Watchlist: ${(d.watchlist || []).length}\nHistorie: ${(d.historyMovies || []).length} filmů, ${(d.historyEpisodes || []).length} epizod\nHodnocení: ${(d.ratingsMovies || []).length + (d.ratingsShows || []).length}\nRozkoukané: ${(d.progressMovies || []).length + (d.progressShows || []).length}\nSeznamy: ${(d.lists || []).length}`;
+    }
+    function _sinBkSay(t) { const el = document.getElementById('sinBkStatus'); if (el) el.textContent = t; }
+    // Stáhne vše z backendu. Při jakékoli chybě vyhodí výjimku — nikdy se neuloží neúplná záloha.
+    async function _sinBkCollect(say) {
+        if (!myBackendReady()) throw new Error('Sinator backend není nastavený (chybí klíč).');
+        const prog = t => { try { say && say(t); } catch (e) {} };
+        const d = { app: 'Sinator Search', kind: 'backend-backup', version: 1, exported: new Date().toISOString() };
+        prog('Stahuji watchlist…'); d.watchlist = _sinBkArr(await myWatchlistGet());
+        prog('Stahuji hodnocení…'); d.ratingsMovies = _sinBkArr(await myRatingsGet('movies')); d.ratingsShows = _sinBkArr(await myRatingsGet('shows'));
+        prog('Stahuji rozkoukané…'); d.progressMovies = _sinBkArr(await myProgressGet('movies')); d.progressShows = _sinBkArr(await myProgressGet('shows'));
+        prog('Stahuji historii filmů…'); d.historyMovies = _sinBkArr(await myHistoryGetAll('movies', true));
+        prog('Stahuji historii epizod…'); d.historyEpisodes = _sinBkArr(await myHistoryGetAll('episodes', true));
+        prog('Stahuji seznamy…');
+        const ls = _sinBkArr(await myListsGet()); d.lists = [];
+        for (const l of ls) { if (!l || l.id == null) continue; const it = _sinBkArr(await myListItemsGet(l.id)); d.lists.push({ id: l.id, name: l.name || ('Seznam ' + l.id), items: it.map(x => ({ id: Number(x.id), type: _sinBkType(x.type) })) }); }
+        return d;
+    }
+    async function sinBkExportFile() {
+        try {
+            const d = await _sinBkCollect(_sinBkSay);
+            const json = JSON.stringify(d);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `sinator-backend-zaloha-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+            _sinBkSay('✅ Záloha stažena.\n' + _sinBkSummary(d));
+        } catch (e) { _sinBkSay('❌ ' + ((e && e.message) || e)); }
+    }
+    async function sinBkAuto(force) {
+        if (window._sinBkBusy) return false;
+        try { if (!myBackendReady()) return false; } catch (e) { return false; }
+        const last = Number(localStorage.getItem('sinator_bk_auto_ts') || 0);
+        if (!force && Date.now() - last < 24 * 3600 * 1000) return false;
+        window._sinBkBusy = true;
+        try {
+            const d = await _sinBkCollect(force ? _sinBkSay : null);
+            const total = _sinBkTotal(d);
+            const latest = await _sinBkGet('latest');
+            localStorage.setItem('sinator_bk_auto_ts', String(Date.now()));
+            // Pojistka: backend najednou vrací výrazně míň než dosavadní záloha (výpadek / smazání) → dobrou zálohu nepřepisovat.
+            if (latest && latest.total >= 20 && total < latest.total * 0.5) {
+                localStorage.setItem('sinator_bk_auto_warn', String(Date.now()));
+                _sinBkSay(`⚠️ Backend teď vrací jen ${total} záznamů (záloha má ${latest.total}) — stávající auto záloha zůstala beze změny.`);
+                return false;
+            }
+            localStorage.removeItem('sinator_bk_auto_warn');
+            if (latest && Date.now() - latest.ts >= 7 * 24 * 3600 * 1000) await _sinBkPut('prev', latest);
+            await _sinBkPut('latest', { ts: Date.now(), total, data: d });
+            sinBkRefreshInfo();
+            return true;
+        } catch (e) { console.warn('sinBkAuto', e); if (force) _sinBkSay('❌ ' + ((e && e.message) || e)); return false; }
+        finally { window._sinBkBusy = false; }
+    }
+    async function sinBkBackupNow() {
+        _sinBkSay('Zálohuji…');
+        const ok = await sinBkAuto(true);
+        if (ok) _sinBkSay('✅ Záloha uložena v telefonu.');
+        await sinBkRefreshInfo(ok);
+    }
+    async function sinBkRefreshInfo(keep) {
+        try {
+            const l = await _sinBkGet('latest'), pv = await _sinBkGet('prev');
+            const f = x => new Date(x.ts).toLocaleString('cs-CZ');
+            let t = l ? `📲 Poslední auto záloha: ${f(l)} (${l.total} záznamů)` : '📲 Auto záloha zatím neproběhla.';
+            if (pv) t += `\n🕰️ Starší kopie: ${f(pv)} (${pv.total} záznamů)`;
+            if (localStorage.getItem('sinator_bk_auto_warn')) t += '\n⚠️ Poslední kontrola: backend vracel podezřele málo dat.';
+            if (!keep) _sinBkSay(t);
+            else { const el = document.getElementById('sinBkStatus'); if (el) el.textContent += '\n' + t; }
+        } catch (e) {}
+    }
+    // Zapíše do backendu jen to, co tam ještě není.
+    async function _sinBkRestore(d) {
+        const el = document.getElementById('sinBkStatus');
+        const imp = (kind, items, label, extra) => items.length ? myImportChunked(kind, items, el, label, extra) : Promise.resolve();
+        _sinBkSay('Kontroluji, co už backend má…');
+        const cur = await _sinBkCollect(_sinBkSay);
+        let added = 0;
+        // watchlist
+        const wl = new Set(cur.watchlist.map(x => _sinBkType(x.type) + ':' + Number(x.id)));
+        const wlNew = (d.watchlist || []).filter(x => x && x.id != null && !wl.has(_sinBkType(x.type) + ':' + Number(x.id))).map(x => ({ id: Number(x.id), type: _sinBkType(x.type), title: x.title || null, year: x.year || null, poster_path: x.poster_path || x.poster || null }));
+        await imp('watchlist', wlNew, 'Watchlist'); added += wlNew.length;
+        // hodnocení
+        for (const [src, k, kind, lab] of [['ratingsMovies', 'ratingsMovies', 'ratings-movies', 'Hodnocení filmů'], ['ratingsShows', 'ratingsShows', 'ratings-shows', 'Hodnocení seriálů']]) {
+            const have = new Map((cur[k] || []).map(x => [Number(x.id), Number(x.rating)]));
+            const arr = (d[src] || []).filter(x => x && x.id != null && have.get(Number(x.id)) !== Number(x.rating)).map(x => ({ id: Number(x.id), rating: x.rating, rated_at: _sinBkMs(x.rated_at) || Date.now() }));
+            await imp(kind, arr, lab); added += arr.length;
+        }
+        // historie (neduplikovat: klíč = id + (série/epizoda) + čas)
+        const hm = new Set(cur.historyMovies.map(x => Number(x.id) + '|' + _sinBkMs(x.watched_at)));
+        const hmNew = (d.historyMovies || []).filter(x => x && x.id != null && !hm.has(Number(x.id) + '|' + _sinBkMs(x.watched_at))).map(x => ({ id: Number(x.id), watched_at: _sinBkMs(x.watched_at) || Date.now() }));
+        await imp('history-movies', hmNew, 'Historie filmů'); added += hmNew.length;
+        const he = new Set(cur.historyEpisodes.map(x => Number(x.id) + '|' + x.season + '|' + x.episode + '|' + _sinBkMs(x.watched_at)));
+        const heNew = (d.historyEpisodes || []).filter(x => x && x.id != null && !he.has(Number(x.id) + '|' + x.season + '|' + x.episode + '|' + _sinBkMs(x.watched_at))).map(x => ({ id: Number(x.id), season: x.season ?? null, episode: x.episode ?? null, watched_at: _sinBkMs(x.watched_at) || Date.now() }));
+        await imp('history-episodes', heNew, 'Historie epizod'); added += heNew.length;
+        // rozkoukané (existující nepřepisovat)
+        const pm = new Set(cur.progressMovies.map(x => Number(x.id)));
+        const pmNew = (d.progressMovies || []).filter(x => x && x.id != null && !pm.has(Number(x.id))).map(x => ({ id: Number(x.id), progress: x.progress, paused_at: _sinBkMs(x.paused_at) || Date.now() }));
+        await imp('progress-movies', pmNew, 'Rozkoukané filmy'); added += pmNew.length;
+        const ps = new Set(cur.progressShows.map(x => Number(x.id) + '|' + x.season + '|' + x.episode));
+        const psNew = (d.progressShows || []).filter(x => x && x.id != null && !ps.has(Number(x.id) + '|' + x.season + '|' + x.episode)).map(x => ({ id: Number(x.id), season: x.season ?? null, episode: x.episode ?? null, progress: x.progress, paused_at: _sinBkMs(x.paused_at) || Date.now() }));
+        await imp('progress-shows', psNew, 'Rozkoukané seriály'); added += psNew.length;
+        // seznamy: stejný název = doplnit chybějící položky, jinak založit nový
+        const byName = new Map(cur.lists.map(l => [String(l.name).trim().toLocaleLowerCase('cs-CZ'), l]));
+        let listsNew = 0;
+        for (const l of (d.lists || [])) {
+            if (!l || !l.name) continue;
+            const ex = byName.get(String(l.name).trim().toLocaleLowerCase('cs-CZ'));
+            const have = new Set(ex ? ex.items.map(x => x.type + ':' + x.id) : []);
+            const items = (l.items || []).map(x => ({ id: Number(x.id), type: _sinBkType(x.type) })).filter(x => !have.has(x.type + ':' + x.id));
+            if (!items.length) continue;
+            let listId = ex ? ex.id : null;
+            for (let i = 0; i < items.length; i += 300) {
+                const resp = await myImportBatch('list', items.slice(i, i + 300), { name: l.name, listId });
+                listId = (resp && resp.listId) || listId;
+            }
+            added += items.length; if (!ex) listsNew++;
+        }
+        try { myApiCacheClear(); for (const k in _historyGetAllCache) delete _historyGetAllCache[k]; } catch (e) {}
+        return { added, wlNew: wlNew.length, hist: hmNew.length + heNew.length, listsNew };
+    }
+    async function _sinBkRestoreFrom(d, srcLabel) {
+        if (!d || d.kind !== 'backend-backup') { _sinBkSay('❌ Tohle není záloha backendu.'); return; }
+        if (!myBackendReady()) { _sinBkSay('❌ Nejdřív nastav Sinator backend (klíč).'); return; }
+        if (!confirm(`Obnovit do backendu (${srcLabel})?\n\n${_sinBkSummary(d)}\n\nZapíše se jen to, co backend ještě nemá — nic se nemaže ani nenásobí.`)) return;
+        try {
+            const r = await _sinBkRestore(d);
+            _sinBkSay(`✅ Obnoveno. Doplněno ${r.added} záznamů (watchlist ${r.wlNew}, historie ${r.hist}, nových seznamů ${r.listsNew}).`);
+        } catch (e) { _sinBkSay('❌ Obnova selhala: ' + ((e && e.message) || e)); }
+    }
+    function sinBkRestoreFile(input) {
+        const f = input.files && input.files[0]; if (!f) return;
+        const r = new FileReader();
+        r.onload = e => { let d = null; try { d = JSON.parse(e.target.result); } catch (err) {} input.value = ''; _sinBkRestoreFrom(d, 'ze souboru'); };
+        r.readAsText(f);
+    }
+    async function sinBkRestoreLocal(slot) {
+        try {
+            const snap = await _sinBkGet(slot);
+            if (!snap) { _sinBkSay('Tahle záloha v telefonu neexistuje.'); return; }
+            await _sinBkRestoreFrom(snap.data, 'z auto zálohy ' + new Date(snap.ts).toLocaleString('cs-CZ'));
+        } catch (e) { _sinBkSay('❌ ' + ((e && e.message) || e)); }
+    }
+    window.sinBkExportFile = sinBkExportFile; window.sinBkRestoreFile = sinBkRestoreFile; window.sinBkRestoreLocal = sinBkRestoreLocal;
+    window.sinBkBackupNow = sinBkBackupNow; window.sinBkAuto = sinBkAuto; window.sinBkRefreshInfo = sinBkRefreshInfo;
+    setTimeout(() => { try { sinBkAuto(false); } catch (e) {} }, 25000);
+    setTimeout(() => { try { sinBkRefreshInfo(); } catch (e) {} }, 2500);
 
     function closeBackup() {
         try { closeSettingsModal(); } catch(e) {}
