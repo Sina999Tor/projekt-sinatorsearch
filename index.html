@@ -49716,6 +49716,7 @@ window._prefillAndOpenAdd = prefillAndOpenAdd;
     var body = document.getElementById('serverLoadBody'), per = document.getElementById('serverLoadPeriod');
     if (!body) return;
     if (per) per.textContent = d.from && d.to ? ('Období: ' + d.from + ' → ' + d.to + (d.cached ? ' (z cache)' : '')) : '';
+    var noteH = d.note ? '<div style="font-size:0.72rem;color:#b9a8f5;line-height:1.4;">ℹ️ ' + _esc(d.note) + '</div>' : '';
     var rows = d.services || [];
     if (!rows.length) { body.innerHTML = '<div style="color:#888;font-size:0.8rem;">Vercel zatím nevrátil žádná data o spotřebě.</div>'; return; }
     var max = Math.max.apply(null, rows.map(function(r) { return r.quantity; })) || 1;
@@ -49727,7 +49728,7 @@ window._prefillAndOpenAdd = prefillAndOpenAdd;
         + (r.cost ? '<div style="font-size:0.7rem;color:#888;margin-top:2px;">≈ $' + _fmt(r.cost) + '</div>' : '') + '</div>';
     });
     if (d.totalCost) h += '<div style="font-size:0.8rem;color:#ddd;border-top:1px solid #333;padding-top:8px;">Celkem za období: <b>$' + _fmt(d.totalCost) + '</b></div>';
-    body.innerHTML = h;
+    body.innerHTML = h + noteH;
   }
   function _err(msg) {
     var body = document.getElementById('serverLoadBody'); if (!body) return;
