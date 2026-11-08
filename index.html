@@ -7866,7 +7866,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-08', date: '8. 11. 2026', items: [
-            'Ukončení appky — gesto „zpět“ appku už neukončuje (jen zavírá okna a vrací o krok); ukončit jde jen křížkem ✕ s potvrzením. Po ukončení se nezobrazuje text „Ukončili jste aplikaci“ a před odchodem se zastaví vše, co běží (přehrávání, časovače, vložená okna)',
+            'Ukončení appky — gesto „zpět“ appku neukončí rovnou: nejdřív zavře okna a vrátí o krok, a na hlavní obrazovce se zeptá „Zavřít aplikaci?“ (stejně jako křížek ✕). Po potvrzení se zastaví vše, co běží (přehrávání, časovače, síťové dotazy, vložená okna), uvolní se paměť stránky, smažou se dočasná data relace a appka se nenechá zmrazená v paměti prohlížeče. Text „Ukončili jste aplikaci“ se nezobrazuje',
             { admin: true, text: 'Záloha dat ze Sinator backendu přesunuta z Nastavení → Záloha dat do Admin → 🧩 Záloha backendu (jen Admin level 2); v „Záloha dat“ zůstala jen kompletní záloha (Export/Import). Auto záloha backendu běží jen pro Admin level 2 a má nastavitelný interval (vypnuto / denně / 3 dny / týdně / 2 týdny / měsíčně; výchozí týdně). Záloha se řídí kalendářními dny — proběhne při prvním otevření appky v den, kdy interval uplyne (na hodině nezáleží). Opraveno zdvojení řádku se stavem zálohy' }
         ] },
         { version: '2026-11-07d', date: '7. 11. 2026', items: [
@@ -48263,6 +48263,16 @@ document.addEventListener('DOMContentLoaded', function() {
         try { if (navigator.mediaSession) { navigator.mediaSession.playbackState = 'none'; navigator.mediaSession.metadata = null; } } catch (e) {}
         try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
         try { var hi = setTimeout(function() {}, 0); for (var k = 0; k <= hi; k++) { clearTimeout(k); clearInterval(k); } } catch (e) {}
+        // žádné další síťové dotazy / odesílání na pozadí
+        try { window.fetch = function() { return Promise.reject(new Error('app closed')); }; } catch (e) {}
+        try { XMLHttpRequest.prototype.send = function() {}; } catch (e) {}
+        try { navigator.sendBeacon = function() { return false; }; } catch (e) {}
+        // dočasná data relace pryč (token, session cache)
+        try { sessionStorage.clear(); } catch (e) {}
+        // stránka nesmí zůstat „zmrazená“ v paměti prohlížeče (bfcache) — posluchač unload ji z bfcache vyřadí
+        try { window.addEventListener('unload', function() {}); } catch (e) {}
+        // uvolnit DOM (obrázky, postery, seznamy) z paměti
+        try { document.body.innerHTML = ''; } catch (e) {}
     }
     function confirmExit() {
         hideExitConfirm();
@@ -48539,15 +48549,35 @@ document.addEventListener('DOMContentLoaded', function() {
     ['pointerdown', 'pointerup', 'keydown', 'click', 'touchend'].forEach(function (ev) { window.addEventListener(ev, topUp, { capture: true, passive: true }); });
     window._sinBackDepth = function () { return _depth; };
 
+    // Hloubka se bere ze stavu záznamu, na kterém jsme přistáli (odolné proti přeskočeným záznamům)
+    function _syncDepth() {
+        var d = history.state && typeof history.state.d === 'number' ? history.state.d : 0;
+        _depth = d;
+    }
+    // Doplnit ochranné záznamy hned (bez čekání na dotek) — když je Chrome přeskočí, doplní se při dalším doteku
+    function _refill() {
+        if (_depth >= 3) return;
+        for (var i = 0; i < 3 - _depth; i++) {
+            try { history.pushState({ pwaGuard: true, d: ++_depth }, '', window.location.href); } catch (e) { _depth--; break; }
+        }
+    }
     window.addEventListener('popstate', function () {
         if (window._sinExiting) return;
-        if (_depth > 0) _depth--;
-        if (handleBack()) return;
-        var ov = document.getElementById('exitConfirmOverlay');
-        if (ov && ov.classList.contains('show')) { hideExitConfirm(); return; }   // zpět zavře dotaz na ukončení
-        // Gesto zpět na hlavní obrazovce nic nedělá a appku neukončuje (ukončit jde jen křížkem ✕).
-        // Ochranný záznam se doplní při dalším dotyku (záznam vložený bez dotyku by Chrome přeskočil).
+        _syncDepth();
+        var handled = handleBack();
+        if (!handled) {
+            var ov = document.getElementById('exitConfirmOverlay');
+            if (!(ov && ov.classList.contains('show')) && !document.body.classList.contains('app-locked')) {
+                // Gesto zpět na hlavní obrazovce = stejný dotaz „Zavřít aplikaci?“ jako po stisku ✕
+                showExitConfirm();
+            }
+        }
+        _refill();
     });
+    // Ochranné záznamy i po návratu do appky z pozadí
+    window.addEventListener('pageshow', function () { if (!window._sinExiting) _refill(); });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && !window._sinExiting) _refill(); });
+    window.addEventListener('load', function () { setTimeout(_refill, 300); });
 
     // ── MutationObserver to hide/show PWA button ─────────────────
     document.addEventListener('DOMContentLoaded', function() {
