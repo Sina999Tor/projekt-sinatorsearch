@@ -7866,7 +7866,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-08', date: '8. 11. 2026', items: [
-            'Ukončení appky — gesto „zpět“ se teď na ukončení ptá stejně jako ✕; po potvrzení (✕ i gesto) appka odejde stejně jako při gestu zpět (zmizí i z pozadí, nezůstane černé okno), nezobrazuje se text „Ukončili jste aplikaci“ a před odchodem se zastaví vše, co běží (přehrávání, časovače, vložená okna)',
+            'Ukončení appky — gesto „zpět“ appku už neukončuje (jen zavírá okna a vrací o krok); ukončit jde jen křížkem ✕ s potvrzením. Po ukončení se nezobrazuje text „Ukončili jste aplikaci“ a před odchodem se zastaví vše, co běží (přehrávání, časovače, vložená okna)',
             { admin: true, text: 'Záloha dat ze Sinator backendu přesunuta z Nastavení → Záloha dat do Admin → 🧩 Záloha backendu (jen Admin level 2); v „Záloha dat“ zůstala jen kompletní záloha (Export/Import). Auto záloha backendu běží jen pro Admin level 2 a má nastavitelný interval (vypnuto / denně / 3 dny / týdně / 2 týdny / měsíčně; výchozí týdně). Záloha se řídí kalendářními dny — proběhne při prvním otevření appky v den, kdy interval uplyne (na hodině nezáleží). Opraveno zdvojení řádku se stavem zálohy' }
         ] },
         { version: '2026-11-07d', date: '7. 11. 2026', items: [
@@ -48527,7 +48527,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sentinely (záznamy v historii, které „zpět“ spotřebuje) se vkládají POSTUPNĚ při skutečných dotycích:
     // Chrome přeskakuje záznamy vložené bez uživatelské akce (a jedna akce autorizuje jen jeden záznam),
     // proto se při „zpět“ nic znovu nevkládá — hloubka se doplňuje dalšími doteky (max. MAX_DEPTH).
-    var _depth = 0, MAX_DEPTH = 8, _lastPush = 0, _lastExitTry = 0;
+    var _depth = 0, MAX_DEPTH = 25, _lastPush = 0, _lastExitTry = 0;
     function topUp(e) {
         if (_depth >= MAX_DEPTH) return;
         if (e && e.type === 'pointerdown' && e.pointerType && e.pointerType !== 'mouse') return;   // dotyk = až pointerup
@@ -48544,8 +48544,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (_depth > 0) _depth--;
         if (handleBack()) return;
         var ov = document.getElementById('exitConfirmOverlay');
-        if (ov && ov.classList.contains('show')) { hideExitConfirm(); return; }   // další „zpět“ dotaz zruší
-        showExitConfirm();   // gesto zpět se na ukončení ptá stejně jako ✕
+        if (ov && ov.classList.contains('show')) { hideExitConfirm(); return; }   // zpět zavře dotaz na ukončení
+        // Gesto zpět appku neukončuje (ani se neptá) — ukončit jde jen křížkem ✕. Jen se doplní ochranný záznam historie.
+        try { history.pushState({ pwaGuard: true, d: ++_depth }, '', window.location.href); } catch (e) { _depth--; }
     });
 
     // ── MutationObserver to hide/show PWA button ─────────────────
