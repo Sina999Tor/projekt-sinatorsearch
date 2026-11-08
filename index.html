@@ -48554,13 +48554,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var d = history.state && typeof history.state.d === 'number' ? history.state.d : 0;
         _depth = d;
     }
-    // Doplnit ochranné záznamy hned (bez čekání na dotek) — když je Chrome přeskočí, doplní se při dalším doteku
-    function _refill() {
-        if (_depth >= 3) return;
-        for (var i = 0; i < 3 - _depth; i++) {
-            try { history.pushState({ pwaGuard: true, d: ++_depth }, '', window.location.href); } catch (e) { _depth--; break; }
-        }
-    }
+    // Záznamy v historii se NESMÍ vkládat bez dotyku: Chrome/Brave takový záznam označí a přeskočí i záznam, na kterém
+    // stojíme — gesto „zpět“ pak appku rovnou opustí. Ochranné záznamy se proto vkládají jen při skutečném klepnutí (topUp).
+    function _refill() {}
     window.addEventListener('popstate', function () {
         if (window._sinExiting) return;
         _syncDepth();
