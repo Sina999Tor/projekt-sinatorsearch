@@ -7865,6 +7865,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-08', date: '8. 11. 2026', items: [
+            'Ukončení appky (✕ → Ano) — už se nezobrazuje text „Ukončili jste aplikaci“; appka se rovnou zavře a před tím zastaví vše, co běží na pozadí (přehrávání, časovače, vložená okna)',
             { admin: true, text: 'Záloha dat ze Sinator backendu přesunuta z Nastavení → Záloha dat do Admin → 🧩 Záloha backendu (jen Admin level 2); v „Záloha dat“ zůstala jen kompletní záloha (Export/Import). Auto záloha backendu běží jen pro Admin level 2 a má nastavitelný interval (vypnuto / denně / 3 dny / týdně / 2 týdny / měsíčně; výchozí týdně). Záloha se řídí kalendářními dny — proběhne při prvním otevření appky v den, kdy interval uplyne (na hodině nezáleží). Opraveno zdvojení řádku se stavem zálohy' }
         ] },
         { version: '2026-11-07d', date: '7. 11. 2026', items: [
@@ -48254,14 +48255,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // ── Exit confirm ─────────────────────────────────────────────
     function showExitConfirm() { document.getElementById('exitConfirmOverlay').classList.add('show'); }
     function hideExitConfirm() { document.getElementById('exitConfirmOverlay').classList.remove('show'); }
+    // Úplné ukončení: zastaví vše, co běží (přehrávání, časovače, vložená okna), zavře okno/appku a nic nezobrazí
+    function _sinShutdown() {
+        try { document.querySelectorAll('audio,video').forEach(function(m) { try { m.pause(); m.removeAttribute('src'); m.load(); } catch (e) {} }); } catch (e) {}
+        try { document.querySelectorAll('iframe').forEach(function(f) { try { f.src = 'about:blank'; f.remove(); } catch (e) {} }); } catch (e) {}
+        try { if (navigator.mediaSession) { navigator.mediaSession.playbackState = 'none'; navigator.mediaSession.metadata = null; } } catch (e) {}
+        try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
+        try { var hi = setTimeout(function() {}, 0); for (var k = 0; k <= hi; k++) { clearTimeout(k); clearInterval(k); } } catch (e) {}
+    }
     function confirmExit() {
         hideExitConfirm();
         try { localStorage.removeItem('sinator_app_unlocked'); } catch(e) {}
+        _sinShutdown();
         try { window.close(); } catch(e) {}
+        // Okno, které prohlížeč nenechá zavřít (karta v prohlížeči): prázdná černá stránka bez textu, nic už neběží
         setTimeout(function() {
-            document.open();
-            document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#000000"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%;background:#000;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Inter,sans-serif;padding:30px}p{color:#fff;font-size:1.6rem;font-weight:600;line-height:1.5;opacity:0;animation:fadeIn 1s ease forwards}@keyframes fadeIn{to{opacity:1}}</style></head><body><p>Ukončili jste aplikaci.<br>Doufám, že se vám líbila. 😀</p></body></html>');
-            document.close();
+            try {
+                document.open();
+                document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#000000"><style>html,body{margin:0;height:100%;background:#000}</style></head><body></body></html>');
+                document.close();
+            } catch (e) {}
         }, 150);
     }
     window.showExitConfirm = showExitConfirm;
