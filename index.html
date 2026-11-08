@@ -7865,7 +7865,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-08', date: '8. 11. 2026', items: [
-            'Ukončení appky (✕ → Ano) — už se nezobrazuje text „Ukončili jste aplikaci“; appka se rovnou zavře a před tím zastaví vše, co běží na pozadí (přehrávání, časovače, vložená okna)',
+            'Ukončení appky — gesto „zpět“ se teď na ukončení ptá stejně jako ✕; po potvrzení (✕ i gesto) appka odejde stejně jako při gestu zpět (zmizí i z pozadí, nezůstane černé okno), nezobrazuje se text „Ukončili jste aplikaci“ a před odchodem se zastaví vše, co běží (přehrávání, časovače, vložená okna)',
             { admin: true, text: 'Záloha dat ze Sinator backendu přesunuta z Nastavení → Záloha dat do Admin → 🧩 Záloha backendu (jen Admin level 2); v „Záloha dat“ zůstala jen kompletní záloha (Export/Import). Auto záloha backendu běží jen pro Admin level 2 a má nastavitelný interval (vypnuto / denně / 3 dny / týdně / 2 týdny / měsíčně; výchozí týdně). Záloha se řídí kalendářními dny — proběhne při prvním otevření appky v den, kdy interval uplyne (na hodině nezáleží). Opraveno zdvojení řádku se stavem zálohy' }
         ] },
         { version: '2026-11-07d', date: '7. 11. 2026', items: [
@@ -48266,7 +48266,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function confirmExit() {
         hideExitConfirm();
         try { localStorage.removeItem('sinator_app_unlocked'); } catch(e) {}
+        window._sinExiting = true;   // popstate při odchodu nesmí znovu vyvolat dotaz
         _sinShutdown();
+        try { history.go(-(_depth + 1)); } catch(e) {}   // stejné jako dokončené gesto zpět: opustí appku
         try { window.close(); } catch(e) {}
         // Okno, které prohlížeč nenechá zavřít (karta v prohlížeči): prázdná černá stránka bez textu, nic už neběží
         setTimeout(function() {
@@ -48521,13 +48523,12 @@ document.addEventListener('DOMContentLoaded', function() {
     window._sinBackDepth = function () { return _depth; };
 
     window.addEventListener('popstate', function () {
+        if (window._sinExiting) return;
         if (_depth > 0) _depth--;
         if (handleBack()) return;
-        if (isAppMode()) { showExitConfirm(); return; }
-        // v záložce prohlížeče: druhé zpět do 2 s appku opustí
-        if (Date.now() - _lastExitTry < 2000) { try { history.go(-(_depth + 1)); } catch (e) {} return; }
-        _lastExitTry = Date.now();
-        _backToast('Stiskni zpět ještě jednou pro opuštění');
+        var ov = document.getElementById('exitConfirmOverlay');
+        if (ov && ov.classList.contains('show')) { hideExitConfirm(); return; }   // další „zpět“ dotaz zruší
+        showExitConfirm();   // gesto zpět se na ukončení ptá stejně jako ✕
     });
 
     // ── MutationObserver to hide/show PWA button ─────────────────
