@@ -2,6 +2,7 @@
 <!-- BUILD: 2026-10-01T17:05:00Z -->
 <html lang="cs">
 <head>
+<script>(function(){try{if(/[?&]sinexit=1/.test(location.search)){document.documentElement.style.background='#000';try{window.stop();}catch(e){}try{window.close();}catch(e){}}}catch(e){}})();</script>
     <script id="sinI18n">
 (function () {
   var LANG = 'cs';
@@ -48268,16 +48269,32 @@ document.addEventListener('DOMContentLoaded', function() {
         try { localStorage.removeItem('sinator_app_unlocked'); } catch(e) {}
         window._sinExiting = true;   // popstate při odchodu nesmí znovu vyvolat dotaz
         _sinShutdown();
-        try { history.go(-(_depth + 1)); } catch(e) {}   // stejné jako dokončené gesto zpět: opustí appku
-        try { window.close(); } catch(e) {}
-        // Okno, které prohlížeč nenechá zavřít (karta v prohlížeči): prázdná černá stránka bez textu, nic už neběží
+        var pre = history.length - 1 - _depth;   // záznamy před appkou (0 = appka je v okně sama)
+        var done = false;
+        function finish() {
+            if (done) return; done = true;
+            // Navigace s nahrazením odstraní zbylé záznamy historie → historie má 1 záznam a prohlížeč dovolí window.close()
+            try { location.replace(location.pathname + '?sinexit=1'); } catch (e) {}
+        }
+        if (pre > 0) {
+            // appka byla otevřena z jiné stránky: odejít zpět stejně jako gestem
+            try { history.go(-(_depth + 1)); } catch (e) {}
+        } else if (_depth > 0) {
+            window.addEventListener('popstate', finish, { once: true });
+            try { history.go(-_depth); } catch (e) { finish(); }
+            setTimeout(finish, 700);
+        } else {
+            finish();
+        }
+        try { window.close(); } catch (e) {}
+        // Záloha, kdyby se okno nedalo zavřít: prázdná černá stránka bez textu
         setTimeout(function() {
             try {
                 document.open();
                 document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#000000"><style>html,body{margin:0;height:100%;background:#000}</style></head><body></body></html>');
                 document.close();
             } catch (e) {}
-        }, 150);
+        }, 2500);
     }
     window.showExitConfirm = showExitConfirm;
     window.hideExitConfirm = hideExitConfirm;
