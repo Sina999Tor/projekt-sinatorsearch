@@ -7866,7 +7866,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-08', date: '8. 11. 2026', items: [
-            'Ukončení appky — gesto „zpět“ appku neukončí rovnou: nejdřív zavře okna a vrátí o krok, a na hlavní obrazovce se zeptá „Zavřít aplikaci?“ (stejně jako křížek ✕). Po potvrzení se zastaví vše, co běží (přehrávání, časovače, síťové dotazy, vložená okna), uvolní se paměť stránky, smažou se dočasná data relace a appka se nenechá zmrazená v paměti prohlížeče. Text „Ukončili jste aplikaci“ se nezobrazuje',
+            'Ukončení appky — gesto „zpět“ appku neukončí rovnou: nejdřív zavře okna a vrátí o krok, a na hlavní obrazovce se zeptá „Zavřít aplikaci?“ (stejně jako křížek ✕). Po potvrzení se zastaví vše, co běží (přehrávání, časovače, síťové dotazy, vložená okna), uvolní se paměť stránky, smažou se dočasná data relace a appka se nenechá zmrazená v paměti prohlížeče. Text „Ukončili jste aplikaci“ se nezobrazuje. Po spuštění appky se před prvním klepnutím zobrazí pole „Klepni pro start“, které zajistí, že gesto „zpět“ už nikdy neukončí appku bez dotazu',
             { admin: true, text: 'Záloha dat ze Sinator backendu přesunuta z Nastavení → Záloha dat do Admin → 🧩 Záloha backendu (jen Admin level 2); v „Záloha dat“ zůstala jen kompletní záloha (Export/Import). Auto záloha backendu běží jen pro Admin level 2 a má nastavitelný interval (vypnuto / denně / 3 dny / týdně / 2 týdny / měsíčně; výchozí týdně). Záloha se řídí kalendářními dny — proběhne při prvním otevření appky v den, kdy interval uplyne (na hodině nezáleží). Opraveno zdvojení řádku se stavem zálohy' }
         ] },
         { version: '2026-11-07d', date: '7. 11. 2026', items: [
@@ -48578,6 +48578,37 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('pageshow', function () { if (!window._sinExiting) _refill(); });
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && !window._sinExiting) _refill(); });
     window.addEventListener('load', function () { setTimeout(_refill, 300); });
+
+    // ── „Klepni pro start“ ───────────────────────────────────────────────────────
+    // Chrome/Brave přeskakují záznamy historie vložené bez dotyku, takže gesto „zpět“ hned po spuštění (před prvním
+    // klepnutím) appku rovnou opustí. Dokud uživatel nepoklepe, překryje appku průhledné pole; první klepnutí vloží
+    // ochranný záznam a pole zmizí — od té chvíle gesto „zpět“ vždy ukáže dotaz „Zavřít aplikaci?“.
+    SKIP_IDS.sinTapStart = 1;
+    function _tapStartNeeded() {
+        try { if (navigator.userActivation && navigator.userActivation.hasBeenActive) return false; } catch (e) {}
+        if (window._sinExiting) return false;
+        if (document.body.classList.contains('app-locked')) return false;   // zamykací obrazovka sama vyžaduje klepnutí
+        return !document.getElementById('sinTapStart');
+    }
+    function _showTapStart() {
+        if (!_tapStartNeeded()) return;
+        var o = document.createElement('div');
+        o.id = 'sinTapStart';
+        o.style.cssText = 'position:fixed;inset:0;z-index:2147482000;background:rgba(8,12,24,0.72);display:flex;align-items:center;justify-content:center;color:#fff;font:600 1.05rem system-ui,sans-serif;text-align:center;padding:24px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;';
+        o.innerHTML = '<div style="background:#1a2238;border:1px solid #3a4666;border-radius:16px;padding:18px 26px;">👆 Klepni pro start<div style="font-weight:400;font-size:0.78rem;opacity:0.7;margin-top:6px;">chrání před omylem při gestu „zpět“</div></div>';
+        function go(ev) {
+            try { ev.preventDefault(); ev.stopPropagation(); } catch (e) {}
+            try { topUp(); _refill(); } catch (e) {}
+            try { o.remove(); } catch (e) {}
+        }
+        o.addEventListener('pointerup', go);
+        o.addEventListener('touchend', go);
+        o.addEventListener('click', go);
+        document.body.appendChild(o);
+    }
+    window.addEventListener('load', function () { setTimeout(_showTapStart, 400); });
+    window.addEventListener('pageshow', function () { setTimeout(_showTapStart, 200); });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') setTimeout(_showTapStart, 200); });
 
     // ── MutationObserver to hide/show PWA button ─────────────────
     document.addEventListener('DOMContentLoaded', function() {
