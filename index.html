@@ -7874,7 +7874,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-08', date: '8. 11. 2026', items: [
-            'Ukončení appky — gesto „zpět“ appku neukončí rovnou: nejdřív zavře okna a vrátí o krok, a na hlavní obrazovce se zeptá „Zavřít aplikaci?“ (stejně jako křížek ✕). Po potvrzení se zastaví vše, co běží (přehrávání, časovače, síťové dotazy, vložená okna), uvolní se paměť stránky, smažou se dočasná data relace a appka se nenechá zmrazená v paměti prohlížeče. Text „Ukončili jste aplikaci“ se nezobrazuje. Po spuštění appky se před prvním klepnutím zobrazí pole „Klepni pro start“, které zajistí, že gesto „zpět“ už nikdy neukončí appku bez dotazu',
+            'Ukončení appky — gesto „zpět“ appku neukončí rovnou: nejdřív zavře okna a vrátí o krok, a na hlavní obrazovce se zeptá „Zavřít aplikaci?“ (stejně jako křížek ✕). Po potvrzení se zastaví vše, co běží (přehrávání, časovače, síťové dotazy, vložená okna), uvolní se paměť stránky, smažou se dočasná data relace a appka se nenechá zmrazená v paměti prohlížeče. Text „Ukončili jste aplikaci“ se nezobrazuje. Gesto „zpět“ je chráněno dotazem „Zavřít aplikaci?“ od prvního klepnutí v appce (bez zobrazené tabulky)',
             { admin: true, text: 'Záloha dat ze Sinator backendu přesunuta z Nastavení → Záloha dat do Admin → 🧩 Záloha backendu (jen Admin level 2); v „Záloha dat“ zůstala jen kompletní záloha (Export/Import). Auto záloha backendu běží jen pro Admin level 2 a má nastavitelný interval (vypnuto / denně / 3 dny / týdně / 2 týdny / měsíčně; výchozí týdně). Záloha se řídí kalendářními dny — proběhne při prvním otevření appky v den, kdy interval uplyne (na hodině nezáleží). Opraveno zdvojení řádku se stavem zálohy' }
         ] },
         { version: '2026-11-07d', date: '7. 11. 2026', items: [
@@ -48602,6 +48602,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return !document.getElementById('sinTapStart');
     }
     function _showTapStart() {
+        return;   // tabulka se nezobrazuje — první klepnutí kamkoli (zachytí ho topUp) ochranu aktivuje samo
         if (!_tapStartNeeded()) return;
         var o = document.createElement('div');
         o.id = 'sinTapStart';
