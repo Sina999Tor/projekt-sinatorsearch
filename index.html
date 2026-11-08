@@ -48537,7 +48537,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sentinely (záznamy v historii, které „zpět“ spotřebuje) se vkládají POSTUPNĚ při skutečných dotycích:
     // Chrome přeskakuje záznamy vložené bez uživatelské akce (a jedna akce autorizuje jen jeden záznam),
     // proto se při „zpět“ nic znovu nevkládá — hloubka se doplňuje dalšími doteky (max. MAX_DEPTH).
-    var _depth = 0, MAX_DEPTH = 25, _lastPush = 0, _lastExitTry = 0;
+    var _depth = 0, MAX_DEPTH = 4, _lastPush = 0, _lastExitTry = 0;
     function topUp(e) {
         if (_depth >= MAX_DEPTH) return;
         if (e && e.type === 'pointerdown' && e.pointerType && e.pointerType !== 'mouse') return;   // dotyk = až pointerup
@@ -48550,16 +48550,17 @@ document.addEventListener('DOMContentLoaded', function() {
     window._sinBackDepth = function () { return _depth; };
 
     // Hloubka se bere ze stavu záznamu, na kterém jsme přistáli (odolné proti přeskočeným záznamům)
-    function _syncDepth() {
-        var d = history.state && typeof history.state.d === 'number' ? history.state.d : 0;
-        _depth = d;
+    function _landedDepth() {
+        return history.state && typeof history.state.d === 'number' ? history.state.d : 0;
     }
+    var _fwdPending = false, _fwdTimer = null;
     // Záznamy v historii se NESMÍ vkládat bez dotyku: Chrome/Brave takový záznam označí a přeskočí i záznam, na kterém
     // stojíme — gesto „zpět“ pak appku rovnou opustí. Ochranné záznamy se proto vkládají jen při skutečném klepnutí (topUp).
     function _refill() {}
     window.addEventListener('popstate', function () {
         if (window._sinExiting) return;
-        _syncDepth();
+        if (_fwdPending) { _fwdPending = false; return; }      // náš vlastní návrat dopředu — nic nedělat
+        var landed = _landedDepth();
         var handled = handleBack();
         if (!handled) {
             var ov = document.getElementById('exitConfirmOverlay');
@@ -48568,7 +48569,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 showExitConfirm();
             }
         }
-        _refill();
+        // Gesto „zpět“ spotřebovalo záznam v historii — hned se vrátíme na nejvyšší záznam (dopředu), takže ochrana
+        // zůstává stále stejně hluboká a další gesto zpět zase skončí v appce, ne mimo ni. Návrat dopředu žádný dotek nevyžaduje.
+        var n = _depth - landed;
+        if (n > 0) {
+            _fwdPending = true;
+            clearTimeout(_fwdTimer);
+            _fwdTimer = setTimeout(function () { _fwdPending = false; }, 1500);
+            setTimeout(function () { try { history.go(n); } catch (e) { _fwdPending = false; } }, 0);
+        }
     });
     // Ochranné záznamy i po návratu do appky z pozadí
     window.addEventListener('pageshow', function () { if (!window._sinExiting) _refill(); });
