@@ -48532,11 +48532,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (_depth >= MAX_DEPTH) return;
         if (e && e.type === 'pointerdown' && e.pointerType && e.pointerType !== 'mouse') return;   // dotyk = až pointerup
         if (e && e.type === 'pointerup' && e.pointerType === 'mouse') return;                      // myš = pointerdown
-        var now = Date.now(); if (now - _lastPush < 250) return;
+        var now = Date.now(); if (now - _lastPush < 80) return;
         _lastPush = now;
         try { history.pushState({ pwaGuard: true, d: ++_depth }, '', window.location.href); } catch (e2) { _depth--; }
     }
-    ['pointerdown', 'pointerup', 'keydown'].forEach(function (ev) { window.addEventListener(ev, topUp, { capture: true, passive: true }); });
+    ['pointerdown', 'pointerup', 'keydown', 'click', 'touchend'].forEach(function (ev) { window.addEventListener(ev, topUp, { capture: true, passive: true }); });
     window._sinBackDepth = function () { return _depth; };
 
     window.addEventListener('popstate', function () {
@@ -48545,8 +48545,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (handleBack()) return;
         var ov = document.getElementById('exitConfirmOverlay');
         if (ov && ov.classList.contains('show')) { hideExitConfirm(); return; }   // zpět zavře dotaz na ukončení
-        // Gesto zpět appku neukončuje (ani se neptá) — ukončit jde jen křížkem ✕. Jen se doplní ochranný záznam historie.
-        try { history.pushState({ pwaGuard: true, d: ++_depth }, '', window.location.href); } catch (e) { _depth--; }
+        // Gesto zpět na hlavní obrazovce nic nedělá a appku neukončuje (ukončit jde jen křížkem ✕).
+        // Ochranný záznam se doplní při dalším dotyku (záznam vložený bez dotyku by Chrome přeskočil).
     });
 
     // ── MutationObserver to hide/show PWA button ─────────────────
