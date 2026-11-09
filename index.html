@@ -2463,6 +2463,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                 <div style="font-size:0.75rem;margin-top:6px;" id="adminModeStatus">
                     <span style="color:#888;">Admin: <span id="adminModeLabel">Neaktivní</span></span>
                 </div>
+                <div style="font-size:0.72rem;color:#888;margin-top:8px;padding:8px 10px;background:rgba(0,0,0,0.25);border-radius:8px;">
+                    🔒 I admin heslo se teď ověřuje na serveru (api/admin-login) a nikde v appce ani v repozitáři nefiguruje. Změna hesla: Vercel → Project Settings → Environment Variables → <strong>ADMIN_HASH</strong> / <strong>ADMIN_HASH_2</strong>, poté projekt znovu nasadit.
+                </div>
             </div>
             <div class="settings-divider"></div>
             <div class="settings-section" id="adminUsersSectionBox" style="display:none;background:rgba(0,180,255,0.06);border:1px solid rgba(0,180,255,0.2);border-radius:12px;padding:14px 16px;">
@@ -50232,7 +50235,7 @@ window._prefillAndOpenAdd = prefillAndOpenAdd;
     for (var i = 0; i < apis.length; i++) {
       try {
         var ctl = new AbortController(), to = setTimeout(function() { ctl.abort(); }, 15000);
-        var r = await fetch(apis[i], { headers: { 'x-admin-hash': _ADMIN2_HASH }, signal: ctl.signal });
+        var r = await fetch(apis[i], { headers: { 'x-admin-hash': _adminHash2() }, signal: ctl.signal });
         clearTimeout(to);
         var j = await r.json().catch(function() { return null; });
         if (!j) { last = 'Neplatná odpověď serveru'; continue; }
@@ -50245,13 +50248,12 @@ window._prefillAndOpenAdd = prefillAndOpenAdd;
 })();
 
 // ---- ADMIN MODE ----
-const _ADMIN_HASH = '781813bb37eab22353b8a69c29a5cac43df0e1efb8b3a112d2528a3c3b59f4d2';
-// Admin level 2 (superadmin) — může mazat uživatele a odhlašovat admin level 1
-const _ADMIN2_HASH = '047a9a6cf044ed6a2881675f4ab69a8db3c3fb40dbbeb6d48af89ce6eca5d769';
-
-async function sha256(str) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+// Heslo (a hash pro x-admin-hash) se teď ověřuje na serveru přes /api/admin-login —
+// appka ho sama nikdy nezná a nikde v kódu nefiguruje. Hash pro level 2 (potřebný
+// pro x-admin-hash u api/vercel-usage apod.) appka dostane od serveru až po
+// úspěšném přihlášení a drží si ho jen v localStorage tohoto zařízení.
+function _adminHash2() {
+  try { return localStorage.getItem('sinator_admin_hash2') || ''; } catch (e) { return ''; }
 }
 
 window.toggleTestUserMode = function() {
@@ -50281,32 +50283,49 @@ window._isAdminLevel2 = function() {
 window.activateAdminMode = async function() {
   const pwd = document.getElementById('adminPwdInput')?.value || '';
   if (!pwd) return;
-  const hash = await sha256(pwd);
-  if (hash === _ADMIN2_HASH) {
-    localStorage.setItem('sinator_admin_mode', '1');
-    localStorage.setItem('sinator_admin_level', '2');
-    document.getElementById('adminPwdInput').value = '';
-    updateAdminStatus();
-    const badge = document.getElementById('onlineBadge');
-    if (badge) badge.style.display = 'block';
-    alert('✅ Admin level 2 aktivován.');
-  } else if (hash === _ADMIN_HASH) {
-    localStorage.setItem('sinator_admin_mode', '1');
-    localStorage.removeItem('sinator_admin_level');
-    document.getElementById('adminPwdInput').value = '';
-    updateAdminStatus();
-    // Zobrazit online badge
-    const badge = document.getElementById('onlineBadge');
-    if (badge) badge.style.display = 'block';
-    alert('✅ Admin režim aktivován.');
-  } else {
-    alert('❌ Nesprávné heslo.');
+  const btn = document.querySelector('button[onclick="activateAdminMode()"]');
+  if (btn) btn.disabled = true;
+  try {
+    const response = await fetch('/api/admin-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pwd })
+    });
+    const data = await response.json().catch(() => null);
+
+    if (data && data.success && data.level === 2) {
+      localStorage.setItem('sinator_admin_mode', '1');
+      localStorage.setItem('sinator_admin_level', '2');
+      try { localStorage.setItem('sinator_admin_hash2', data.adminHash2 || ''); } catch (e) {}
+      document.getElementById('adminPwdInput').value = '';
+      updateAdminStatus();
+      const badge = document.getElementById('onlineBadge');
+      if (badge) badge.style.display = 'block';
+      alert('✅ Admin level 2 aktivován.');
+    } else if (data && data.success) {
+      localStorage.setItem('sinator_admin_mode', '1');
+      localStorage.removeItem('sinator_admin_level');
+      try { localStorage.removeItem('sinator_admin_hash2'); } catch (e) {}
+      document.getElementById('adminPwdInput').value = '';
+      updateAdminStatus();
+      const badge = document.getElementById('onlineBadge');
+      if (badge) badge.style.display = 'block';
+      alert('✅ Admin režim aktivován.');
+    } else {
+      alert('❌ ' + ((data && data.error) || 'Nesprávné heslo.'));
+    }
+  } catch (e) {
+    console.error('[admin] Chyba při komunikaci s /api/admin-login:', e);
+    alert('⚠️ Server nedostupný, zkus to znovu.');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 };
 
 window.deactivateAdminMode = function() {
   localStorage.removeItem('sinator_admin_mode');
   localStorage.removeItem('sinator_admin_level');
+  try { localStorage.removeItem('sinator_admin_hash2'); } catch (e) {}
   localStorage.setItem('sinator_adult_content', 'false');
   adultContent = false;
   if (typeof updateAdultToggleUI === 'function') updateAdultToggleUI();
