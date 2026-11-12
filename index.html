@@ -7993,6 +7993,8 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // ============================================================
     const CHANGELOG_HISTORY = [
         { version: '2026-11-12a', date: '12. 11. 2026', items: [
+            { text: '🇨🇿 Tematické seznamy 3: tituly (hlavně ty importované z Histry) se zobrazují s českými názvy z TMDB místo anglických' },
+            { text: '🔧 Tematické seznamy 3: oprava chyby „Missing or insufficient permissions“ při ukládání sdíleného seznamu (🟣 Z Histry → 🌍 Sdílené) — když Firestore nepovolí kolekci tematických seznamů, uloží se sdílený seznam do povolené kolekce' },
             { text: '🗂️ Seznamy → nové „Tematické seznamy 3“: vlastní tematické seznamy (vidíš je jen ty, ukládají se v zařízení) a sdílené seznamy pro všechny uživatele (podobně jako Top tipy — upravovat je může jen autor a admin). Titul přidáš vyhledáním, a když je připojená Histra, jde z ní vytvořit tematický seznam z kteréhokoli tvého Histra seznamu (🟣 Z Histry)' },
             { text: '🎄 Nastavení → Vzhled → nový „Předdefinovaný vzhled“: 🎄 Vánoční tmavý, ❄️ Vánoční světlý a 🎨 Výchozí (tvůj vlastní vzhled z Téma a barvy / Vlastní vzhled zůstane beze změny a po návratu na Výchozí se zase použije)' },
             { admin: true, text: 'Nastavení → Propojení účtů: „Sinator backend“ se zobrazuje jen přihlášenému Adminu level 2' }
@@ -50156,18 +50158,33 @@ function renderDList() {
 }
 
 // ---- 🗂️ SDÍLENÉ TEMATICKÉ SEZNAMY 3 (kolekce „tematicke_seznamy“) ----
-window._tl3Fs = {
-  async list() {
-    const snap = await getDocs(query(collection(db, 'tematicke_seznamy'), orderBy('createdAt', 'desc')));
-    return snap.docs.map(d => { const x = d.data(); return { id: d.id, name: x.name || '', emoji: x.emoji || '🗂️', nickname: x.nickname || '', items: Array.isArray(x.items) ? x.items : [], createdAt: (x.createdAt && x.createdAt.toMillis) ? x.createdAt.toMillis() : 0 }; });
-  },
-  async create(o) {
-    const r = await addDoc(collection(db, 'tematicke_seznamy'), { name: o.name, emoji: o.emoji || '🗂️', nickname: o.nickname || '', items: o.items || [], createdAt: serverTimestamp() });
-    return r.id;
-  },
-  async update(id, patch) { await updateDoc(doc(db, 'tematicke_seznamy', id), patch); },
-  async remove(id) { await deleteDoc(doc(db, 'tematicke_seznamy', id)); }
-};
+window._tl3Fs = (function () {
+  // Primárně kolekce „tematicke_seznamy“. Pokud ji Firestore pravidla nepovolí (Missing or insufficient permissions),
+  // uloží se sdílené seznamy do kolekce „doporuceni“ (která pravidla povolují) jako dokumenty s type:'tl3list'.
+  const PRIMARY = 'tematicke_seznamy', FALLBACK = 'doporuceni', colOf = {};
+  const isPerm = e => !!e && (e.code === 'permission-denied' || /insufficient permissions|permission/i.test(String(e.message || e)));
+  const map = (d, col) => { const x = d.data(); colOf[d.id] = col; return { id: d.id, name: x.name || '', emoji: x.emoji || '🗂️', nickname: x.nickname || '', items: Array.isArray(x.items) ? x.items : [], createdAt: (x.createdAt && x.createdAt.toMillis) ? x.createdAt.toMillis() : 0 }; };
+  return {
+    async list() {
+      let out = [];
+      try { const snap = await getDocs(query(collection(db, PRIMARY), orderBy('createdAt', 'desc'))); out = snap.docs.map(d => map(d, PRIMARY)); } catch (e) { if (!isPerm(e)) throw e; }
+      try { const snap = await getDocs(query(collection(db, FALLBACK), orderBy('createdAt', 'desc'))); out = out.concat(snap.docs.filter(d => d.data().type === 'tl3list').map(d => map(d, FALLBACK))); }
+      catch (e) { if (!out.length) throw e; }
+      return out.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    },
+    async create(o) {
+      const base = { name: o.name, emoji: o.emoji || '🗂️', nickname: o.nickname || '', items: o.items || [], createdAt: serverTimestamp() };
+      try { const r = await addDoc(collection(db, PRIMARY), base); colOf[r.id] = PRIMARY; return r.id; }
+      catch (e) {
+        if (!isPerm(e)) throw e;
+        const r = await addDoc(collection(db, FALLBACK), Object.assign({ type: 'tl3list', tags: [], title: o.name }, base));
+        colOf[r.id] = FALLBACK; return r.id;
+      }
+    },
+    async update(id, patch) { await updateDoc(doc(db, colOf[id] || PRIMARY, id), patch); },
+    async remove(id) { await deleteDoc(doc(db, colOf[id] || PRIMARY, id)); }
+  };
+})();
 
 window._deleteDoporuceni = async function(docId) {
   if (!confirm('Smazat toto doporučení?')) return;
@@ -57736,7 +57753,7 @@ window.sfFrAuto=async function(id,t){
   function close() { var o = g('tl3Overlay'); if (o) o.style.display = 'none'; }
 
   // ── Názvy / plakáty (cache z TMDB) ──
-  function meta(it) { var m = jget(META, {})[it.type + ':' + it.id] || {}; return { t: it.t || m.t || '', y: it.y || m.y || '', p: it.p || m.p || '' }; }
+  function meta(it) { var m = jget(META, {})[it.type + ':' + it.id] || {}; return { t: m.t || it.t || '', y: it.y || m.y || '', p: it.p || m.p || '' }; }
   async function resolve(items) {
     var k = tkey(); if (!k) return;
     var m = jget(META, {}), need = items.filter(function (it) { var key = it.type + ':' + it.id; return !it.p && !(m[key] && m[key].p !== undefined) && !S.tried[key]; });
