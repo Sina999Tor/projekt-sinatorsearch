@@ -58258,17 +58258,20 @@ window.sfFrAuto=async function(id,t){
     var b = g('tl3Bg'), i = g('tl3Intro'), o = g('tl3Overlay');
     if (i) { i.style.display = 'none'; i.style.opacity = '0'; i.innerHTML = ''; }
     if (!spec) { if (b) { b.style.opacity = '0'; b.style.backgroundImage = 'none'; } if (o) o.classList.remove('tl3HasBg'); return; }
+    // hned zakrýt seznam černou clonou (ještě než se stihnou vykreslit filmy), plakát se doplní po načtení
+    if (i) { i.style.transition = 'none'; i.style.display = 'block'; i.style.opacity = '1'; i.innerHTML = ''; i.onclick = null; void i.offsetWidth; i.style.transition = 'opacity .5s'; }
+    function abort() { if (tok === S.bgTok && i) { i.style.display = 'none'; i.style.opacity = '0'; i.innerHTML = ''; } }
     var url = ''; try { url = await bgUrl(spec); } catch (e) {}
-    if (!url || tok !== S.bgTok) return;
+    if (!url) return abort();
+    if (tok !== S.bgTok) return;
     var im = new Image();
+    im.onerror = abort;
     im.onload = function () {
       if (tok !== S.bgTok) return;
       b.style.backgroundImage = 'linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.7)),url("' + url + '")'; b.style.opacity = '1'; o.classList.add('tl3HasBg');
       i.innerHTML = '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover;display:block;">';
-      i.style.display = 'block';
       function done() { clearTimeout(S.bgTimer); i.style.opacity = '0'; setTimeout(function () { if (tok === S.bgTok) { i.style.display = 'none'; i.innerHTML = ''; } }, 520); }
       i.onclick = done;
-      requestAnimationFrame(function () { requestAnimationFrame(function () { i.style.opacity = '1'; }); });
       S.bgTimer = setTimeout(done, BGMS);
     };
     im.src = url;
