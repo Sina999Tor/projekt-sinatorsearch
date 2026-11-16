@@ -29125,8 +29125,9 @@ function _hockeyRender() {
         h += '<select onchange="_splSet(\'league\',this.value)" style="' + selSt + (lgs.length ? '' : 'opacity:0.5;') + '"' + (lgs.length ? '' : ' disabled') + '>';
         h += '<option value="">🏆 Všechny ligy</option>';
         lgs.forEach(lg => { h += '<option value="' + esc(lg) + '"' + (st.league === lg ? ' selected' : '') + '>' + esc(lg) + ' (' + leagueCnt[lg] + ')</option>'; });
-        h += '</select></div><div style="display:flex;padding-bottom:6px;">';
+        h += '</select></div><div style="display:flex;gap:8px;align-items:stretch;padding-bottom:6px;">';
         h += '<button onclick="_splSet(\'live\')" style="flex-shrink:0;padding:7px 14px;border-radius:10px;border:1px solid ' + (st.live ? '#ef4444' : 'var(--border)') + ';background:' + (st.live ? 'rgba(239,68,68,0.2)' : 'var(--bg-elevated)') + ';color:' + (st.live ? '#fff' : '#bbb') + ';font-size:0.8rem;font-weight:' + (st.live ? 700 : 500) + ';cursor:pointer;white-space:nowrap;">' + (st.live ? '🔴 Jen živě — zapnuto' : '🔴 Jen živě') + '</button>';
+        h += '<button onclick="window.open(\'https://onhockey.tv/\', \'_blank\', \'noopener\')" title="OnHockey.tv" aria-label="OnHockey.tv" style="flex-shrink:0;padding:7px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:#fff;font-size:0.95rem;cursor:pointer;">🌐</button>';
         h += '</div>';
         fb.innerHTML = h;
     }
