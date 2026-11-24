@@ -2343,7 +2343,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             <div class="settings-divider"></div>
             <div class="settings-section">
                 <span class="settings-label">📺 TV aplikace a párování TV ⇄ mobil</span>
-                <div style="font-size:0.78rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">Stažení aplikace pro TV a spárování s mobilem (přenos dat kódem) najdeš v Nápovědě.</div>
+                <div style="font-size:0.78rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">Spárování s mobilem (přenos dat kódem) a návod k TV aplikaci najdeš v Nápovědě; stažení APK je také v Nastavení → Aplikace → Aplikace pro TV.</div>
                 <button class="settings-btn-small" onclick="openTvHelp()">📖 Otevřít v Nápovědě</button>
             </div>
             <template id="tvHelpPairTpl">
@@ -2473,7 +2473,6 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
             </div><!-- /swPageBackup -->
             <div class="settings-divider"></div>
             <div class="sw-page" id="swPageApps">
-            <template id="tvHelpAppTpl">
             <div class="settings-section" id="tvAppSection" style="background:rgba(56,189,248,0.07);border:1px solid rgba(56,189,248,0.3);border-radius:12px;padding:14px 16px;">
                 <span class="settings-label" style="color:#38bdf8;">📺 Aplikace pro TV (Android TV / Google TV)</span>
                 <div style="font-size:0.78rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.5;">Samostatná aplikace Sinator Search pro televizi s ovládáním dálkovým ovladačem (šipky, OK, Zpět). Stáhni instalační soubor (APK) a nainstaluj ho na TV. Nová verze se instaluje přes starou, data v aplikaci zůstanou.</div>
@@ -2489,7 +2488,6 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
                     3. Spusť <b>Sinator Search</b>. Nastavení z mobilu přeneseš přes <b>Spárovat</b> (kód).
                 </div>
             </div>
-            </template>
             <div class="settings-divider"></div>
             <div class="settings-section">
                 <span class="settings-label">▶️ Přehrávání v externí aplikaci</span>
@@ -8098,7 +8096,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         { version: '2026-11-24', date: '24. 11. 2026', items: [
             { text: '📡 Přehrát v externí aplikaci: nová položka „Web Video Caster“ (spustí aplikaci, název se zkopíruje do schránky; nemá-li ji, otevře se Google Play). Zapneš ji v Nastavení → Přehrávání v externí aplikaci. V bloku „📥 Kde stáhnout“ přibyl odkaz na Google Play a webvideocaster.com' },
             { text: '📺 TV: Vyhledat zdroje se teď otevře jako vlastní seznam webů přímo v TV obrazovce (dřív se klasické okno na TV nezobrazilo). Ovládá se šipkami a OK, Zpět zavře, na konci je Zkopírovat název' },
-            { text: '📖 Nápověda → nové téma „TV aplikace a párování TV ⇄ mobil“: stažení a instalace APK (Stáhnout / Zkopírovat odkaz) a Spárovat TV ⇄ mobil (kód, Přijmout / Odeslat data) se přesunuly z Nastavení sem, spolu s návody k ovládání TV a Vyhledat zdroje. V Nastavení → Profil zůstal odkaz do Nápovědy' }
+            { text: '📖 Nápověda → nové téma „TV aplikace a párování TV ⇄ mobil“: Spárovat TV ⇄ mobil (kód, Přijmout / Odeslat data) se přesunulo z Nastavení sem a stažení APK (Stáhnout / Zkopírovat odkaz) je tu navíc k Nastavení → Aplikace → Aplikace pro TV, spolu s návody k ovládání TV a Vyhledat zdroje. V Nastavení → Profil zůstal odkaz do Nápovědy' }
         ] },
         { version: '2026-11-23c', date: '23. 11. 2026', items: [
             { text: '📺 TV: Vyhledat zdroje a další akce z nabídek, které otevírají okno, se už nezavřou „doběhlým“ stiskem OK (klik se po akci krátce zahazuje); když se okno neotevře, ukáže se hláška' }
@@ -56052,10 +56050,9 @@ window.addEventListener('load', function() {
     var sec=root.querySelector('details.hp-sec[data-s="tvapp"]'); if(!sec) return;
     var box=document.createElement('div'); box.className='hp-live';
     var inTvApp=/SinatorTV/i.test(navigator.userAgent);
-    ['tvHelpAppTpl','tvHelpPairTpl'].forEach(function(id){
-      if(id==='tvHelpAppTpl' && inTvApp) return;
-      var t=document.getElementById(id); if(t && t.content) box.appendChild(t.content.cloneNode(true));
-    });
+    var ap=document.getElementById('tvAppSection');
+    if(ap && !inTvApp){ var c=ap.cloneNode(true); c.removeAttribute('id'); c.style.display=''; box.appendChild(c); }
+    var pt=document.getElementById('tvHelpPairTpl'); if(pt && pt.content) box.appendChild(pt.content.cloneNode(true));
     sec.appendChild(box);
   }
   window.openTvHelp=function(){
