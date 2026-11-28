@@ -4685,6 +4685,7 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         window.azxAttach = function(container) {
             azxDetach();
             if (!container) return;
+            window._azxContainer = container;
             const cards = [...container.querySelectorAll('.card, [data-az]')];
             if (cards.length < 8) return;
             const first = {};
@@ -8233,6 +8234,9 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
     // nepřibude další položka nahoru.
     // ============================================================
     const CHANGELOG_HISTORY = [
+        { version: '2026-11-28f', date: '28. 11. 2026', items: [
+            { text: '🔤 A–Z lišty (Filmy, Seriály, Minisérie, Anime, Kolekce, Oblíbené vč. herců, Shlédnuté, Sinator/Histra seznamy): po klepnutí na písmeno se dole objeví řádek s tímto písmenem, kam můžeš dopisovat další — A → AV → AVA → AVATAR — a seznam se zúží na tituly začínající na napsané. Jedno písmeno = jen skok na písmeno, ✕ zruší filtr' }
+        ] },
         { version: '2026-11-28e', date: '28. 11. 2026', items: [
             { text: '🗄️ Nová experimentální funkce: Vlastní databáze TMDB (Nastavení → Experimentální funkce). Stáhne katalog filmů a seriálů do paměti telefonu a procházení Filmů, Seriálů, Minisérií a Anime pak jde z paměti — rychleji a bez dotazů na TMDB (offline katalog). Jen v mobilní appce' },
             { text: '🔤 S databází funguje řazení A → Z nad celým katalogem: abecedně podle českého názvu, s lištou písmen (skok na písmeno je okamžitý) a vše načtené. Žánr, rok, země i řazení Populárita / Hodnocení / Nejnovější jdou nad databází také; podržení A → Z (počáteční písmena) taky' },
@@ -10335,6 +10339,173 @@ html body #accessReqNick { -webkit-user-select: text !important; user-select: te
         }
         state._loadingMore = true; more();
     };
+
+    // ══ Řádek „dopisování písmen“ pod A–Z lištou (všechny A–Z lišty v appce) ══
+    // Klepnu na písmeno v liště → dole se objeví řádek s tímto písmenem, kam můžu dopisovat další
+    // (A → AV → AVA → AVATAR) a seznam se zúží na tituly / jména začínající na napsané. 1 písmeno = jen skok.
+    (function() {
+        const CTX = { kind: null, letter: '', prefix: '', view: '' };
+        let row = null, input = null, chip = null, cnt = null, debT = null, watchT = null, moT = null, mo = null, touching = false;
+        const MAIN_VIEWS = ['movies', 'tv', 'miniseries', 'anime'];
+        const ITEM_SEL = '.card, [data-az], .coll-item';
+        const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+        const isMain = () => CTX.kind === 'main' || CTX.kind === 'maincoll';
+
+        function kindOf(a) {
+            const b = a.closest('#mainAzBar,#watchedAzBar,#collAzBar,.watched-az-bar');
+            if (!b) return null;
+            if (b.id === 'mainAzBar') return state.view === 'collections' ? 'maincoll' : (MAIN_VIEWS.indexOf(state.view) >= 0 ? 'main' : null);
+            if (b.id === 'collAzBar') return 'coll';
+            return b.id === 'watchedAzBar' ? 'watched' : 'azx';
+        }
+        function container() {
+            if (CTX.kind === 'watched') return $('modalScrollBody');
+            if (CTX.kind === 'coll') return $('collGrid');
+            if (CTX.kind === 'azx') return window._azxContainer || null;
+            return null;
+        }
+        function titleOf(el) {
+            const t = el.querySelector('.card-title, .coll-item-name');
+            return t ? t.textContent : (el.dataset.az || el.textContent || '');
+        }
+
+        // ── místní seznamy (Shlédnuté, Oblíbené vč. herců, Sinator/Histra seznamy, kolekce): filtr přímo v seznamu ──
+        function applyLocal() {
+            const c = container(); if (!c) return;
+            const p = CTX.prefix.trim().length >= 2 ? norm(CTX.prefix) : '';
+            let shown = 0;
+            const items = [...c.querySelectorAll(ITEM_SEL)].filter(el => !(el.parentElement && el.parentElement.closest(ITEM_SEL) && c.contains(el.parentElement.closest(ITEM_SEL))));
+            items.forEach(el => {
+                const ok = !p || norm(titleOf(el)).startsWith(p);
+                if (ok) { if (el.dataset.azpHid) { el.style.display = ''; delete el.dataset.azpHid; } shown++; }
+                else { el.style.display = 'none'; el.dataset.azpHid = '1'; }
+            });
+            // záhlaví písmen bez viditelných položek schovat
+            c.querySelectorAll('.watched-letter-anchor, .coll-letter-anchor').forEach(h => {
+                let vis = !p, n = h.nextElementSibling;
+                while (p && n && !n.matches('.watched-letter-anchor, .coll-letter-anchor')) { if (n.style.display !== 'none') { vis = true; break; } n = n.nextElementSibling; }
+                h.style.display = vis ? '' : 'none';
+            });
+            if (cnt) cnt.textContent = p ? (shown ? shown + '×' : 'nic') : '';
+        }
+        function observe() {
+            unobserve();
+            const c = container(); if (!c) return;
+            mo = new MutationObserver(() => { clearTimeout(moT); moT = setTimeout(applyLocal, 80); });
+            mo.observe(c, { childList: true, subtree: true });
+        }
+        function unobserve() { if (mo) { mo.disconnect(); mo = null; } }
+
+        // ── hlavní obrazovka (Filmy / Seriály / Minisérie / Anime / Kolekce): filtr nad celým katalogem ──
+        function applyMain() {
+            const p = CTX.prefix.trim();
+            if (p.length >= 2) {
+                if (CTX.kind === 'maincoll') {
+                    state.collPrefix = p.toLowerCase(); state.collSort = 'az'; state.collGenre = ''; state.collKw = ''; state.collKwLabel = ''; state.collCast = ''; state.collCastLabel = '';
+                    startCollectionsFeed();
+                } else startTitlePrefixFeed(p.toLowerCase());
+            } else restoreMain(true);
+        }
+        function restoreMain(jump) {
+            const L = CTX.letter;
+            if (CTX.kind === 'maincoll') {
+                if (!state.collPrefix) return;
+                state.collPrefix = '';
+                if (jump && L) collScrollToLetter(L); else { state.collSort = 'az'; startCollectionsFeed(); }
+                return;
+            }
+            if (!state._titlePrefix) return;
+            state._titleFeed = null; state._titlePrefix = '';
+            applyTabSort('original_title.asc');
+            if (jump && L) setTimeout(() => { try { scrollToMainLetter(L); } catch (e) {} }, 900);
+        }
+
+        function onType() {
+            CTX.prefix = input.value.replace(/[\u0000-\u001f]/g, '');
+            clearTimeout(debT);
+            if (isMain()) debT = setTimeout(applyMain, 380);
+            else {
+                debT = setTimeout(() => {
+                    applyLocal();
+                    if (CTX.prefix.trim().length < 2 && CTX.letter) { try { if (CTX.kind === 'coll') scrollToCollLetter(CTX.letter); else if (CTX.kind === 'watched') scrollToWatchedLetter(CTX.letter); } catch (e) {} }
+                }, 120);
+            }
+        }
+        function ensureRow() {
+            if (row) return;
+            row = document.createElement('div');
+            row.id = 'azPrefixRow';
+            row.style.cssText = 'position:fixed;left:8px;right:8px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:100010;display:none;align-items:center;gap:8px;padding:8px 10px;border-radius:14px;background:rgba(18,22,38,0.98);border:1px solid #1db954;box-shadow:0 4px 18px rgba(0,0,0,0.6);box-sizing:border-box;';
+            chip = document.createElement('div');
+            chip.style.cssText = 'min-width:30px;height:30px;border-radius:8px;background:#1db954;color:#000;font-weight:800;font-size:1.05rem;display:flex;align-items:center;justify-content:center;flex:0 0 auto;';
+            input = document.createElement('input');
+            input.type = 'text'; input.maxLength = 40; input.autocomplete = 'off'; input.spellcheck = false;
+            input.setAttribute('autocapitalize', 'characters'); input.setAttribute('enterkeyhint', 'search'); input.placeholder = 'dopisuj další písmena…';
+            input.style.cssText = 'flex:1;min-width:0;padding:8px 10px;border-radius:10px;border:1px solid var(--border,#2a3350);background:var(--bg-elevated,#1d2540);color:var(--text,#fff);font-size:1.1rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;-webkit-user-select:text;user-select:text;';
+            cnt = document.createElement('div');
+            cnt.style.cssText = 'font-size:0.8rem;opacity:0.75;min-width:30px;text-align:right;flex:0 0 auto;';
+            const x = document.createElement('button');
+            x.type = 'button'; x.textContent = '✕';
+            x.style.cssText = 'width:36px;height:36px;border-radius:10px;border:1px solid var(--border,#2a3350);background:transparent;color:var(--text,#fff);font-size:1rem;cursor:pointer;flex:0 0 auto;';
+            x.addEventListener('click', () => close(true));
+            input.addEventListener('input', onType);
+            input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(debT); if (isMain()) applyMain(); else applyLocal(); input.blur(); } });
+            row.appendChild(chip); row.appendChild(input); row.appendChild(cnt); row.appendChild(x);
+            document.body.appendChild(row);
+        }
+        function open(kind, letter, focus) {
+            ensureRow();
+            const sameCtx = CTX.kind === kind && (!isMain() || CTX.view === state.view);
+            if (!sameCtx && CTX.kind) { clearTimeout(debT); }
+            CTX.kind = kind; CTX.letter = letter; CTX.prefix = letter; CTX.view = state.view;
+            chip.textContent = letter; input.value = letter; cnt.textContent = '';
+            row.style.display = 'flex';
+            if (!isMain()) { observe(); applyLocal(); }
+            else unobserve();
+            if (focus) setTimeout(() => { try { input.focus(); const n = input.value.length; input.setSelectionRange(n, n); } catch (e) {} }, 60);
+            clearInterval(watchT); watchT = setInterval(watch, 700);
+        }
+        function close(reset) {
+            clearTimeout(debT); clearInterval(watchT); watchT = null;
+            if (CTX.kind) {
+                if (reset) { if (isMain()) { CTX.prefix = ''; restoreMain(false); } else { CTX.prefix = ''; applyLocal(); } }
+                else if (!isMain()) { CTX.prefix = ''; try { applyLocal(); } catch (e) {} }
+            }
+            unobserve();
+            CTX.kind = null;
+            if (row) { row.style.display = 'none'; try { input.blur(); } catch (e) {} }
+        }
+        // řádek se sám schová, když se seznam zavře / přepne
+        function watch() {
+            if (!CTX.kind) return;
+            if (isMain()) {
+                const mdl = $('modal');
+                const hasPrefix = CTX.kind === 'maincoll' ? !!state.collPrefix : !!state._titlePrefix;
+                const trg = $('mainAzTrigger');
+                const barUp = !!(trg && trg.style.display !== 'none');
+                const same = state.view === CTX.view;
+                if (!same) { close(false); return; }
+                row.style.display = ((mdl && mdl.classList.contains('open')) || !(barUp || hasPrefix || input === document.activeElement)) ? 'none' : 'flex';
+            } else {
+                const c = container();
+                if (!c || !c.isConnected || c.getClientRects().length === 0 || !c.querySelector(ITEM_SEL)) close(false);
+            }
+        }
+
+        // klepnutí na písmeno v kterékoli A–Z liště (capture = běží před skokem na písmeno)
+        document.addEventListener('touchstart', e => { if (e.target.closest && e.target.closest('.main-az-bar,.watched-az-bar,#collAzBar')) touching = true; }, { passive: true, capture: true });
+        ['touchend', 'touchcancel'].forEach(ev => document.addEventListener(ev, () => { touching = false; }, { passive: true, capture: true }));
+        document.addEventListener('click', e => {
+            const a = e.target.closest && e.target.closest('#mainAzBar a,#watchedAzBar a,#collAzBar a,.watched-az-bar a');
+            if (!a) return;
+            const L = (a.textContent || '').trim();
+            if (!/^[A-Z]$/.test(L)) return;   // ↑ ↓ # …
+            const kind = kindOf(a); if (!kind) return;
+            if (isMain() && CTX.kind === kind && state.view === CTX.view && (state._titlePrefix || state.collPrefix)) return;
+            open(kind, L, !touching);          // při tažení prstem po liště klávesnici neotvírat
+        }, true);
+        window.azPrefixRowClose = () => close(false);
+    })();
 
     window.renderReleaseTypeOptions = function() {
         const dd = $('tabSortDropdown');
